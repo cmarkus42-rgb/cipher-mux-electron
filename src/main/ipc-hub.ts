@@ -23,9 +23,14 @@ export class IpcHub {
   constructor(private windowManager: WindowManager) {
     this.tmux = new TmuxManager()
     this.sessionManager = new SessionManager(this.tmux)
-    this.messageBus = new MessageBus({
-      dbPath: path.join(app.getPath('userData'), 'messages.db'),
-    })
+    try {
+      this.messageBus = new MessageBus({
+        dbPath: path.join(app.getPath('userData'), 'messages.db'),
+      })
+    } catch (err) {
+      console.error('[IpcHub] MessageBus init failed (native module mismatch?):', err)
+      this.messageBus = null as any
+    }
     this.projectScanner = new ProjectScanner()
   }
 
@@ -39,8 +44,20 @@ export class IpcHub {
     this.registerBugreportChannels()
     this.setupEventForwarding()
 
+    // Connect tmux control mode
+    this.tmux.connect().catch((err) => {
+      console.error('[IpcHub] tmux connect failed:', err)
+    })
+
+    // Recover orphaned sessions
+    this.sessionManager.recover().catch((err) => {
+      console.error('[IpcHub] session recovery failed:', err)
+    })
+
     // Initial cleanup
-    this.messageBus.cleanup()
+    if (this.messageBus) {
+      this.messageBus.cleanup()
+    }
   }
 
   getTmuxManager(): TmuxManager {
@@ -65,9 +82,11 @@ export class IpcHub {
       this.windowManager.sendToMainWindow(IPC.TERMINAL_DATA, { paneId, data })
     })
 
-    this.messageBus.on('message', (msg) => {
-      this.windowManager.sendToMainWindow(IPC.MESSAGE_RECEIVED, msg)
-    })
+    if (this.messageBus) {
+      this.messageBus.on('message', (msg) => {
+        this.windowManager.sendToMainWindow(IPC.MESSAGE_RECEIVED, msg)
+      })
+    }
   }
 
   // ─── Sessions ──────────────────────────────────────────
@@ -120,10 +139,12 @@ export class IpcHub {
   // ─── Messages ──────────────────────────────────────────
   private registerMessageChannels(): void {
     ipcMain.handle(IPC.MESSAGES_SEND, async (_e, msg: SendMessage) => {
+      if (!this.messageBus) return { error: 'MessageBus not available' }
       return this.messageBus.send(msg)
     })
 
     ipcMain.handle(IPC.MESSAGES_LIST, async (_e, opts?: { topic?: Topic; limit?: number; before?: number }) => {
+      if (!this.messageBus) return []
       if (opts?.topic) {
         return this.messageBus.getByTopic(opts.topic, opts.limit, opts.before)
       }
@@ -131,10 +152,12 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.MESSAGES_UNREAD, async () => {
+      if (!this.messageBus) return 0
       return this.messageBus.unreadCount('renderer')
     })
 
     ipcMain.handle(IPC.MESSAGES_MARK_READ, async (_e, { messageIds }: { messageIds: string[] }) => {
+      if (!this.messageBus) return { ok: false }
       this.messageBus.markRead(messageIds, 'renderer')
       return { ok: true }
     })
@@ -147,7 +170,8 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.PROJECTS_SCAN, async () => {
-      const scanPaths = configStore.get('app').scanPaths
+      const appConfig = configStore.get('app')
+      const scanPaths = appConfig?.scanPaths ?? []
       this.cachedProjects = await this.projectScanner.scan(scanPaths)
       return this.cachedProjects
     })
@@ -198,7 +222,7 @@ export class IpcHub {
 
   async destroy(): Promise<void> {
     this.projectScanner.stopWatch()
-    this.messageBus.destroy()
+    if (this.messageBus) this.messageBus.destroy()
     await this.sessionManager.destroy()
   }
 }

@@ -101,11 +101,12 @@
 }
 
 .activity-rail__item {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 18px;
   cursor: pointer;
   color: var(--color-text-dim);
   border: 1px solid transparent;
@@ -229,6 +230,7 @@
 /* ── Content Viewport (terminals live here) ── */
 .content-viewport {
   flex: 1;
+  min-height: 0; /* allow flex shrink — critical for xterm.js fit */
   position: relative;
   overflow: hidden;
 }

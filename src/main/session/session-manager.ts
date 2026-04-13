@@ -50,6 +50,10 @@ export class SessionManager extends EventEmitter {
     }
 
     this.sessions.set(id, session)
+
+    // Start output watcher — emits terminal data with session ULID as ID
+    this.tmux.watchSession(tmuxName, id)
+
     this.emit('session-changed', session)
     return session
   }
@@ -62,6 +66,9 @@ export class SessionManager extends EventEmitter {
     if (!session) {
       throw new Error(`Session ${sessionId} not found`)
     }
+
+    // Stop output watcher before killing session
+    this.tmux.unwatchSession(session.tmuxSession)
 
     try {
       await this.tmux.killSession(session.tmuxSession)

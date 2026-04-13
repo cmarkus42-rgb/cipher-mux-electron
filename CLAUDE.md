@@ -14,7 +14,7 @@ Phasen-Übersicht:
 5. **Autonome Implementierung (Autonom) → Code** ← aktuell
 6. Review, Test & Iteration (Touchpoint) → Feedback-Loop
 
-**Nächster Schritt:** `/implement` fortsetzen — Phase 1 + 2 (Core) + 3.1 + 4.1 done. Nächste: Terminal-UI (2.5), Chatroom (3.4), Cockpit (4.3).
+**Nächster Schritt:** `/implement` fortsetzen — Phase 1-4 Kern done (Sessions, Terminal, Chatroom, Cockpit). Nächste: MCP-Server (3.2), Unread-Badges (3.5), StatusLineMonitor (4.4).
 
 ## Build & Test
 

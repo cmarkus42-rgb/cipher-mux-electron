@@ -432,3 +432,57 @@
   color: var(--color-text-dim);
   max-width: 360px;
 }
+
+/* ================================================================
+   Chat Message
+   ================================================================ */
+
+.chat-message {
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.chat-message:last-child {
+  border-bottom: none;
+}
+
+.chat-message__header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  margin-bottom: 2px;
+}
+
+.chat-message__sender {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-accent);
+}
+
+.chat-message__time {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+  margin-left: auto;
+}
+
+.chat-message__text {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* System messages — muted, italic-ish */
+.chat-message--system .chat-message__sender {
+  color: var(--color-text-dim);
+}
+
+.chat-message--system .chat-message__text {
+  color: var(--color-text-dim);
+  font-style: italic;
+}

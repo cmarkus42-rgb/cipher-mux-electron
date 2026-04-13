@@ -37,6 +37,7 @@ export class TmuxManager extends EventEmitter {
     reject: (err: Error) => void
     buffer: string[]
   }> = new Map()
+  private outputWatchers: Map<string, { process: ChildProcess; parser: TmuxParser }> = new Map()
 
   constructor() {
     super()
@@ -120,7 +121,60 @@ export class TmuxManager extends EventEmitter {
     })
   }
 
+  /**
+   * Watch a tmux session's output by attaching a read-only control mode client.
+   * Output events are emitted with `emitId` (the session ULID) as paneId,
+   * so the renderer can match them to the correct terminal.
+   */
+  watchSession(sessionName: string, emitId: string): void {
+    if (this.outputWatchers.has(sessionName)) return
+
+    const proc = spawn('tmux', ['-C', 'attach-session', '-t', sessionName, '-r'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, TERM: 'xterm-256color' },
+    })
+
+    const sessionParser = new TmuxParser()
+    sessionParser.onEvent((event: TmuxEvent) => {
+      if (event.type === 'output') {
+        // Remap tmux pane ID → session ULID for renderer matching
+        this.batcher.push(emitId, event.data)
+      }
+    })
+
+    proc.stdout?.on('data', (chunk: Buffer) => {
+      sessionParser.feed(chunk.toString('utf-8'))
+    })
+
+    proc.stderr?.on('data', (chunk: Buffer) => {
+      console.error(`[TmuxManager] watcher stderr (${sessionName}):`, chunk.toString('utf-8').trim())
+    })
+
+    proc.on('exit', () => {
+      this.outputWatchers.delete(sessionName)
+    })
+
+    this.outputWatchers.set(sessionName, { process: proc, parser: sessionParser })
+  }
+
+  /**
+   * Stop watching a session's output.
+   */
+  unwatchSession(sessionName: string): void {
+    const watcher = this.outputWatchers.get(sessionName)
+    if (watcher) {
+      watcher.process.kill()
+      this.outputWatchers.delete(sessionName)
+    }
+  }
+
   disconnect(): void {
+    // Kill all output watchers
+    for (const [name, watcher] of this.outputWatchers) {
+      watcher.process.kill()
+    }
+    this.outputWatchers.clear()
+
     this.batcher.destroy()
     if (this.controlProcess) {
       this.controlProcess.kill()
@@ -225,7 +279,7 @@ export class TmuxManager extends EventEmitter {
    * Send keystrokes to a tmux pane.
    */
   async sendKeys(target: string, keys: string): Promise<void> {
-    await runCommand('tmux', ['send-keys', '-t', target, keys])
+    await runCommand('tmux', ['send-keys', '-l', '-t', target, keys])
   }
 
   /**

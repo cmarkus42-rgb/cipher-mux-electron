@@ -4,6 +4,7 @@ import { useSessions } from './hooks/useSessions'
 import { ActivityRail } from './components/ActivityRail'
 import { CockpitView } from './components/CockpitView'
 import { TerminalPane } from './components/TerminalPane'
+import { ChatroomPanel } from './components/ChatroomPanel'
 
 export function App() {
   const [activeView, setActiveView] = useState<ActiveView>('cockpit')
@@ -29,12 +30,16 @@ export function App() {
   }, [])
 
   const handleStartSession = useCallback(async (project: ProjectInfo) => {
-    const session = await startSession({
-      name: project.name,
-      projectPath: project.path,
-    })
-    setActiveSessionId(session.id)
-    setActiveView('terminal')
+    try {
+      const session = await startSession({
+        name: project.name,
+        projectPath: project.path,
+      })
+      setActiveSessionId(session.id)
+      setActiveView('terminal')
+    } catch (err) {
+      console.error('[App] Failed to start session:', err)
+    }
   }, [startSession])
 
   const activeSession = activeSessionId
@@ -90,19 +95,7 @@ export function App() {
         </main>
 
         {/* Chatroom Panel */}
-        <aside class={`chatroom-panel ${chatroomVisible ? 'chatroom-panel--open' : ''}`}>
-          <div class="chatroom-panel__header">
-            <span>Chatroom</span>
-          </div>
-          <div class="chatroom-panel__messages">
-            <div class="empty-state">
-              <div class="empty-state__text">No messages yet</div>
-            </div>
-          </div>
-          <div class="chatroom-panel__input">
-            <input type="text" placeholder="Message..." disabled />
-          </div>
-        </aside>
+        <ChatroomPanel visible={chatroomVisible} />
       </div>
 
       {/* Status Bar */}
