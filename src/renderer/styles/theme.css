@@ -1,0 +1,374 @@
+/*
+ * theme.css — cipher-mux-electron "Cipher Ivory" Design System
+ *
+ * Merged from cipher-mux v1 + cipher-desktop-electron.
+ * Dark theme primary. Muted neon accents. Cut-corner geometry.
+ * Rajdhani headings, Fira Code mono. CALM aesthetic.
+ */
+
+/* ================================================================
+   Font Faces
+   ================================================================ */
+
+@font-face {
+  font-family: 'Rajdhani';
+  src: url('../fonts/Rajdhani-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Fira Code';
+  src: url('../fonts/FiraCode-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Fira Code';
+  src: url('../fonts/FiraCode-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+
+/* ================================================================
+   Design Tokens — Dark Theme (Default)
+   ================================================================ */
+
+:root {
+  /* ── Surfaces ── */
+  --color-bg:             #2A2A32;
+  --color-bg-elevated:    #33333C;
+  --color-bg-sunken:      #222228;
+  --color-bg-overlay:     rgba(22, 22, 26, 0.85);
+
+  /* ── Borders ── */
+  --color-border:         #3E3E4A;
+  --color-border-light:   #4A4A58;
+  --color-border-focus:   #5C9A6E;
+
+  /* ── Text ── */
+  --color-text:           #D8D8E0;
+  --color-text-secondary: #A0A0B0;
+  --color-text-dim:       #6E6E80;
+  --color-text-accent:    #8CC8A0;
+
+  /* ── Accents — muted neon, not eye-burning ── */
+  --color-neon-green:     #5C9A6E;
+  --color-neon-red:       #B85060;
+  --color-neon-orange:    #C07840;
+  --color-neon-cyan:      #5090A8;
+
+  /* ── Semantic ── */
+  --color-accent:         #5C9A6E;
+  --color-accent-soft:    rgba(92, 154, 110, 0.10);
+  --color-success:        #5C9A6E;
+  --color-error:          #B85060;
+  --color-warning:        #C07840;
+  --color-info:           #5090A8;
+
+  /* ── Typography ── */
+  --font-heading:         'Rajdhani', 'Teko', 'Orbitron', system-ui, sans-serif;
+  --font-sans:            'Rajdhani', system-ui, sans-serif;
+  --font-mono:            'Fira Code', 'Roboto Mono', 'SF Mono', Menlo, monospace;
+
+  /* ── Font Sizes ── */
+  --font-size-xs:         10px;
+  --font-size-sm:         11px;
+  --font-size-base:       13px;
+  --font-size-md:         14px;
+  --font-size-lg:         16px;
+  --font-size-xl:         20px;
+
+  /* ── Geometry — cut corners, no rounding ── */
+  --radius-sm:            0;
+  --radius-md:            0;
+  --radius-lg:            0;
+  --cut-corner:           8px;
+  --cut-corner-lg:        14px;
+
+  /* ── Spacing ── */
+  --space-xs:             4px;
+  --space-sm:             8px;
+  --space-md:             12px;
+  --space-lg:             16px;
+  --space-xl:             24px;
+  --space-2xl:            32px;
+
+  /* ── Shadows ── */
+  --shadow-sm:            0 1px 2px rgba(0, 0, 0, 0.20), 0 2px 6px rgba(0, 0, 0, 0.16);
+  --shadow-md:            0 2px 4px rgba(0, 0, 0, 0.24), 0 4px 16px rgba(0, 0, 0, 0.20);
+  --shadow-lg:            0 4px 8px rgba(0, 0, 0, 0.28), 0 8px 32px rgba(0, 0, 0, 0.24);
+  --shadow-inset:         inset 0 1px 4px rgba(0, 0, 0, 0.16), inset 0 0 1px rgba(0, 0, 0, 0.08);
+
+  /* ── Transitions ── */
+  --transition-fast:      0.1s ease;
+  --transition-base:      0.15s ease;
+  --transition-slow:      0.3s ease;
+
+  /* ── Z-Index Scale ── */
+  --z-base:               1;
+  --z-dropdown:           100;
+  --z-sticky:             200;
+  --z-overlay:            500;
+  --z-modal:              1000;
+  --z-toast:              2000;
+  --z-scanline:           9999;
+}
+
+/* ================================================================
+   Base Reset
+   ================================================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  height: 100%;
+}
+
+/* ================================================================
+   Scrollbar — Square, Minimal
+   ================================================================ */
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-light);
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-dim);
+}
+
+/* ================================================================
+   Typography
+   ================================================================ */
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+h1 { font-size: var(--font-size-xl); }
+h2 { font-size: var(--font-size-lg); }
+h3 { font-size: var(--font-size-md); }
+
+a {
+  color: var(--color-text-accent);
+  text-decoration: none;
+  transition: color var(--transition-base);
+}
+
+a:hover {
+  color: var(--color-neon-green);
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--color-bg-sunken);
+  padding: 0.15em 0.4em;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-accent);
+}
+
+pre {
+  background: var(--color-bg-sunken);
+  border: 1px solid var(--color-border);
+  padding: 1em;
+  overflow-x: auto;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+  border: none;
+}
+
+/* ================================================================
+   Selection
+   ================================================================ */
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+/* ================================================================
+   Scan-Line Overlay — Subtle CRT Effect
+   ================================================================ */
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: var(--z-scanline);
+}
+
+/* ================================================================
+   Cut Corner Clip Paths
+   ================================================================ */
+
+.cut-corners {
+  clip-path: polygon(
+    var(--cut-corner) 0%, 100% 0%,
+    100% calc(100% - var(--cut-corner)),
+    calc(100% - var(--cut-corner)) 100%,
+    0% 100%, 0% var(--cut-corner)
+  );
+}
+
+.cut-corners-lg {
+  clip-path: polygon(
+    var(--cut-corner-lg) 0%, 100% 0%,
+    100% calc(100% - var(--cut-corner-lg)),
+    calc(100% - var(--cut-corner-lg)) 100%,
+    0% 100%, 0% var(--cut-corner-lg)
+  );
+}
+
+/* ================================================================
+   Wire Divider — Exposed Wiring Aesthetic
+   ================================================================ */
+
+.wire-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-neon-green), transparent);
+  opacity: 0.3;
+  animation: wire-pulse 3s ease-in-out infinite;
+}
+
+.wire-divider--red {
+  background: linear-gradient(90deg, transparent, var(--color-neon-red), transparent);
+}
+
+.wire-divider--orange {
+  background: linear-gradient(90deg, transparent, var(--color-neon-orange), transparent);
+}
+
+@keyframes wire-pulse {
+  0%, 100% { opacity: 0.15; }
+  50%      { opacity: 0.4; }
+}
+
+/* ================================================================
+   Neon Status Dot
+   ================================================================ */
+
+.neon-dot {
+  width: 7px;
+  height: 7px;
+  display: inline-block;
+  flex-shrink: 0;
+  transition: background var(--transition-slow), box-shadow var(--transition-slow);
+}
+
+.neon-dot--ok {
+  background: var(--color-neon-green);
+  box-shadow: 0 0 4px rgba(92, 154, 110, 0.4);
+}
+
+.neon-dot--warn {
+  background: var(--color-neon-orange);
+  box-shadow: 0 0 4px rgba(192, 120, 64, 0.4);
+}
+
+.neon-dot--error {
+  background: var(--color-neon-red);
+  box-shadow: 0 0 4px rgba(184, 80, 96, 0.4);
+}
+
+.neon-dot--info {
+  background: var(--color-neon-cyan);
+  box-shadow: 0 0 4px rgba(80, 144, 168, 0.4);
+}
+
+.neon-dot--dim {
+  background: var(--color-text-dim);
+  box-shadow: none;
+}
+
+@keyframes neon-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+
+/* ================================================================
+   Utility Classes
+   ================================================================ */
+
+/* ── Display ── */
+.hidden        { display: none !important; }
+.flex          { display: flex; }
+.flex-col      { flex-direction: column; }
+.flex-1        { flex: 1; }
+.items-center  { align-items: center; }
+.justify-center { justify-content: center; }
+.gap-xs        { gap: var(--space-xs); }
+.gap-sm        { gap: var(--space-sm); }
+.gap-md        { gap: var(--space-md); }
+.gap-lg        { gap: var(--space-lg); }
+
+/* ── Text ── */
+.text-xs       { font-size: var(--font-size-xs); }
+.text-sm       { font-size: var(--font-size-sm); }
+.text-base     { font-size: var(--font-size-base); }
+.text-dim      { color: var(--color-text-dim); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-accent   { color: var(--color-text-accent); }
+.text-upper    { text-transform: uppercase; letter-spacing: 0.06em; }
+.font-heading  { font-family: var(--font-heading); font-weight: 700; }
+.font-mono     { font-family: var(--font-mono); }
+.truncate      { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Spacing ── */
+.p-sm          { padding: var(--space-sm); }
+.p-md          { padding: var(--space-md); }
+.p-lg          { padding: var(--space-lg); }
+.px-lg         { padding-left: var(--space-lg); padding-right: var(--space-lg); }
+.py-sm         { padding-top: var(--space-sm); padding-bottom: var(--space-sm); }
+
+/* ── Borders ── */
+.border        { border: 1px solid var(--color-border); }
+.border-b      { border-bottom: 1px solid var(--color-border); }
+.border-t      { border-top: 1px solid var(--color-border); }
+
+/* ── User Select ── */
+.select-none   { user-select: none; }
+.select-text   { user-select: text; }
