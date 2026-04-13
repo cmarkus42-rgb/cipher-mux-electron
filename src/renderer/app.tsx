@@ -1,13 +1,47 @@
 import { useState, useCallback } from 'preact/hooks'
-import type { ActiveView } from '../shared/types'
+import type { ActiveView, ProjectInfo } from '../shared/types'
+import { useSessions } from './hooks/useSessions'
+import { ActivityRail } from './components/ActivityRail'
+import { CockpitView } from './components/CockpitView'
+import { TerminalPane } from './components/TerminalPane'
 
 export function App() {
   const [activeView, setActiveView] = useState<ActiveView>('cockpit')
   const [chatroomVisible, setChatroomVisible] = useState(false)
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+
+  const { sessions, startSession, stopSession } = useSessions()
 
   const toggleChatroom = useCallback(() => {
     setChatroomVisible((v) => !v)
   }, [])
+
+  const handleViewChange = useCallback((view: ActiveView) => {
+    setActiveView(view)
+    if (view !== 'terminal') {
+      setActiveSessionId(null)
+    }
+  }, [])
+
+  const handleSessionSelect = useCallback((sessionId: string) => {
+    setActiveSessionId(sessionId)
+    setActiveView('terminal')
+  }, [])
+
+  const handleStartSession = useCallback(async (project: ProjectInfo) => {
+    const session = await startSession({
+      name: project.name,
+      projectPath: project.path,
+    })
+    setActiveSessionId(session.id)
+    setActiveView('terminal')
+  }, [startSession])
+
+  const activeSession = activeSessionId
+    ? sessions.find((s) => s.id === activeSessionId)
+    : null
+
+  const activeSessions = sessions.filter((s) => s.status === 'active')
 
   return (
     <div class="app-shell">
@@ -20,29 +54,38 @@ export function App() {
       {/* ── Body: Rail + Content + Chatroom ── */}
       <div class="app-body">
         {/* Activity Rail */}
-        <nav class="activity-rail">
-          <RailItem
-            icon="◉"
-            label="Cockpit"
-            active={activeView === 'cockpit'}
-            onClick={() => setActiveView('cockpit')}
-          />
-          <div class="activity-rail__spacer" />
-          <RailItem
-            icon="💬"
-            label="Chat"
-            active={chatroomVisible}
-            onClick={toggleChatroom}
-          />
-          <RailItem icon="ℹ" label="Info" active={activeView === 'info'} onClick={() => setActiveView('info')} />
-        </nav>
+        <ActivityRail
+          activeView={activeView}
+          sessions={sessions}
+          chatroomVisible={chatroomVisible}
+          activeSessionId={activeSessionId}
+          onViewChange={handleViewChange}
+          onToggleChatroom={toggleChatroom}
+          onSessionSelect={handleSessionSelect}
+        />
 
         {/* Main Content */}
         <main class="main-content">
           <div class="content-viewport">
-            {activeView === 'cockpit' && <CockpitPlaceholder />}
-            {activeView === 'terminal' && <TerminalPlaceholder />}
-            {activeView === 'info' && <InfoPlaceholder />}
+            {activeView === 'cockpit' && (
+              <CockpitView
+                sessions={sessions}
+                onStartSession={handleStartSession}
+              />
+            )}
+            {activeView === 'terminal' && activeSession && (
+              <TerminalPane
+                sessionId={activeSession.id}
+                sessionName={activeSession.name}
+              />
+            )}
+            {activeView === 'terminal' && !activeSession && (
+              <div class="empty-state">
+                <div class="empty-state__title">Terminal</div>
+                <div class="empty-state__text">No active session. Start a session from the Cockpit.</div>
+              </div>
+            )}
+            {activeView === 'info' && <InfoView />}
           </div>
         </main>
 
@@ -65,8 +108,8 @@ export function App() {
       {/* Status Bar */}
       <div class="status-bar">
         <div class="status-bar__segment">
-          <span class="neon-dot neon-dot--ok" />
-          <span>0 sessions</span>
+          <span class={`neon-dot ${activeSessions.length > 0 ? 'neon-dot--ok' : 'neon-dot--dim'}`} />
+          <span>{activeSessions.length} session{activeSessions.length !== 1 ? 's' : ''}</span>
         </div>
         <div class="status-bar__spacer" />
         <div class="status-bar__segment">
@@ -77,52 +120,7 @@ export function App() {
   )
 }
 
-// ─── Placeholder Components ──────────────────────────────
-
-function RailItem({
-  icon,
-  label,
-  active,
-  onClick,
-}: {
-  icon: string
-  label: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <div
-      class={`activity-rail__item ${active ? 'activity-rail__item--active' : ''}`}
-      onClick={onClick}
-      title={label}
-    >
-      {icon}
-    </div>
-  )
-}
-
-function CockpitPlaceholder() {
-  return (
-    <div class="empty-state">
-      <div class="empty-state__title">Cockpit</div>
-      <div class="empty-state__text">
-        No projects found. Configure scan paths or use Cmd+N to kick off a new project.
-      </div>
-      <button class="btn btn--primary">Scan Projects</button>
-    </div>
-  )
-}
-
-function TerminalPlaceholder() {
-  return (
-    <div class="empty-state">
-      <div class="empty-state__title">Terminal</div>
-      <div class="empty-state__text">No active session. Start a session from the Cockpit.</div>
-    </div>
-  )
-}
-
-function InfoPlaceholder() {
+function InfoView() {
   return (
     <div class="empty-state">
       <div class="empty-state__title">Info</div>
