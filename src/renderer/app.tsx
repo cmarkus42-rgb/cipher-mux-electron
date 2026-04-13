@@ -7,6 +7,7 @@ import { ActivityRail } from './components/ActivityRail'
 import { CockpitView } from './components/CockpitView'
 import { TerminalPane } from './components/TerminalPane'
 import { ChatroomPanel } from './components/ChatroomPanel'
+import { StatusBar } from './components/StatusBar'
 
 export function App() {
   const [activeView, setActiveView] = useState<ActiveView>('cockpit')
@@ -106,16 +107,7 @@ export function App() {
       </div>
 
       {/* Status Bar */}
-      <div class="status-bar">
-        <div class="status-bar__segment">
-          <span class={`neon-dot ${activeSessions.length > 0 ? 'neon-dot--ok' : 'neon-dot--dim'}`} />
-          <span>{activeSessions.length} session{activeSessions.length !== 1 ? 's' : ''}</span>
-        </div>
-        <div class="status-bar__spacer" />
-        <div class="status-bar__segment">
-          <span>MCP: offline</span>
-        </div>
-      </div>
+      <StatusBar sessions={sessions} />
     </div>
   )
 }
