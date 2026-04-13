@@ -2,6 +2,7 @@ import { useState, useCallback } from 'preact/hooks'
 import type { ActiveView, ProjectInfo } from '../shared/types'
 import { useSessions } from './hooks/useSessions'
 import { useMessages } from './hooks/useMessages'
+import { useContextUsage } from './hooks/useContextUsage'
 import { ActivityRail } from './components/ActivityRail'
 import { CockpitView } from './components/CockpitView'
 import { TerminalPane } from './components/TerminalPane'
@@ -14,6 +15,7 @@ export function App() {
 
   const { sessions, startSession, stopSession } = useSessions()
   const { unreadCount } = useMessages()
+  const contextUsages = useContextUsage()
 
   const toggleChatroom = useCallback(() => {
     setChatroomVisible((v) => !v)
@@ -78,6 +80,7 @@ export function App() {
             {activeView === 'cockpit' && (
               <CockpitView
                 sessions={sessions}
+                contextUsages={contextUsages}
                 onStartSession={handleStartSession}
               />
             )}
@@ -85,6 +88,7 @@ export function App() {
               <TerminalPane
                 sessionId={activeSession.id}
                 sessionName={activeSession.name}
+                contextUsage={contextUsages[activeSession.id]?.usedPercentage}
               />
             )}
             {activeView === 'terminal' && !activeSession && (

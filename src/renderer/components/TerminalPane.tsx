@@ -5,9 +5,10 @@ import { PaneHeader } from './PaneHeader'
 interface TerminalPaneProps {
   sessionId: string
   sessionName?: string
+  contextUsage?: number
 }
 
-export function TerminalPane({ sessionId, sessionName }: TerminalPaneProps) {
+export function TerminalPane({ sessionId, sessionName, contextUsage }: TerminalPaneProps) {
   const { terminalRef, fit } = useTerminal(sessionId)
 
   const handleResize = useCallback(() => {
@@ -28,7 +29,7 @@ export function TerminalPane({ sessionId, sessionName }: TerminalPaneProps) {
         overflow: 'hidden',
       }}
     >
-      <PaneHeader sessionName={sessionName ?? sessionId} />
+      <PaneHeader sessionName={sessionName ?? sessionId} contextUsage={contextUsage} />
       <div
         ref={terminalRef}
         style={{

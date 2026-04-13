@@ -1,6 +1,12 @@
 interface PaneHeaderProps {
   sessionName: string
-  contextUsage?: number // 0–100 percentage, placeholder
+  contextUsage?: number // 0–100 percentage
+}
+
+function contextColorClass(pct: number): string {
+  if (pct > 80) return 'text-ctx-error'
+  if (pct >= 60) return 'text-ctx-warn'
+  return 'text-accent'
 }
 
 export function PaneHeader({ sessionName, contextUsage }: PaneHeaderProps) {
@@ -16,7 +22,9 @@ export function PaneHeader({ sessionName, contextUsage }: PaneHeaderProps) {
           class="tab-bar__tab"
           style={{ cursor: 'default', borderRight: 'none' }}
         >
-          <span class="text-dim text-xs">CTX {contextUsage}%</span>
+          <span class={`text-xs ${contextColorClass(contextUsage)}`}>
+            CTX {contextUsage}%
+          </span>
         </div>
       )}
     </div>

@@ -3,10 +3,17 @@ import type { ProjectInfo, SessionInfo } from '../../shared/types'
 interface ProjectCardProps {
   project: ProjectInfo
   session?: SessionInfo
+  contextUsage?: number
   onStartSession: (project: ProjectInfo) => void
 }
 
-export function ProjectCard({ project, session, onStartSession }: ProjectCardProps) {
+function contextColorClass(pct: number): string {
+  if (pct > 80) return 'text-ctx-error'
+  if (pct >= 60) return 'text-ctx-warn'
+  return 'text-accent'
+}
+
+export function ProjectCard({ project, session, contextUsage, onStartSession }: ProjectCardProps) {
   const isActive = session != null && session.status === 'active'
 
   return (
@@ -24,7 +31,7 @@ export function ProjectCard({ project, session, onStartSession }: ProjectCardPro
             </span>
             {project.gitDirty && (
               <span class="badge badge--warn" style={{ marginLeft: '6px' }}>
-                dirty
+                uncommitted
               </span>
             )}
           </div>
@@ -50,6 +57,11 @@ export function ProjectCard({ project, session, onStartSession }: ProjectCardPro
           {project.path}
         </span>
 
+        {isActive && contextUsage != null && (
+          <span class={`font-mono text-xs ${contextColorClass(contextUsage)}`}>
+            CTX {contextUsage}%
+          </span>
+        )}
         {isActive ? (
           <span class="badge badge--ok">Active</span>
         ) : (

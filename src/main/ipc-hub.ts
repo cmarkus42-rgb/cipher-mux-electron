@@ -6,8 +6,9 @@ import { TmuxManager } from './tmux/tmux-manager'
 import { MessageBus } from './message-bus/message-bus'
 import { ProjectScanner } from './project/project-scanner'
 import { configStore } from './config/config-store'
+import { StatusLineMonitor } from './monitoring/statusline-monitor'
 import { IPC } from '../shared/ipc-channels'
-import type { StartSessionOpts, SendMessage, Topic } from '../shared/types'
+import type { StartSessionOpts, SendMessage, Topic, ContextUsage } from '../shared/types'
 
 /**
  * IPC Hub — Central router for all IPC channels.
@@ -18,6 +19,7 @@ export class IpcHub {
   private sessionManager: SessionManager
   private messageBus: MessageBus
   private projectScanner: ProjectScanner
+  private statusLineMonitor: StatusLineMonitor
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
 
   constructor(private windowManager: WindowManager) {
@@ -32,6 +34,7 @@ export class IpcHub {
       this.messageBus = null as any
     }
     this.projectScanner = new ProjectScanner()
+    this.statusLineMonitor = new StatusLineMonitor()
   }
 
   init(): void {
@@ -43,6 +46,9 @@ export class IpcHub {
     this.registerConfigChannels()
     this.registerBugreportChannels()
     this.setupEventForwarding()
+
+    // Start context usage monitor
+    this.statusLineMonitor.start()
 
     // Connect tmux control mode
     this.tmux.connect().catch((err) => {
@@ -87,6 +93,14 @@ export class IpcHub {
         this.windowManager.sendToMainWindow(IPC.MESSAGE_RECEIVED, msg)
       })
     }
+
+    this.statusLineMonitor.on('usage-updated', (sessionId: string, usage: ContextUsage) => {
+      this.windowManager.sendToMainWindow(IPC.CONTEXT_UPDATED, { sessionId, usage })
+    })
+
+    this.statusLineMonitor.on('usage-warning', (sessionId: string, usage: ContextUsage) => {
+      this.windowManager.sendToMainWindow(IPC.CONTEXT_WARNING, { sessionId, usage })
+    })
   }
 
   // ─── Sessions ──────────────────────────────────────────
@@ -183,12 +197,17 @@ export class IpcHub {
 
   // ─── Context ───────────────────────────────────────────
   private registerContextChannels(): void {
-    ipcMain.handle(IPC.CONTEXT_GET, async (_e, _opts) => {
-      return null
+    ipcMain.handle(IPC.CONTEXT_GET, async (_e, { sessionId }: { sessionId: string }) => {
+      return this.statusLineMonitor.get(sessionId) ?? null
     })
 
     ipcMain.handle(IPC.CONTEXT_ALL, async () => {
-      return {}
+      const map = this.statusLineMonitor.getAll()
+      const result: Record<string, ContextUsage> = {}
+      for (const [key, value] of map) {
+        result[key] = value
+      }
+      return result
     })
   }
 
@@ -221,6 +240,7 @@ export class IpcHub {
   }
 
   async destroy(): Promise<void> {
+    this.statusLineMonitor.stop()
     this.projectScanner.stopWatch()
     if (this.messageBus) this.messageBus.destroy()
     await this.sessionManager.destroy()

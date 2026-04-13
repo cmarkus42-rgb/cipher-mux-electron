@@ -352,6 +352,8 @@ body::after {
 .text-dim      { color: var(--color-text-dim); }
 .text-secondary { color: var(--color-text-secondary); }
 .text-accent   { color: var(--color-text-accent); }
+.text-ctx-warn { color: var(--color-neon-orange); }
+.text-ctx-error { color: var(--color-neon-red); }
 .text-upper    { text-transform: uppercase; letter-spacing: 0.06em; }
 .font-heading  { font-family: var(--font-heading); font-weight: 700; }
 .font-mono     { font-family: var(--font-mono); }

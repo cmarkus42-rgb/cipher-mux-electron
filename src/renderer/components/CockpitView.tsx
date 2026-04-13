@@ -1,9 +1,10 @@
-import type { ProjectInfo, SessionInfo } from '../../shared/types'
+import type { ProjectInfo, SessionInfo, ContextUsage } from '../../shared/types'
 import { useProjects } from '../hooks/useProjects'
 import { ProjectCard } from './ProjectCard'
 
 interface CockpitViewProps {
   sessions: SessionInfo[]
+  contextUsages: Record<string, ContextUsage>
   onStartSession: (project: ProjectInfo) => void
 }
 
@@ -16,7 +17,7 @@ const gridStyle = {
   flex: 1,
 }
 
-export function CockpitView({ sessions, onStartSession }: CockpitViewProps) {
+export function CockpitView({ sessions, contextUsages, onStartSession }: CockpitViewProps) {
   const { projects, scanning, rescan } = useProjects()
 
   /** Match a session to a project by path */
@@ -67,6 +68,7 @@ export function CockpitView({ sessions, onStartSession }: CockpitViewProps) {
             key={project.path}
             project={project}
             session={sessionForProject(project)}
+            contextUsage={sessionForProject(project) ? contextUsages[sessionForProject(project)!.id]?.usedPercentage : undefined}
             onStartSession={onStartSession}
           />
         ))}
