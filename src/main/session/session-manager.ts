@@ -108,8 +108,14 @@ export class SessionManager extends EventEmitter {
       }
 
       if (!found) {
-        // Orphaned session — create a placeholder entry
-        const orphanSession: SessionInfo = {
+        // Orphaned session — kill it, don't count against limit
+        console.log(`[SessionManager] killing orphaned tmux session: ${tmuxSession.name}`)
+        try {
+          await this.tmux.killSession(tmuxSession.name)
+        } catch {
+          // may already be gone
+        }
+        orphaned.push({
           id: ulid(),
           name: tmuxSession.name,
           projectPath: null,
@@ -118,9 +124,7 @@ export class SessionManager extends EventEmitter {
           status: 'orphaned',
           createdAt: tmuxSession.created * 1000,
           updatedAt: Date.now(),
-        }
-        this.sessions.set(orphanSession.id, orphanSession)
-        orphaned.push(orphanSession)
+        })
       }
     }
 

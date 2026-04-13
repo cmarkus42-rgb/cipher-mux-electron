@@ -99,6 +99,15 @@ export function useTerminal(sessionId: string): UseTerminalResult {
     })
     resizeObserver.observe(container)
 
+    // Restore scrollback from tmux when (re-)mounting
+    api().terminal.capture(sessionId, 2000).then((content: string) => {
+      if (content && term) {
+        term.write(content.replace(/\n/g, '\r\n'))
+      }
+    }).catch(() => {
+      // session may not be ready yet on first creation
+    })
+
     // Send user input to main process
     const inputDisposable = term.onData((data: string) => {
       api().terminal.write(sessionId, data)

@@ -60,14 +60,12 @@ export function App() {
     ? sessions.find((s) => s.id === activeSessionId)
     : null
 
-  const activeSessions = sessions.filter((s) => s.status === 'active')
-
   return (
     <div class="app-shell">
       {/* ── Drag Region / Title Bar ── */}
       <div class="drag-region">
         <span class="title">cipher-mux</span>
-        <span class="title-version">v0.1.0</span>
+        <span class="title-version">v0.2.0</span>
       </div>
 
       {/* ── Body: Rail + Content + Chatroom ── */}
@@ -126,7 +124,7 @@ function InfoView() {
     <div class="empty-state">
       <div class="empty-state__title">Info</div>
       <div class="empty-state__text">
-        cipher-mux v0.1.0 — Electron-based command center for Claude Code projects.
+        cipher-mux v0.2.0 — Electron-based command center for Claude Code projects.
       </div>
     </div>
   )

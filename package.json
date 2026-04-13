@@ -1,8 +1,8 @@
 {
   "name": "cipher-mux-electron",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Electron-basierte Kommandozentrale für Claude Code Projekte",
-  "main": "dist/main/main.js",
+  "main": "dist/main/main/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "dev:main": "tsc -p tsconfig.main.json --watch",
@@ -11,7 +11,10 @@
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
     "start": "electron .",
-    "test": "node --test --import tsx $(find test -name '*.test.ts' | sort)",
+    "prestart": "electron-builder install-app-deps 2>/dev/null || true",
+    "test": "npm run rebuild:node && node --test --import tsx $(find test -name '*.test.ts' | sort)",
+    "rebuild:node": "cd node_modules/better-sqlite3 && npx node-gyp rebuild --release 2>/dev/null",
+    "rebuild:electron": "npx electron-rebuild -f -w better-sqlite3",
     "lint": "eslint src/ --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "postinstall": "electron-builder install-app-deps"
