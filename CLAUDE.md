@@ -4,17 +4,17 @@ Electron-basierte Kommandozentrale für Claude Code Projekte. Ein Fenster mit ei
 
 ## Aktueller Status
 
-**Phase: 1 — Anforderungsinterview**
+**Phase: 4 → 5 — Autonome Implementierung**
 
 Phasen-Übersicht:
-1. Anforderungsinterview (Touchpoint) → `docs/requirements.md`
-2. Spezifikation erstellen (Autonom) → `docs/SPEC.md`
-3. Technische Entscheidungen (Touchpoint) → `docs/decisions/`
-4. Task-Dekomposition (Autonom) → `docs/todo.md`
-5. Autonome Implementierung (Autonom) → Code
+1. ~~Anforderungsinterview (Touchpoint) → `docs/requirements.md`~~ ✅ (2026-04-13)
+2. ~~Spezifikation erstellen (Autonom) → `docs/SPEC.md`~~ ✅ (2026-04-13)
+3. ~~Technische Entscheidungen (Touchpoint) → `docs/decisions/`~~ ✅ (2026-04-13)
+4. ~~Task-Dekomposition (Autonom) → `docs/todo.md`~~ ✅ (2026-04-13)
+5. **Autonome Implementierung (Autonom) → Code** ← aktuell
 6. Review, Test & Iteration (Touchpoint) → Feedback-Loop
 
-**Nächster Schritt:** `/interview` starten — systematisches Anforderungsinterview durchführen.
+**Nächster Schritt:** `/implement` fortsetzen — Phase 1 + 2 (Core) + 3.1 + 4.1 done. Nächste: Terminal-UI (2.5), Chatroom (3.4), Cockpit (4.3).
 
 ## Build & Test
 
@@ -31,6 +31,9 @@ npm run lint           # ESLint
 ```
 cipher-mux-electron/
 ├── CLAUDE.md
+├── package.json
+├── tsconfig.json / tsconfig.main.json / tsconfig.renderer.json
+├── electron-builder.yml
 ├── docs/
 │   ├── SPEC.md            ← Technische Spezifikation (Phase 2)
 │   ├── requirements.md    ← Anforderungskatalog (Phase 1)
@@ -39,10 +42,30 @@ cipher-mux-electron/
 ├── .claude/
 │   ├── settings.json
 │   └── skills/            ← Workflow-Skills für jede Phase
-└── src/
-    ├── main/              ← Electron Main Process
-    ├── renderer/          ← Preact UI (xterm.js, Activity Rail, Chatroom)
-    └── shared/            ← Shared Types & IPC-Channels
+├── src/
+│   ├── main/
+│   │   ├── main.ts, window-manager.ts, ipc-hub.ts, preload.ts
+│   │   ├── tmux/          ← TmuxManager (Control Mode), Parser, Batcher
+│   │   ├── message-bus/   ← SQLite CRUD, Schema, Types
+│   │   ├── mcp/           ← Streamable HTTP Server, Tools, Auth
+│   │   ├── session/       ← SessionManager, Recovery
+│   │   ├── project/       ← ProjectScanner, KickoffManager
+│   │   ├── config/        ← ConfigStore (electron-store)
+│   │   ├── monitoring/    ← StatusLineMonitor
+│   │   ├── bugreport/     ← BugreportManager
+│   │   └── util/          ← exec-util, dependency-check
+│   ├── renderer/
+│   │   ├── app.tsx, index.html
+│   │   ├── components/    ← ActivityRail, TerminalPane, Chatroom, Cockpit, etc.
+│   │   ├── hooks/         ← useTerminal, useMessages, useSessions, useContextUsage
+│   │   ├── styles/        ← theme.css, layout.css, components.css
+│   │   └── fonts/         ← Rajdhani, Fira Code
+│   └── shared/
+│       ├── ipc-channels.ts ← Typed Channel Constants
+│       ├── types.ts        ← Shared Interfaces
+│       └── constants.ts
+└── test/
+    └── main/              ← Unit-Tests für Business-Logik
 ```
 
 ## Referenz-Projekte
@@ -70,7 +93,14 @@ cipher-mux-electron/
 
 ## Architekturentscheidungen
 
-_Werden in Phase 3 via `/decide` dokumentiert. Jede Entscheidung hier als Einzeiler, Details in `docs/decisions/`._
+- **ADR-001:** tmux Control Mode (-C) für Streaming — `docs/decisions/ADR-001-tmux-streaming.md`
+- **ADR-002:** Streamable HTTP für MCP Transport — `docs/decisions/ADR-002-mcp-transport.md`
+- **ADR-003:** statusLine-Hook für Context-Usage (real-time) — `docs/decisions/ADR-003-statusline-integration.md`
+- **ADR-004:** Vite als Renderer-Bundler — `docs/decisions/ADR-004-renderer-bundler.md`
+- **ADR-005:** WebGL + Canvas-Fallback für xterm.js — `docs/decisions/ADR-005-xterm-renderer.md`
+- **ADR-006:** ulidx für ULID-Generierung — `docs/decisions/ADR-006-ulid-library.md`
+- **ADR-007:** 7 Tage zeitbasierte Message-Retention — `docs/decisions/ADR-007-message-retention.md`
+- **ADR-008:** Strukturiertes Orchestrator CLAUDE.md Template — `docs/decisions/ADR-008-orchestrator-template.md`
 
 ## Bekannte Constraints
 

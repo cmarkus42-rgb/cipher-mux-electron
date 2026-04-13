@@ -1,0 +1,18 @@
+appId: com.cipher.mux
+productName: cipher-mux
+directories:
+  output: out
+  buildResources: assets
+files:
+  - dist/**/*
+  - package.json
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+  darkModeSupport: true
+  extendInfo:
+    NSAppleEventsUsageDescription: "cipher-mux needs Apple Events for tmux integration."
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**"
+npmRebuild: true

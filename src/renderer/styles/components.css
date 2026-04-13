@@ -1,0 +1,434 @@
+/*
+ * components.css — cipher-mux-electron UI Components
+ *
+ * Placeholder styles for reusable components.
+ * Cut-corner geometry, ghost buttons, muted neon accents.
+ */
+
+/* ================================================================
+   Ghost Button
+   ================================================================ */
+
+.btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: var(--font-size-sm);
+  padding: var(--space-xs) var(--space-md);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition:
+    color var(--transition-base),
+    border-color var(--transition-base),
+    background var(--transition-base);
+}
+
+.btn:hover {
+  border-color: var(--color-neon-green);
+  color: var(--color-neon-green);
+  background: var(--color-accent-soft);
+}
+
+.btn:active {
+  background: rgba(92, 154, 110, 0.16);
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: var(--color-border);
+  color: var(--color-text-dim);
+  background: transparent;
+}
+
+/* ── Sweep effect on hover ── */
+.btn::after {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(transparent 0%, var(--color-accent-soft) 50%, transparent 100%);
+  transition: top var(--transition-slow);
+  pointer-events: none;
+}
+
+.btn:hover::after {
+  top: 100%;
+}
+
+/* ── Button Variants ── */
+.btn--primary {
+  border-color: var(--color-neon-green);
+  color: var(--color-neon-green);
+}
+
+.btn--primary:hover {
+  background: rgba(92, 154, 110, 0.16);
+}
+
+.btn--danger {
+  border-color: var(--color-neon-red);
+  color: var(--color-neon-red);
+}
+
+.btn--danger:hover {
+  background: rgba(184, 80, 96, 0.10);
+}
+
+.btn--warn {
+  border-color: var(--color-neon-orange);
+  color: var(--color-neon-orange);
+}
+
+.btn--warn:hover {
+  background: rgba(192, 120, 64, 0.10);
+}
+
+/* ── Size Variants ── */
+.btn--sm {
+  font-size: var(--font-size-xs);
+  padding: 2px var(--space-sm);
+}
+
+.btn--lg {
+  font-size: var(--font-size-base);
+  padding: var(--space-sm) var(--space-lg);
+}
+
+/* ================================================================
+   Card
+   ================================================================ */
+
+.card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base);
+  clip-path: polygon(
+    var(--cut-corner) 0%, 100% 0%,
+    100% calc(100% - var(--cut-corner)),
+    calc(100% - var(--cut-corner)) 100%,
+    0% 100%, 0% var(--cut-corner)
+  );
+}
+
+.card:hover {
+  border-color: var(--color-border-light);
+  box-shadow: var(--shadow-md);
+}
+
+.card--selected {
+  border-left: 3px solid var(--color-neon-green);
+}
+
+.card__title {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: var(--font-size-base);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: var(--space-sm);
+}
+
+.card__body {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.card__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+}
+
+/* ── Card without cut corners (flat variant) ── */
+.card--flat {
+  clip-path: none;
+}
+
+/* ================================================================
+   Badge
+   ================================================================ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px var(--space-sm);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-dim);
+  user-select: none;
+}
+
+.badge--ok {
+  border-color: var(--color-neon-green);
+  color: var(--color-neon-green);
+}
+
+.badge--warn {
+  border-color: var(--color-neon-orange);
+  color: var(--color-neon-orange);
+}
+
+.badge--error {
+  border-color: var(--color-neon-red);
+  color: var(--color-neon-red);
+}
+
+.badge--info {
+  border-color: var(--color-neon-cyan);
+  color: var(--color-neon-cyan);
+}
+
+/* Filled variant */
+.badge--filled {
+  background: var(--color-neon-green);
+  color: var(--color-bg);
+  border-color: var(--color-neon-green);
+}
+
+.badge--filled.badge--warn {
+  background: var(--color-neon-orange);
+  border-color: var(--color-neon-orange);
+}
+
+.badge--filled.badge--error {
+  background: var(--color-neon-red);
+  border-color: var(--color-neon-red);
+}
+
+/* ================================================================
+   Input / Text Field
+   ================================================================ */
+
+.input {
+  background: var(--color-bg-sunken);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  padding: var(--space-xs) var(--space-sm);
+  outline: none;
+  transition: border-color var(--transition-base);
+  width: 100%;
+}
+
+.input:focus {
+  border-color: var(--color-border-focus);
+}
+
+.input::placeholder {
+  color: var(--color-text-dim);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ================================================================
+   Dropdown / Select
+   ================================================================ */
+
+.dropdown {
+  background: var(--color-bg-sunken);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: var(--space-xs) var(--space-sm);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  transition: border-color var(--transition-base);
+}
+
+.dropdown:hover,
+.dropdown:focus {
+  border-color: var(--color-border-focus);
+}
+
+/* ================================================================
+   Toggle Switch
+   ================================================================ */
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-dim);
+  user-select: none;
+}
+
+.toggle__track {
+  width: 28px;
+  height: 14px;
+  background: var(--color-bg-sunken);
+  border: 1px solid var(--color-border);
+  position: relative;
+  transition: border-color var(--transition-base);
+}
+
+.toggle__track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-text-dim);
+  transition: all var(--transition-base);
+}
+
+.toggle--active .toggle__track {
+  border-color: var(--color-neon-green);
+}
+
+.toggle--active .toggle__track::after {
+  left: 16px;
+  background: var(--color-neon-green);
+  box-shadow: 0 0 4px rgba(92, 154, 110, 0.4);
+}
+
+/* ================================================================
+   Toast / Notification
+   ================================================================ */
+
+.toast {
+  position: fixed;
+  bottom: 40px;
+  right: var(--space-lg);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  box-shadow: var(--shadow-md);
+  z-index: var(--z-toast);
+  animation: toast-in 0.2s ease;
+}
+
+.toast--warn {
+  border-color: var(--color-neon-orange);
+  color: var(--color-neon-orange);
+}
+
+.toast--error {
+  border-color: var(--color-neon-red);
+  color: var(--color-neon-red);
+}
+
+.toast--ok {
+  border-color: var(--color-neon-green);
+  color: var(--color-neon-green);
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ================================================================
+   Toolbar
+   ================================================================ */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+  user-select: none;
+}
+
+.toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.toolbar__spacer {
+  flex: 1;
+}
+
+/* ================================================================
+   Loading State
+   ================================================================ */
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--color-text-dim);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-md);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* ================================================================
+   Empty State
+   ================================================================ */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-lg);
+  padding: var(--space-2xl);
+  text-align: center;
+  color: var(--color-text-dim);
+}
+
+.empty-state__title {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.empty-state__text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-dim);
+  max-width: 360px;
+}
