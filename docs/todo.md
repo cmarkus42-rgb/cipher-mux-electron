@@ -51,7 +51,7 @@ Ziel: Inter-Session-Kommunikation funktioniert end-to-end, MCP-Server erreichbar
 | 3.2 | **MCP-Server** — Streamable HTTP (via @modelcontextprotocol/sdk), API-Key-Auth, 7 Tools registriert (mux_send, mux_read, mux_status, mux_sessions, mux_create_session, mux_kill_session, mux_context_usage) | open | #3.1, #2.3 | — | src/main/mcp/mcp-server.ts, mcp-tools.ts, mcp-auth.ts (~3 Dateien) | curl mit Bearer-Token liefert Tool-Liste, Tools funktionieren, ohne Token: 401 |
 | 3.3 | **IPC Hub — Message-Channels** — cipher-mux:messages:* Channels, preload.ts erweitern | done (2026-04-13) | #3.1, #2.4 | — | src/main/ipc-hub.ts (erweitern), src/main/preload.ts (erweitern) (~2 Dateien) | Renderer kann Messages senden/lesen via IPC |
 | 3.4 | **Chatroom-Panel** — ChatroomPanel.tsx: Message-Feed (chronologisch, alle Topics), Input-Feld (bidirektional), System-Messages, useMessages.ts Hook. Cmd+K toggle. | done (2026-04-13) | #3.3, #2.6 | — | src/renderer/components/ChatroomPanel.tsx, hooks/useMessages.ts (~2 Dateien) | Cmd+K öffnet Sidebar, Messages erscheinen live, User kann Nachrichten senden |
-| 3.5 | **Unread-Badges** — Activity Rail zeigt Unread-Count pro Session, Badge-Updates bei neuen Messages | open | #3.4, #2.6 | — | src/renderer/components/ActivityRail.tsx (erweitern) (~1 Datei) | Neue Message → Badge erscheint, Klick auf Session → Badge verschwindet |
+| 3.5 | **Unread-Badges** — Activity Rail zeigt Unread-Count pro Session, Badge-Updates bei neuen Messages | done (2026-04-13) | #3.4, #2.6 | — | src/renderer/components/ActivityRail.tsx (erweitern) (~1 Datei) | Neue Message → Badge erscheint, Klick auf Session → Badge verschwindet |
 
 ---
 
