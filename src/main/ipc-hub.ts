@@ -7,7 +7,10 @@ import { MessageBus } from './message-bus/message-bus'
 import { ProjectScanner } from './project/project-scanner'
 import { configStore } from './config/config-store'
 import { StatusLineMonitor } from './monitoring/statusline-monitor'
+import { McpServerManager } from './mcp/mcp-server'
+import { generateApiKey } from './mcp/mcp-auth'
 import { IPC } from '../shared/ipc-channels'
+import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
 import type { StartSessionOpts, SendMessage, Topic, ContextUsage } from '../shared/types'
 
 /**
@@ -20,6 +23,7 @@ export class IpcHub {
   private messageBus: MessageBus
   private projectScanner: ProjectScanner
   private statusLineMonitor: StatusLineMonitor
+  private mcpServer: McpServerManager
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
 
   constructor(private windowManager: WindowManager) {
@@ -35,6 +39,7 @@ export class IpcHub {
     }
     this.projectScanner = new ProjectScanner()
     this.statusLineMonitor = new StatusLineMonitor()
+    this.mcpServer = new McpServerManager()
   }
 
   init(): void {
@@ -64,6 +69,23 @@ export class IpcHub {
     if (this.messageBus) {
       this.messageBus.cleanup()
     }
+
+    // Start MCP server
+    const mcpConfig = configStore.get('mcp')
+    const port = mcpConfig?.port ?? MCP_DEFAULT_PORT
+    const host = mcpConfig?.host ?? MCP_DEFAULT_HOST
+    const apiKey = mcpConfig?.apiKey || generateApiKey()
+    // Persist generated key
+    if (!mcpConfig?.apiKey) {
+      configStore.set('mcp', { ...mcpConfig, port, host, apiKey })
+    }
+    this.mcpServer.start(port, host, apiKey, {
+      sessionManager: this.sessionManager,
+      messageBus: this.messageBus,
+      statusLineMonitor: this.statusLineMonitor,
+    }).catch((err) => {
+      console.error('[IpcHub] MCP server start failed:', err)
+    })
   }
 
   getTmuxManager(): TmuxManager {
@@ -72,6 +94,10 @@ export class IpcHub {
 
   getSessionManager(): SessionManager {
     return this.sessionManager
+  }
+
+  getMcpServer(): McpServerManager {
+    return this.mcpServer
   }
 
   // ─── Event Forwarding to Renderer ──────────────────────
@@ -240,6 +266,7 @@ export class IpcHub {
   }
 
   async destroy(): Promise<void> {
+    await this.mcpServer.stop().catch(() => {})
     this.statusLineMonitor.stop()
     this.projectScanner.stopWatch()
     if (this.messageBus) this.messageBus.destroy()

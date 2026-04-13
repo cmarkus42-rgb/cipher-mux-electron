@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'preact/hooks'
+import { useState, useCallback, useEffect } from 'preact/hooks'
 import type { ActiveView, ProjectInfo } from '../shared/types'
 import { useSessions } from './hooks/useSessions'
 import { useMessages } from './hooks/useMessages'
@@ -17,6 +17,15 @@ export function App() {
   const { sessions, startSession, stopSession } = useSessions()
   const { unreadCount } = useMessages()
   const contextUsages = useContextUsage()
+  const [mcpPort, setMcpPort] = useState<number | undefined>(undefined)
+
+  // Load MCP config to show port in status bar
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    api.config.get('mcp').then((cfg: any) => {
+      if (cfg?.port) setMcpPort(cfg.port)
+    })
+  }, [])
 
   const toggleChatroom = useCallback(() => {
     setChatroomVisible((v) => !v)
@@ -107,7 +116,7 @@ export function App() {
       </div>
 
       {/* Status Bar */}
-      <StatusBar sessions={sessions} />
+      <StatusBar sessions={sessions} mcpPort={mcpPort} mcpRunning={mcpPort != null} />
     </div>
   )
 }
