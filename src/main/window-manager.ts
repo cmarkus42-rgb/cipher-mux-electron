@@ -26,7 +26,7 @@ export class WindowManager {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: true,
+        sandbox: false,
       },
     })
 
@@ -34,7 +34,7 @@ export class WindowManager {
     if (process.env.VITE_DEV_SERVER_URL) {
       this.mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
     } else {
-      this.mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
+      this.mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'))
     }
 
     this.mainWindow.on('closed', () => {
