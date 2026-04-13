@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { CanvasAddon } from '@xterm/addon-canvas'
+import '@xterm/xterm/css/xterm.css'
 
 const api = () => (window as any).cipherMux
 
@@ -87,13 +88,16 @@ export function useTerminal(sessionId: string): UseTerminalResult {
     termRef.current = term
     fitAddonRef.current = fitAddon
 
-    // Initial fit
-    try {
-      fitAddon.fit()
-      api().terminal.resize(sessionId, term.cols, term.rows)
-    } catch {
-      // container may not be sized yet
-    }
+    // Use ResizeObserver to fit terminal when container gets/changes size
+    const resizeObserver = new ResizeObserver(() => {
+      try {
+        fitAddon.fit()
+        api().terminal.resize(sessionId, term.cols, term.rows)
+      } catch {
+        // container may not be visible yet
+      }
+    })
+    resizeObserver.observe(container)
 
     // Send user input to main process
     const inputDisposable = term.onData((data: string) => {
@@ -110,6 +114,7 @@ export function useTerminal(sessionId: string): UseTerminalResult {
     )
 
     return () => {
+      resizeObserver.disconnect()
       inputDisposable.dispose()
       unsubscribe()
       term.dispose()
