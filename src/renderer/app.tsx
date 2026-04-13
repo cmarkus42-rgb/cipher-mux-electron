@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'preact/hooks'
 import type { ActiveView, ProjectInfo } from '../shared/types'
 import { useSessions } from './hooks/useSessions'
+import { useMessages } from './hooks/useMessages'
 import { ActivityRail } from './components/ActivityRail'
 import { CockpitView } from './components/CockpitView'
 import { TerminalPane } from './components/TerminalPane'
@@ -12,6 +13,7 @@ export function App() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
 
   const { sessions, startSession, stopSession } = useSessions()
+  const { unreadCount } = useMessages()
 
   const toggleChatroom = useCallback(() => {
     setChatroomVisible((v) => !v)
@@ -64,6 +66,7 @@ export function App() {
           sessions={sessions}
           chatroomVisible={chatroomVisible}
           activeSessionId={activeSessionId}
+          unreadCount={unreadCount}
           onViewChange={handleViewChange}
           onToggleChatroom={toggleChatroom}
           onSessionSelect={handleSessionSelect}

@@ -5,6 +5,7 @@ interface ActivityRailProps {
   sessions: SessionInfo[]
   chatroomVisible: boolean
   activeSessionId: string | null
+  unreadCount?: number
   onViewChange: (view: ActiveView) => void
   onToggleChatroom: () => void
   onSessionSelect: (sessionId: string) => void
@@ -42,6 +43,7 @@ export function ActivityRail({
   sessions,
   chatroomVisible,
   activeSessionId,
+  unreadCount,
   onViewChange,
   onToggleChatroom,
   onSessionSelect,
@@ -77,6 +79,7 @@ export function ActivityRail({
         icon="&#x25A8;"
         label="Chatroom"
         active={chatroomVisible}
+        badge={!chatroomVisible ? unreadCount : undefined}
         onClick={onToggleChatroom}
       />
 
