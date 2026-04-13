@@ -1,10 +1,13 @@
-import { ipcMain } from 'electron'
+import { app, ipcMain } from 'electron'
+import * as path from 'path'
 import { WindowManager } from './window-manager'
 import { SessionManager } from './session/session-manager'
 import { TmuxManager } from './tmux/tmux-manager'
+import { MessageBus } from './message-bus/message-bus'
+import { ProjectScanner } from './project/project-scanner'
 import { configStore } from './config/config-store'
 import { IPC } from '../shared/ipc-channels'
-import type { StartSessionOpts } from '../shared/types'
+import type { StartSessionOpts, SendMessage, Topic } from '../shared/types'
 
 /**
  * IPC Hub — Central router for all IPC channels.
@@ -13,10 +16,17 @@ import type { StartSessionOpts } from '../shared/types'
 export class IpcHub {
   private tmux: TmuxManager
   private sessionManager: SessionManager
+  private messageBus: MessageBus
+  private projectScanner: ProjectScanner
+  private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
 
   constructor(private windowManager: WindowManager) {
     this.tmux = new TmuxManager()
     this.sessionManager = new SessionManager(this.tmux)
+    this.messageBus = new MessageBus({
+      dbPath: path.join(app.getPath('userData'), 'messages.db'),
+    })
+    this.projectScanner = new ProjectScanner()
   }
 
   init(): void {
@@ -28,6 +38,9 @@ export class IpcHub {
     this.registerConfigChannels()
     this.registerBugreportChannels()
     this.setupEventForwarding()
+
+    // Initial cleanup
+    this.messageBus.cleanup()
   }
 
   getTmuxManager(): TmuxManager {
@@ -50,6 +63,10 @@ export class IpcHub {
 
     this.tmux.on('output', (paneId: string, data: string) => {
       this.windowManager.sendToMainWindow(IPC.TERMINAL_DATA, { paneId, data })
+    })
+
+    this.messageBus.on('message', (msg) => {
+      this.windowManager.sendToMainWindow(IPC.MESSAGE_RECEIVED, msg)
     })
   }
 
@@ -102,33 +119,37 @@ export class IpcHub {
 
   // ─── Messages ──────────────────────────────────────────
   private registerMessageChannels(): void {
-    // Will be connected to MessageBus (Phase 3)
-    ipcMain.handle(IPC.MESSAGES_SEND, async (_e, _msg) => {
-      return { error: 'Not implemented' }
+    ipcMain.handle(IPC.MESSAGES_SEND, async (_e, msg: SendMessage) => {
+      return this.messageBus.send(msg)
     })
 
-    ipcMain.handle(IPC.MESSAGES_LIST, async (_e, _opts) => {
-      return []
+    ipcMain.handle(IPC.MESSAGES_LIST, async (_e, opts?: { topic?: Topic; limit?: number; before?: number }) => {
+      if (opts?.topic) {
+        return this.messageBus.getByTopic(opts.topic, opts.limit, opts.before)
+      }
+      return this.messageBus.getAll(opts?.limit, opts?.before)
     })
 
     ipcMain.handle(IPC.MESSAGES_UNREAD, async () => {
-      return 0
+      return this.messageBus.unreadCount('renderer')
     })
 
-    ipcMain.handle(IPC.MESSAGES_MARK_READ, async (_e, _opts) => {
+    ipcMain.handle(IPC.MESSAGES_MARK_READ, async (_e, { messageIds }: { messageIds: string[] }) => {
+      this.messageBus.markRead(messageIds, 'renderer')
       return { ok: true }
     })
   }
 
   // ─── Projects ──────────────────────────────────────────
   private registerProjectChannels(): void {
-    // Will be connected to ProjectScanner (Phase 4)
     ipcMain.handle(IPC.PROJECTS_LIST, async () => {
-      return []
+      return this.cachedProjects
     })
 
     ipcMain.handle(IPC.PROJECTS_SCAN, async () => {
-      return []
+      const scanPaths = configStore.get('app').scanPaths
+      this.cachedProjects = await this.projectScanner.scan(scanPaths)
+      return this.cachedProjects
     })
 
     ipcMain.handle(IPC.PROJECTS_KICKOFF, async (_e, _opts) => {
@@ -150,7 +171,7 @@ export class IpcHub {
   // ─── Config ────────────────────────────────────────────
   private registerConfigChannels(): void {
     ipcMain.handle(IPC.CONFIG_GET, async (_e, { key }: { key: string }) => {
-      return configStore.get(key as keyof typeof configStore extends never ? never : any)
+      return configStore.get(key as any)
     })
 
     ipcMain.handle(IPC.CONFIG_SET, async (_e, { key, value }: { key: string; value: unknown }) => {
@@ -176,6 +197,8 @@ export class IpcHub {
   }
 
   async destroy(): Promise<void> {
+    this.projectScanner.stopWatch()
+    this.messageBus.destroy()
     await this.sessionManager.destroy()
   }
 }
