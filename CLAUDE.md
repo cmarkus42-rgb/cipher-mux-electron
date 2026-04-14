@@ -4,17 +4,17 @@ Electron-basierte Kommandozentrale für Claude Code Projekte. Ein Fenster mit ei
 
 ## Aktueller Status
 
-**Phase: 4 → 5 — Autonome Implementierung**
+**Phase: 5 → 6 — Review & Test**
 
 Phasen-Übersicht:
 1. ~~Anforderungsinterview (Touchpoint) → `docs/requirements.md`~~ ✅ (2026-04-13)
 2. ~~Spezifikation erstellen (Autonom) → `docs/SPEC.md`~~ ✅ (2026-04-13)
 3. ~~Technische Entscheidungen (Touchpoint) → `docs/decisions/`~~ ✅ (2026-04-13)
 4. ~~Task-Dekomposition (Autonom) → `docs/todo.md`~~ ✅ (2026-04-13)
-5. **Autonome Implementierung (Autonom) → Code** ← aktuell
-6. Review, Test & Iteration (Touchpoint) → Feedback-Loop
+5. ~~Autonome Implementierung (Autonom) → Code~~ ✅ (2026-04-14)
+6. **Review, Test & Iteration (Touchpoint) → Feedback-Loop** ← aktuell
 
-**Nächster Schritt:** `/implement` fortsetzen — Phase 1-4 Kern done (Sessions, Terminal, Chatroom, Cockpit). Nächste: MCP-Server (3.2), Unread-Badges (3.5), StatusLineMonitor (4.4).
+**Nächster Schritt:** Auftraggeber testet Phase 5 (Orchestrator, Kickoff, MCP-Injection) via `docs/TESTCASE.md` Tests 6–10. Danach Phase 6 (Polish: Recovery, Layout-Persistenz, Info-Seite, Bugreport, Keyboard-Shortcuts).
 
 ## Build & Test
 

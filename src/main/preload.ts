@@ -85,6 +85,14 @@ const api = {
     saveLayout: (layout: unknown) => ipcRenderer.invoke(IPC.CONFIG_SAVE_LAYOUT, layout),
   },
 
+  // ─── Dialogs ──────────────────────────────────────────────
+  dialog: {
+    openFile: (opts?: { title?: string; filters?: Array<{ name: string; extensions: string[] }> }) =>
+      ipcRenderer.invoke(IPC.DIALOG_OPEN_FILE, opts),
+    openDir: (opts?: { title?: string }) =>
+      ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR, opts),
+  },
+
   // ─── Orchestrator ────────────────────────────────────────
   orchestrator: {
     start: () => ipcRenderer.invoke(IPC.ORCHESTRATOR_START),

@@ -4,9 +4,10 @@ interface StatusBarProps {
   sessions: SessionInfo[]
   mcpPort?: number
   mcpRunning?: boolean
+  orchestratorRunning?: boolean
 }
 
-export function StatusBar({ sessions, mcpPort, mcpRunning }: StatusBarProps) {
+export function StatusBar({ sessions, mcpPort, mcpRunning, orchestratorRunning }: StatusBarProps) {
   const activeCount = sessions.filter((s) => s.status === 'active').length
 
   return (
@@ -17,6 +18,11 @@ export function StatusBar({ sessions, mcpPort, mcpRunning }: StatusBarProps) {
       </div>
 
       <div class="status-bar__spacer" />
+
+      <div class="status-bar__segment">
+        <span class={`neon-dot ${orchestratorRunning ? 'neon-dot--info' : 'neon-dot--dim'}`} />
+        <span>Orch: {orchestratorRunning ? 'running' : 'off'}</span>
+      </div>
 
       <div class="status-bar__segment">
         <span class={`neon-dot ${mcpRunning ? 'neon-dot--ok' : 'neon-dot--dim'}`} />
