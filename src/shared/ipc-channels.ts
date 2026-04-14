@@ -39,6 +39,11 @@ export const IPC = {
   CONFIG_SET: 'cipher-mux:config:set',
   CONFIG_SAVE_LAYOUT: 'cipher-mux:config:save-layout',
 
+  // Orchestrator
+  ORCHESTRATOR_START: 'cipher-mux:orchestrator:start',
+  ORCHESTRATOR_STOP: 'cipher-mux:orchestrator:stop',
+  ORCHESTRATOR_STATUS: 'cipher-mux:orchestrator:status',
+
   // Bugreport
   BUGREPORT_COLLECT: 'cipher-mux:bugreport:collect',
   BUGREPORT_EXPORT: 'cipher-mux:bugreport:export',

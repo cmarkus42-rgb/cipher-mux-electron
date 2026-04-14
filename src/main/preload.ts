@@ -85,6 +85,13 @@ const api = {
     saveLayout: (layout: unknown) => ipcRenderer.invoke(IPC.CONFIG_SAVE_LAYOUT, layout),
   },
 
+  // ─── Orchestrator ────────────────────────────────────────
+  orchestrator: {
+    start: () => ipcRenderer.invoke(IPC.ORCHESTRATOR_START),
+    stop: () => ipcRenderer.invoke(IPC.ORCHESTRATOR_STOP),
+    status: () => ipcRenderer.invoke(IPC.ORCHESTRATOR_STATUS),
+  },
+
   // ─── Bugreport ─────────────────────────────────────────
   bugreport: {
     collect: () => ipcRenderer.invoke(IPC.BUGREPORT_COLLECT),
