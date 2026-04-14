@@ -49,6 +49,7 @@ export class IpcHub {
     this.registerProjectChannels()
     this.registerContextChannels()
     this.registerConfigChannels()
+    this.registerOrchestratorChannels()
     this.registerBugreportChannels()
     this.setupEventForwarding()
 
@@ -251,6 +252,30 @@ export class IpcHub {
     ipcMain.handle(IPC.CONFIG_SAVE_LAYOUT, async (_e, layout) => {
       configStore.set('ui', { ...configStore.get('ui'), layout })
       return { ok: true }
+    })
+  }
+
+  // ─── Orchestrator ────────────────────────────────────────
+  private registerOrchestratorChannels(): void {
+    ipcMain.handle(IPC.ORCHESTRATOR_START, async () => {
+      const mcpConfig = configStore.get('mcp')
+      return this.sessionManager.startOrchestrator({
+        mcpHost: mcpConfig?.host ?? MCP_DEFAULT_HOST,
+        mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
+        mcpApiKey: mcpConfig?.apiKey ?? '',
+      })
+    })
+
+    ipcMain.handle(IPC.ORCHESTRATOR_STOP, async () => {
+      await this.sessionManager.stopOrchestrator()
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.ORCHESTRATOR_STATUS, async () => {
+      return {
+        running: this.sessionManager.isOrchestratorRunning(),
+        sessionId: this.sessionManager.getOrchestratorSessionId(),
+      }
     })
   }
 

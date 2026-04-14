@@ -1,8 +1,12 @@
 import { EventEmitter } from 'events'
+import * as fs from 'fs'
+import * as path from 'path'
+import * as os from 'os'
 import { ulid } from 'ulidx'
 import type { SessionInfo, SessionStatus, StartSessionOpts, RecoveryResult } from '../../shared/types'
-import { MAX_SESSIONS } from '../../shared/constants'
+import { MAX_SESSIONS, ORCHESTRATOR_DIR, ORCHESTRATOR_MAX_RETRIES } from '../../shared/constants'
 import { TmuxManager } from '../tmux/tmux-manager'
+import { generateOrchestratorClaudeMd } from './orchestrator-template'
 
 /**
  * SessionManager — Registry for cipher-mux sessions.
@@ -10,9 +14,16 @@ import { TmuxManager } from '../tmux/tmux-manager'
  * Manages session lifecycle (create, stop, recover) and enforces
  * the MAX_SESSIONS limit. Each session maps to a tmux session.
  */
+export interface OrchestratorConfig {
+  mcpHost: string
+  mcpPort: number
+  mcpApiKey: string
+}
+
 export class SessionManager extends EventEmitter {
   private sessions: Map<string, SessionInfo> = new Map()
   private tmux: TmuxManager
+  private orchestratorSessionId: string | null = null
 
   constructor(tmux: TmuxManager) {
     super()
@@ -184,6 +195,83 @@ export class SessionManager extends EventEmitter {
     if (!session) throw new Error(`Session ${sessionId} not found`)
     const target = session.tmuxPane ?? session.tmuxSession
     return this.tmux.capturePane(target, lines)
+  }
+
+  // ─── Orchestrator ─────────────────────────────────────
+
+  /**
+   * Resolve the orchestrator directory path (expand ~).
+   */
+  private resolveOrchestratorDir(): string {
+    return ORCHESTRATOR_DIR.replace(/^~/, os.homedir())
+  }
+
+  /**
+   * Start the Orchestrator session.
+   * Creates the orchestrator directory and CLAUDE.md, then starts
+   * a special session pointing at that directory.
+   */
+  async startOrchestrator(config: OrchestratorConfig): Promise<SessionInfo> {
+    if (this.orchestratorSessionId) {
+      const existing = this.sessions.get(this.orchestratorSessionId)
+      if (existing && existing.status === 'active') {
+        throw new Error('Orchestrator is already running')
+      }
+      // Stale reference — clear it
+      this.orchestratorSessionId = null
+    }
+
+    const orchestratorDir = this.resolveOrchestratorDir()
+
+    // Ensure directory exists
+    fs.mkdirSync(orchestratorDir, { recursive: true })
+
+    // Generate and write CLAUDE.md
+    const claudeMd = generateOrchestratorClaudeMd({
+      mcpHost: config.mcpHost,
+      mcpPort: config.mcpPort,
+      mcpApiKey: config.mcpApiKey,
+      maxRetries: ORCHESTRATOR_MAX_RETRIES,
+    })
+    fs.writeFileSync(path.join(orchestratorDir, 'CLAUDE.md'), claudeMd, 'utf-8')
+
+    // Start session
+    const session = await this.start({
+      name: 'Orchestrator',
+      projectPath: orchestratorDir,
+    })
+
+    this.orchestratorSessionId = session.id
+    this.emit('orchestrator-started', session)
+    return session
+  }
+
+  /**
+   * Stop the Orchestrator session.
+   */
+  async stopOrchestrator(): Promise<void> {
+    if (!this.orchestratorSessionId) {
+      throw new Error('Orchestrator is not running')
+    }
+    await this.stop(this.orchestratorSessionId)
+    this.orchestratorSessionId = null
+    this.emit('orchestrator-stopped')
+  }
+
+  /**
+   * Check if the Orchestrator is currently running.
+   */
+  isOrchestratorRunning(): boolean {
+    if (!this.orchestratorSessionId) return false
+    const session = this.sessions.get(this.orchestratorSessionId)
+    return (session?.status === 'active') || false
+  }
+
+  /**
+   * Get the Orchestrator session ID (or null).
+   */
+  getOrchestratorSessionId(): string | null {
+    return this.orchestratorSessionId
   }
 
   /**
