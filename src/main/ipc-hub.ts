@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, dialog, ipcMain } from 'electron'
 import * as path from 'path'
 import { WindowManager } from './window-manager'
 import { SessionManager } from './session/session-manager'
@@ -9,9 +9,10 @@ import { configStore } from './config/config-store'
 import { StatusLineMonitor } from './monitoring/statusline-monitor'
 import { McpServerManager } from './mcp/mcp-server'
 import { generateApiKey } from './mcp/mcp-auth'
+import { KickoffManager } from './project/kickoff-manager'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
-import type { StartSessionOpts, SendMessage, Topic, ContextUsage } from '../shared/types'
+import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffOpts } from '../shared/types'
 
 /**
  * IPC Hub — Central router for all IPC channels.
@@ -24,6 +25,7 @@ export class IpcHub {
   private projectScanner: ProjectScanner
   private statusLineMonitor: StatusLineMonitor
   private mcpServer: McpServerManager
+  private kickoffManager: KickoffManager
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
 
   constructor(private windowManager: WindowManager) {
@@ -40,6 +42,7 @@ export class IpcHub {
     this.projectScanner = new ProjectScanner()
     this.statusLineMonitor = new StatusLineMonitor()
     this.mcpServer = new McpServerManager()
+    this.kickoffManager = new KickoffManager()
   }
 
   init(): void {
@@ -49,6 +52,7 @@ export class IpcHub {
     this.registerProjectChannels()
     this.registerContextChannels()
     this.registerConfigChannels()
+    this.registerDialogChannels()
     this.registerOrchestratorChannels()
     this.registerBugreportChannels()
     this.setupEventForwarding()
@@ -80,6 +84,13 @@ export class IpcHub {
     if (!mcpConfig?.apiKey) {
       configStore.set('mcp', { ...mcpConfig, port, host, apiKey })
     }
+    // Inject MCP config into SessionManager for auto-injection into new sessions
+    this.sessionManager.setMcpConfig({
+      mcpHost: host,
+      mcpPort: port,
+      mcpApiKey: apiKey,
+    })
+
     this.mcpServer.start(port, host, apiKey, {
       sessionManager: this.sessionManager,
       messageBus: this.messageBus,
@@ -217,8 +228,8 @@ export class IpcHub {
       return this.cachedProjects
     })
 
-    ipcMain.handle(IPC.PROJECTS_KICKOFF, async (_e, _opts) => {
-      return { error: 'Not implemented' }
+    ipcMain.handle(IPC.PROJECTS_KICKOFF, async (_e, opts: KickoffOpts) => {
+      return this.kickoffManager.kickoff(opts)
     })
   }
 
@@ -252,6 +263,30 @@ export class IpcHub {
     ipcMain.handle(IPC.CONFIG_SAVE_LAYOUT, async (_e, layout) => {
       configStore.set('ui', { ...configStore.get('ui'), layout })
       return { ok: true }
+    })
+  }
+
+  // ─── Dialogs ────────────────────────────────────────────
+  private registerDialogChannels(): void {
+    ipcMain.handle(IPC.DIALOG_OPEN_FILE, async (_e, opts?: { title?: string; filters?: Electron.FileFilter[] }) => {
+      const win = this.windowManager.getMainWindow()
+      if (!win) return null
+      const result = await dialog.showOpenDialog(win, {
+        title: opts?.title ?? 'Select File',
+        properties: ['openFile'],
+        filters: opts?.filters,
+      })
+      return result.canceled ? null : result.filePaths[0] ?? null
+    })
+
+    ipcMain.handle(IPC.DIALOG_OPEN_DIR, async (_e, opts?: { title?: string }) => {
+      const win = this.windowManager.getMainWindow()
+      if (!win) return null
+      const result = await dialog.showOpenDialog(win, {
+        title: opts?.title ?? 'Select Directory',
+        properties: ['openDirectory', 'createDirectory'],
+      })
+      return result.canceled ? null : result.filePaths[0] ?? null
     })
   }
 

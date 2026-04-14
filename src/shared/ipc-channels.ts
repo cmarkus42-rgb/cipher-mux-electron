@@ -39,6 +39,10 @@ export const IPC = {
   CONFIG_SET: 'cipher-mux:config:set',
   CONFIG_SAVE_LAYOUT: 'cipher-mux:config:save-layout',
 
+  // Dialogs
+  DIALOG_OPEN_FILE: 'cipher-mux:dialog:open-file',
+  DIALOG_OPEN_DIR: 'cipher-mux:dialog:open-dir',
+
   // Orchestrator
   ORCHESTRATOR_START: 'cipher-mux:orchestrator:start',
   ORCHESTRATOR_STOP: 'cipher-mux:orchestrator:stop',

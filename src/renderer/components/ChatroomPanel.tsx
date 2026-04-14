@@ -85,11 +85,18 @@ export function ChatroomPanel({ visible }: ChatroomPanelProps) {
 
 function ChatMessage({ message }: { message: Message }) {
   const isSystem = message.topic === 'system' || message.sender === 'system'
+  const isOrchestrator = message.sender === 'Orchestrator'
   const text = (message.payload as any)?.text ?? JSON.stringify(message.payload)
   const time = formatTime(message.createdAt)
 
+  const cls = [
+    'chat-message',
+    isSystem ? 'chat-message--system' : '',
+    isOrchestrator ? 'chat-message--orchestrator' : '',
+  ].filter(Boolean).join(' ')
+
   return (
-    <div class={`chat-message ${isSystem ? 'chat-message--system' : ''}`}>
+    <div class={cls}>
       <div class="chat-message__header">
         <span class="chat-message__sender">{message.sender}</span>
         <span class="chat-message__time">{time}</span>

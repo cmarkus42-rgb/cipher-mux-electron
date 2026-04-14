@@ -486,3 +486,111 @@
   color: var(--color-text-dim);
   font-style: italic;
 }
+
+/* Orchestrator messages — cyan accent */
+.chat-message--orchestrator .chat-message__sender {
+  color: var(--color-neon-cyan);
+}
+
+.chat-message--orchestrator .chat-message__text {
+  color: var(--color-text-secondary);
+}
+
+/* ================================================================
+   Kickoff Dialog
+   ================================================================ */
+
+.kickoff-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal, 100);
+  animation: toast-in 0.15s ease;
+}
+
+.kickoff-dialog {
+  width: 480px;
+  max-width: 90vw;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+}
+
+.kickoff-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text);
+}
+
+.kickoff-dialog__close {
+  cursor: pointer;
+  color: var(--color-text-dim);
+  font-size: 14px;
+  transition: color var(--transition-base);
+}
+
+.kickoff-dialog__close:hover {
+  color: var(--color-neon-red);
+}
+
+.kickoff-dialog__body {
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.kickoff-dialog__label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+}
+
+.kickoff-dialog__file-row {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.kickoff-dialog__file-row .input {
+  flex: 1;
+}
+
+.kickoff-dialog__file-row .btn {
+  min-width: 36px;
+  padding: var(--space-xs);
+  text-align: center;
+}
+
+.kickoff-dialog__error {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-neon-red);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-neon-red);
+  background: rgba(184, 80, 96, 0.08);
+}
+
+.kickoff-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px solid var(--color-border);
+}

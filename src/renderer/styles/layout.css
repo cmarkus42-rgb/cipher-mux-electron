@@ -162,6 +162,36 @@
 }
 
 /* ================================================================
+   Orchestrator Rail Item — Cyan Accent
+   ================================================================ */
+
+.activity-rail__item--orchestrator {
+  color: var(--color-neon-cyan);
+  border-color: var(--color-neon-cyan);
+  background: rgba(80, 144, 168, 0.08);
+}
+
+.activity-rail__item--orchestrator::before {
+  background: var(--color-neon-cyan);
+}
+
+.activity-rail__pulse {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-neon-cyan);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; box-shadow: 0 0 2px rgba(80, 144, 168, 0.3); }
+  50% { opacity: 1; box-shadow: 0 0 6px rgba(80, 144, 168, 0.6); }
+}
+
+/* ================================================================
    Main Content
    ================================================================ */
 

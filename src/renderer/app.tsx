@@ -7,6 +7,7 @@ import { ActivityRail } from './components/ActivityRail'
 import { CockpitView } from './components/CockpitView'
 import { TerminalPane } from './components/TerminalPane'
 import { ChatroomPanel } from './components/ChatroomPanel'
+import { KickoffDialog } from './components/KickoffDialog'
 import { StatusBar } from './components/StatusBar'
 
 export function App() {
@@ -18,6 +19,8 @@ export function App() {
   const { unreadCount } = useMessages()
   const contextUsages = useContextUsage()
   const [mcpPort, setMcpPort] = useState<number | undefined>(undefined)
+  const [orchestratorRunning, setOrchestratorRunning] = useState(false)
+  const [kickoffVisible, setKickoffVisible] = useState(false)
 
   // Load MCP config to show port in status bar
   useEffect(() => {
@@ -31,6 +34,29 @@ export function App() {
     setChatroomVisible((v) => !v)
   }, [])
 
+  // Check orchestrator status on mount
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    api.orchestrator.status().then((s: { running: boolean }) => {
+      setOrchestratorRunning(s.running)
+    })
+  }, [])
+
+  const handleOrchestratorToggle = useCallback(async () => {
+    const api = (window as any).cipherMux
+    try {
+      if (orchestratorRunning) {
+        await api.orchestrator.stop()
+        setOrchestratorRunning(false)
+      } else {
+        await api.orchestrator.start()
+        setOrchestratorRunning(true)
+      }
+    } catch (err) {
+      console.error('[App] Orchestrator toggle failed:', err)
+    }
+  }, [orchestratorRunning])
+
   const handleViewChange = useCallback((view: ActiveView) => {
     setActiveView(view)
     if (view !== 'terminal') {
@@ -41,6 +67,35 @@ export function App() {
   const handleSessionSelect = useCallback((sessionId: string) => {
     setActiveSessionId(sessionId)
     setActiveView('terminal')
+  }, [])
+
+  const handleKickoff = useCallback(async (opts: {
+    requirementsFile: string
+    targetDir: string
+    projectName: string
+    autoInterview: boolean
+  }) => {
+    const api = (window as any).cipherMux
+    try {
+      await api.projects.kickoff(opts)
+      setKickoffVisible(false)
+      // Refresh project list
+      await api.projects.scan()
+    } catch (err) {
+      console.error('[App] Kickoff failed:', err)
+    }
+  }, [])
+
+  // Cmd+N keyboard shortcut for kickoff dialog
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.metaKey && e.key === 'n') {
+        e.preventDefault()
+        setKickoffVisible((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
   }, [])
 
   const handleStartSession = useCallback(async (project: ProjectInfo) => {
@@ -77,9 +132,11 @@ export function App() {
           chatroomVisible={chatroomVisible}
           activeSessionId={activeSessionId}
           unreadCount={unreadCount}
+          orchestratorRunning={orchestratorRunning}
           onViewChange={handleViewChange}
           onToggleChatroom={toggleChatroom}
           onSessionSelect={handleSessionSelect}
+          onOrchestratorToggle={handleOrchestratorToggle}
         />
 
         {/* Main Content */}
@@ -114,7 +171,14 @@ export function App() {
       </div>
 
       {/* Status Bar */}
-      <StatusBar sessions={sessions} mcpPort={mcpPort} mcpRunning={mcpPort != null} />
+      <StatusBar sessions={sessions} mcpPort={mcpPort} mcpRunning={mcpPort != null} orchestratorRunning={orchestratorRunning} />
+
+      {/* Kickoff Dialog (Cmd+N) */}
+      <KickoffDialog
+        visible={kickoffVisible}
+        onClose={() => setKickoffVisible(false)}
+        onKickoff={handleKickoff}
+      />
     </div>
   )
 }

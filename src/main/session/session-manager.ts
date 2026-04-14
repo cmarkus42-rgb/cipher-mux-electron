@@ -24,10 +24,20 @@ export class SessionManager extends EventEmitter {
   private sessions: Map<string, SessionInfo> = new Map()
   private tmux: TmuxManager
   private orchestratorSessionId: string | null = null
+  private mcpConfig: OrchestratorConfig | null = null
 
   constructor(tmux: TmuxManager) {
     super()
     this.tmux = tmux
+  }
+
+  /**
+   * Set MCP config for auto-injection into new sessions.
+   * When set, every new session gets CIPHER_MUX_MCP_URL and CIPHER_MUX_MCP_KEY
+   * as environment variables.
+   */
+  setMcpConfig(config: OrchestratorConfig | null): void {
+    this.mcpConfig = config
   }
 
   /**
@@ -42,11 +52,22 @@ export class SessionManager extends EventEmitter {
     const tmuxName = `cmux-${id.slice(-8).toLowerCase()}`
     const now = Date.now()
 
+    // Merge MCP env vars if config is set
+    let env = opts.env
+    if (this.mcpConfig) {
+      const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}`
+      env = {
+        ...env,
+        CIPHER_MUX_MCP_URL: mcpUrl,
+        CIPHER_MUX_MCP_KEY: this.mcpConfig.mcpApiKey,
+      }
+    }
+
     // Create tmux session
     const tmuxSession = await this.tmux.createSession(tmuxName, {
       cwd: opts.projectPath,
       command: opts.command,
-      env: opts.env,
+      env,
     })
 
     const session: SessionInfo = {

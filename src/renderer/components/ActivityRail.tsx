@@ -6,9 +6,11 @@ interface ActivityRailProps {
   chatroomVisible: boolean
   activeSessionId: string | null
   unreadCount?: number
+  orchestratorRunning: boolean
   onViewChange: (view: ActiveView) => void
   onToggleChatroom: () => void
   onSessionSelect: (sessionId: string) => void
+  onOrchestratorToggle: () => void
 }
 
 function RailItem({
@@ -44,9 +46,11 @@ export function ActivityRail({
   chatroomVisible,
   activeSessionId,
   unreadCount,
+  orchestratorRunning,
   onViewChange,
   onToggleChatroom,
   onSessionSelect,
+  onOrchestratorToggle,
 }: ActivityRailProps) {
   const activeSessions = sessions.filter((s) => s.status === 'active')
 
@@ -71,6 +75,16 @@ export function ActivityRail({
           onClick={() => onSessionSelect(session.id)}
         />
       ))}
+
+      {/* Orchestrator toggle */}
+      <div
+        class={`activity-rail__item ${orchestratorRunning ? 'activity-rail__item--orchestrator' : ''}`}
+        onClick={onOrchestratorToggle}
+        title={orchestratorRunning ? 'Stop Orchestrator' : 'Start Orchestrator'}
+      >
+        {'\u03DF'}
+        {orchestratorRunning && <span class="activity-rail__pulse" />}
+      </div>
 
       <div class="activity-rail__spacer" />
 
