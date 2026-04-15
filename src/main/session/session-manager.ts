@@ -7,6 +7,7 @@ import type { SessionInfo, SessionStatus, StartSessionOpts, RecoveryResult } fro
 import { MAX_SESSIONS, ORCHESTRATOR_DIR, ORCHESTRATOR_MAX_RETRIES } from '../../shared/constants'
 import { TmuxManager } from '../tmux/tmux-manager'
 import { generateOrchestratorClaudeMd } from './orchestrator-template'
+import { runCommand } from '../util/exec-util'
 
 /**
  * SessionManager — Registry for cipher-mux sessions.
@@ -60,6 +61,12 @@ export class SessionManager extends EventEmitter {
         ...env,
         CIPHER_MUX_MCP_URL: mcpUrl,
         CIPHER_MUX_MCP_KEY: this.mcpConfig.mcpApiKey,
+      }
+
+      // Register MCP server in Claude Code project-level settings
+      // so claude CLI can discover it on startup (env vars alone are ignored)
+      if (opts.projectPath) {
+        await this.registerMcpForProject(opts.projectPath, this.mcpConfig)
       }
     }
 
@@ -160,6 +167,14 @@ export class SessionManager extends EventEmitter {
       }
     }
 
+    // Restore orchestrator link if a recovered session is named "Orchestrator"
+    for (const session of recovered) {
+      if (session.name === 'Orchestrator') {
+        this.orchestratorSessionId = session.id
+        break
+      }
+    }
+
     return { recovered, orphaned }
   }
 
@@ -218,6 +233,30 @@ export class SessionManager extends EventEmitter {
     return this.tmux.capturePane(target, lines)
   }
 
+  // ─── MCP Registration ───────────────────────────────────
+
+  /**
+   * Register the cipher-mux MCP server for a project directory.
+   * Uses `claude mcp add-json` with local scope so Claude Code discovers it on startup.
+   */
+  private async registerMcpForProject(projectPath: string, config: OrchestratorConfig): Promise<void> {
+    const mcpUrl = `http://${config.mcpHost}:${config.mcpPort}/mcp`
+    const serverJson = JSON.stringify({
+      type: 'http',
+      url: mcpUrl,
+      headers: { Authorization: `Bearer ${config.mcpApiKey}` },
+    })
+
+    try {
+      await runCommand('claude', [
+        'mcp', 'add-json', '-s', 'local', 'cipher-mux', serverJson,
+      ], { cwd: projectPath, timeout: 15_000 })
+      console.log(`[SessionManager] MCP registered for project: ${projectPath}`)
+    } catch (err) {
+      console.warn(`[SessionManager] MCP registration failed for ${projectPath}:`, err)
+    }
+  }
+
   // ─── Orchestrator ─────────────────────────────────────
 
   /**
@@ -256,7 +295,28 @@ export class SessionManager extends EventEmitter {
     })
     fs.writeFileSync(path.join(orchestratorDir, 'CLAUDE.md'), claudeMd, 'utf-8')
 
-    // Start session
+    // Write .mcp.json into the orchestrator project directory.
+    // Claude Code reads this file when starting in the project dir.
+    const mcpUrl = `http://${config.mcpHost}:${config.mcpPort}/mcp`
+    const mcpJsonPath = path.join(orchestratorDir, '.mcp.json')
+    const mcpJson = {
+      mcpServers: {
+        'cipher-mux': {
+          type: 'http',
+          url: mcpUrl,
+          headers: {
+            Authorization: `Bearer ${config.mcpApiKey}`,
+          },
+        },
+      },
+    }
+    fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2), 'utf-8')
+
+    // MCP registration via `claude mcp add-json` happens automatically
+    // in start() when mcpConfig is set. The .mcp.json above is an
+    // additional fallback specific to the orchestrator directory.
+
+    // Start session — command is sent separately after renderer has resized
     const session = await this.start({
       name: 'Orchestrator',
       projectPath: orchestratorDir,
@@ -265,6 +325,17 @@ export class SessionManager extends EventEmitter {
     this.orchestratorSessionId = session.id
     this.emit('orchestrator-started', session)
     return session
+  }
+
+  /**
+   * Launch Claude Code in the Orchestrator session.
+   * Called after the renderer has resized the terminal to the correct dimensions.
+   */
+  async launchOrchestratorClaude(): Promise<void> {
+    if (!this.orchestratorSessionId) {
+      throw new Error('Orchestrator is not running')
+    }
+    await this.sendKeys(this.orchestratorSessionId, 'claude --dangerously-skip-permissions\n')
   }
 
   /**
