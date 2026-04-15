@@ -11,6 +11,7 @@ interface ActivityRailProps {
   onToggleChatroom: () => void
   onSessionSelect: (sessionId: string) => void
   onOrchestratorToggle: () => void
+  onAddSession: () => void
 }
 
 function RailItem({
@@ -51,6 +52,7 @@ export function ActivityRail({
   onToggleChatroom,
   onSessionSelect,
   onOrchestratorToggle,
+  onAddSession,
 }: ActivityRailProps) {
   const activeSessions = sessions.filter((s) => s.status === 'active')
 
@@ -75,6 +77,14 @@ export function ActivityRail({
           onClick={() => onSessionSelect(session.id)}
         />
       ))}
+
+      {/* Add session (+) */}
+      <RailItem
+        icon="+"
+        label="New Session"
+        active={false}
+        onClick={onAddSession}
+      />
 
       {/* Orchestrator toggle */}
       <div

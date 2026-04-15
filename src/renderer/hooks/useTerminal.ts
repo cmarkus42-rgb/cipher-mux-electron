@@ -99,14 +99,37 @@ export function useTerminal(sessionId: string): UseTerminalResult {
     })
     resizeObserver.observe(container)
 
-    // Restore scrollback from tmux when (re-)mounting
-    api().terminal.capture(sessionId, 2000).then((content: string) => {
-      if (content && term) {
-        term.write(content.replace(/\n/g, '\r\n'))
+    // Initial fit after layout settles
+    requestAnimationFrame(() => {
+      try {
+        fitAddon.fit()
+        api().terminal.resize(sessionId, term.cols, term.rows)
+      } catch {
+        // container may not be visible yet
       }
-    }).catch(() => {
-      // session may not be ready yet on first creation
     })
+    // Second fit after a short delay to catch late layout changes
+    setTimeout(() => {
+      try {
+        fitAddon.fit()
+        api().terminal.resize(sessionId, term.cols, term.rows)
+      } catch {
+        // ignore
+      }
+    }, 200)
+
+    // Restore pane content from tmux when re-mounting (e.g. switching sessions).
+    // Delay to let tmux settle and xterm.js resize to correct dimensions.
+    const restoreTimer = setTimeout(() => {
+      api().terminal.capture(sessionId).then((content: string) => {
+        if (content?.trim() && term) {
+          term.reset()
+          term.write(content.replace(/\n/g, '\r\n'))
+        }
+      }).catch(() => {
+        // session may not be ready yet on first creation
+      })
+    }, 500)
 
     // Send user input to main process
     const inputDisposable = term.onData((data: string) => {
@@ -123,6 +146,7 @@ export function useTerminal(sessionId: string): UseTerminalResult {
     )
 
     return () => {
+      clearTimeout(restoreTimer)
       resizeObserver.disconnect()
       inputDisposable.dispose()
       unsubscribe()

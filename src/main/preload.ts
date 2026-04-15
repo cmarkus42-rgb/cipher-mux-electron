@@ -98,6 +98,11 @@ const api = {
     start: () => ipcRenderer.invoke(IPC.ORCHESTRATOR_START),
     stop: () => ipcRenderer.invoke(IPC.ORCHESTRATOR_STOP),
     status: () => ipcRenderer.invoke(IPC.ORCHESTRATOR_STATUS),
+    onStarted: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.ORCHESTRATOR_STARTED, handler)
+      return () => ipcRenderer.removeListener(IPC.ORCHESTRATOR_STARTED, handler)
+    },
   },
 
   // ─── Bugreport ─────────────────────────────────────────

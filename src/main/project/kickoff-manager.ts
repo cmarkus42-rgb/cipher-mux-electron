@@ -22,7 +22,11 @@ export class KickoffManager {
    * 5. Return result
    */
   async kickoff(opts: KickoffOpts): Promise<KickoffResult> {
-    const projectPath = path.join(opts.targetDir, opts.projectName)
+    // If targetDir already ends with projectName, don't double-append
+    const baseName = path.basename(opts.targetDir)
+    const projectPath = baseName === opts.projectName
+      ? opts.targetDir
+      : path.join(opts.targetDir, opts.projectName)
 
     // Fail if project directory already exists
     if (fs.existsSync(projectPath)) {
@@ -50,11 +54,46 @@ export class KickoffManager {
     const claudeMdContent = generateClaudeMd(opts.projectName)
     fs.writeFileSync(claudeMdPath, claudeMdContent, 'utf-8')
 
+    // Copy SDD workflow skills (.claude/skills/) into the new project
+    this.copySkills(projectPath)
+
     return {
       projectPath,
       claudeMdPath,
       requirementsCopied: true,
     }
+  }
+
+  /**
+   * Copy the SDD workflow skills from the bundled template into a new project.
+   * Skills are stored alongside the app in .claude/skills/.
+   */
+  private copySkills(projectPath: string): void {
+    // Resolve skills template directory relative to the app root
+    const appRoot = path.resolve(__dirname, '..', '..', '..')
+    const skillsSrc = path.join(appRoot, '.claude', 'skills')
+
+    if (!fs.existsSync(skillsSrc)) {
+      console.warn('[KickoffManager] Skills template not found:', skillsSrc)
+      return
+    }
+
+    const skillsDest = path.join(projectPath, '.claude', 'skills')
+    fs.mkdirSync(skillsDest, { recursive: true })
+
+    // Copy each skill directory
+    for (const entry of fs.readdirSync(skillsSrc, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      const srcDir = path.join(skillsSrc, entry.name)
+      const destDir = path.join(skillsDest, entry.name)
+      fs.mkdirSync(destDir, { recursive: true })
+
+      for (const file of fs.readdirSync(srcDir)) {
+        fs.copyFileSync(path.join(srcDir, file), path.join(destDir, file))
+      }
+    }
+
+    console.log(`[KickoffManager] Skills copied to ${skillsDest}`)
   }
 }
 
@@ -67,7 +106,20 @@ function generateClaudeMd(projectName: string): string {
 ## Status
 **Phase: 1 — Anforderungsinterview**
 
+**Nächster Schritt:** \`/interview\` starten — Requirements mit dem Auftraggeber erheben.
+
 ## Build & Test
 _Noch nicht konfiguriert._
+
+## Workflow-Skills
+
+| Phase | Skill | Zweck |
+|-------|-------|-------|
+| 1 | \`/interview\` | Anforderungsinterview durchführen |
+| 2 | \`/spec\` | Technische Spezifikation erstellen |
+| 3 | \`/decide\` | ADRs für Entscheidungspunkte erstellen |
+| 4 | \`/decompose\` | Spezifikation in Tasks zerlegen |
+| 5 | \`/implement\` | Nächsten Task implementieren |
+| — | \`/doc-review\` | Dokumentation mit Code abgleichen |
 `
 }

@@ -218,29 +218,34 @@ export class TmuxManager extends EventEmitter {
     width?: number
     height?: number
   }): Promise<string> {
-    const width = opts?.width ?? 200
-    const height = opts?.height ?? 50
+    const width = opts?.width ?? 80
+    const height = opts?.height ?? 24
     const args = ['new-session', '-d', '-s', name, '-x', String(width), '-y', String(height), '-P', '-F', '#{session_id}']
     if (opts?.cwd) {
       args.push('-c', opts.cwd)
     }
 
-    // Build env string for tmux
-    let envPrefix = ''
+    // Ensure 256-color support inside the session
+    args.push('-e', 'TERM=xterm-256color')
+
+    // Set env vars via -e flags (tmux 3.2+)
     if (opts?.env) {
       for (const [key, val] of Object.entries(opts.env)) {
-        envPrefix += `${key}=${val} `
+        args.push('-e', `${key}=${val}`)
       }
     }
 
+    const result = await runCommand('tmux', args)
+    const sessionId = result.trim()
+
+    // Send command via send-keys so the shell stays alive after command exits
+    // Wait for shell to be ready before sending
     if (opts?.command) {
-      args.push(envPrefix + opts.command)
-    } else if (envPrefix) {
-      args.push(`${envPrefix}$SHELL`)
+      await new Promise((r) => setTimeout(r, 500))
+      await runCommand('tmux', ['send-keys', '-t', name, opts.command, 'Enter'])
     }
 
-    const result = await runCommand('tmux', args)
-    return result.trim() // Returns session ID like $1
+    return sessionId
   }
 
   /**
@@ -302,7 +307,7 @@ export class TmuxManager extends EventEmitter {
    * Capture pane content.
    */
   async capturePane(target: string, lines?: number): Promise<string> {
-    const args = ['capture-pane', '-t', target, '-p']
+    const args = ['capture-pane', '-t', target, '-p', '-e']
     if (lines) {
       args.push('-S', String(-lines))
     }
