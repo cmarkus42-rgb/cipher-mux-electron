@@ -1,10 +1,12 @@
 import type { ProjectInfo, SessionInfo, ContextUsage } from '../../shared/types'
-import { useProjects } from '../hooks/useProjects'
 import { ProjectCard } from './ProjectCard'
 
 interface CockpitViewProps {
   sessions: SessionInfo[]
   contextUsages: Record<string, ContextUsage>
+  projects: ProjectInfo[]
+  scanning: boolean
+  onRescan: () => void
   onStartSession: (project: ProjectInfo) => void
 }
 
@@ -17,8 +19,7 @@ const gridStyle = {
   flex: 1,
 }
 
-export function CockpitView({ sessions, contextUsages, onStartSession }: CockpitViewProps) {
-  const { projects, scanning, rescan } = useProjects()
+export function CockpitView({ sessions, contextUsages, projects, scanning, onRescan, onStartSession }: CockpitViewProps) {
 
   /** Match a session to a project by path */
   function sessionForProject(project: ProjectInfo): SessionInfo | undefined {
@@ -34,7 +35,7 @@ export function CockpitView({ sessions, contextUsages, onStartSession }: Cockpit
         <div class="empty-state__text">
           No projects found. Configure scan paths or use the button below to scan.
         </div>
-        <button class="btn btn--primary" onClick={rescan}>
+        <button class="btn btn--primary" onClick={onRescan}>
           Scan Projects
         </button>
       </div>
@@ -53,7 +54,7 @@ export function CockpitView({ sessions, contextUsages, onStartSession }: Cockpit
         <div class="toolbar__group">
           <button
             class="btn btn--sm"
-            onClick={rescan}
+            onClick={onRescan}
             disabled={scanning}
           >
             {scanning ? 'Scanning...' : 'Scan Projects'}

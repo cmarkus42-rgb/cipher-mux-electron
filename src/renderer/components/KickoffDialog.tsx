@@ -51,12 +51,14 @@ export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProp
 
     setLoading(true)
     try {
-      onKickoff({
+      await onKickoff({
         requirementsFile: requirementsFile.trim(),
         targetDir: targetDir.trim(),
         projectName: projectName.trim(),
         autoInterview,
       })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
@@ -113,7 +115,7 @@ export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProp
               <input
                 class="input"
                 type="text"
-                placeholder="/path/to/projects"
+                placeholder="Übergeordnetes Verzeichnis (z.B. ~/Projects)"
                 value={targetDir}
                 onInput={(e) => setTargetDir((e.target as HTMLInputElement).value)}
               />

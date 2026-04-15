@@ -95,8 +95,35 @@ export class IpcHub {
       sessionManager: this.sessionManager,
       messageBus: this.messageBus,
       statusLineMonitor: this.statusLineMonitor,
+    }).then(() => {
+      // Auto-start orchestrator after MCP server is ready
+      this.autoStartOrchestrator()
     }).catch((err) => {
       console.error('[IpcHub] MCP server start failed:', err)
+    })
+  }
+
+  /**
+   * Auto-start the Orchestrator session after MCP server is ready.
+   */
+  private autoStartOrchestrator(): void {
+    const mcpConfig = configStore.get('mcp')
+    this.sessionManager.startOrchestrator({
+      mcpHost: mcpConfig?.host ?? MCP_DEFAULT_HOST,
+      mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
+      mcpApiKey: mcpConfig?.apiKey ?? '',
+    }).then((session) => {
+      console.log(`[IpcHub] Orchestrator auto-started: ${session.id}`)
+      // Notify renderer about orchestrator state
+      this.windowManager.sendToMainWindow(IPC.ORCHESTRATOR_STARTED, session)
+      // Launch Claude after renderer has had time to resize the terminal
+      setTimeout(() => {
+        this.sessionManager.launchOrchestratorClaude().catch((err) => {
+          console.error('[IpcHub] Failed to launch orchestrator claude:', err)
+        })
+      }, 2000)
+    }).catch((err) => {
+      console.error('[IpcHub] Orchestrator auto-start failed:', err)
     })
   }
 
@@ -229,7 +256,14 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.PROJECTS_KICKOFF, async (_e, opts: KickoffOpts) => {
-      return this.kickoffManager.kickoff(opts)
+      const result = await this.kickoffManager.kickoff(opts)
+      // Inspect the newly created project and add it to the cached list
+      const projectInfo = await this.projectScanner.inspectProject(result.projectPath)
+      if (projectInfo) {
+        this.cachedProjects.push(projectInfo)
+        this.cachedProjects.sort((a, b) => a.name.localeCompare(b.name))
+      }
+      return result
     })
   }
 
@@ -294,11 +328,18 @@ export class IpcHub {
   private registerOrchestratorChannels(): void {
     ipcMain.handle(IPC.ORCHESTRATOR_START, async () => {
       const mcpConfig = configStore.get('mcp')
-      return this.sessionManager.startOrchestrator({
+      const session = await this.sessionManager.startOrchestrator({
         mcpHost: mcpConfig?.host ?? MCP_DEFAULT_HOST,
         mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
         mcpApiKey: mcpConfig?.apiKey ?? '',
       })
+      // Launch Claude after renderer has had time to resize the terminal
+      setTimeout(() => {
+        this.sessionManager.launchOrchestratorClaude().catch((err) => {
+          console.error('[IpcHub] Failed to launch orchestrator claude:', err)
+        })
+      }, 1500)
+      return session
     })
 
     ipcMain.handle(IPC.ORCHESTRATOR_STOP, async () => {

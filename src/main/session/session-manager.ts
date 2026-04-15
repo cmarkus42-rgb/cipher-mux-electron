@@ -248,6 +248,11 @@ export class SessionManager extends EventEmitter {
     })
 
     try {
+      // Remove existing entry first (ignore errors if it doesn't exist)
+      await runCommand('claude', [
+        'mcp', 'remove', '-s', 'local', 'cipher-mux',
+      ], { cwd: projectPath, timeout: 10_000 }).catch(() => {})
+
       await runCommand('claude', [
         'mcp', 'add-json', '-s', 'local', 'cipher-mux', serverJson,
       ], { cwd: projectPath, timeout: 15_000 })

@@ -3,6 +3,7 @@ import type { ActiveView, ProjectInfo } from '../shared/types'
 import { useSessions } from './hooks/useSessions'
 import { useMessages } from './hooks/useMessages'
 import { useContextUsage } from './hooks/useContextUsage'
+import { useProjects } from './hooks/useProjects'
 import { ActivityRail } from './components/ActivityRail'
 import { CockpitView } from './components/CockpitView'
 import { TerminalPane } from './components/TerminalPane'
@@ -18,6 +19,7 @@ export function App() {
   const { sessions, startSession, stopSession } = useSessions()
   const { unreadCount } = useMessages()
   const contextUsages = useContextUsage()
+  const { projects, scanning, rescan } = useProjects()
   const [mcpPort, setMcpPort] = useState<number | undefined>(undefined)
   const [orchestratorRunning, setOrchestratorRunning] = useState(false)
   const [kickoffVisible, setKickoffVisible] = useState(false)
@@ -34,12 +36,17 @@ export function App() {
     setChatroomVisible((v) => !v)
   }, [])
 
-  // Check orchestrator status on mount
+  // Check orchestrator status on mount + listen for autostart
   useEffect(() => {
     const api = (window as any).cipherMux
     api.orchestrator.status().then((s: { running: boolean }) => {
       setOrchestratorRunning(s.running)
     })
+    // Listen for orchestrator auto-start event from main process
+    const unsub = api.orchestrator.onStarted(() => {
+      setOrchestratorRunning(true)
+    })
+    return () => unsub()
   }, [])
 
   const handleOrchestratorToggle = useCallback(async () => {
@@ -54,6 +61,9 @@ export function App() {
       }
     } catch (err) {
       console.error('[App] Orchestrator toggle failed:', err)
+      // Re-sync UI state with backend on error
+      const status = await api.orchestrator.status()
+      setOrchestratorRunning(status.running)
     }
   }, [orchestratorRunning])
 
@@ -76,15 +86,11 @@ export function App() {
     autoInterview: boolean
   }) => {
     const api = (window as any).cipherMux
-    try {
-      await api.projects.kickoff(opts)
-      setKickoffVisible(false)
-      // Refresh project list
-      await api.projects.scan()
-    } catch (err) {
-      console.error('[App] Kickoff failed:', err)
-    }
-  }, [])
+    await api.projects.kickoff(opts)
+    setKickoffVisible(false)
+    // Refresh project list so the new tile appears immediately
+    await rescan()
+  }, [rescan])
 
   // Cmd+N keyboard shortcut for kickoff dialog
   useEffect(() => {
@@ -106,8 +112,31 @@ export function App() {
       })
       setActiveSessionId(session.id)
       setActiveView('terminal')
+      // Auto-launch Claude in project sessions after terminal has time to resize
+      const api = (window as any).cipherMux
+      setTimeout(() => {
+        api.terminal.write(session.id, 'claude --dangerously-skip-permissions\n')
+      }, 1000)
     } catch (err) {
       console.error('[App] Failed to start session:', err)
+    }
+  }, [startSession])
+
+  // Start a plain shell session in a user-selected directory (no claude)
+  const handleAddSession = useCallback(async () => {
+    const api = (window as any).cipherMux
+    const dir = await api.dialog.openDir({ title: 'Session-Verzeichnis wählen' })
+    if (!dir) return
+    try {
+      const name = dir.split('/').pop() || 'shell'
+      const session = await startSession({
+        name,
+        projectPath: dir,
+      })
+      setActiveSessionId(session.id)
+      setActiveView('terminal')
+    } catch (err) {
+      console.error('[App] Failed to start shell session:', err)
     }
   }, [startSession])
 
@@ -137,6 +166,7 @@ export function App() {
           onToggleChatroom={toggleChatroom}
           onSessionSelect={handleSessionSelect}
           onOrchestratorToggle={handleOrchestratorToggle}
+          onAddSession={handleAddSession}
         />
 
         {/* Main Content */}
@@ -146,6 +176,9 @@ export function App() {
               <CockpitView
                 sessions={sessions}
                 contextUsages={contextUsages}
+                projects={projects}
+                scanning={scanning}
+                onRescan={rescan}
                 onStartSession={handleStartSession}
               />
             )}
