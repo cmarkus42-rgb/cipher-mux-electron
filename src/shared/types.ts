@@ -116,6 +116,10 @@ export interface AppConfig {
     defaultProjectDir: string
     maxSessions: number
     messageRetentionDays: number
+    /** Path to the projectlauncher working directory. */
+    projectlauncherPath: string
+    /** Minutes to wait for a kickoff completion signal before warning. */
+    kickoffTimeoutMinutes: number
   }
   mcp: {
     port: number
