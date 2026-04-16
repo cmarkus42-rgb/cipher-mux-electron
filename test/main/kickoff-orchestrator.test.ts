@@ -7,6 +7,25 @@ import { EventEmitter } from 'events'
 import { KickoffOrchestrator } from '../../src/main/project/kickoff-orchestrator'
 import type { SessionInfo, StartSessionOpts } from '../../src/shared/types'
 
+/** Captures console.log + console.warn + console.error output for assertions. */
+function captureConsole(): { lines: string[]; restore: () => void } {
+  const lines: string[] = []
+  const origLog = console.log
+  const origWarn = console.warn
+  const origError = console.error
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(' ')) }
+  console.warn = (...args: unknown[]) => { lines.push(args.map(String).join(' ')) }
+  console.error = (...args: unknown[]) => { lines.push(args.map(String).join(' ')) }
+  return {
+    lines,
+    restore: () => {
+      console.log = origLog
+      console.warn = origWarn
+      console.error = origError
+    },
+  }
+}
+
 // Minimal SessionManager stand-in. Only the methods the orchestrator uses.
 class MockSessionManager extends EventEmitter {
   public starts: StartSessionOpts[] = []
@@ -252,5 +271,77 @@ describe('KickoffOrchestrator', () => {
     assert.equal(timeoutFired, true, 'kickoff-timeout should fire')
     assert.equal(completeFired, false, 'kickoff-complete should NOT fire without CLAUDE.md')
     shortOrch.destroy()
+  })
+
+  it('emits one structured log line per complete path', async () => {
+    // Pfad A: reason=normal (via handleCompletion).
+    const cap1 = captureConsole()
+    await orchestrator.start({ projectDir })
+    orchestrator.handleCompletion({ projectPath: projectDir, projectName: 'my-project' })
+    await new Promise((r) => setTimeout(r, 80))
+    cap1.restore()
+    const normalLogs = cap1.lines.filter((l) => l.includes('kickoff-result'))
+    assert.equal(normalLogs.length, 1, `normal path: expected 1 log line, got ${normalLogs.length}`)
+    assert.match(normalLogs[0], /reason=normal/)
+    assert.match(normalLogs[0], /project=my-project/)
+    orchestrator.destroy()
+
+    // Pfad B: reason=marker (via marker file).
+    const fresh = new KickoffOrchestrator({
+      sessionManager: mockSm as any,
+      projectlauncherPath: launcherDir,
+      timeoutMs: 60_000,
+      pollIntervalMs: 30,
+      promptSendDelayMs: 10,
+      interviewSendDelayMs: 10,
+    })
+    const cap2 = captureConsole()
+    await fresh.start({ projectDir })
+    fs.writeFileSync(path.join(projectDir, '.kickoff-complete'), '', 'utf-8')
+    await new Promise((r) => setTimeout(r, 200))
+    cap2.restore()
+    const markerLogs = cap2.lines.filter((l) => l.includes('kickoff-result'))
+    assert.equal(markerLogs.length, 1, `marker path: expected 1 log line, got ${markerLogs.length}`)
+    assert.match(markerLogs[0], /reason=marker/)
+    fresh.destroy()
+    fs.rmSync(path.join(projectDir, '.kickoff-complete'))
+
+    // Pfad C: reason=implicit (Timeout mit CLAUDE.md).
+    const impl = new KickoffOrchestrator({
+      sessionManager: mockSm as any,
+      projectlauncherPath: launcherDir,
+      timeoutMs: 80,
+      pollIntervalMs: 30,
+      promptSendDelayMs: 10,
+      interviewSendDelayMs: 10,
+    })
+    fs.writeFileSync(path.join(projectDir, 'CLAUDE.md'), '# x', 'utf-8')
+    const cap3 = captureConsole()
+    await impl.start({ projectDir })
+    await new Promise((r) => setTimeout(r, 300))
+    cap3.restore()
+    const implLogs = cap3.lines.filter((l) => l.includes('kickoff-result'))
+    assert.equal(implLogs.length, 1, `implicit path: expected 1 log line, got ${implLogs.length}`)
+    assert.match(implLogs[0], /reason=implicit/)
+    impl.destroy()
+    fs.rmSync(path.join(projectDir, 'CLAUDE.md'))
+
+    // Pfad D: reason=hard-fail (Timeout ohne CLAUDE.md).
+    const hard = new KickoffOrchestrator({
+      sessionManager: mockSm as any,
+      projectlauncherPath: launcherDir,
+      timeoutMs: 80,
+      pollIntervalMs: 30,
+      promptSendDelayMs: 10,
+      interviewSendDelayMs: 10,
+    })
+    const cap4 = captureConsole()
+    await hard.start({ projectDir })
+    await new Promise((r) => setTimeout(r, 300))
+    cap4.restore()
+    const hardLogs = cap4.lines.filter((l) => l.includes('kickoff-result'))
+    assert.equal(hardLogs.length, 1, `hard-fail path: expected 1 log line, got ${hardLogs.length}`)
+    assert.match(hardLogs[0], /reason=hard-fail/)
+    hard.destroy()
   })
 })

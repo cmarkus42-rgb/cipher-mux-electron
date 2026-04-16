@@ -140,6 +140,13 @@ export class KickoffOrchestrator extends EventEmitter {
     const active = this.active
     this.cleanupActive()
 
+    const effectiveName = payload.projectName || active.handle.projectName
+    const effectivePath = payload.projectPath || active.handle.projectDir
+    console.log(
+      `[KickoffOrchestrator] kickoff-result reason=${reason} `
+      + `project=${effectiveName} path=${effectivePath}`,
+    )
+
     const interviewDelay = this.deps.interviewSendDelayMs ?? DEFAULT_INTERVIEW_SEND_DELAY_MS
 
     // Start the follow-up session in the project dir.
@@ -197,6 +204,10 @@ export class KickoffOrchestrator extends EventEmitter {
       return
     }
 
+    console.error(
+      `[KickoffOrchestrator] kickoff-result reason=hard-fail `
+      + `project=${handle.projectName} path=${handle.projectDir}`,
+    )
     this.cleanupActive()
     this.emit('kickoff-timeout', { handle })
   }
