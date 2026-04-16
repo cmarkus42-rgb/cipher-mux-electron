@@ -177,6 +177,29 @@ export class IpcHub {
     })
 
     this.kickoffOrchestrator.on('kickoff-complete', (event) => {
+      // Persist the project's parent directory as a scan path, so that the
+      // renderer's post-completion rescan (and any future manual rescan) finds
+      // the new project even if it lives outside the default scan paths.
+      const projectPath = event.handle.projectDir
+      const parentDir = path.dirname(projectPath)
+      const appCfg = configStore.get('app')
+      const scanPaths = appCfg?.scanPaths ?? []
+      if (!scanPaths.includes(parentDir)) {
+        configStore.set('app', { ...appCfg, scanPaths: [...scanPaths, parentDir] })
+      }
+
+      // Pre-populate cachedProjects so the new project shows up immediately
+      // without waiting for the renderer's rescan round-trip.
+      this.projectScanner.inspectProject(projectPath).then((projectInfo) => {
+        if (projectInfo) {
+          this.cachedProjects = this.cachedProjects.filter((p) => p.path !== projectInfo.path)
+          this.cachedProjects.push(projectInfo)
+          this.cachedProjects.sort((a, b) => a.name.localeCompare(b.name))
+        }
+      }).catch((err) => {
+        console.warn('[IpcHub] kickoff-complete: inspectProject failed:', err)
+      })
+
       this.windowManager.sendToMainWindow(
         IPC.PROJECT_KICKOFF_COMPLETED,
         { status: 'complete', event },
