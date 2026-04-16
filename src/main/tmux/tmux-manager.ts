@@ -282,8 +282,23 @@ export class TmuxManager extends EventEmitter {
 
   /**
    * Send keystrokes to a tmux pane.
+   *
+   * Uses the existing Control Mode stdin when connected (no fork/exec per
+   * keystroke, keeps escape sequences like arrow keys intact as a single
+   * atomic write). Encodes bytes as hex for `send-keys -H` so there is no
+   * shell quoting and no ambiguity with special characters.
    */
   async sendKeys(target: string, keys: string): Promise<void> {
+    if (!keys) return
+    if (this.connected && this.controlProcess?.stdin?.writable) {
+      const bytes = Buffer.from(keys, 'utf-8')
+      if (bytes.length === 0) return
+      const hex = bytes.toString('hex').match(/.{2}/g)!.join(' ')
+      // target name is our own ULID-derived `cmux-xxxxxxxx`, safe to inline
+      this.sendRaw(`send-keys -H -t ${target} ${hex}`)
+      return
+    }
+    // Fallback when control mode isn't available
     await runCommand('tmux', ['send-keys', '-l', '-t', target, keys])
   }
 

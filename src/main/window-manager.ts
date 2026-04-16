@@ -30,6 +30,11 @@ export class WindowManager {
       },
     })
 
+    // Open DevTools in dev mode
+    if (process.env.VITE_DEV_SERVER_URL) {
+      this.mainWindow.webContents.openDevTools({ mode: 'detach' })
+    }
+
     // Load renderer
     if (process.env.VITE_DEV_SERVER_URL) {
       this.mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)

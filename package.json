@@ -10,6 +10,7 @@
     "build": "npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
+    "dist": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg",
     "start": "electron .",
     "prestart": "electron-builder install-app-deps 2>/dev/null || true",
     "test": "npm run rebuild:node && node --test --import tsx $(find test -name '*.test.ts' | sort)",
@@ -20,12 +21,12 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
     "better-sqlite3": "^11.10.0",
     "ulidx": "^2.4.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0",
     "@preact/preset-vite": "^2.9.0",
     "@types/better-sqlite3": "^7.6.0",
     "@xterm/addon-canvas": "^0.7.0",

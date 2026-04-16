@@ -34,6 +34,8 @@ const api = {
       ipcRenderer.invoke(IPC.TERMINAL_SPLIT, { paneId, direction }),
     capture: (paneId: string, lines?: number) =>
       ipcRenderer.invoke(IPC.TERMINAL_CAPTURE, { paneId, lines }),
+    ready: (paneId: string, cols: number, rows: number) =>
+      ipcRenderer.send(IPC.TERMINAL_READY, { paneId, cols, rows }),
     onData: (cb: (data: { paneId: string; data: string }) => void) => {
       const handler = (_e: unknown, data: { paneId: string; data: string }) => cb(data)
       ipcRenderer.on(IPC.TERMINAL_DATA, handler)

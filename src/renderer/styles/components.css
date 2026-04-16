@@ -594,3 +594,108 @@
   padding: var(--space-sm) var(--space-md);
   border-top: 1px solid var(--color-border);
 }
+
+/* ================================================================
+   Settings View
+   ================================================================ */
+
+.settings-view {
+  padding: var(--space-lg) var(--space-xl);
+  overflow-y: auto;
+  height: 100%;
+  max-width: 720px;
+}
+
+.settings-view__heading {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: var(--font-size-xl);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 var(--space-lg) 0;
+  color: var(--color-text);
+}
+
+.settings-section {
+  margin-bottom: var(--space-xl);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elev-1, rgba(255, 255, 255, 0.02));
+}
+
+.settings-section__title {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: var(--font-size-md);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
+  margin-bottom: var(--space-sm);
+}
+
+.settings-section__hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-dim);
+  margin-bottom: var(--space-md);
+  line-height: 1.5;
+}
+
+.settings-section__hint code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0 4px;
+}
+
+.settings-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-sm) 0;
+  border: 1px solid var(--color-border);
+}
+
+.settings-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-list__item:last-child {
+  border-bottom: none;
+}
+
+.settings-list__item > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.settings-list__empty {
+  padding: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-dim);
+  font-style: italic;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.settings-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-dim);
+}

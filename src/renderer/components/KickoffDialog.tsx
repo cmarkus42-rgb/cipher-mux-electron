@@ -115,12 +115,15 @@ export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProp
               <input
                 class="input"
                 type="text"
-                placeholder="Übergeordnetes Verzeichnis (z.B. ~/Projects)"
+                placeholder="Parent-Dir (neues Projekt) oder existierender Pfad"
                 value={targetDir}
                 onInput={(e) => setTargetDir((e.target as HTMLInputElement).value)}
               />
               <button class="btn btn--sm" onClick={handlePickDir}>...</button>
             </div>
+            <span class="text-xs text-dim" style={{ marginTop: '4px' }}>
+              Tipp: Endet der Pfad auf den Projektnamen, wird dort hineingelegt (docs/requirements.md + CLAUDE.md falls fehlt).
+            </span>
           </label>
 
           {/* Auto Interview Toggle */}

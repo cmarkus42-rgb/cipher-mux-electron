@@ -1,3 +1,4 @@
+import { useState } from 'preact/hooks'
 import type { ProjectInfo, SessionInfo } from '../../shared/types'
 
 interface ProjectCardProps {
@@ -15,6 +16,18 @@ function contextColorClass(pct: number): string {
 
 export function ProjectCard({ project, session, contextUsage, onStartSession }: ProjectCardProps) {
   const isActive = session != null && session.status === 'active'
+  const [copied, setCopied] = useState(false)
+
+  const handleCopyPath = async (e: MouseEvent) => {
+    e.stopPropagation()
+    try {
+      await navigator.clipboard.writeText(project.path)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1000)
+    } catch (err) {
+      console.error('[ProjectCard] clipboard write failed:', err)
+    }
+  }
 
   return (
     <div class={`card ${isActive ? 'card--selected' : ''}`}>
@@ -53,8 +66,19 @@ export function ProjectCard({ project, session, contextUsage, onStartSession }: 
       </div>
 
       <div class="card__footer">
-        <span class="font-mono text-xs text-dim truncate" style={{ flex: 1 }}>
-          {project.path}
+        <span
+          class="font-mono text-xs text-dim truncate"
+          style={{
+            flex: 1,
+            direction: 'rtl',
+            textAlign: 'left',
+            cursor: 'pointer',
+            userSelect: 'none',
+          }}
+          title={copied ? 'Copied!' : `Click to copy: ${project.path}`}
+          onClick={handleCopyPath}
+        >
+          {copied ? '✓ Copied!' : project.path}
         </span>
 
         {isActive && contextUsage != null && (

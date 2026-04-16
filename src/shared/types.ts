@@ -20,6 +20,12 @@ export interface StartSessionOpts {
   projectPath: string
   command?: string
   env?: Record<string, string>
+  /**
+   * Command to run in the session once the renderer has reported its real
+   * terminal size (TERMINAL_READY). Use this for TUIs like `claude` that
+   * don't reflow after a late SIGWINCH.
+   */
+  autoLaunch?: string
 }
 
 export interface RecoveryResult {
@@ -105,6 +111,8 @@ export interface AppState {
 export interface AppConfig {
   app: {
     scanPaths: string[]
+    /** Directory levels below each scanPath that are inspected (1 = children only). */
+    scanDepth: number
     defaultProjectDir: string
     maxSessions: number
     messageRetentionDays: number

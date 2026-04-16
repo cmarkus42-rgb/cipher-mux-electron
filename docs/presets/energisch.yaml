@@ -1,0 +1,9 @@
+version: '1.0'
+name: energisch
+breathing.frequency_hz: 0.3
+breathing.head_amplitude_deg: 3.5
+breathing.antenna_sway_deg: 8
+ambient.look_around_interval_s: 4
+ambient.micro_movement_amplitude_deg: 1.5
+speaking.wobble_amplitude_deg: 5
+speaking.wobble_frequency_hz: 6

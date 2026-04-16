@@ -7,18 +7,28 @@ import { validateBearer } from './mcp-auth'
 import { registerTools, ToolContext } from './mcp-tools'
 
 /**
+ * Per-client MCP session — each connecting client gets its own
+ * McpServer + StreamableHTTPServerTransport pair.
+ */
+interface McpSession {
+  sessionId: string
+  mcpServer: McpServer
+  transport: StreamableHTTPServerTransport
+}
+
+/**
  * McpServerManager — Runs an MCP server over Streamable HTTP in the Electron main process.
  *
- * Uses @modelcontextprotocol/sdk's McpServer + StreamableHTTPServerTransport
- * with API-key auth via Bearer token.
+ * Supports multiple concurrent clients. Each client that sends an `initialize`
+ * request gets its own McpServer + Transport pair, keyed by the Mcp-Session-Id header.
  */
 export class McpServerManager {
   private httpServer: http.Server | null = null
-  private mcpServer: McpServer | null = null
-  private transport: StreamableHTTPServerTransport | null = null
+  private sessions: Map<string, McpSession> = new Map()
   private port: number = MCP_DEFAULT_PORT
   private host: string = MCP_DEFAULT_HOST
   private apiKey: string = ''
+  private toolCtx: ToolContext | null = null
 
   /**
    * Start the MCP server.
@@ -31,23 +41,7 @@ export class McpServerManager {
     this.port = port
     this.host = host
     this.apiKey = apiKey
-
-    // Create MCP server
-    this.mcpServer = new McpServer(
-      { name: APP_NAME, version: APP_VERSION },
-      { capabilities: { tools: {} } }
-    )
-
-    // Register tools
-    registerTools(this.mcpServer, ctx)
-
-    // Create transport (stateful mode with session IDs)
-    this.transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-    })
-
-    // Connect transport to MCP server
-    await this.mcpServer.connect(this.transport)
+    this.toolCtx = ctx
 
     // Create HTTP server with auth middleware
     this.httpServer = http.createServer((req, res) => {
@@ -66,17 +60,18 @@ export class McpServerManager {
   }
 
   /**
-   * Stop the MCP server.
+   * Stop the MCP server and all sessions.
    */
   async stop(): Promise<void> {
-    if (this.transport) {
-      await this.transport.close()
-      this.transport = null
-    }
-
-    if (this.mcpServer) {
-      await this.mcpServer.close()
-      this.mcpServer = null
+    // Close all sessions
+    for (const [id, session] of this.sessions) {
+      try {
+        await session.transport.close()
+        await session.mcpServer.close()
+      } catch {
+        // ignore cleanup errors
+      }
+      this.sessions.delete(id)
     }
 
     if (this.httpServer) {
@@ -103,8 +98,39 @@ export class McpServerManager {
   }
 
   /**
+   * Create a new MCP session (McpServer + Transport) for a connecting client.
+   */
+  private async createSession(): Promise<McpSession> {
+    const mcpServer = new McpServer(
+      { name: APP_NAME, version: APP_VERSION },
+      { capabilities: { tools: {} } }
+    )
+
+    // Register tools on the new server instance
+    registerTools(mcpServer, this.toolCtx!)
+
+    const sessionId = randomUUID()
+
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => sessionId,
+      onsessioninitialized: (id: string) => {
+        console.log(`[McpServer] session initialized: ${id}`)
+      },
+    })
+
+    // Connect transport to MCP server
+    await mcpServer.connect(transport)
+
+    const session: McpSession = { sessionId, mcpServer, transport }
+    this.sessions.set(sessionId, session)
+
+    console.log(`[McpServer] new session created: ${sessionId} (total: ${this.sessions.size})`)
+    return session
+  }
+
+  /**
    * Handle an incoming HTTP request.
-   * Validates auth, sets CORS headers, routes to transport.
+   * Validates auth, sets CORS headers, routes to the correct session transport.
    */
   private handleRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
     // CORS headers
@@ -135,31 +161,129 @@ export class McpServerManager {
       return
     }
 
-    // Delegate to transport
-    if (!this.transport) {
-      res.writeHead(503, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ error: 'MCP transport not initialized' }))
-      return
-    }
-
-    // For POST requests, collect body and pass as parsedBody
+    // For POST requests, collect body and route to the right session
     if (req.method === 'POST') {
       const chunks: Buffer[] = []
       req.on('data', (chunk: Buffer) => chunks.push(chunk))
       req.on('end', () => {
         try {
           const body = JSON.parse(Buffer.concat(chunks).toString('utf-8'))
-          this.transport!.handleRequest(req, res, body)
+          this.routePost(req, res, body)
         } catch {
           res.writeHead(400, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ error: 'Invalid JSON body' }))
         }
       })
     } else if (req.method === 'GET' || req.method === 'DELETE') {
-      this.transport.handleRequest(req, res)
+      this.routeGetOrDelete(req, res)
     } else {
       res.writeHead(405, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'Method not allowed' }))
     }
+  }
+
+  /**
+   * Route a POST request. If it's an initialize request (no session ID),
+   * create a new session. Otherwise, route to the existing session.
+   */
+  private async routePost(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    body: unknown
+  ): Promise<void> {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined
+
+    // Check if this is an initialize request (no session header)
+    if (!sessionId) {
+      // Check if the body contains an initialize method
+      const isInit = this.isInitializeRequest(body)
+      if (isInit) {
+        try {
+          const session = await this.createSession()
+          session.transport.handleRequest(req, res, body)
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          res.writeHead(500, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message: msg }, id: null }))
+        }
+        return
+      }
+      // Non-init request without session ID — reject
+      res.writeHead(400, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({
+        jsonrpc: '2.0',
+        error: { code: -32000, message: 'Bad Request: Mcp-Session-Id header is required' },
+        id: null,
+      }))
+      return
+    }
+
+    // Route to existing session
+    const session = this.sessions.get(sessionId)
+    if (!session) {
+      res.writeHead(404, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({
+        jsonrpc: '2.0',
+        error: { code: -32001, message: 'Session not found' },
+        id: null,
+      }))
+      return
+    }
+
+    session.transport.handleRequest(req, res, body)
+  }
+
+  /**
+   * Route GET or DELETE requests to the correct session.
+   */
+  private routeGetOrDelete(req: http.IncomingMessage, res: http.ServerResponse): void {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined
+
+    if (!sessionId) {
+      res.writeHead(400, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({
+        jsonrpc: '2.0',
+        error: { code: -32000, message: 'Bad Request: Mcp-Session-Id header is required' },
+        id: null,
+      }))
+      return
+    }
+
+    const session = this.sessions.get(sessionId)
+    if (!session) {
+      res.writeHead(404, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({
+        jsonrpc: '2.0',
+        error: { code: -32001, message: 'Session not found' },
+        id: null,
+      }))
+      return
+    }
+
+    // On DELETE, clean up the session after the transport handles it
+    if (req.method === 'DELETE') {
+      session.transport.handleRequest(req, res)
+      // Clean up after a short delay to let the response finish
+      setTimeout(async () => {
+        try {
+          await session.mcpServer.close()
+        } catch { /* ignore */ }
+        this.sessions.delete(sessionId)
+        console.log(`[McpServer] session closed: ${sessionId} (remaining: ${this.sessions.size})`)
+      }, 100)
+      return
+    }
+
+    session.transport.handleRequest(req, res)
+  }
+
+  /**
+   * Check if a JSON-RPC body is an initialize request.
+   */
+  private isInitializeRequest(body: unknown): boolean {
+    if (Array.isArray(body)) {
+      return body.some(msg => msg?.method === 'initialize')
+    }
+    return (body as { method?: string })?.method === 'initialize'
   }
 }

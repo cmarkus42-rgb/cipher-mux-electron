@@ -7,6 +7,15 @@ import '@xterm/xterm/css/xterm.css'
 
 const api = () => (window as any).cipherMux
 
+/**
+ * Tracks sessionIds that have been mounted at least once in this renderer
+ * process. First mount → we assume the session is fresh and don't replay
+ * captured pane content (would clobber an in-flight autoLaunch TUI like
+ * `claude`). Subsequent mounts (session switch) → restore so the xterm canvas
+ * reflects the current pane state.
+ */
+const firstMountDone = new Set<string>()
+
 export interface UseTerminalResult {
   terminalRef: preact.RefObject<HTMLDivElement>
   fit: () => void
@@ -88,11 +97,31 @@ export function useTerminal(sessionId: string): UseTerminalResult {
     termRef.current = term
     fitAddonRef.current = fitAddon
 
+    // Track first successful fit so we can signal TERMINAL_READY exactly once.
+    // This unblocks any queued auto-launch commands in the main process (e.g.
+    // `claude --...`) so TUIs start at the real terminal size, not 80x24.
+    let reported = false
+    const reportReady = () => {
+      if (reported) return
+      if (term.cols < 20 || term.rows < 5) return
+      reported = true
+      api().terminal.ready(sessionId, term.cols, term.rows)
+      // After autoLaunch fires (≈ 250ms post-ready in main), the viewport can
+      // be scrolled off the live region because xterm stored the shell prompt
+      // + command echo in scrollback before claude's RIS+clear landed. Nudge
+      // the viewport to the cursor a few times to catch up.
+      const nudge = () => term.scrollToBottom()
+      setTimeout(nudge, 400)
+      setTimeout(nudge, 900)
+      setTimeout(nudge, 1500)
+    }
+
     // Use ResizeObserver to fit terminal when container gets/changes size
     const resizeObserver = new ResizeObserver(() => {
       try {
         fitAddon.fit()
         api().terminal.resize(sessionId, term.cols, term.rows)
+        reportReady()
       } catch {
         // container may not be visible yet
       }
@@ -104,6 +133,7 @@ export function useTerminal(sessionId: string): UseTerminalResult {
       try {
         fitAddon.fit()
         api().terminal.resize(sessionId, term.cols, term.rows)
+        reportReady()
       } catch {
         // container may not be visible yet
       }
@@ -113,23 +143,30 @@ export function useTerminal(sessionId: string): UseTerminalResult {
       try {
         fitAddon.fit()
         api().terminal.resize(sessionId, term.cols, term.rows)
+        reportReady()
       } catch {
         // ignore
       }
     }, 200)
 
     // Restore pane content from tmux when re-mounting (e.g. switching sessions).
-    // Delay to let tmux settle and xterm.js resize to correct dimensions.
-    const restoreTimer = setTimeout(() => {
-      api().terminal.capture(sessionId).then((content: string) => {
-        if (content?.trim() && term) {
-          term.reset()
-          term.write(content.replace(/\n/g, '\r\n'))
-        }
-      }).catch(() => {
-        // session may not be ready yet on first creation
-      })
-    }, 500)
+    // Skip on first mount: a freshly-created session may have a queued autoLaunch
+    // (e.g. `claude --...`) in flight. Capturing + term.reset() + replay would
+    // wipe the TUI mid-draw and leave the input line in the wrong row.
+    const isFirstMount = !firstMountDone.has(sessionId)
+    firstMountDone.add(sessionId)
+    const restoreTimer = isFirstMount
+      ? null
+      : setTimeout(() => {
+          api().terminal.capture(sessionId).then((content: string) => {
+            if (content?.trim() && term) {
+              term.reset()
+              term.write(content.replace(/\n/g, '\r\n'))
+            }
+          }).catch(() => {
+            // session may not be ready yet on first creation
+          })
+        }, 500)
 
     // Send user input to main process
     const inputDisposable = term.onData((data: string) => {
@@ -146,7 +183,7 @@ export function useTerminal(sessionId: string): UseTerminalResult {
     )
 
     return () => {
-      clearTimeout(restoreTimer)
+      if (restoreTimer) clearTimeout(restoreTimer)
       resizeObserver.disconnect()
       inputDisposable.dispose()
       unsubscribe()

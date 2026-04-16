@@ -13,10 +13,20 @@ const EXTRA_PATHS = [
   `${os.homedir()}/.claude/local`,
 ]
 
-function getEnhancedPath(): string {
+export function getEnhancedPath(): string {
   const existing = process.env.PATH ?? ''
   const extras = EXTRA_PATHS.filter((p) => !existing.includes(p))
   return extras.length ? `${existing}:${extras.join(':')}` : existing
+}
+
+/**
+ * Patch process.env.PATH so every child_process spawned anywhere in the
+ * main process inherits the enhanced PATH. Call once at app startup.
+ * Required because macOS GUI apps launched from Finder have a minimal PATH
+ * (no /opt/homebrew/bin) and `spawn('tmux', ...)` would fail with ENOENT.
+ */
+export function patchEnvPath(): void {
+  process.env.PATH = getEnhancedPath()
 }
 
 /**
