@@ -169,11 +169,24 @@ export interface KickoffCompletionPayload {
   detectedStack?: string
 }
 
+/**
+ * Grund, warum die Kickoff-Arbeit als abgeschlossen behandelt wurde.
+ *
+ * - `normal`  — /launch hat das MCP-Tool `kickoff_complete` aufgerufen.
+ * - `marker`  — /launch hat die `.kickoff-complete`-Datei geschrieben (Bonus-Pfad
+ *               aus Skill-Sicht, aber der Primary-Pfad in der neuen Skill-Version).
+ * - `implicit`— Timeout ist abgelaufen, aber CLAUDE.md existiert im Zielverzeichnis.
+ *               Wir interpretieren das als „Scaffold fertig, nur Exit-Gate verpasst".
+ */
+export type KickoffCompleteReason = 'normal' | 'marker' | 'implicit'
+
 export interface KickoffCompletedEvent {
   handle: KickoffHandle
   payload: KickoffCompletionPayload
   /** ID der neu gestarteten Folge-Session (im Projekt-Verzeichnis). */
   followupSessionId: string
+  /** Welcher Pfad hat den Complete ausgelöst. */
+  reason: KickoffCompleteReason
 }
 
 // ─── Bugreport ─────────────────────────────────────────────
