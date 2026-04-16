@@ -360,6 +360,55 @@ rm -rf /tmp/test-kickoff-ui
 
 ---
 
+## Test 11 — Kickoff mit Obsidian-Verzeichnis
+
+**Setup:**
+1. Erstelle in Nextcloud ein leeres Testverzeichnis, z.B. `/Users/Shared/Nextcloud/ClaudeCode01/kickoff-test-obsidian/`.
+2. Lege darin eine Datei `requirements.md` mit 3-5 Bullet-Points zum Projektkonzept an (beliebiges Thema).
+
+**Schritte:**
+1. Starte cipher-mux-electron.
+2. Drücke `Cmd+N` → Dialog "Neues Projekt aus Konzept" öffnet sich.
+3. Pastet den Pfad `.../kickoff-test-obsidian/` ins Feld "Projekt-Verzeichnis".
+4. Lass "Anforderungsdatei" leer (schon im Verzeichnis).
+5. Tippe im Freitext-Feld: "Stack-Präferenz: Python" (oder Equivalent).
+6. Klick "Projekt aufsetzen".
+
+**Erwartung:**
+- Dialog schließt sich.
+- Eine neue Session namens "Launcher: kickoff-test-obsidian" erscheint und läuft.
+- Nach einigen Sekunden startet Claude in dieser Session, bekommt den Launcher-Prompt und fängt an zu arbeiten (sichtbare Subagent-Dispatches idealerweise).
+- Wenn der Launcher fertig ist: Eine neue Session `kickoff-test-obsidian` wird automatisch gestartet, Focus wechselt dorthin, Claude läuft und startet `/interview`.
+- Das Projekt-Verzeichnis hat jetzt: `CLAUDE.md`, `.claude/`, `docs/SPEC.md`, `docs/todo.md`, `.gitignore`, ggf. `.git/`.
+
+## Test 12 — Kickoff mit externer `.docx`-Anforderungsdatei
+
+**Setup:**
+1. Leeres Testverzeichnis wie in Test 11 — **ohne** Anforderungsdatei drin.
+2. Eine externe `.docx`-Datei mit Anforderungen an einem beliebigen anderen Ort (z.B. Desktop).
+
+**Schritte:**
+1. `Cmd+N`, pastet den Verzeichnis-Pfad.
+2. Im Feld "Anforderungsdatei": pastet den `.docx`-Pfad.
+3. Klick "Projekt aufsetzen".
+
+**Erwartung:**
+- Vor dem Launcher-Start: im Projekt-Verzeichnis liegt jetzt `docs/requirements.docx` (Extension erhalten).
+- Launcher-Session läuft, Claude liest die `.docx`-Datei (über geeigneten Reader oder verweist auf Missing-Tool).
+- Folge-Session öffnet sich nach Completion.
+
+## Test 13 — Kickoff-Fehlerfälle
+
+**Testschritte:**
+1. `Cmd+N`, pastet einen **nicht existierenden** Pfad ins Verzeichnis-Feld → Klick "Projekt aufsetzen".
+   **Erwartung:** Dialog zeigt Fehler "Project directory does not exist", Dialog bleibt offen.
+2. `Cmd+N`, pastet einen Pfad zu einer **Datei** (nicht Verzeichnis) → Klick.
+   **Erwartung:** Fehler "Project path is not a directory".
+3. Starte einen gültigen Kickoff, dann **warte 15 Minuten ohne Interaktion** (oder setze in `ConfigStore` `kickoffTimeoutMinutes: 1` und warte 1 Minute).
+   **Erwartung:** Toast oder Console-Warning über Timeout. Launcher-Session bleibt sichtbar, Folge-Session startet nicht automatisch.
+
+---
+
 ## Feedback erwünscht
 
 1. **Look & Feel** — Stimmt die cipher ivory Ästhetik? Farben, Fonts, Cut-Corners?
