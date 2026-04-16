@@ -138,11 +138,38 @@ export interface AppConfig {
 
 // ─── Kickoff ───────────────────────────────────────────────
 
-export interface KickoffOpts {
-  requirementsFile: string
-  targetDir: string
+export interface KickoffRequest {
+  /** Absoluter Pfad zum existierenden Projekt-Verzeichnis (aus Obsidian). */
+  projectDir: string
+  /** Optional: absoluter Pfad zu einer externen Anforderungsdatei beliebigen Formats. */
+  requirementsFile?: string
+  /** Optional: zusätzlicher Freitext-Kontext für den Launcher-Prompt. */
+  extraContext?: string
+}
+
+export interface KickoffHandle {
+  /** ID der sichtbaren Launcher-tmux-Session. */
+  launcherSessionId: string
+  /** Normalisierter absoluter Pfad zum Projekt-Verzeichnis. */
+  projectDir: string
+  /** Aus Verzeichnisnamen abgeleiteter Projektname. */
   projectName: string
-  autoInterview: boolean
+}
+
+export interface KickoffCompletionPayload {
+  /** Absoluter Pfad zum fertig aufgesetzten Projekt-Verzeichnis. */
+  projectPath: string
+  /** Projektname (aus Verzeichnisnamen). */
+  projectName: string
+  /** Vom /launch-Skill erkannter Tech-Stack — optional. */
+  detectedStack?: string
+}
+
+export interface KickoffCompletedEvent {
+  handle: KickoffHandle
+  payload: KickoffCompletionPayload
+  /** ID der neu gestarteten Folge-Session (im Projekt-Verzeichnis). */
+  followupSessionId: string
 }
 
 // ─── Bugreport ─────────────────────────────────────────────
