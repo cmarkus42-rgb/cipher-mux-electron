@@ -201,4 +201,56 @@ describe('KickoffOrchestrator', () => {
     assert.ok(fired, 'event not emitted')
     assert.equal(fired.reason, 'normal')
   })
+
+  it('treats timeout as implicit complete when CLAUDE.md exists in projectDir', async () => {
+    const shortOrch = new KickoffOrchestrator({
+      sessionManager: mockSm as any,
+      projectlauncherPath: launcherDir,
+      timeoutMs: 80,
+      pollIntervalMs: 30,
+      promptSendDelayMs: 10,
+      interviewSendDelayMs: 10,
+    })
+
+    let completeEvent: any = null
+    let timeoutFired = false
+    shortOrch.on('kickoff-complete', (e) => { completeEvent = e })
+    shortOrch.on('kickoff-timeout', () => { timeoutFired = true })
+
+    // Scaffold has "happened" — CLAUDE.md is there but marker is missing.
+    fs.writeFileSync(path.join(projectDir, 'CLAUDE.md'), '# my-project\n', 'utf-8')
+    await shortOrch.start({ projectDir })
+
+    // Wait past timeout + handleCompletion async work.
+    await new Promise((r) => setTimeout(r, 300))
+
+    assert.equal(timeoutFired, false, 'kickoff-timeout should NOT fire when CLAUDE.md exists')
+    assert.ok(completeEvent, 'kickoff-complete should fire as implicit')
+    assert.equal(completeEvent.reason, 'implicit')
+    shortOrch.destroy()
+  })
+
+  it('still fires kickoff-timeout when CLAUDE.md is absent at timeout', async () => {
+    const shortOrch = new KickoffOrchestrator({
+      sessionManager: mockSm as any,
+      projectlauncherPath: launcherDir,
+      timeoutMs: 80,
+      pollIntervalMs: 30,
+      promptSendDelayMs: 10,
+      interviewSendDelayMs: 10,
+    })
+
+    let completeFired = false
+    let timeoutFired = false
+    shortOrch.on('kickoff-complete', () => { completeFired = true })
+    shortOrch.on('kickoff-timeout', () => { timeoutFired = true })
+
+    // No CLAUDE.md — scaffold never got there.
+    await shortOrch.start({ projectDir })
+    await new Promise((r) => setTimeout(r, 300))
+
+    assert.equal(timeoutFired, true, 'kickoff-timeout should fire')
+    assert.equal(completeFired, false, 'kickoff-complete should NOT fire without CLAUDE.md')
+    shortOrch.destroy()
+  })
 })

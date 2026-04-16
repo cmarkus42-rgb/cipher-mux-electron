@@ -177,6 +177,26 @@ export class KickoffOrchestrator extends EventEmitter {
   private handleTimeout(): void {
     if (!this.active) return
     const handle = this.active.handle
+
+    // Pragmatic resilience: if /launch scaffolded the project but skipped the
+    // exit gate (marker + MCP call), CLAUDE.md still exists in the target dir.
+    // Treat that state as an implicit complete so the follow-up session opens
+    // instead of leaving the user stranded at the launcher.
+    const claudeMdPath = path.join(handle.projectDir, 'CLAUDE.md')
+    const hasClaudeMd = fs.existsSync(claudeMdPath)
+
+    if (hasClaudeMd) {
+      console.warn(
+        `[KickoffOrchestrator] Implicit complete via CLAUDE.md presence — `
+        + `/launch skill skipped exit gate for project ${handle.projectName}`,
+      )
+      this.handleCompletion({
+        projectPath: handle.projectDir,
+        projectName: handle.projectName,
+      }, 'implicit')
+      return
+    }
+
     this.cleanupActive()
     this.emit('kickoff-timeout', { handle })
   }
