@@ -1,6 +1,6 @@
 # ISSUE — `/launch`-Skill ruft `kickoff_complete` nicht auf
 
-**Status:** offen
+**Status:** in implementation (Plan 1, `docs/superpowers/plans/2026-04-16-launcher-exit-gate-resilience.md`)
 **Erfasst:** 2026-04-16
 **Priorität:** hoch (blockt End-to-End-Kickoff-Flow in cipher-mux)
 **Betrifft:** `projectlauncher/.claude/skills/launch/SKILL.md` Schritt 8
@@ -52,3 +52,13 @@ Erster produktiver Kickoff aus cipher-mux-electron:
 - Orchestrator: `src/main/project/kickoff-orchestrator.ts`
 - MCP-Tool-Registrierung: `src/main/mcp/mcp-tools.ts` (Tool #8)
 - Launcher-Prompt-Builder: `src/main/project/launcher-prompt.ts`
+
+## Implementierungs-Bezug
+
+Behoben durch Plan 1 (Exit-Gate & Orchestrator-Resilienz) — siehe
+`docs/superpowers/plans/2026-04-16-launcher-exit-gate-resilience.md`.
+
+Konkret:
+- `/launch`-Skill Schritt 8 → eigene verbindliche Handover-Phase (Marker als Primary)
+- `KickoffOrchestrator`: CLAUDE.md-Existenz-Check im Timeout-Pfad als impliziter Complete
+- Structured Logging (`kickoff-result reason=…`) für späteres Messen der Pfade
