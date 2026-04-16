@@ -1,6 +1,6 @@
 # ISSUE — `/launch`-Skill ruft `kickoff_complete` nicht auf
 
-**Status:** in implementation (Plan 1, `docs/superpowers/plans/2026-04-16-launcher-exit-gate-resilience.md`)
+**Status:** behoben (Plan 1 verifiziert 2026-04-16)
 **Erfasst:** 2026-04-16
 **Priorität:** hoch (blockt End-to-End-Kickoff-Flow in cipher-mux)
 **Betrifft:** `projectlauncher/.claude/skills/launch/SKILL.md` Schritt 8
@@ -62,3 +62,23 @@ Konkret:
 - `/launch`-Skill Schritt 8 → eigene verbindliche Handover-Phase (Marker als Primary)
 - `KickoffOrchestrator`: CLAUDE.md-Existenz-Check im Timeout-Pfad als impliziter Complete
 - Structured Logging (`kickoff-result reason=…`) für späteres Messen der Pfade
+
+## Verifikation 2026-04-16
+
+End-to-End-Test mit überarbeitetem /launch-Skill + resilientem Orchestrator,
+Target: `/Users/Shared/Nextcloud/Claude/ClaudeCode01/OnlyOfficeMCP` (selbes
+Input-Verzeichnis wie der blockierende Smoke-Test am Morgen).
+
+- Log: `[KickoffOrchestrator] kickoff-result reason=marker project=OnlyOfficeMCP path=…`
+- Marker-Datei `.kickoff-complete`: **existiert** (geschrieben vom Skill)
+- CLAUDE.md: existiert (Scaffold sauber durchgelaufen)
+- Follow-up-Session: **geöffnet** mit `/interview`-Prompt
+
+Fazit: Die verbindliche Handover-Formulierung im Skill (Schritt 8 als eigene
+Phase, Marker-Datei als Primary) hat gegriffen. Claude hat den Exit-Gate
+diesmal nicht als Housekeeping behandelt, sondern aktiv den Marker gesetzt.
+Der Implicit-Complete-Fallback im Orchestrator musste nicht einspringen —
+blieb aber als Safety-Net intakt und ist durch 115 Unit-Tests abgesichert.
+
+Plan 2 (Quality-Refactor: dünnes `/launch`, Template-Overhaul, Meta-Kanon)
+kann losgelöst von Exit-Gate-Sorgen angegangen werden.
