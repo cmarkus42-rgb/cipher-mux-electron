@@ -62,6 +62,11 @@ const api = {
     list: () => ipcRenderer.invoke(IPC.PROJECTS_LIST),
     scan: () => ipcRenderer.invoke(IPC.PROJECTS_SCAN),
     kickoff: (opts: unknown) => ipcRenderer.invoke(IPC.PROJECTS_KICKOFF, opts),
+    onCompleted: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.PROJECT_KICKOFF_COMPLETED, handler)
+      return () => ipcRenderer.removeListener(IPC.PROJECT_KICKOFF_COMPLETED, handler)
+    },
   },
 
   // ─── Context Usage ─────────────────────────────────────
