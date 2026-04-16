@@ -9,10 +9,10 @@ import { configStore } from './config/config-store'
 import { StatusLineMonitor } from './monitoring/statusline-monitor'
 import { McpServerManager } from './mcp/mcp-server'
 import { generateApiKey } from './mcp/mcp-auth'
-import { KickoffManager } from './project/kickoff-manager'
+import { KickoffOrchestrator } from './project/kickoff-orchestrator'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
-import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffOpts } from '../shared/types'
+import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest } from '../shared/types'
 
 /**
  * IPC Hub — Central router for all IPC channels.
@@ -25,7 +25,7 @@ export class IpcHub {
   private projectScanner: ProjectScanner
   private statusLineMonitor: StatusLineMonitor
   private mcpServer: McpServerManager
-  private kickoffManager: KickoffManager
+  private kickoffOrchestrator: KickoffOrchestrator
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
 
   constructor(private windowManager: WindowManager) {
@@ -42,7 +42,13 @@ export class IpcHub {
     this.projectScanner = new ProjectScanner()
     this.statusLineMonitor = new StatusLineMonitor()
     this.mcpServer = new McpServerManager()
-    this.kickoffManager = new KickoffManager()
+    const appConfig = configStore.get('app')
+    this.kickoffOrchestrator = new KickoffOrchestrator({
+      sessionManager: this.sessionManager,
+      projectlauncherPath: appConfig?.projectlauncherPath
+        ?? '/Users/Shared/Nextcloud/Claude/ClaudeCode01/projectlauncher',
+      timeoutMs: ((appConfig?.kickoffTimeoutMinutes ?? 15) * 60_000),
+    })
   }
 
   init(): void {
@@ -95,6 +101,7 @@ export class IpcHub {
       sessionManager: this.sessionManager,
       messageBus: this.messageBus,
       statusLineMonitor: this.statusLineMonitor,
+      kickoffOrchestrator: this.kickoffOrchestrator,
     }).then(() => {
       // Auto-start orchestrator after MCP server is ready
       this.autoStartOrchestrator()
@@ -167,6 +174,31 @@ export class IpcHub {
 
     this.statusLineMonitor.on('usage-warning', (sessionId: string, usage: ContextUsage) => {
       this.windowManager.sendToMainWindow(IPC.CONTEXT_WARNING, { sessionId, usage })
+    })
+
+    this.kickoffOrchestrator.on('kickoff-complete', (event) => {
+      this.windowManager.sendToMainWindow(
+        IPC.PROJECT_KICKOFF_COMPLETED,
+        { status: 'complete', event },
+      )
+    })
+
+    this.kickoffOrchestrator.on('kickoff-timeout', (data) => {
+      this.windowManager.sendToMainWindow(
+        IPC.PROJECT_KICKOFF_COMPLETED,
+        { status: 'timeout', ...data },
+      )
+    })
+
+    this.kickoffOrchestrator.on('kickoff-error', (data) => {
+      this.windowManager.sendToMainWindow(
+        IPC.PROJECT_KICKOFF_COMPLETED,
+        {
+          status: 'error',
+          handle: data.handle,
+          error: data.error instanceof Error ? data.error.message : String(data.error),
+        },
+      )
     })
   }
 
@@ -264,31 +296,9 @@ export class IpcHub {
       return this.cachedProjects
     })
 
-    ipcMain.handle(IPC.PROJECTS_KICKOFF, async (_e, opts: KickoffOpts) => {
-      const result = await this.kickoffManager.kickoff(opts)
-
-      // Inspect the project (new or existing) and refresh cachedProjects.
-      // Deduplicate by path so calling kickoff on an existing project doesn't
-      // produce a duplicate tile.
-      const projectInfo = await this.projectScanner.inspectProject(result.projectPath)
-      if (projectInfo) {
-        this.cachedProjects = this.cachedProjects.filter((p) => p.path !== projectInfo.path)
-        this.cachedProjects.push(projectInfo)
-        this.cachedProjects.sort((a, b) => a.name.localeCompare(b.name))
-      }
-
-      // Persist the project's parent directory as a scan path, so a subsequent
-      // PROJECTS_SCAN (e.g. from a rescan) will find the project too. Without
-      // this, rescan would drop the new project if it lives outside the
-      // default scan paths.
-      const parentDir = path.dirname(result.projectPath)
-      const appCfg = configStore.get('app')
-      const scanPaths = appCfg?.scanPaths ?? []
-      if (!scanPaths.includes(parentDir)) {
-        configStore.set('app', { ...appCfg, scanPaths: [...scanPaths, parentDir] })
-      }
-
-      return { ...result, project: projectInfo }
+    ipcMain.handle(IPC.PROJECTS_KICKOFF, async (_e, req: KickoffRequest) => {
+      const handle = await this.kickoffOrchestrator.start(req)
+      return handle
     })
   }
 
@@ -395,6 +405,7 @@ export class IpcHub {
     await this.mcpServer.stop().catch(() => {})
     this.statusLineMonitor.stop()
     this.projectScanner.stopWatch()
+    this.kickoffOrchestrator.destroy()
     if (this.messageBus) this.messageBus.destroy()
     await this.sessionManager.destroy()
   }
