@@ -50,6 +50,24 @@ export function App() {
     return () => unsub()
   }, [])
 
+  // Listen for kickoff completion — focus follow-up session and rescan projects.
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    const unsub = api.projects.onCompleted((data: any) => {
+      if (data?.status === 'complete' && data.event?.followupSessionId) {
+        setActiveSessionId(data.event.followupSessionId)
+        setActiveView('terminal')
+        // Project dir is now populated — refresh scan so the tile appears.
+        rescan().catch((err) => console.error('[App] rescan failed:', err))
+      } else if (data?.status === 'timeout') {
+        console.warn('[App] Kickoff timed out:', data.handle)
+      } else if (data?.status === 'error') {
+        console.error('[App] Kickoff error:', data.error)
+      }
+    })
+    return () => unsub()
+  }, [rescan])
+
   const handleOrchestratorToggle = useCallback(async () => {
     const api = (window as any).cipherMux
     try {
@@ -80,38 +98,18 @@ export function App() {
     setActiveView('terminal')
   }, [])
 
-  const handleKickoff = useCallback(async (opts: {
-    requirementsFile: string
-    targetDir: string
-    projectName: string
-    autoInterview: boolean
+  const handleKickoff = useCallback(async (req: {
+    projectDir: string
+    requirementsFile?: string
+    extraContext?: string
   }) => {
     const api = (window as any).cipherMux
-    // Main process: creates/uses dir, writes requirements + CLAUDE.md,
-    // updates cachedProjects, and adds the parent dir to scanPaths.
-    const result = await api.projects.kickoff(opts)
+    // Main process starts the launcher session; we just close the dialog.
+    // The focus switch to the follow-up session happens via the
+    // PROJECT_KICKOFF_COMPLETED event listener below.
+    await api.projects.kickoff(req)
     setKickoffVisible(false)
-    // Refresh project list — parent dir is now in scanPaths, so tile appears.
-    await rescan()
-    // Auto-start a Claude session in the new project so the user can start
-    // interviewing right away.
-    const project = result?.project
-    if (project) {
-      try {
-        const session = await startSession({
-          name: project.name,
-          projectPath: project.path,
-          autoLaunch: opts.autoInterview
-            ? 'clear; claude --dangerously-skip-permissions\n'
-            : undefined,
-        })
-        setActiveSessionId(session.id)
-        setActiveView('terminal')
-      } catch (err) {
-        console.error('[App] Kickoff session start failed:', err)
-      }
-    }
-  }, [rescan, startSession])
+  }, [])
 
   // Cmd+N keyboard shortcut for kickoff dialog
   useEffect(() => {
