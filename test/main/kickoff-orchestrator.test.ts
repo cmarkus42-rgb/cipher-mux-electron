@@ -178,4 +178,27 @@ describe('KickoffOrchestrator', () => {
     await new Promise((r) => setTimeout(r, 200))
     assert.equal(completeFired, true)
   })
+
+  it('tags kickoff-complete reason=marker when triggered via marker file', async () => {
+    await orchestrator.start({ projectDir })
+    let fired: any = null
+    orchestrator.on('kickoff-complete', (e) => { fired = e })
+    fs.writeFileSync(path.join(projectDir, '.kickoff-complete'), '', 'utf-8')
+    await new Promise((r) => setTimeout(r, 200))
+    assert.ok(fired, 'event not emitted')
+    assert.equal(fired.reason, 'marker')
+  })
+
+  it('tags kickoff-complete reason=normal when triggered via MCP handleCompletion', async () => {
+    await orchestrator.start({ projectDir })
+    let fired: any = null
+    orchestrator.on('kickoff-complete', (e) => { fired = e })
+    orchestrator.handleCompletion({
+      projectPath: projectDir,
+      projectName: 'my-project',
+    })
+    await new Promise((r) => setTimeout(r, 80))
+    assert.ok(fired, 'event not emitted')
+    assert.equal(fired.reason, 'normal')
+  })
 })

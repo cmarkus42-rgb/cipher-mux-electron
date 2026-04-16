@@ -7,6 +7,7 @@ import type {
   KickoffHandle,
   KickoffCompletionPayload,
   KickoffCompletedEvent,
+  KickoffCompleteReason,
 } from '../../shared/types'
 import { buildLauncherPrompt } from './launcher-prompt'
 import { KickoffWatcher } from './kickoff-watcher'
@@ -114,7 +115,7 @@ export class KickoffOrchestrator extends EventEmitter {
         this.handleCompletion({
           projectPath: projectDir,
           projectName,
-        })
+        }, 'marker')
       },
       onTimeout: () => {
         this.handleTimeout()
@@ -131,7 +132,10 @@ export class KickoffOrchestrator extends EventEmitter {
    * Called by the kickoff_complete MCP tool handler. Idempotent — if the
    * watcher's marker-file already fired, this call is ignored.
    */
-  handleCompletion(payload: KickoffCompletionPayload): void {
+  handleCompletion(
+    payload: KickoffCompletionPayload,
+    reason: KickoffCompleteReason = 'normal',
+  ): void {
     if (!this.active) return
     const active = this.active
     this.cleanupActive()
@@ -161,6 +165,7 @@ export class KickoffOrchestrator extends EventEmitter {
           detectedStack: payload.detectedStack,
         },
         followupSessionId: followup.id,
+        reason,
       }
       this.emit('kickoff-complete', event)
     }).catch((err) => {

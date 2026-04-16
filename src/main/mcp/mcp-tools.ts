@@ -244,7 +244,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           projectPath: args.projectPath,
           projectName: args.projectName,
           detectedStack: args.detectedStack,
-        })
+        }, 'normal')
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }],
         }
