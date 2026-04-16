@@ -9,6 +9,7 @@ import { CockpitView } from './components/CockpitView'
 import { TerminalPane } from './components/TerminalPane'
 import { ChatroomPanel } from './components/ChatroomPanel'
 import { KickoffDialog } from './components/KickoffDialog'
+import { SettingsView } from './components/SettingsView'
 import { StatusBar } from './components/StatusBar'
 
 export function App() {
@@ -86,11 +87,31 @@ export function App() {
     autoInterview: boolean
   }) => {
     const api = (window as any).cipherMux
-    await api.projects.kickoff(opts)
+    // Main process: creates/uses dir, writes requirements + CLAUDE.md,
+    // updates cachedProjects, and adds the parent dir to scanPaths.
+    const result = await api.projects.kickoff(opts)
     setKickoffVisible(false)
-    // Refresh project list so the new tile appears immediately
+    // Refresh project list — parent dir is now in scanPaths, so tile appears.
     await rescan()
-  }, [rescan])
+    // Auto-start a Claude session in the new project so the user can start
+    // interviewing right away.
+    const project = result?.project
+    if (project) {
+      try {
+        const session = await startSession({
+          name: project.name,
+          projectPath: project.path,
+          autoLaunch: opts.autoInterview
+            ? 'clear; claude --dangerously-skip-permissions\n'
+            : undefined,
+        })
+        setActiveSessionId(session.id)
+        setActiveView('terminal')
+      } catch (err) {
+        console.error('[App] Kickoff session start failed:', err)
+      }
+    }
+  }, [rescan, startSession])
 
   // Cmd+N keyboard shortcut for kickoff dialog
   useEffect(() => {
@@ -109,14 +130,13 @@ export function App() {
       const session = await startSession({
         name: project.name,
         projectPath: project.path,
+        // Claude is launched by the main process once the renderer reports
+        // the real terminal size (TERMINAL_READY), so the TUI starts at the
+        // correct cols/rows instead of tmux's default 80x24.
+        autoLaunch: 'clear; claude --dangerously-skip-permissions\n',
       })
       setActiveSessionId(session.id)
       setActiveView('terminal')
-      // Auto-launch Claude in project sessions after terminal has time to resize
-      const api = (window as any).cipherMux
-      setTimeout(() => {
-        api.terminal.write(session.id, 'claude --dangerously-skip-permissions\n')
-      }, 1000)
     } catch (err) {
       console.error('[App] Failed to start session:', err)
     }
@@ -195,7 +215,7 @@ export function App() {
                 <div class="empty-state__text">No active session. Start a session from the Cockpit.</div>
               </div>
             )}
-            {activeView === 'info' && <InfoView />}
+            {activeView === 'info' && <SettingsView onRescan={rescan} scanning={scanning} />}
           </div>
         </main>
 
@@ -216,13 +236,3 @@ export function App() {
   )
 }
 
-function InfoView() {
-  return (
-    <div class="empty-state">
-      <div class="empty-state__title">Info</div>
-      <div class="empty-state__text">
-        cipher-mux v0.2.0 — Electron-based command center for Claude Code projects.
-      </div>
-    </div>
-  )
-}

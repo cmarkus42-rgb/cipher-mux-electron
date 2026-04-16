@@ -35,6 +35,10 @@ export const STATUSLINE_DIR = '/tmp/cipher-mux/context'
 /** Default scan paths */
 export const DEFAULT_SCAN_PATHS = ['/Users/Shared/Nextcloud/Claude/ClaudeCode01']
 export const DEFAULT_PROJECT_DIR = '/Users/Shared/Nextcloud/Claude/ClaudeCode01'
+/** Default scan depth (directory levels below each scanPath that are inspected). */
+export const DEFAULT_SCAN_DEPTH = 1
+/** Max allowed scan depth (guardrail against runaway recursion). */
+export const MAX_SCAN_DEPTH = 5
 
 /** Window defaults */
 export const DEFAULT_WINDOW_WIDTH = 1400

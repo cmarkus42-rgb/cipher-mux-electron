@@ -105,6 +105,8 @@ export class IpcHub {
 
   /**
    * Auto-start the Orchestrator session after MCP server is ready.
+   * The Claude launch is queued; it fires only after the renderer opens
+   * the terminal and reports its real size (TERMINAL_READY).
    */
   private autoStartOrchestrator(): void {
     const mcpConfig = configStore.get('mcp')
@@ -116,12 +118,12 @@ export class IpcHub {
       console.log(`[IpcHub] Orchestrator auto-started: ${session.id}`)
       // Notify renderer about orchestrator state
       this.windowManager.sendToMainWindow(IPC.ORCHESTRATOR_STARTED, session)
-      // Launch Claude after renderer has had time to resize the terminal
-      setTimeout(() => {
-        this.sessionManager.launchOrchestratorClaude().catch((err) => {
-          console.error('[IpcHub] Failed to launch orchestrator claude:', err)
-        })
-      }, 2000)
+      // Queue Claude launch — fires when renderer reports real size
+      try {
+        this.sessionManager.queueOrchestratorClaude()
+      } catch (err) {
+        console.error('[IpcHub] Failed to queue orchestrator claude:', err)
+      }
     }).catch((err) => {
       console.error('[IpcHub] Orchestrator auto-start failed:', err)
     })
@@ -213,6 +215,12 @@ export class IpcHub {
     ipcMain.handle(IPC.TERMINAL_CAPTURE, async (_e, { paneId, lines }: { paneId: string; lines?: number }) => {
       return this.sessionManager.capture(paneId, lines)
     })
+
+    ipcMain.on(IPC.TERMINAL_READY, (_e, { paneId, cols, rows }: { paneId: string; cols: number; rows: number }) => {
+      this.sessionManager.markReady(paneId, cols, rows).catch((err) => {
+        console.error('terminal ready error:', err)
+      })
+    })
   }
 
   // ─── Messages ──────────────────────────────────────────
@@ -251,19 +259,36 @@ export class IpcHub {
     ipcMain.handle(IPC.PROJECTS_SCAN, async () => {
       const appConfig = configStore.get('app')
       const scanPaths = appConfig?.scanPaths ?? []
-      this.cachedProjects = await this.projectScanner.scan(scanPaths)
+      const scanDepth = appConfig?.scanDepth ?? 1
+      this.cachedProjects = await this.projectScanner.scan(scanPaths, scanDepth)
       return this.cachedProjects
     })
 
     ipcMain.handle(IPC.PROJECTS_KICKOFF, async (_e, opts: KickoffOpts) => {
       const result = await this.kickoffManager.kickoff(opts)
-      // Inspect the newly created project and add it to the cached list
+
+      // Inspect the project (new or existing) and refresh cachedProjects.
+      // Deduplicate by path so calling kickoff on an existing project doesn't
+      // produce a duplicate tile.
       const projectInfo = await this.projectScanner.inspectProject(result.projectPath)
       if (projectInfo) {
+        this.cachedProjects = this.cachedProjects.filter((p) => p.path !== projectInfo.path)
         this.cachedProjects.push(projectInfo)
         this.cachedProjects.sort((a, b) => a.name.localeCompare(b.name))
       }
-      return result
+
+      // Persist the project's parent directory as a scan path, so a subsequent
+      // PROJECTS_SCAN (e.g. from a rescan) will find the project too. Without
+      // this, rescan would drop the new project if it lives outside the
+      // default scan paths.
+      const parentDir = path.dirname(result.projectPath)
+      const appCfg = configStore.get('app')
+      const scanPaths = appCfg?.scanPaths ?? []
+      if (!scanPaths.includes(parentDir)) {
+        configStore.set('app', { ...appCfg, scanPaths: [...scanPaths, parentDir] })
+      }
+
+      return { ...result, project: projectInfo }
     })
   }
 
@@ -333,12 +358,12 @@ export class IpcHub {
         mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
         mcpApiKey: mcpConfig?.apiKey ?? '',
       })
-      // Launch Claude after renderer has had time to resize the terminal
-      setTimeout(() => {
-        this.sessionManager.launchOrchestratorClaude().catch((err) => {
-          console.error('[IpcHub] Failed to launch orchestrator claude:', err)
-        })
-      }, 1500)
+      // Queue Claude launch — fires when renderer reports real terminal size
+      try {
+        this.sessionManager.queueOrchestratorClaude()
+      } catch (err) {
+        console.error('[IpcHub] Failed to queue orchestrator claude:', err)
+      }
       return session
     })
 

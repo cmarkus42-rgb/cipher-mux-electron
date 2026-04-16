@@ -4,6 +4,7 @@ import * as path from 'path'
 import type { AppConfig } from '../../shared/types'
 import {
   DEFAULT_SCAN_PATHS,
+  DEFAULT_SCAN_DEPTH,
   DEFAULT_PROJECT_DIR,
   MAX_SESSIONS,
   MESSAGE_RETENTION_DAYS,
@@ -18,6 +19,7 @@ import {
 const defaults: AppConfig = {
   app: {
     scanPaths: DEFAULT_SCAN_PATHS,
+    scanDepth: DEFAULT_SCAN_DEPTH,
     defaultProjectDir: DEFAULT_PROJECT_DIR,
     maxSessions: MAX_SESSIONS,
     messageRetentionDays: MESSAGE_RETENTION_DAYS,

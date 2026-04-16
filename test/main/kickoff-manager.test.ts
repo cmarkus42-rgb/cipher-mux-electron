@@ -83,23 +83,38 @@ describe('KickoffManager', () => {
     )
   })
 
-  it('should throw when target directory already exists', async () => {
-    // Create the directory first
+  it('should accept an existing target directory and seed docs/requirements.md', async () => {
+    // Create the directory first (simulates pointing at an existing project)
     const existingDir = path.join(tmpDir, 'existing-project')
     fs.mkdirSync(existingDir)
 
-    await assert.rejects(
-      () =>
-        manager.kickoff({
-          requirementsFile,
-          targetDir: tmpDir,
-          projectName: 'existing-project',
-          autoInterview: false,
-        }),
-      (err: Error) => {
-        assert.ok(err.message.includes('already exists'))
-        return true
-      },
-    )
+    const result = await manager.kickoff({
+      requirementsFile,
+      targetDir: tmpDir,
+      projectName: 'existing-project',
+      autoInterview: false,
+    })
+
+    assert.equal(result.existingProject, true)
+    assert.equal(result.claudeMdCreated, true)
+    assert.ok(fs.existsSync(path.join(existingDir, 'docs', 'requirements.md')))
+  })
+
+  it('should preserve an existing CLAUDE.md when kicked off on an existing project', async () => {
+    const existingDir = path.join(tmpDir, 'preserve-claude-md')
+    fs.mkdirSync(existingDir)
+    fs.writeFileSync(path.join(existingDir, 'CLAUDE.md'), 'KEEP ME', 'utf-8')
+
+    const result = await manager.kickoff({
+      requirementsFile,
+      targetDir: tmpDir,
+      projectName: 'preserve-claude-md',
+      autoInterview: false,
+    })
+
+    assert.equal(result.existingProject, true)
+    assert.equal(result.claudeMdCreated, false)
+    const content = fs.readFileSync(path.join(existingDir, 'CLAUDE.md'), 'utf-8')
+    assert.equal(content, 'KEEP ME')
   })
 })

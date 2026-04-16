@@ -6,6 +6,10 @@ export interface KickoffResult {
   projectPath: string
   claudeMdPath: string
   requirementsCopied: boolean
+  /** True if targetDir already existed (user pointed at existing project). */
+  existingProject: boolean
+  /** True if a new CLAUDE.md was written (false if it already existed). */
+  claudeMdCreated: boolean
 }
 
 /**
@@ -22,45 +26,52 @@ export class KickoffManager {
    * 5. Return result
    */
   async kickoff(opts: KickoffOpts): Promise<KickoffResult> {
-    // If targetDir already ends with projectName, don't double-append
+    // If targetDir already ends with projectName, don't double-append.
+    // This also handles the "point at existing directory" case.
     const baseName = path.basename(opts.targetDir)
     const projectPath = baseName === opts.projectName
       ? opts.targetDir
       : path.join(opts.targetDir, opts.projectName)
-
-    // Fail if project directory already exists
-    if (fs.existsSync(projectPath)) {
-      throw new Error(`Project directory already exists: ${projectPath}`)
-    }
 
     // Validate requirements file exists
     if (!fs.existsSync(opts.requirementsFile)) {
       throw new Error(`Requirements file not found: ${opts.requirementsFile}`)
     }
 
-    // Create project directory
-    fs.mkdirSync(projectPath, { recursive: true })
+    const existed = fs.existsSync(projectPath)
+    if (existed) {
+      const stat = fs.statSync(projectPath)
+      if (!stat.isDirectory()) {
+        throw new Error(`Path exists but is not a directory: ${projectPath}`)
+      }
+    } else {
+      fs.mkdirSync(projectPath, { recursive: true })
+    }
 
-    // Create docs/ subdirectory
+    // docs/ subdirectory (idempotent)
     const docsDir = path.join(projectPath, 'docs')
-    fs.mkdirSync(docsDir)
+    fs.mkdirSync(docsDir, { recursive: true })
 
-    // Copy requirements file
+    // Copy requirements file (always overwrite — user just picked it)
     const requirementsDest = path.join(docsDir, 'requirements.md')
     fs.copyFileSync(opts.requirementsFile, requirementsDest)
 
-    // Generate CLAUDE.md
+    // CLAUDE.md — only create if missing (don't clobber an existing project)
     const claudeMdPath = path.join(projectPath, 'CLAUDE.md')
-    const claudeMdContent = generateClaudeMd(opts.projectName)
-    fs.writeFileSync(claudeMdPath, claudeMdContent, 'utf-8')
+    const claudeMdExisted = fs.existsSync(claudeMdPath)
+    if (!claudeMdExisted) {
+      fs.writeFileSync(claudeMdPath, generateClaudeMd(opts.projectName), 'utf-8')
+    }
 
-    // Copy SDD workflow skills (.claude/skills/) into the new project
+    // Copy SDD workflow skills (.claude/skills/) — only if not already present
     this.copySkills(projectPath)
 
     return {
       projectPath,
       claudeMdPath,
       requirementsCopied: true,
+      existingProject: existed,
+      claudeMdCreated: !claudeMdExisted,
     }
   }
 

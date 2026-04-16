@@ -15,6 +15,7 @@ export const IPC = {
   TERMINAL_RESIZE: 'cipher-mux:terminal:resize',
   TERMINAL_SPLIT: 'cipher-mux:terminal:split',
   TERMINAL_CAPTURE: 'cipher-mux:terminal:capture',
+  TERMINAL_READY: 'cipher-mux:terminal:ready',
 
   // Message Bus
   MESSAGES_SEND: 'cipher-mux:messages:send',

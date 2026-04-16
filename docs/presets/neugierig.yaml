@@ -1,0 +1,9 @@
+version: '1.0'
+name: neugierig
+breathing.frequency_hz: 0.2
+breathing.head_amplitude_deg: 2.5
+breathing.antenna_sway_deg: 6
+ambient.look_around_interval_s: 3
+ambient.micro_movement_amplitude_deg: 1
+speaking.wobble_amplitude_deg: 4
+speaking.wobble_frequency_hz: 5

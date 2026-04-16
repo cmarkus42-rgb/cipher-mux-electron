@@ -86,20 +86,20 @@ await window.cipherMux.orchestrator.start()
 ```
 
 **Erwartetes Ergebnis:**
-- [ ] Session wird erstellt (Activity Rail zeigt neue Session)
-- [ ] Verzeichnis existiert: `~/.config/cipher-mux/orchestrator/`
-- [ ] Datei existiert: `~/.config/cipher-mux/orchestrator/CLAUDE.md`
-- [ ] CLAUDE.md enthält MCP-URL `http://127.0.0.1:3100/mcp`
-- [ ] CLAUDE.md enthält Bearer-Token (32-Zeichen Hex)
-- [ ] CLAUDE.md enthält alle 7 Tools (mux_sessions, mux_create_session, mux_kill_session, mux_send, mux_read, mux_status, mux_context_usage)
-- [ ] CLAUDE.md enthält "Maximal 2 Retry-Versuche"
+- [x] Session wird erstellt (Activity Rail zeigt neue Session)
+- [x] Verzeichnis existiert: `~/.config/cipher-mux/orchestrator/`
+- [x] Datei existiert: `~/.config/cipher-mux/orchestrator/CLAUDE.md`
+- [x] CLAUDE.md enthält MCP-URL `http://127.0.0.1:3100/mcp`
+- [x] CLAUDE.md enthält Bearer-Token (32-Zeichen Hex)
+- [x] CLAUDE.md enthält alle 7 Tools (mux_sessions, mux_create_session, mux_kill_session, mux_send, mux_read, mux_status, mux_context_usage)
+- [x] CLAUDE.md enthält "Maximal 2 Retry-Versuche"
 
 **Prüfen per Terminal:**
 ```bash
 cat ~/.config/cipher-mux/orchestrator/CLAUDE.md
 ```
 
-**Ergebnis:** _hier eintragen_
+**Ergebnis:** passt_
 
 ### 6b: Orchestrator-Status abfragen
 
@@ -111,7 +111,7 @@ await window.cipherMux.orchestrator.status()
 **Erwartetes Ergebnis:**
 - [ ] `{ running: true, sessionId: "01..." }` — sessionId ist ein ULID
 
-**Ergebnis:** _hier eintragen_
+**Ergebnis:** _das steht jetzt nur function - im UI steht Orchestrator auch als Off
 
 ### 6c: Doppelstart verhindern
 
@@ -121,9 +121,9 @@ await window.cipherMux.orchestrator.start()
 ```
 
 **Erwartetes Ergebnis:**
-- [ ] Fehler: "Orchestrator is already running"
+- [x] Fehler: "Orchestrator is already running"
 
-**Ergebnis:** _hier eintragen_
+**Ergebnis:** _hier eintragen - das sagt er mir wenn ich den blitz klicke - nicht beim bash vorhin - im ui steht weietrhin orch:off_
 
 ### 6d: Orchestrator stoppen
 
@@ -137,7 +137,7 @@ await window.cipherMux.orchestrator.stop()
 - [ ] Activity Rail: Session verschwindet
 - [ ] Status danach: `await window.cipherMux.orchestrator.status()` → `{ running: false, sessionId: null }`
 
-**Ergebnis:** _hier eintragen_
+**Ergebnis:** _hier eintragen --- da steht nur funktion_
 
 ### 6e: Neustart nach Stopp
 
@@ -150,7 +150,7 @@ await window.cipherMux.orchestrator.start()
 - [ ] Neue Session wird erstellt (neuer ULID)
 - [ ] CLAUDE.md wird frisch generiert (ggf. neuer API-Key falls geändert)
 
-**Ergebnis:** _hier eintragen_
+**Ergebnis:** _hier eintragen.  same_
 
 ---
 
@@ -161,35 +161,36 @@ await window.cipherMux.orchestrator.start()
 ### 7a: Blitz-Icon in Activity Rail
 
 **Erwartetes Ergebnis:**
-- [ ] Activity Rail zeigt ein ϟ (Koppa/Blitz) Icon zwischen den Session-Slots und dem Spacer
-- [ ] Icon ist im inaktiven Zustand in gedämpfter Farbe (wie andere Icons)
-- [ ] Hover zeigt hellere Border
+- [x] Activity Rail zeigt ein ϟ (Koppa/Blitz) Icon zwischen den Session-Slots und dem Spacer
+- [x] Icon ist im inaktiven Zustand in gedämpfter Farbe (wie andere Icons)
+- [x] Hover zeigt hellere Border
 
-**Ergebnis:** _hier eintragen_
+**Ergebnis:** _hier eintragen_ok
 
 ### 7b: Orchestrator starten via Blitz-Icon
 
 **Aktion:** Klicke auf das ϟ Icon
 
 **Erwartetes Ergebnis:**
-- [ ] Icon wechselt auf Cyan-Akzent (nicht grün wie normale Sessions)
-- [ ] Pulsierender Dot erscheint unten-rechts am Icon
-- [ ] Status Bar zeigt "Orch: running" mit cyan Dot
-- [ ] Neue Session erscheint in der Activity Rail (nummeriert)
+- [x] Icon wechselt auf Cyan-Akzent (nicht grün wie normale Sessions)
+- [x] Pulsierender Dot erscheint unten-rechts am Icon
+- [x] Status Bar zeigt "Orch: running" mit cyan Dot
+- [x] Neue Session erscheint in der Activity Rail (nummeriert)
 
-**Ergebnis:** _hier eintragen_
+**Ergebnis:** _hier eintragen_ok --- anmerkung: der orchestrator sollte immer mit dem start des mux mit gestartet werden - nicht always on, aber autostart
+
 
 ### 7c: Orchestrator stoppen via Blitz-Icon
 
 **Aktion:** Klicke erneut auf das ϟ Icon
 
 **Erwartetes Ergebnis:**
-- [ ] Icon kehrt zum inaktiven Zustand zurück
-- [ ] Pulsierender Dot verschwindet
-- [ ] Status Bar zeigt "Orch: off" mit dimmed Dot
-- [ ] Orchestrator-Session wird aus der Activity Rail entfernt
+- [x] Icon kehrt zum inaktiven Zustand zurück
+- [x] Pulsierender Dot verschwindet
+- [x] Status Bar zeigt "Orch: off" mit dimmed Dot
+- [x] Orchestrator-Session wird aus der Activity Rail entfernt
 
-**Ergebnis:** _hier eintragen_
+**Ergebnis:** _hier eintragen_ok ...
 
 ### 7d: Orchestrator-Messages im Chatroom
 
@@ -208,7 +209,8 @@ Dann Chatroom öffnen (▦ Icon).
 - [ ] Sender "Orchestrator" ist in Cyan dargestellt (nicht Standard-Farbe)
 - [ ] Normale Messages (anderer Sender) sind weiterhin in Standard-Farbe
 
-**Ergebnis:** _hier eintragen_
+**Ergebnis:** _hier eintragen_sinnloser test - das soll doch der orchestrator machen...ich kann aber schonmal nichts in den chatroom schicken
+
 
 ---
 
@@ -272,7 +274,7 @@ echo $CIPHER_MUX_MCP_KEY
 - [ ] `CIPHER_MUX_MCP_URL` zeigt `http://127.0.0.1:3100` (oder konfigurierten Port)
 - [ ] `CIPHER_MUX_MCP_KEY` zeigt einen 32-Zeichen Hex-String (API Key)
 
-**Ergebnis:** _hier eintragen_
+**Ergebnis:** _hier eintragen_selber machen
 
 ---
 

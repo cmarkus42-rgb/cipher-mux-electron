@@ -8,11 +8,14 @@ files:
   - package.json
 mac:
   category: public.app-category.developer-tools
+  icon: assets/icon.icns
   target:
     - dmg
   darkModeSupport: true
   extendInfo:
     NSAppleEventsUsageDescription: "cipher-mux needs Apple Events for tmux integration."
+dmg:
+  icon: assets/icon.icns
 asarUnpack:
   - "**/node_modules/better-sqlite3/**"
 npmRebuild: true

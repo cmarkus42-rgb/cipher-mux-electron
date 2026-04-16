@@ -1,6 +1,11 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, globalShortcut } from 'electron'
 import { WindowManager } from './window-manager'
 import { IpcHub } from './ipc-hub'
+import { patchEnvPath } from './util/exec-util'
+
+// macOS GUI apps inherit a minimal PATH — patch in /opt/homebrew/bin etc.
+// before any child_process spawns (tmux, claude, etc.)
+patchEnvPath()
 
 // Single instance lock
 const gotLock = app.requestSingleInstanceLock()
@@ -17,6 +22,14 @@ app.whenReady().then(() => {
   ipcHub.init()
 
   windowManager.createMainWindow()
+
+  // Cmd+Alt+I toggles DevTools
+  globalShortcut.register('CommandOrControl+Alt+I', () => {
+    const win = windowManager.getMainWindow()
+    if (win) {
+      win.webContents.toggleDevTools()
+    }
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

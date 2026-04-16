@@ -26,6 +26,12 @@ export class SessionManager extends EventEmitter {
   private tmux: TmuxManager
   private orchestratorSessionId: string | null = null
   private mcpConfig: OrchestratorConfig | null = null
+  /**
+   * Commands queued to be sent to a session once its terminal reports
+   * the real (post-mount) size via markReady(). Prevents launching TUIs
+   * like Claude at the default 80x24 before xterm has fitted.
+   */
+  private pendingLaunch: Map<string, { command: string; timer: NodeJS.Timeout }> = new Map()
 
   constructor(tmux: TmuxManager) {
     super()
@@ -92,6 +98,12 @@ export class SessionManager extends EventEmitter {
 
     // Start output watcher — emits terminal data with session ULID as ID
     this.tmux.watchSession(tmuxName, id)
+
+    // Queue auto-launch (e.g. `claude --...`) to fire once the renderer
+    // reports the real terminal size, so TUIs start at the correct dims.
+    if (opts.autoLaunch) {
+      this.setPendingLaunch(id, opts.autoLaunch)
+    }
 
     this.emit('session-changed', session)
     return session
@@ -224,6 +236,58 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
+   * Queue a command to be sent once the renderer reports its real
+   * terminal size via markReady(). Falls back to firing after 4s.
+   */
+  setPendingLaunch(sessionId: string, command: string): void {
+    const existing = this.pendingLaunch.get(sessionId)
+    if (existing) clearTimeout(existing.timer)
+    const timer = setTimeout(() => {
+      console.warn(`[SessionManager] pending launch fallback fired for ${sessionId}`)
+      this.flushPendingLaunch(sessionId).catch((err) => {
+        console.error('[SessionManager] pending launch flush error:', err)
+      })
+    }, 4000)
+    this.pendingLaunch.set(sessionId, { command, timer })
+  }
+
+  /**
+   * Called by the renderer after xterm has mounted and applied its first
+   * real resize. Resizes the pane once more (defensive) and flushes any
+   * pending launch command so the TUI starts at the right size.
+   */
+  async markReady(sessionId: string, cols: number, rows: number): Promise<void> {
+    const session = this.sessions.get(sessionId)
+    if (!session) return
+    // Apply the resize defensively — renderer already did it, but a second
+    // pass ensures tmux state matches before we launch a TUI.
+    const target = session.tmuxPane ?? session.tmuxSession
+    try {
+      await this.tmux.resizePane(target, cols, rows)
+    } catch (err) {
+      console.warn('[SessionManager] markReady resize failed:', err)
+    }
+    // Give tmux time to propagate the new size to the pane's process group
+    // before spawning a TUI that reads size once at startup. 250ms is a
+    // conservative upper bound — on slow machines 100ms was racy and claude
+    // would start at 80x24, ending up with the input line in the wrong row.
+    await new Promise((r) => setTimeout(r, 250))
+    await this.flushPendingLaunch(sessionId)
+  }
+
+  private async flushPendingLaunch(sessionId: string): Promise<void> {
+    const pending = this.pendingLaunch.get(sessionId)
+    if (!pending) return
+    clearTimeout(pending.timer)
+    this.pendingLaunch.delete(sessionId)
+    try {
+      await this.sendKeys(sessionId, pending.command)
+    } catch (err) {
+      console.warn('[SessionManager] sending pending launch failed:', err)
+    }
+  }
+
+  /**
    * Capture content from a session's pane.
    */
   async capture(sessionId: string, lines?: number): Promise<string> {
@@ -333,14 +397,23 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
-   * Launch Claude Code in the Orchestrator session.
-   * Called after the renderer has resized the terminal to the correct dimensions.
+   * Queue Claude Code launch in the Orchestrator session.
+   * The command is sent only after the renderer marks the terminal ready
+   * with its real size, so the TUI doesn't start at tmux's default 80x24.
    */
-  async launchOrchestratorClaude(): Promise<void> {
+  queueOrchestratorClaude(): void {
     if (!this.orchestratorSessionId) {
       throw new Error('Orchestrator is not running')
     }
-    await this.sendKeys(this.orchestratorSessionId, 'claude --dangerously-skip-permissions\n')
+    // Prepending `clear` wipes the shell prompt + command-echo before claude
+    // takes over the pane; without it xterm's viewport could remain scrolled
+    // above Claude's TUI. Do NOT send RIS (ESC c) here — tmux's per-pane
+    // charset state doesn't survive it, leaving DEC line-drawing chars
+    // rendered as `@`/`0` glyphs.
+    this.setPendingLaunch(
+      this.orchestratorSessionId,
+      'clear; claude --dangerously-skip-permissions\n',
+    )
   }
 
   /**
