@@ -49,3 +49,10 @@ export const ACTIVITY_RAIL_WIDTH = 48
 
 /** Chatroom panel width */
 export const CHATROOM_PANEL_WIDTH = 280
+
+/** Default path to the projectlauncher working directory. */
+export const PROJECTLAUNCHER_DIR_DEFAULT =
+  '/Users/Shared/Nextcloud/Claude/ClaudeCode01/projectlauncher'
+
+/** Default kickoff timeout (minutes) — how long we wait for a completion signal. */
+export const KICKOFF_TIMEOUT_MIN_DEFAULT = 15

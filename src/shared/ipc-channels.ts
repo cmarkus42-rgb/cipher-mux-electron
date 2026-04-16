@@ -28,6 +28,7 @@ export const IPC = {
   PROJECTS_LIST: 'cipher-mux:projects:list',
   PROJECTS_SCAN: 'cipher-mux:projects:scan',
   PROJECTS_KICKOFF: 'cipher-mux:projects:kickoff',
+  PROJECT_KICKOFF_COMPLETED: 'cipher-mux:projects:kickoff-completed',
 
   // Context Usage
   CONTEXT_GET: 'cipher-mux:context:get',
