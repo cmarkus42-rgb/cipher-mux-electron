@@ -3,6 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { SessionManager } from '../session/session-manager'
 import type { MessageBus } from '../message-bus/message-bus'
 import type { StatusLineMonitor } from '../monitoring/statusline-monitor'
+import type { KickoffOrchestrator } from '../project/kickoff-orchestrator'
 import type { Topic } from '../../shared/types'
 
 /**
@@ -12,6 +13,7 @@ export interface ToolContext {
   sessionManager: SessionManager
   messageBus: MessageBus | null
   statusLineMonitor: StatusLineMonitor | null
+  kickoffOrchestrator: KickoffOrchestrator | null
 }
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']
@@ -210,6 +212,48 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+      }
+    }
+  )
+
+  // 8. kickoff_complete — Signal that /launch finished its work
+  ;(server.registerTool as any)(
+    'kickoff_complete',
+    {
+      description:
+        'Signal dass der Launcher das Projekt-Scaffolding abgeschlossen hat. '
+        + 'cipher-mux reagiert, indem es eine neue Claude-Session im Projekt-'
+        + 'Verzeichnis öffnet und /interview startet.',
+      inputSchema: {
+        projectPath: z.string().describe('Absoluter Pfad zum Projekt-Verzeichnis'),
+        projectName: z.string().describe('Projektname (kebab-case, aus dem Verzeichnisnamen)'),
+        detectedStack: z.string().optional().describe(
+          'Erkannter Tech-Stack, z.B. "kotlin-android", "electron-ts", "python"'
+        ),
+      },
+    },
+    async (args: { projectPath: string; projectName: string; detectedStack?: string }) => {
+      if (!ctx.kickoffOrchestrator) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'KickoffOrchestrator not available' }) }],
+          isError: true,
+        }
+      }
+      try {
+        ctx.kickoffOrchestrator.handleCompletion({
+          projectPath: args.projectPath,
+          projectName: args.projectName,
+          detectedStack: args.detectedStack,
+        })
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }],
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: msg }) }],
+          isError: true,
+        }
       }
     }
   )
