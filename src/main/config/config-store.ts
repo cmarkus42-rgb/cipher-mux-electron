@@ -8,6 +8,8 @@ import {
   DEFAULT_PROJECT_DIR,
   MAX_SESSIONS,
   MESSAGE_RETENTION_DAYS,
+  PROJECTLAUNCHER_DIR_DEFAULT,
+  KICKOFF_TIMEOUT_MIN_DEFAULT,
   MCP_DEFAULT_PORT,
   MCP_DEFAULT_HOST,
   ORCHESTRATOR_DIR,
@@ -23,6 +25,8 @@ const defaults: AppConfig = {
     defaultProjectDir: DEFAULT_PROJECT_DIR,
     maxSessions: MAX_SESSIONS,
     messageRetentionDays: MESSAGE_RETENTION_DAYS,
+    projectlauncherPath: PROJECTLAUNCHER_DIR_DEFAULT,
+    kickoffTimeoutMinutes: KICKOFF_TIMEOUT_MIN_DEFAULT,
   },
   mcp: {
     port: MCP_DEFAULT_PORT,
