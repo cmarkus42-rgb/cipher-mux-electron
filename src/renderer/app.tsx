@@ -12,6 +12,7 @@ import { TerminalPane } from './components/TerminalPane'
 import { SplitContainer } from './components/SplitContainer'
 import { ChatroomPanel } from './components/ChatroomPanel'
 import { KickoffDialog } from './components/KickoffDialog'
+import { RecoveryDialog } from './components/RecoveryDialog'
 import { SettingsView } from './components/SettingsView'
 import { StatusBar } from './components/StatusBar'
 
@@ -293,6 +294,9 @@ export function App() {
         onClose={() => setKickoffVisible(false)}
         onKickoff={handleKickoff}
       />
+
+      {/* Recovery Dialog — shown on startup when orphaned sessions are found */}
+      <RecoveryDialog onDone={() => {}} />
     </div>
   )
 }

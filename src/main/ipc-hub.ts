@@ -72,7 +72,11 @@ export class IpcHub {
     })
 
     // Recover orphaned sessions
-    this.sessionManager.recover().catch((err) => {
+    this.sessionManager.recover().then((result) => {
+      if (result.orphaned.length > 0) {
+        this.windowManager.sendToMainWindow(IPC.SESSIONS_RECOVERY_RESULT, result)
+      }
+    }).catch((err) => {
       console.error('[IpcHub] session recovery failed:', err)
     })
 
@@ -242,6 +246,19 @@ export class IpcHub {
 
     ipcMain.handle(IPC.SESSIONS_RECOVER, async () => {
       return this.sessionManager.recover()
+    })
+
+    ipcMain.handle(IPC.SESSIONS_RECOVERY_ACTION, async (_e, { action, tmuxSession, displayName }: {
+      action: 'adopt' | 'kill'
+      tmuxSession: string
+      displayName?: string
+    }) => {
+      if (action === 'adopt') {
+        return this.sessionManager.adoptOrphan(tmuxSession, displayName)
+      } else {
+        await this.sessionManager.killOrphan(tmuxSession)
+        return { ok: true }
+      }
     })
   }
 
