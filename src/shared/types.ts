@@ -75,35 +75,13 @@ export interface ContextUsage {
   updatedAt: number
 }
 
-// ─── Layout ────────────────────────────────────────────────
+// ─── Grid ──────────────────────────────────────────────────
 
-export type SplitDirection = 'horizontal' | 'vertical'
-
-export interface SplitNode {
-  type: 'split'
-  direction: SplitDirection
-  ratio: number
-  children: LayoutNode[]
-}
-
-export interface PaneNode {
-  type: 'pane'
-  sessionId: string
-}
-
-export type LayoutNode = SplitNode | PaneNode
-
-export interface LayoutState {
-  root: LayoutNode | null
-  activePaneId: string | null
-}
-
-export type ActiveView = 'cockpit' | 'terminal' | 'info'
+// Re-export grid types for backward compat
+export type { GridConfig, GridSlot, GridState, ThemeName } from './grid-types'
 
 export interface AppState {
-  activeView: ActiveView
   activeSessionId: string | null
-  splitLayout: LayoutState
   chatroomVisible: boolean
 }
 
@@ -133,8 +111,8 @@ export interface AppConfig {
   }
   ui: {
     chatroomVisible: boolean
-    activeView: ActiveView
-    layout: LayoutState
+    theme: ThemeName
+    grid: GridState
   }
   windows: {
     main: { x: number; y: number; width: number; height: number }

@@ -2,6 +2,7 @@ import { app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 import type { AppConfig } from '../../shared/types'
+import { createEmptyGrid } from '../../shared/grid-types'
 import { deepMerge } from '../util/deep-merge'
 import {
   DEFAULT_SCAN_PATHS,
@@ -40,11 +41,8 @@ const defaults: AppConfig = {
   },
   ui: {
     chatroomVisible: false,
-    activeView: 'cockpit',
-    layout: {
-      root: null,
-      activePaneId: null,
-    },
+    theme: 'ivory' as const,
+    grid: createEmptyGrid(),
   },
   windows: {
     main: { x: 0, y: 0, width: DEFAULT_WINDOW_WIDTH, height: DEFAULT_WINDOW_HEIGHT },

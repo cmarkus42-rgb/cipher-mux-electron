@@ -41,7 +41,7 @@ export const IPC = {
   // Config
   CONFIG_GET: 'cipher-mux:config:get',
   CONFIG_SET: 'cipher-mux:config:set',
-  CONFIG_SAVE_LAYOUT: 'cipher-mux:config:save-layout',
+  CONFIG_SAVE_GRID: 'cipher-mux:config:save-grid',
 
   // Dialogs
   DIALOG_OPEN_FILE: 'cipher-mux:dialog:open-file',
@@ -56,6 +56,7 @@ export const IPC = {
   // Bugreport
   BUGREPORT_COLLECT: 'cipher-mux:bugreport:collect',
   BUGREPORT_SUBMIT: 'cipher-mux:bugreport:submit',
+  BUGREPORT_ENRICH: 'cipher-mux:bugreport:enrich',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

@@ -1,7 +1,8 @@
 /** Application-wide constants */
 
 export const APP_NAME = 'cipher-mux'
-export const APP_VERSION = '0.1.0'
+/** App version — injected at build time, fallback for dev */
+export const APP_VERSION = (globalThis as any).__CIPHER_MUX_VERSION__ ?? '0.3.0-dev'
 
 /** Maximum concurrent sessions */
 export const MAX_SESSIONS = 10
@@ -19,8 +20,8 @@ export const MESSAGE_RETENTION_DAYS = 7
 /** Output batching interval for terminal streaming (ms) */
 export const OUTPUT_BATCH_INTERVAL_MS = 16
 
-/** Layout save debounce (ms) */
-export const LAYOUT_SAVE_DEBOUNCE_MS = 500
+/** Grid save debounce (ms) */
+export const GRID_SAVE_DEBOUNCE_MS = 300
 
 /** Message cleanup interval (ms) — every 6 hours */
 export const MESSAGE_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000
@@ -44,8 +45,13 @@ export const MAX_SCAN_DEPTH = 5
 export const DEFAULT_WINDOW_WIDTH = 1400
 export const DEFAULT_WINDOW_HEIGHT = 900
 
-/** Activity Rail width */
-export const ACTIVITY_RAIL_WIDTH = 48
+/** Grid defaults */
+export const DEFAULT_GRID_COLS = 5
+export const DEFAULT_GRID_ROWS = 2
+export const MAX_GRID_COLS = 5
+export const MAX_GRID_ROWS = 3
+export const MIN_GRID_COLS = 1
+export const MIN_GRID_ROWS = 1
 
 /** Chatroom panel width */
 export const CHATROOM_PANEL_WIDTH = 280
