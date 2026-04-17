@@ -1,9 +1,10 @@
-import { useState, useCallback, useEffect } from 'preact/hooks'
+import { useState, useCallback, useEffect, useMemo } from 'preact/hooks'
 import type { ActiveView, ProjectInfo } from '../shared/types'
 import { useSessions } from './hooks/useSessions'
 import { useMessages } from './hooks/useMessages'
 import { useContextUsage } from './hooks/useContextUsage'
 import { useProjects } from './hooks/useProjects'
+import { useShortcuts } from './hooks/useShortcuts'
 import { ActivityRail } from './components/ActivityRail'
 import { CockpitView } from './components/CockpitView'
 import { TerminalPane } from './components/TerminalPane'
@@ -111,18 +112,6 @@ export function App() {
     setKickoffVisible(false)
   }, [])
 
-  // Cmd+N keyboard shortcut for kickoff dialog
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.metaKey && e.key === 'n') {
-        e.preventDefault()
-        setKickoffVisible((v) => !v)
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
-
   const handleStartSession = useCallback(async (project: ProjectInfo) => {
     try {
       const session = await startSession({
@@ -157,6 +146,14 @@ export function App() {
       console.error('[App] Failed to start shell session:', err)
     }
   }, [startSession])
+
+  const shortcutEntries = useMemo(() => [
+    { combo: 'Cmd+0', label: 'Cockpit', category: 'Navigation' as const, action: () => handleViewChange('cockpit') },
+    { combo: 'Cmd+K', label: 'Chatroom toggle', category: 'Navigation' as const, action: toggleChatroom },
+    { combo: 'Cmd+N', label: 'Neues Projekt', category: 'Aktionen' as const, action: () => setKickoffVisible((v) => !v) },
+  ], [handleViewChange, toggleChatroom])
+
+  const registeredShortcuts = useShortcuts(shortcutEntries)
 
   const activeSession = activeSessionId
     ? sessions.find((s) => s.id === activeSessionId)
