@@ -42,8 +42,8 @@ export async function enrichBugreport(description: string): Promise<EnrichedBugr
 
     if (!response.ok) return null
 
-    const data = await response.json()
-    const text = data.response?.trim()
+    const data = await response.json() as Record<string, unknown>
+    const text = (data.response as string | undefined)?.trim()
     if (!text) return null
 
     return parseEnrichedOutput(text)
