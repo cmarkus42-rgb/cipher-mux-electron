@@ -165,8 +165,7 @@ export function App() {
       if (targetSessionId) {
         splitPane(targetSessionId, direction, session.id)
       } else {
-        // First split — create layout from scratch
-        splitPane(session.id, direction, session.id)
+        // No existing pane to split — just show the new session as single pane
         setActiveSessionId(session.id)
       }
       setActiveView('terminal')
