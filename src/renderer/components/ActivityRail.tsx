@@ -110,7 +110,7 @@ export function ActivityRail({
       {/* Info */}
       <RailItem
         icon="i"
-        label="Info"
+        label="Info & Einstellungen"
         active={activeView === 'info'}
         onClick={() => onViewChange('info')}
       />

@@ -13,7 +13,7 @@ import { SplitContainer } from './components/SplitContainer'
 import { ChatroomPanel } from './components/ChatroomPanel'
 import { KickoffDialog } from './components/KickoffDialog'
 import { RecoveryDialog } from './components/RecoveryDialog'
-import { SettingsView } from './components/SettingsView'
+import { InfoSettingsView } from './components/InfoSettingsView'
 import { StatusBar } from './components/StatusBar'
 
 export function App() {
@@ -277,7 +277,13 @@ export function App() {
                 <div class="empty-state__text">No active session. Start a session from the Cockpit.</div>
               </div>
             )}
-            {activeView === 'info' && <SettingsView onRescan={rescan} scanning={scanning} />}
+            {activeView === 'info' && (
+              <InfoSettingsView
+                shortcuts={registeredShortcuts}
+                onRescan={rescan}
+                scanning={scanning}
+              />
+            )}
           </div>
         </main>
 
