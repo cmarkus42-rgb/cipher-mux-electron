@@ -372,9 +372,9 @@ export class IpcHub {
       return { ok: true }
     })
 
-    ipcMain.handle(IPC.CONFIG_SAVE_LAYOUT, async (_e, layout) => {
-      configStore.set('ui', { ...configStore.get('ui'), layout })
-      return { ok: true }
+    ipcMain.handle(IPC.CONFIG_SAVE_GRID, (_event, grid) => {
+      const ui = configStore.get('ui')
+      configStore.set('ui', { ...ui, grid })
     })
   }
 
