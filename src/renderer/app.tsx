@@ -17,7 +17,7 @@ import { InfoSettingsView } from './components/InfoSettingsView'
 import { StatusBar } from './components/StatusBar'
 
 export function App() {
-  const [chatroomVisible, setChatroomVisible] = useState(false)
+  const [chatroomVisible, setChatroomVisible] = useState(true)
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null)
   const [bugreportVisible, setBugreportVisible] = useState(false)
   const [infoVisible, setInfoVisible] = useState(false)
@@ -36,17 +36,25 @@ export function App() {
 
   const [orchestratorSessionId, setOrchestratorSessionId] = useState<string | null>(null)
 
+  // Place orchestrator in grid slot 0
+  const placeOrchestrator = useCallback((sessionId: string) => {
+    setOrchestratorSessionId(sessionId)
+    // Always put orchestrator in slot 0 (top-left)
+    setSessionAtSlot(0, sessionId)
+  }, [setSessionAtSlot])
+
   // Check orchestrator status on mount
   useEffect(() => {
     const api = (window as any).cipherMux
     api.orchestrator.status().then((s: { running: boolean; sessionId?: string }) => {
-      if (s.running && s.sessionId) setOrchestratorSessionId(s.sessionId)
+      if (s.running && s.sessionId) placeOrchestrator(s.sessionId)
     })
     const unsub = api.orchestrator.onStarted((data: any) => {
-      if (data?.sessionId) setOrchestratorSessionId(data.sessionId)
+      const sid = data?.sessionId ?? data?.id
+      if (sid) placeOrchestrator(sid)
     })
     return () => unsub()
-  }, [])
+  }, [placeOrchestrator])
 
   // Listen for kickoff completion
   useEffect(() => {
@@ -126,6 +134,23 @@ export function App() {
     resize({ cols, rows })
   }, [resize])
 
+  const handleOrchestratorToggle = useCallback(async () => {
+    const api = (window as any).cipherMux
+    try {
+      if (orchestratorSessionId) {
+        await api.orchestrator.stop()
+        removeSession(orchestratorSessionId)
+        setOrchestratorSessionId(null)
+      } else {
+        const session = await api.orchestrator.start()
+        const sid = session?.sessionId ?? session?.id
+        if (sid) placeOrchestrator(sid)
+      }
+    } catch (err) {
+      console.error('[App] orchestrator toggle failed:', err)
+    }
+  }, [orchestratorSessionId, removeSession, placeOrchestrator])
+
   return (
     <div class="app-shell">
       {/* drag region */}
@@ -162,7 +187,11 @@ export function App() {
       {/* statusbar */}
       <StatusBar
         theme={theme}
+        chatroomVisible={chatroomVisible}
+        orchestratorRunning={!!orchestratorSessionId}
+        onOrchestrator={handleOrchestratorToggle}
         onBugreport={() => setBugreportVisible(true)}
+        onToggleChatroom={() => setChatroomVisible((v) => !v)}
         onToggleTheme={toggleTheme}
         onInfo={() => setInfoVisible(true)}
       />
@@ -186,7 +215,6 @@ export function App() {
         <div class="modal-overlay" onClick={() => setInfoVisible(false)}>
           <div class="modal-panel" style={{ width: '600px' }} onClick={(e) => e.stopPropagation()}>
             <InfoSettingsView
-              shortcuts={[]}
               onRescan={rescan}
               scanning={scanning}
             />

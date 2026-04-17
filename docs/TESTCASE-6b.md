@@ -17,26 +17,26 @@ npm run dev
 ```
 
 **Erwartetes Ergebnis:**
-- [ ] Electron-Fenster öffnet sich
-- [ ] Ivory Theme (heller Hintergrund #F2F2E8, nicht dunkel)
-- [ ] Kein ActivityRail links — stattdessen Grid mit leeren Zellen
-- [ ] StatusBar unten: Version links, "bugreport · theme: ivory · info" rechts
-- [ ] Alles lowercase (Labels, Buttons, StatusBar)
-- [ ] Rajdhani Headings, Fira Code Mono Schrift
+- [x] Electron-Fenster öffnet sich
+- [x] Ivory Theme (heller Hintergrund #F2F2E8, nicht dunkel)
+- [x] Kein ActivityRail links — stattdessen Grid mit leeren Zellen
+- [x] StatusBar unten: Version links, "bugreport · theme: ivory · info" rechts
+- [x] Alles lowercase (Labels, Buttons, StatusBar)
+- [x] Rajdhani Headings, Fira Code Mono Schrift
 
-**Ergebnis:** _hier eintragen_
+**Ergebnis:** alles gut - sieht gut aus
 
 ---
 
 ## Test 2: Grid-Layout (leerer Zustand)
 
 **Erwartetes Ergebnis:**
-- [ ] 5x2 Grid mit 10 leeren Zellen sichtbar
-- [ ] Jede leere Zelle zeigt: dashed Border, "+" Icon, "projekt auswählen" Label
-- [ ] Grid-Controls unten rechts: "spalten −/+" und "zeilen −/+"
-- [ ] Cut-Corner-Design auf allen Zellen (abgeschnittene Ecken, kein border-radius)
+- [x] 5x2 Grid mit 10 leeren Zellen sichtbar
+- [x] Jede leere Zelle zeigt: dashed Border, "+" Icon, "projekt auswählen" Label
+- [x] Grid-Controls unten rechts: "spalten −/+" und "zeilen −/+"
+- [x] Cut-Corner-Design auf allen Zellen (abgeschnittene Ecken, kein border-radius)
 
-**Ergebnis:** _hier eintragen_
+**Ergebnis:** _hier eintragen_ja
 
 ---
 
@@ -51,29 +51,27 @@ npm run dev
 4. Buttons bei Min/Max ausgegraut?
 
 **Erwartetes Ergebnis:**
-- [ ] Grid passt sich sofort an
-- [ ] Minimum 1x1, Maximum 5x3
-- [ ] Buttons disabled am Limit
-- [ ] Grid-Größe bleibt nach App-Neustart erhalten (persistent)
+- [x] Grid passt sich sofort an
+- [x] Minimum 1x1, Maximum 5x3
+- [x] Buttons disabled am Limit
+- [x] Grid-Größe bleibt nach App-Neustart erhalten (persistent)
 
-**Ergebnis:** _hier eintragen_
-
----
+**Ergebnis:** 
+---passt
 
 ## Test 4: Session starten via Launcher-Zelle
 
 **Aktion:** Klick auf eine leere Grid-Zelle ("+"-Symbol)
 
 **Erwartetes Ergebnis:**
-- [ ] ProjectPopup öffnet sich (Modal-Overlay, abgedunkelt)
-- [ ] Titel zeigt "projekt auswählen"
-- [ ] Projektliste mit Filtern/Suchfeld
-- [ ] "↻" Button zum Rescannen
-- [ ] Klick auf ein Projekt startet eine Session
-- [ ] Session erscheint in der angeklickten Zelle (nicht irgendwo)
+- [x] ProjectPopup öffnet sich (Modal-Overlay, abgedunkelt)
+- [x] Titel zeigt "projekt auswählen"
+- [x] Projektliste mit Filtern/Suchfeld
+- [x] "↻" Button zum Rescannen
+- [x] Klick auf ein Projekt startet eine Session
+- [x] Session erscheint in der angeklickten Zelle (nicht irgendwo)
 
-**Ergebnis:** _hier eintragen_
-
+**Ergebnis:** gut
 ---
 
 ## Test 5: Session-Zelle
@@ -81,15 +79,14 @@ npm run dev
 **Voraussetzung:** Mindestens eine laufende Session
 
 **Erwartetes Ergebnis:**
-- [ ] Cell Header zeigt: Status-Dot · Projektname (lowercase) · "·" · Context-Usage %
-- [ ] Rechts im Header: "⇄" (projekt wechseln) · "✕" (session schließen)
-- [ ] Terminal-Bereich darunter (xterm.js)
-- [ ] Terminal hat Ivory-Hintergrund (#F5F5EC) — hell, nicht dunkel
-- [ ] Inset-Shadow auf dem Terminal-Bereich
-- [ ] Klick in die Zelle setzt Fokus (Border-Highlight)
+- [x] Cell Header zeigt: Status-Dot · Projektname (lowercase) · "·" · Context-Usage %
+- [x] Rechts im Header: "⇄" (projekt wechseln) · "✕" (session schließen)
+- [x] Terminal-Bereich darunter (xterm.js)
+- [x] Terminal hat Ivory-Hintergrund (#F5F5EC) — hell, nicht dunkel
+- [x] Inset-Shadow auf dem Terminal-Bereich
+- [x] Klick in die Zelle setzt Fokus (Border-Highlight)
 
-**Ergebnis:** _hier eintragen_
-
+**Ergebnis:** gut
 ---
 
 ## Test 6: Projekt wechseln (⇄)
@@ -97,28 +94,26 @@ npm run dev
 **Aktion:** "⇄" Button in einem Session-Header klicken
 
 **Erwartetes Ergebnis:**
-- [ ] ProjectPopup öffnet sich
-- [ ] Titel zeigt "projekt wechseln" (nicht "auswählen")
-- [ ] Klick auf Projekt: alte Session wird gestoppt, neue Session startet im selben Slot
-- [ ] Terminal zeigt neues Projekt
+- [x] ProjectPopup öffnet sich
+- [x] Titel zeigt "projekt wechseln" (nicht "auswählen")
+- [x] Klick auf Projekt: alte Session wird gestoppt, neue Session startet im selben Slot
+- [x] Terminal zeigt neues Projekt
 
-**Ergebnis:** _hier eintragen_
-
----
+**Ergebnis:** 
+---gut
 
 ## Test 7: Session schließen (✕)
 
 **Aktion:** "✕" Button in einem Session-Header klicken
 
 **Erwartetes Ergebnis:**
-- [ ] Session wird gestoppt
-- [ ] Zelle wird wieder zur Launcher-Zelle (dashed Border, "+" Icon)
-- [ ] Fokus wechselt auf nächste vorhandene Session
+- [x] Session wird gestoppt
+- [x] Zelle wird wieder zur Launcher-Zelle (dashed Border, "+" Icon)
+- [x] Fokus wechselt auf nächste vorhandene Session
 
-**Ergebnis:** _hier eintragen_
-
+**Ergebnis:** 
 ---
-
+ok
 ## Test 8: Drag & Drop
 
 **Voraussetzung:** 2+ Sessions im Grid
@@ -126,29 +121,27 @@ npm run dev
 **Aktion:** Session-Header greifen, auf andere Zelle ziehen
 
 **Erwartetes Ergebnis:**
-- [ ] Drag-Handle am Header (cursor: grab)
-- [ ] Drop auf leere Zelle: Session wandert dorthin
-- [ ] Drop auf andere Session: Swap (Positionen tauschen)
-- [ ] Drop-Target zeigt visuelles Feedback (dashed Border)
+- [x] Drag-Handle am Header (cursor: grab)
+- [x] Drop auf leere Zelle: Session wandert dorthin
+- [x] Drop auf andere Session: Swap (Positionen tauschen)
+- [x] Drop-Target zeigt visuelles Feedback (dashed Border)
 
-**Ergebnis:** _hier eintragen_
-
----
+**Ergebnis:** 
+---schick
 
 ## Test 9: Theme-Wechsel
 
 **Aktion:** "theme: ivory" in der StatusBar klicken
 
 **Erwartetes Ergebnis:**
-- [ ] Sofortiger Wechsel auf Dark Theme
-- [ ] StatusBar zeigt "theme: dark"
-- [ ] Terminals wechseln auf dunklen Hintergrund (#222228)
-- [ ] Alle Farben passen zum Dark Theme (muted neon accents)
-- [ ] Nochmal klicken: zurück auf Ivory
-- [ ] Theme-Wahl bleibt nach App-Neustart erhalten
+- [x] Sofortiger Wechsel auf Dark Theme
+- [x] StatusBar zeigt "theme: dark"
+- [x] Terminals wechseln auf dunklen Hintergrund (#222228)
+- [x] Alle Farben passen zum Dark Theme (muted neon accents)
+- [x] Nochmal klicken: zurück auf Ivory
+- [x] Theme-Wahl bleibt nach App-Neustart erhalten
 
-**Ergebnis:** _hier eintragen_
-
+**Ergebnis:** 
 ---
 
 ## Test 10: Chatroom Toggle
@@ -156,24 +149,22 @@ npm run dev
 **Aktion:** Floating-Button am rechten Rand klicken (✉)
 
 **Erwartetes Ergebnis:**
-- [ ] Chatroom-Panel schiebt sich von rechts auf (~220px)
-- [ ] Button verschwindet wenn Panel offen
+- [x] Chatroom-Panel schiebt sich von rechts auf (~220px)
+- [x] Button verschwindet wenn Panel offen
 - [ ] Message-Bubbles mit #F5F5EC Hintergrund (Ivory) / Dark-Äquivalent
 - [ ] Panel schließen: Button erscheint wieder
 
-**Ergebnis:** _hier eintragen_
-
+**Ergebnis:** keine bubbles, keine möglichkkeit zu schließen zu sehen
 ---
 
 ## Test 11: StatusBar
 
 **Erwartetes Ergebnis:**
 - [ ] Links: Version (z.B. "v0.3.0-dev" oder "v0.3.0+42")
-- [ ] Rechts: "bugreport" · "theme: ivory" · "info" — alles lowercase, klickbar
-- [ ] 24px Höhe, fest am unteren Rand
+- [x] Rechts: "bugreport" · "theme: ivory" · "info" — alles lowercase, klickbar
+- [x] 24px Höhe, fest am unteren Rand
 
-**Ergebnis:** _hier eintragen_
-
+**Ergebnis:** version 020
 ---
 
 ## Test 12: Bugreport mit Ollama-Enrichment
@@ -186,30 +177,28 @@ npm run dev
 3. "vorschau" klicken
 
 **Erwartetes Ergebnis (Ollama läuft):**
-- [ ] Ladeindikator während Ollama arbeitet
-- [ ] Strukturierte Vorschau: Title, Severity, Tags, Steps, Summary
-- [ ] Vorschau editierbar
-- [ ] "absenden" schreibt Markdown mit YAML-Frontmatter in Outbox
+- [x] Ladeindikator während Ollama arbeitet
+- [x] Strukturierte Vorschau: Title, Severity, Tags, Steps, Summary
+- [x] Vorschau editierbar
+- [x] "absenden" schreibt Markdown mit YAML-Frontmatter in Outbox
 
 **Erwartetes Ergebnis (Ollama nicht erreichbar):**
-- [ ] Hinweis "ollama nicht erreichbar"
-- [ ] Rohtext wird ohne Enrichment gespeichert
+- [x] Hinweis "ollama nicht erreichbar"
+- [x] Rohtext wird ohne Enrichment gespeichert
 
-**Ergebnis:** _hier eintragen_
-
----
+**Ergebnis:** 
+---ja...ollama integration folgt noch? oder?
 
 ## Test 13: Info-Dialog
 
 **Aktion:** "info" in StatusBar klicken
 
 **Erwartetes Ergebnis:**
-- [ ] Modal-Overlay öffnet sich mit InfoSettingsView
-- [ ] Klick auf Overlay schließt Dialog
-- [ ] Tabs: Shortcuts, Features, Einstellungen
+- [x] Modal-Overlay öffnet sich mit InfoSettingsView
+- [x] Klick auf Overlay schließt Dialog
+- [x] Tabs: Shortcuts, Features, Einstellungen
 
-**Ergebnis:** _hier eintragen_
-
+**Ergebnis:** schon mitgeteilt
 ---
 
 ## Test 14: Config-Persistenz
@@ -222,17 +211,16 @@ npm run dev
 5. App neustarten
 
 **Erwartetes Ergebnis:**
-- [ ] Grid ist 3x2 (nicht zurück auf 5x2)
-- [ ] Theme ist Dark (nicht zurück auf Ivory)
-- [ ] Config-Datei `~/Library/Application Support/cipher-mux/cipher-mux-config.json` ist NICHT leer
+- [x] Grid ist 3x2 (nicht zurück auf 5x2)
+- [x] Theme ist Dark (nicht zurück auf Ivory)
+- [x] Config-Datei `~/Library/Application Support/cipher-mux/cipher-mux-config.json` ist NICHT leer
 
 **Prüfen:**
 ```bash
 cat ~/Library/Application\ Support/cipher-mux/cipher-mux-config.json | python3 -m json.tool
 ```
 
-**Ergebnis:** _hier eintragen_
-
+**Ergebnis:** hatten wir alles durch und den bash kannste dslebst besser
 ---
 
 ## Test 15: Orchestrator im Grid
@@ -244,8 +232,7 @@ cat ~/Library/Application\ Support/cipher-mux/cipher-mux-config.json | python3 -
 - [ ] Kein "⇄"-Button (Projekt wechseln nicht möglich für Orchestrator)
 - [ ] "✕" Button funktioniert normal
 
-**Ergebnis:** _hier eintragen_
-
+**Ergebnis:** kein orchestrator
 ---
 
 ## Test 16: Context-Usage Farbkodierung
@@ -258,8 +245,7 @@ cat ~/Library/Application\ Support/cipher-mux/cipher-mux-config.json | python3 -
 - [ ] 85–100%: Rot (#cc0030 ivory / #B85060 dark)
 - [ ] Status-Dot ändert Farbe passend
 
-**Ergebnis:** _hier eintragen_
-
+**Ergebnis:** wird man sehen :)
 ---
 
 ## Bekannte Einschränkungen (Phase 6b)

@@ -1,9 +1,8 @@
 // src/renderer/components/InfoSettingsView.tsx
 import { useCallback, useEffect, useState } from 'preact/hooks'
-import type { ShortcutEntry } from '../shortcut-registry'
+import { APP_VERSION } from '../../shared/constants'
 
 interface InfoSettingsViewProps {
-  shortcuts: ShortcutEntry[]
   onRescan: () => void | Promise<void>
   scanning: boolean
 }
@@ -17,8 +16,16 @@ interface AppSection {
 
 type TabId = 'shortcuts' | 'features' | 'settings'
 
-export function InfoSettingsView({ shortcuts, onRescan, scanning }: InfoSettingsViewProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('shortcuts')
+// Built-in shortcuts (hard-coded since most keyboard shortcuts were removed)
+const SHORTCUTS = [
+  { category: 'global', combo: 'Cmd+B', label: 'bugreport dialog öffnen' },
+  { category: 'global', combo: 'Escape', label: 'dialog / overlay schließen' },
+  { category: 'terminal', combo: 'Cmd+C', label: 'text kopieren / prozess abbrechen' },
+  { category: 'terminal', combo: 'Cmd+V', label: 'einfügen' },
+]
+
+export function InfoSettingsView({ onRescan, scanning }: InfoSettingsViewProps) {
+  const [activeTab, setActiveTab] = useState<TabId>('features')
   const [scanPaths, setScanPaths] = useState<string[]>([])
   const [scanDepth, setScanDepth] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -60,7 +67,7 @@ export function InfoSettingsView({ shortcuts, onRescan, scanning }: InfoSettings
     await persist({ scanDepth: clamped })
   }, [persist])
 
-  const grouped = shortcuts.reduce<Record<string, ShortcutEntry[]>>((acc, s) => {
+  const grouped = SHORTCUTS.reduce<Record<string, typeof SHORTCUTS>>((acc, s) => {
     (acc[s.category] ??= []).push(s)
     return acc
   }, {})
@@ -74,7 +81,7 @@ export function InfoSettingsView({ shortcuts, onRescan, scanning }: InfoSettings
             class={`info-tab ${activeTab === tab ? 'info-tab--active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === 'shortcuts' ? 'Shortcuts' : tab === 'features' ? 'Features' : 'Einstellungen'}
+            {tab === 'shortcuts' ? 'shortcuts' : tab === 'features' ? 'features' : 'einstellungen'}
           </button>
         ))}
       </div>
@@ -96,43 +103,153 @@ export function InfoSettingsView({ shortcuts, onRescan, scanning }: InfoSettings
               </table>
             </div>
           ))}
+          <div class="settings-section__hint" style={{ marginTop: '12px' }}>
+            die meisten aktionen werden per klick in der statusbar oder im grid ausgelöst.
+            keyboard shortcuts sind auf ein minimum reduziert.
+          </div>
         </section>
       )}
 
       {activeTab === 'features' && (
-        <section class="settings-section">
-          <div class="settings-section__title">Terminals & Splits</div>
-          <div class="settings-section__hint">
-            Eingebettete Terminals über tmux-Sessions. Cmd+\ und Cmd+- für vertikale/horizontale Splits, Cmd+W zum Schließen.
+        <section class="settings-section wiki-section">
+          <div class="wiki-entry">
+            <div class="settings-section__title">was ist cipher-mux?</div>
+            <p class="wiki-text">
+              cipher-mux ist eine electron-app, die mehrere claude code sessions gleichzeitig
+              in einem fenster verwaltet. jede session läuft in einem eigenen tmux-terminal.
+              die sessions können über einen message bus kommunizieren und werden von einem
+              orchestrator koordiniert.
+            </p>
+            <p class="wiki-text">
+              <strong>wann braucht man das?</strong> sobald man an mehreren projekten gleichzeitig
+              arbeitet oder ein projekt so groß ist, dass ein einzelner claude agent an seine
+              context-grenzen stößt. der orchestrator kann aufgaben verteilen und ergebnisse
+              zusammenführen.
+            </p>
           </div>
-          <div class="settings-section__title">Message Bus & Chatroom</div>
-          <div class="settings-section__hint">
-            SQLite-basierter Nachrichtenkanal zwischen Sessions. Chatroom (Cmd+K) zeigt den Bus-Feed.
+
+          <div class="wiki-entry">
+            <div class="settings-section__title">grid layout</div>
+            <p class="wiki-text">
+              das hauptfenster zeigt ein grid mit bis zu 5×3 zellen. jede zelle kann eine
+              terminal-session aufnehmen. leere zellen zeigen einen „+" button zum starten
+              neuer sessions.
+            </p>
+            <p class="wiki-text">
+              <strong>bedienung:</strong> grid-größe über die „spalten ±" / „zeilen ±" controls
+              unten rechts anpassen. sessions per drag & drop umordnen. klick auf den header
+              einer session setzt den fokus.
+            </p>
+            <p class="wiki-text">
+              <strong>projekt wechseln:</strong> „⇄" im header einer session öffnet den
+              projektpicker. die alte session wird gestoppt und eine neue im selben slot gestartet.
+            </p>
           </div>
-          <div class="settings-section__title">MCP-Server</div>
-          <div class="settings-section__hint">
-            Lokaler HTTP-Server für Machine-to-Machine-Kommunikation. Wird automatisch in jede Session injiziert.
+
+          <div class="wiki-entry">
+            <div class="settings-section__title">orchestrator</div>
+            <p class="wiki-text">
+              der orchestrator ist eine spezielle claude session, die immer in slot 0 (oben links)
+              läuft. er hat zugriff auf alle anderen sessions über den MCP-server und kann:
+            </p>
+            <ul class="wiki-list">
+              <li>sessions starten, stoppen und überwachen</li>
+              <li>nachrichten an sessions senden</li>
+              <li>context-usage aller sessions abfragen</li>
+              <li>aufgaben zwischen sessions verteilen</li>
+            </ul>
+            <p class="wiki-text">
+              der orchestrator startet automatisch mit der app. über den „orchestrator" button
+              in der statusbar kann er manuell gestartet/gestoppt werden.
+            </p>
           </div>
-          <div class="settings-section__title">Orchestrator</div>
-          <div class="settings-section__hint">
-            Zentrale Claude-Session, die andere Sessions via MCP steuert und koordiniert.
+
+          <div class="wiki-entry">
+            <div class="settings-section__title">message bus & chatroom</div>
+            <p class="wiki-text">
+              alle sessions teilen sich einen SQLite-basierten nachrichtenbus. sessions können
+              nachrichten an topics senden (z.b. „broadcast", „orchestrator", „session:xyz").
+              der chatroom zeigt den gesamten bus-feed in echtzeit.
+            </p>
+            <p class="wiki-text">
+              <strong>wozu?</strong> der orchestrator nutzt den bus um anweisungen zu verteilen.
+              sessions können ergebnisse zurückmelden. du siehst im chatroom was zwischen den
+              agents passiert.
+            </p>
           </div>
-          <div class="settings-section__title">Kickoff / Projektstart</div>
-          <div class="settings-section__hint">
-            Neues Projekt aus Obsidian-Notizen scaffolden (Cmd+N). Nutzt den projectlauncher-Skill.
+
+          <div class="wiki-entry">
+            <div class="settings-section__title">MCP-server</div>
+            <p class="wiki-text">
+              ein lokaler HTTP-server (default port 3100) stellt tools bereit, die claude sessions
+              programmatisch nutzen können. der MCP-server wird automatisch in jede neue session
+              injiziert (via CLAUDE.md).
+            </p>
+            <p class="wiki-text">
+              <strong>verfügbare tools:</strong> session management, message bus, context usage
+              abfrage, kickoff/projektstart. der orchestrator nutzt diese tools um andere
+              sessions zu steuern.
+            </p>
+          </div>
+
+          <div class="wiki-entry">
+            <div class="settings-section__title">context usage monitoring</div>
+            <p class="wiki-text">
+              jede session zeigt ihren aktuellen context-verbrauch im header (0-100%). die farbe
+              wechselt automatisch:
+            </p>
+            <ul class="wiki-list">
+              <li><span style={{ color: 'var(--color-neon-green)' }}>grün</span> — 0-60%: alles gut</li>
+              <li><span style={{ color: 'var(--color-neon-orange)' }}>orange</span> — 60-85%: wird eng</li>
+              <li><span style={{ color: 'var(--color-neon-red)' }}>rot</span> — 85-100%: session bald am limit</li>
+            </ul>
+            <p class="wiki-text">
+              die daten kommen aus claudes statusLine-hook und werden in echtzeit aktualisiert.
+            </p>
+          </div>
+
+          <div class="wiki-entry">
+            <div class="settings-section__title">bugreport</div>
+            <p class="wiki-text">
+              über „bugreport" in der statusbar (oder Cmd+B) kannst du einen bug-report erstellen.
+              die beschreibung wird optional von ollama (lokales LLM) in ein strukturiertes format
+              gebracht: titel, severity, tags, schritte, zusammenfassung. der report landet als
+              markdown-datei in der outbox.
+            </p>
+          </div>
+
+          <div class="wiki-entry">
+            <div class="settings-section__title">themes</div>
+            <p class="wiki-text">
+              zwei themes: <strong>ivory</strong> (hell, keramik-töne) und <strong>dark</strong>
+              (dunkel, muted neon). wechsel über „theme: ..." in der statusbar. die terminals
+              passen sich automatisch an. die wahl wird persistent gespeichert.
+            </p>
+          </div>
+
+          <div class="wiki-entry">
+            <div class="settings-section__title">projekt scanner</div>
+            <p class="wiki-text">
+              cipher-mux scannt konfigurierte verzeichnisse nach claude-code-projekten
+              (erkennbar an CLAUDE.md, .claude/, package.json etc). die gefundenen projekte
+              erscheinen im projektpicker wenn du eine neue session startest.
+            </p>
+            <p class="wiki-text">
+              scan-pfade und -tiefe lassen sich im „einstellungen" tab konfigurieren.
+            </p>
           </div>
         </section>
       )}
 
       {activeTab === 'settings' && !loading && (
         <section class="settings-section">
-          <div class="settings-section__title">Scan-Pfade</div>
+          <div class="settings-section__title">scan-pfade</div>
           <div class="settings-section__hint">
-            Verzeichnisse, die beim Scan nach Claude-Code-Projekten durchsucht werden.
+            verzeichnisse, die beim scan nach claude-code-projekten durchsucht werden.
           </div>
           <ul class="settings-list">
             {scanPaths.length === 0 && (
-              <li class="settings-list__empty">Keine Pfade hinterlegt.</li>
+              <li class="settings-list__empty">keine pfade hinterlegt.</li>
             )}
             {scanPaths.map((p) => (
               <li key={p} class="settings-list__item">
@@ -142,14 +259,14 @@ export function InfoSettingsView({ shortcuts, onRescan, scanning }: InfoSettings
             ))}
           </ul>
           <div class="settings-row">
-            <button class="btn btn--primary btn--sm" onClick={handleAdd}>+ Pfad hinzufügen</button>
+            <button class="btn btn--primary btn--sm" onClick={handleAdd}>+ pfad hinzufügen</button>
             <button class="btn btn--sm" onClick={onRescan} disabled={scanning}>
-              {scanning ? 'Scanne…' : 'Jetzt rescannen'}
+              {scanning ? 'scanne…' : 'jetzt rescannen'}
             </button>
           </div>
           <div class="settings-row" style={{ marginTop: '12px' }}>
             <label class="settings-label">
-              <span>Scan-Tiefe</span>
+              <span>scan-tiefe</span>
               <input
                 class="input input--sm"
                 type="number"
@@ -160,11 +277,11 @@ export function InfoSettingsView({ shortcuts, onRescan, scanning }: InfoSettings
                 style={{ width: '64px' }}
               />
             </label>
-            <span class="text-xs text-dim">1 = nur direkte Kinder · max. 5</span>
+            <span class="text-xs text-dim">1 = nur direkte kinder · max. 5</span>
           </div>
-          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>Über</div>
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>über</div>
           <div class="settings-section__hint">
-            cipher-mux v0.2.0 — Electron-basierte Kommandozentrale für Claude Code Projekte.
+            cipher-mux {APP_VERSION} — electron-basierte kommandozentrale für claude code projekte.
           </div>
         </section>
       )}

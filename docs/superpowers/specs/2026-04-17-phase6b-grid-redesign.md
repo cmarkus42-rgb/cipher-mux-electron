@@ -44,7 +44,7 @@ interface GridState {
 ### Grid-Controls
 - +/− Buttons unten rechts: "spalten −/+" und "zeilen −/+"
 - Änderung sofort persistent
-- Minimum 1x1, Maximum 5x3
+- Minimum 1x1, Maximum 5x3 bei dghd, sonst angepasst an auflösung
 
 ### Drag & Drop
 - Session-Header als Drag-Handle
