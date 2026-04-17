@@ -6,6 +6,7 @@ import { ulid } from 'ulidx'
 import type { BugreportData, SessionInfo } from '../../shared/types'
 import { APP_VERSION } from '../../shared/constants'
 import { runCommand } from '../util/exec-util'
+import { enrichBugreport, type EnrichedBugreport } from './ollama-client'
 
 const BUGREPORT_BASE = path.join(os.homedir(), '.config', 'cipher-mux', 'bugreports')
 const OUTBOX_DIR = path.join(BUGREPORT_BASE, 'outbox')
@@ -99,5 +100,9 @@ ${diagnostics.logs.slice(-50).join('\n')}
 
     fs.writeFileSync(path.join(OUTBOX_DIR, filename), content, 'utf-8')
     return id
+  }
+
+  async enrich(description: string): Promise<EnrichedBugreport | null> {
+    return enrichBugreport(description)
   }
 }

@@ -446,6 +446,10 @@ export class IpcHub {
       const id = await this.bugreportManager.submit(description, this.sessionManager.list(), project)
       return { id }
     })
+
+    ipcMain.handle(IPC.BUGREPORT_ENRICH, async (_event, { description }: { description: string }) => {
+      return this.bugreportManager.enrich(description)
+    })
   }
 
   async destroy(): Promise<void> {
