@@ -96,7 +96,7 @@ const api = {
   config: {
     get: (key: string) => ipcRenderer.invoke(IPC.CONFIG_GET, { key }),
     set: (key: string, value: unknown) => ipcRenderer.invoke(IPC.CONFIG_SET, { key, value }),
-    saveLayout: (layout: unknown) => ipcRenderer.invoke(IPC.CONFIG_SAVE_LAYOUT, layout),
+    saveGrid: (grid: unknown) => ipcRenderer.invoke(IPC.CONFIG_SAVE_GRID, grid),
   },
 
   // ─── Dialogs ──────────────────────────────────────────────
@@ -124,6 +124,8 @@ const api = {
     collect: () => ipcRenderer.invoke(IPC.BUGREPORT_COLLECT),
     submit: (description: string, project?: string) =>
       ipcRenderer.invoke(IPC.BUGREPORT_SUBMIT, { description, project }),
+    enrich: (description: string) =>
+      ipcRenderer.invoke(IPC.BUGREPORT_ENRICH, { description }),
   },
 }
 
