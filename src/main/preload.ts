@@ -122,7 +122,8 @@ const api = {
   // ─── Bugreport ─────────────────────────────────────────
   bugreport: {
     collect: () => ipcRenderer.invoke(IPC.BUGREPORT_COLLECT),
-    export: (format: string) => ipcRenderer.invoke(IPC.BUGREPORT_EXPORT, { format }),
+    submit: (description: string, project?: string) =>
+      ipcRenderer.invoke(IPC.BUGREPORT_SUBMIT, { description, project }),
   },
 }
 

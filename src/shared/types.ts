@@ -203,3 +203,8 @@ export interface BugreportData {
   logs: string[]
   timestamp: number
 }
+
+export interface BugreportSubmission {
+  description: string
+  project?: string
+}

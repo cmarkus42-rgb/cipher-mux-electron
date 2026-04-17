@@ -13,6 +13,7 @@ import { SplitContainer } from './components/SplitContainer'
 import { ChatroomPanel } from './components/ChatroomPanel'
 import { KickoffDialog } from './components/KickoffDialog'
 import { RecoveryDialog } from './components/RecoveryDialog'
+import { BugreportDialog } from './components/BugreportDialog'
 import { InfoSettingsView } from './components/InfoSettingsView'
 import { StatusBar } from './components/StatusBar'
 
@@ -29,6 +30,7 @@ export function App() {
   const [mcpPort, setMcpPort] = useState<number | undefined>(undefined)
   const [orchestratorRunning, setOrchestratorRunning] = useState(false)
   const [kickoffVisible, setKickoffVisible] = useState(false)
+  const [bugreportVisible, setBugreportVisible] = useState(false)
 
   // Load MCP config to show port in status bar
   useEffect(() => {
@@ -193,6 +195,7 @@ export function App() {
       { combo: 'Cmd+0', label: 'Cockpit', category: 'Navigation' as const, action: () => handleViewChange('cockpit') },
       { combo: 'Cmd+K', label: 'Chatroom toggle', category: 'Navigation' as const, action: toggleChatroom },
       { combo: 'Cmd+N', label: 'Neues Projekt', category: 'Aktionen' as const, action: () => setKickoffVisible((v) => !v) },
+      { combo: 'Cmd+B', label: 'Bugreport', category: 'Aktionen' as const, action: () => setBugreportVisible((v) => !v) },
       { combo: 'Cmd+\\', label: 'Split vertikal', category: 'Layout' as const, action: () => handleSplit('vertical') },
       { combo: 'Cmd+-', label: 'Split horizontal', category: 'Layout' as const, action: () => handleSplit('horizontal') },
       { combo: 'Cmd+W', label: 'Pane schließen', category: 'Layout' as const, action: handleClosePane },
@@ -303,6 +306,12 @@ export function App() {
 
       {/* Recovery Dialog — shown on startup when orphaned sessions are found */}
       <RecoveryDialog onDone={() => {}} />
+
+      {/* Bugreport Dialog (Cmd+B) */}
+      <BugreportDialog
+        visible={bugreportVisible}
+        onClose={() => setBugreportVisible(false)}
+      />
     </div>
   )
 }
