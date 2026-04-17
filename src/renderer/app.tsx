@@ -1,13 +1,15 @@
 import { useState, useCallback, useEffect, useMemo } from 'preact/hooks'
-import type { ActiveView, ProjectInfo } from '../shared/types'
+import type { ActiveView, ProjectInfo, SplitDirection } from '../shared/types'
 import { useSessions } from './hooks/useSessions'
 import { useMessages } from './hooks/useMessages'
 import { useContextUsage } from './hooks/useContextUsage'
 import { useProjects } from './hooks/useProjects'
 import { useShortcuts } from './hooks/useShortcuts'
+import { useLayout } from './hooks/useLayout'
 import { ActivityRail } from './components/ActivityRail'
 import { CockpitView } from './components/CockpitView'
 import { TerminalPane } from './components/TerminalPane'
+import { SplitContainer } from './components/SplitContainer'
 import { ChatroomPanel } from './components/ChatroomPanel'
 import { KickoffDialog } from './components/KickoffDialog'
 import { SettingsView } from './components/SettingsView'
@@ -22,6 +24,7 @@ export function App() {
   const { unreadCount } = useMessages()
   const contextUsages = useContextUsage()
   const { projects, scanning, rescan } = useProjects()
+  const { layout, splitPane, closePane, updateRatio, setActivePane, pruneInvalidPanes } = useLayout()
   const [mcpPort, setMcpPort] = useState<number | undefined>(undefined)
   const [orchestratorRunning, setOrchestratorRunning] = useState(false)
   const [kickoffVisible, setKickoffVisible] = useState(false)
@@ -97,7 +100,10 @@ export function App() {
   const handleSessionSelect = useCallback((sessionId: string) => {
     setActiveSessionId(sessionId)
     setActiveView('terminal')
-  }, [])
+    if (layout.root) {
+      setActivePane(sessionId)
+    }
+  }, [layout.root, setActivePane])
 
   const handleKickoff = useCallback(async (req: {
     projectDir: string
@@ -147,11 +153,61 @@ export function App() {
     }
   }, [startSession])
 
-  const shortcutEntries = useMemo(() => [
-    { combo: 'Cmd+0', label: 'Cockpit', category: 'Navigation' as const, action: () => handleViewChange('cockpit') },
-    { combo: 'Cmd+K', label: 'Chatroom toggle', category: 'Navigation' as const, action: toggleChatroom },
-    { combo: 'Cmd+N', label: 'Neues Projekt', category: 'Aktionen' as const, action: () => setKickoffVisible((v) => !v) },
-  ], [handleViewChange, toggleChatroom])
+  // Split active pane in given direction
+  const handleSplit = useCallback(async (direction: SplitDirection) => {
+    const api = (window as any).cipherMux
+    const dir = await api.dialog.openDir({ title: 'Session-Verzeichnis wählen' })
+    if (!dir) return
+    try {
+      const name = dir.split('/').pop() || 'shell'
+      const session = await startSession({ name, projectPath: dir })
+      const targetSessionId = layout.activePaneId ?? activeSessionId
+      if (targetSessionId) {
+        splitPane(targetSessionId, direction, session.id)
+      } else {
+        // First split — create layout from scratch
+        splitPane(session.id, direction, session.id)
+        setActiveSessionId(session.id)
+      }
+      setActiveView('terminal')
+    } catch (err) {
+      console.error('[App] Failed to split:', err)
+    }
+  }, [startSession, layout.activePaneId, activeSessionId, splitPane])
+
+  const handleClosePane = useCallback(() => {
+    const target = layout.activePaneId
+    if (!target) return
+    closePane(target)
+  }, [layout.activePaneId, closePane])
+
+  // Prune layout when sessions change
+  useEffect(() => {
+    if (!layout.root) return
+    const validIds = new Set(sessions.map((s) => s.id))
+    pruneInvalidPanes(validIds)
+  }, [sessions, layout.root, pruneInvalidPanes])
+
+  const shortcutEntries = useMemo(() => {
+    const entries = [
+      { combo: 'Cmd+0', label: 'Cockpit', category: 'Navigation' as const, action: () => handleViewChange('cockpit') },
+      { combo: 'Cmd+K', label: 'Chatroom toggle', category: 'Navigation' as const, action: toggleChatroom },
+      { combo: 'Cmd+N', label: 'Neues Projekt', category: 'Aktionen' as const, action: () => setKickoffVisible((v) => !v) },
+      { combo: 'Cmd+\\', label: 'Split vertikal', category: 'Layout' as const, action: () => handleSplit('vertical') },
+      { combo: 'Cmd+-', label: 'Split horizontal', category: 'Layout' as const, action: () => handleSplit('horizontal') },
+      { combo: 'Cmd+W', label: 'Pane schließen', category: 'Layout' as const, action: handleClosePane },
+    ]
+    // Cmd+1..9 — jump to session by index
+    sessions.slice(0, 9).forEach((s, i) => {
+      entries.push({
+        combo: `Cmd+${i + 1}`,
+        label: s.name,
+        category: 'Navigation' as const,
+        action: () => handleSessionSelect(s.id),
+      })
+    })
+    return entries
+  }, [handleViewChange, toggleChatroom, handleSplit, handleClosePane, sessions, handleSessionSelect])
 
   const registeredShortcuts = useShortcuts(shortcutEntries)
 
@@ -197,14 +253,25 @@ export function App() {
                 onStartSession={handleStartSession}
               />
             )}
-            {activeView === 'terminal' && activeSession && (
+            {activeView === 'terminal' && layout.root && (
+              <SplitContainer
+                node={layout.root}
+                path={[]}
+                sessions={sessions}
+                contextUsages={contextUsages}
+                activePaneId={layout.activePaneId}
+                onUpdateRatio={updateRatio}
+                onPaneClick={setActivePane}
+              />
+            )}
+            {activeView === 'terminal' && !layout.root && activeSession && (
               <TerminalPane
                 sessionId={activeSession.id}
                 sessionName={activeSession.name}
                 contextUsage={contextUsages[activeSession.id]?.usedPercentage}
               />
             )}
-            {activeView === 'terminal' && !activeSession && (
+            {activeView === 'terminal' && !layout.root && !activeSession && (
               <div class="empty-state">
                 <div class="empty-state__title">Terminal</div>
                 <div class="empty-state__text">No active session. Start a session from the Cockpit.</div>
