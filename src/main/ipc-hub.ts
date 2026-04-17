@@ -10,6 +10,7 @@ import { StatusLineMonitor } from './monitoring/statusline-monitor'
 import { McpServerManager } from './mcp/mcp-server'
 import { generateApiKey } from './mcp/mcp-auth'
 import { KickoffOrchestrator } from './project/kickoff-orchestrator'
+import { BugreportManager } from './bugreport/bugreport-manager'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
 import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest } from '../shared/types'
@@ -26,6 +27,7 @@ export class IpcHub {
   private statusLineMonitor: StatusLineMonitor
   private mcpServer: McpServerManager
   private kickoffOrchestrator: KickoffOrchestrator
+  private bugreportManager: BugreportManager
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
 
   constructor(private windowManager: WindowManager) {
@@ -49,6 +51,7 @@ export class IpcHub {
         ?? '/Users/Shared/Nextcloud/Claude/ClaudeCode01/projectlauncher',
       timeoutMs: ((appConfig?.kickoffTimeoutMinutes ?? 15) * 60_000),
     })
+    this.bugreportManager = new BugreportManager()
   }
 
   init(): void {
@@ -433,11 +436,15 @@ export class IpcHub {
   // ─── Bugreport ─────────────────────────────────────────
   private registerBugreportChannels(): void {
     ipcMain.handle(IPC.BUGREPORT_COLLECT, async () => {
-      return { error: 'Not implemented' }
+      return this.bugreportManager.collectDiagnostics(this.sessionManager.list())
     })
 
-    ipcMain.handle(IPC.BUGREPORT_EXPORT, async (_e, _opts) => {
-      return { error: 'Not implemented' }
+    ipcMain.handle(IPC.BUGREPORT_SUBMIT, async (_e, { description, project }: {
+      description: string
+      project?: string
+    }) => {
+      const id = await this.bugreportManager.submit(description, this.sessionManager.list(), project)
+      return { id }
     })
   }
 

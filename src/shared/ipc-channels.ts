@@ -55,7 +55,7 @@ export const IPC = {
 
   // Bugreport
   BUGREPORT_COLLECT: 'cipher-mux:bugreport:collect',
-  BUGREPORT_EXPORT: 'cipher-mux:bugreport:export',
+  BUGREPORT_SUBMIT: 'cipher-mux:bugreport:submit',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
