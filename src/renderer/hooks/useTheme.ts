@@ -17,24 +17,29 @@ export function useTheme() {
     }).catch(() => {})
   }, [])
 
-  const setTheme = useCallback((next: ThemeName) => {
-    setThemeState(next)
-    applyThemeClass(next)
-    api().config.set('ui', { theme: next } as any).catch((err: unknown) =>
+  const persistTheme = useCallback((next: ThemeName) => {
+    // Read current ui config first to avoid overwriting grid state
+    api().config.get('ui').then((ui: any) => {
+      api().config.set('ui', { ...ui, theme: next })
+    }).catch((err: unknown) =>
       console.error('[useTheme] persist failed:', err),
     )
   }, [])
+
+  const setTheme = useCallback((next: ThemeName) => {
+    setThemeState(next)
+    applyThemeClass(next)
+    persistTheme(next)
+  }, [persistTheme])
 
   const toggleTheme = useCallback(() => {
     setThemeState((prev) => {
       const next: ThemeName = prev === 'ivory' ? 'dark' : 'ivory'
       applyThemeClass(next)
-      api().config.set('ui', { theme: next } as any).catch((err: unknown) =>
-        console.error('[useTheme] persist failed:', err),
-      )
+      persistTheme(next)
       return next
     })
-  }, [])
+  }, [persistTheme])
 
   return { theme, setTheme, toggleTheme }
 }

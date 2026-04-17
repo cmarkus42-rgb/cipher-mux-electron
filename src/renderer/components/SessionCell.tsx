@@ -22,7 +22,7 @@ export function SessionCell({
   session, contextUsage, focused, isOrchestrator, theme,
   onFocus, onClose, onSwitchProject, onDragStart, onDragOver, onDrop,
 }: SessionCellProps) {
-  const { terminalRef } = useTerminal(session.id, theme)
+  const { terminalRef } = useTerminal(session.id, theme, session.createdAt)
   const pct = contextUsage?.usedPercentage ?? 0
 
   const handleClick = useCallback(() => onFocus(session.id), [session.id, onFocus])
