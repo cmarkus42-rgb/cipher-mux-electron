@@ -699,3 +699,44 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-dim);
 }
+
+/* ================================================================
+   Split Layout
+   ================================================================ */
+
+.split-container {
+  position: relative;
+}
+
+.split-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.split-pane--active {
+  outline: 1px solid var(--color-neon-green);
+  outline-offset: -1px;
+}
+
+.split-divider {
+  flex-shrink: 0;
+  background: var(--color-border);
+  transition: background var(--transition-base);
+  z-index: 10;
+}
+
+.split-divider:hover,
+.split-divider:active {
+  background: var(--color-neon-green);
+}
+
+.split-divider--vertical {
+  width: 4px;
+  cursor: col-resize;
+}
+
+.split-divider--horizontal {
+  height: 4px;
+  cursor: row-resize;
+}
