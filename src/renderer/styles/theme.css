@@ -2,9 +2,16 @@
  * theme.css — cipher-mux-electron "Cipher Ivory" Design System
  *
  * Merged from cipher-mux v1 + cipher-desktop-electron.
- * Dark theme primary. Muted neon accents. Cut-corner geometry.
- * Rajdhani headings, Fira Code mono. CALM aesthetic.
+ * Ivory (light) theme default. Dark theme via body.theme-dark.
+ * Cut-corner geometry. Rajdhani headings, Fira Code mono. CALM aesthetic.
  */
+
+/* ================================================================
+   Theme Token Imports
+   ================================================================ */
+
+@import './theme-ivory.css';
+@import './theme-dark.css';
 
 /* ================================================================
    Font Faces
@@ -32,41 +39,10 @@
 }
 
 /* ================================================================
-   Design Tokens — Dark Theme (Default)
+   Shared Design Tokens — Typography, Geometry, Spacing, Z-Index
    ================================================================ */
 
 :root {
-  /* ── Surfaces ── */
-  --color-bg:             #2A2A32;
-  --color-bg-elevated:    #33333C;
-  --color-bg-sunken:      #222228;
-  --color-bg-overlay:     rgba(22, 22, 26, 0.85);
-
-  /* ── Borders ── */
-  --color-border:         #3E3E4A;
-  --color-border-light:   #4A4A58;
-  --color-border-focus:   #5C9A6E;
-
-  /* ── Text ── */
-  --color-text:           #D8D8E0;
-  --color-text-secondary: #A0A0B0;
-  --color-text-dim:       #6E6E80;
-  --color-text-accent:    #8CC8A0;
-
-  /* ── Accents — muted neon, not eye-burning ── */
-  --color-neon-green:     #5C9A6E;
-  --color-neon-red:       #B85060;
-  --color-neon-orange:    #C07840;
-  --color-neon-cyan:      #5090A8;
-
-  /* ── Semantic ── */
-  --color-accent:         #5C9A6E;
-  --color-accent-soft:    rgba(92, 154, 110, 0.10);
-  --color-success:        #5C9A6E;
-  --color-error:          #B85060;
-  --color-warning:        #C07840;
-  --color-info:           #5090A8;
-
   /* ── Typography ── */
   --font-heading:         'Rajdhani', 'Teko', 'Orbitron', system-ui, sans-serif;
   --font-sans:            'Rajdhani', system-ui, sans-serif;
@@ -94,12 +70,6 @@
   --space-lg:             16px;
   --space-xl:             24px;
   --space-2xl:            32px;
-
-  /* ── Shadows ── */
-  --shadow-sm:            0 1px 2px rgba(0, 0, 0, 0.20), 0 2px 6px rgba(0, 0, 0, 0.16);
-  --shadow-md:            0 2px 4px rgba(0, 0, 0, 0.24), 0 4px 16px rgba(0, 0, 0, 0.20);
-  --shadow-lg:            0 4px 8px rgba(0, 0, 0, 0.28), 0 8px 32px rgba(0, 0, 0, 0.24);
-  --shadow-inset:         inset 0 1px 4px rgba(0, 0, 0, 0.16), inset 0 0 1px rgba(0, 0, 0, 0.08);
 
   /* ── Transitions ── */
   --transition-fast:      0.1s ease;
@@ -234,8 +204,8 @@ body::after {
     0deg,
     transparent,
     transparent 2px,
-    rgba(0, 0, 0, 0.03) 2px,
-    rgba(0, 0, 0, 0.03) 4px
+    rgba(0, 0, 0, var(--scanline-opacity, 0.03)) 2px,
+    rgba(0, 0, 0, var(--scanline-opacity, 0.03)) 4px
   );
   pointer-events: none;
   z-index: var(--z-scanline);
@@ -300,23 +270,23 @@ body::after {
 }
 
 .neon-dot--ok {
-  background: var(--color-neon-green);
-  box-shadow: 0 0 4px rgba(92, 154, 110, 0.4);
+  background: var(--color-dot-ok);
+  box-shadow: 0 0 4px var(--color-dot-ok);
 }
 
 .neon-dot--warn {
-  background: var(--color-neon-orange);
-  box-shadow: 0 0 4px rgba(192, 120, 64, 0.4);
+  background: var(--color-dot-warn);
+  box-shadow: 0 0 4px var(--color-dot-warn);
 }
 
 .neon-dot--error {
-  background: var(--color-neon-red);
-  box-shadow: 0 0 4px rgba(184, 80, 96, 0.4);
+  background: var(--color-dot-error);
+  box-shadow: 0 0 4px var(--color-dot-error);
 }
 
 .neon-dot--info {
-  background: var(--color-neon-cyan);
-  box-shadow: 0 0 4px rgba(80, 144, 168, 0.4);
+  background: var(--color-dot-info);
+  box-shadow: 0 0 4px var(--color-dot-info);
 }
 
 .neon-dot--dim {
