@@ -31,3 +31,6 @@ __pycache__/
 # Secrets
 *.env
 *.keystore
+
+# Superpowers brainstorm sessions
+.superpowers/
