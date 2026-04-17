@@ -90,14 +90,6 @@
   overflow: hidden;
 }
 
-/* ── Content Viewport (terminals live here) ── */
-.content-viewport {
-  flex: 1;
-  min-height: 0; /* allow flex shrink — critical for xterm.js fit */
-  position: relative;
-  overflow: hidden;
-}
-
 /* ================================================================
    Chatroom Panel — Right (hidden by default)
    ================================================================ */

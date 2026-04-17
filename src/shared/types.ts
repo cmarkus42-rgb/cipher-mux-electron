@@ -1,5 +1,7 @@
 /** Shared type definitions for cipher-mux-electron */
 
+import type { GridState, ThemeName } from './grid-types'
+
 // ─── Session ───────────────────────────────────────────────
 
 export type SessionStatus = 'active' | 'stopped' | 'orphaned'
