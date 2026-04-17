@@ -22,6 +22,13 @@ const api = {
       ipcRenderer.on(IPC.SESSION_STOPPED, handler)
       return () => ipcRenderer.removeListener(IPC.SESSION_STOPPED, handler)
     },
+    onRecoveryResult: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.SESSIONS_RECOVERY_RESULT, handler)
+      return () => ipcRenderer.removeListener(IPC.SESSIONS_RECOVERY_RESULT, handler)
+    },
+    recoveryAction: (action: string, tmuxSession: string, displayName?: string) =>
+      ipcRenderer.invoke(IPC.SESSIONS_RECOVERY_ACTION, { action, tmuxSession, displayName }),
   },
 
   // ─── Terminal ──────────────────────────────────────────

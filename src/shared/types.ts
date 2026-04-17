@@ -31,6 +31,7 @@ export interface StartSessionOpts {
 export interface RecoveryResult {
   recovered: SessionInfo[]
   orphaned: SessionInfo[]
+  killed: SessionInfo[]
 }
 
 // ─── Messages ──────────────────────────────────────────────

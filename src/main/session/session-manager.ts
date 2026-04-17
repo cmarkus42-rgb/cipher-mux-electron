@@ -135,12 +135,15 @@ export class SessionManager extends EventEmitter {
 
   /**
    * Recover sessions by scanning existing tmux sessions.
-   * Matches known sessions and marks unknowns as orphaned.
+   * - Launcher/kickoff sessions (name contains "launcher" or "kickoff") are auto-killed → killed[]
+   * - Unknown sessions are presented to the user for adopt/kill → orphaned[]
+   * - Known sessions are restored → recovered[]
    */
   async recover(): Promise<RecoveryResult> {
     const tmuxSessions = await this.tmux.listSessions()
     const recovered: SessionInfo[] = []
     const orphaned: SessionInfo[] = []
+    const killed: SessionInfo[] = []
 
     for (const tmuxSession of tmuxSessions) {
       // Check if this is one of our sessions (prefix cmux-)
@@ -159,14 +162,10 @@ export class SessionManager extends EventEmitter {
       }
 
       if (!found) {
-        // Orphaned session — kill it, don't count against limit
-        console.log(`[SessionManager] killing orphaned tmux session: ${tmuxSession.name}`)
-        try {
-          await this.tmux.killSession(tmuxSession.name)
-        } catch {
-          // may already be gone
-        }
-        orphaned.push({
+        const lowerName = tmuxSession.name.toLowerCase()
+        const isLauncher = lowerName.includes('launcher') || lowerName.includes('kickoff')
+
+        const sessionInfo: SessionInfo = {
           id: ulid(),
           name: tmuxSession.name,
           projectPath: null,
@@ -175,7 +174,22 @@ export class SessionManager extends EventEmitter {
           status: 'orphaned',
           createdAt: tmuxSession.created * 1000,
           updatedAt: Date.now(),
-        })
+        }
+
+        if (isLauncher) {
+          // Auto-kill launcher/kickoff sessions — they are transient
+          console.log(`[SessionManager] auto-killing launcher/kickoff session: ${tmuxSession.name}`)
+          try {
+            await this.tmux.killSession(tmuxSession.name)
+          } catch {
+            // may already be gone
+          }
+          killed.push(sessionInfo)
+        } else {
+          // Present unknown sessions to the user for adopt/kill decision
+          console.log(`[SessionManager] orphaned session queued for user decision: ${tmuxSession.name}`)
+          orphaned.push(sessionInfo)
+        }
       }
     }
 
@@ -187,7 +201,36 @@ export class SessionManager extends EventEmitter {
       }
     }
 
-    return { recovered, orphaned }
+    return { recovered, orphaned, killed }
+  }
+
+  /**
+   * Adopt an orphaned tmux session into the session registry.
+   */
+  async adoptOrphan(tmuxSessionName: string, displayName?: string): Promise<SessionInfo> {
+    const id = ulid()
+    const now = Date.now()
+    const session: SessionInfo = {
+      id,
+      name: displayName ?? tmuxSessionName,
+      projectPath: null,
+      tmuxSession: tmuxSessionName,
+      tmuxPane: tmuxSessionName,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    }
+    this.sessions.set(id, session)
+    this.tmux.watchSession(tmuxSessionName, id)
+    this.emit('session-changed', session)
+    return session
+  }
+
+  /**
+   * Kill an orphaned tmux session (no registry entry).
+   */
+  async killOrphan(tmuxSessionName: string): Promise<void> {
+    try { await this.tmux.killSession(tmuxSessionName) } catch { /* may be gone */ }
   }
 
   /**
