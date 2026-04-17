@@ -2,6 +2,7 @@ import { app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 import type { AppConfig } from '../../shared/types'
+import { deepMerge } from '../util/deep-merge'
 import {
   DEFAULT_SCAN_PATHS,
   DEFAULT_SCAN_DEPTH,
@@ -57,7 +58,8 @@ function getConfigPath(): string {
 function loadConfig(): AppConfig {
   try {
     const raw = fs.readFileSync(getConfigPath(), 'utf-8')
-    return { ...defaults, ...JSON.parse(raw) }
+    if (!raw.trim()) return { ...defaults }
+    return deepMerge(defaults, JSON.parse(raw))
   } catch {
     return { ...defaults }
   }
