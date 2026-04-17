@@ -1,318 +1,198 @@
-import { useState, useCallback, useEffect, useMemo } from 'preact/hooks'
-import type { ActiveView, ProjectInfo, SplitDirection } from '../shared/types'
+// src/renderer/app.tsx
+import { useState, useCallback, useEffect } from 'preact/hooks'
+import type { ProjectInfo } from '../shared/types'
 import { useSessions } from './hooks/useSessions'
 import { useMessages } from './hooks/useMessages'
 import { useContextUsage } from './hooks/useContextUsage'
 import { useProjects } from './hooks/useProjects'
-import { useShortcuts } from './hooks/useShortcuts'
-import { useLayout } from './hooks/useLayout'
-import { ActivityRail } from './components/ActivityRail'
-import { CockpitView } from './components/CockpitView'
-import { TerminalPane } from './components/TerminalPane'
-import { SplitContainer } from './components/SplitContainer'
+import { useGrid } from './hooks/useGrid'
+import { useTheme } from './hooks/useTheme'
+import { SessionGrid } from './components/SessionGrid'
 import { ChatroomPanel } from './components/ChatroomPanel'
-import { KickoffDialog } from './components/KickoffDialog'
+import { ChatToggleButton } from './components/ChatToggleButton'
+import { ProjectPopup } from './components/ProjectPopup'
 import { RecoveryDialog } from './components/RecoveryDialog'
 import { BugreportDialog } from './components/BugreportDialog'
 import { InfoSettingsView } from './components/InfoSettingsView'
 import { StatusBar } from './components/StatusBar'
 
 export function App() {
-  const [activeView, setActiveView] = useState<ActiveView>('cockpit')
   const [chatroomVisible, setChatroomVisible] = useState(false)
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null)
+  const [bugreportVisible, setBugreportVisible] = useState(false)
+  const [infoVisible, setInfoVisible] = useState(false)
+
+  // Project popup state
+  const [popupVisible, setPopupVisible] = useState(false)
+  const [popupTargetSessionId, setPopupTargetSessionId] = useState<string | null>(null)
+  const [popupTargetSlotIndex, setPopupTargetSlotIndex] = useState<number | null>(null)
 
   const { sessions, startSession, stopSession } = useSessions()
   const { unreadCount } = useMessages()
   const contextUsages = useContextUsage()
   const { projects, scanning, rescan } = useProjects()
-  const { layout, splitPane, closePane, updateRatio, setActivePane, pruneInvalidPanes } = useLayout()
-  const [mcpPort, setMcpPort] = useState<number | undefined>(undefined)
-  const [orchestratorRunning, setOrchestratorRunning] = useState(false)
-  const [kickoffVisible, setKickoffVisible] = useState(false)
-  const [bugreportVisible, setBugreportVisible] = useState(false)
+  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot } = useGrid()
+  const { theme, toggleTheme } = useTheme()
 
-  // Load MCP config to show port in status bar
+  const [orchestratorSessionId, setOrchestratorSessionId] = useState<string | null>(null)
+
+  // Check orchestrator status on mount
   useEffect(() => {
     const api = (window as any).cipherMux
-    api.config.get('mcp').then((cfg: any) => {
-      if (cfg?.port) setMcpPort(cfg.port)
+    api.orchestrator.status().then((s: { running: boolean; sessionId?: string }) => {
+      if (s.running && s.sessionId) setOrchestratorSessionId(s.sessionId)
     })
-  }, [])
-
-  const toggleChatroom = useCallback(() => {
-    setChatroomVisible((v) => !v)
-  }, [])
-
-  // Check orchestrator status on mount + listen for autostart
-  useEffect(() => {
-    const api = (window as any).cipherMux
-    api.orchestrator.status().then((s: { running: boolean }) => {
-      setOrchestratorRunning(s.running)
-    })
-    // Listen for orchestrator auto-start event from main process
-    const unsub = api.orchestrator.onStarted(() => {
-      setOrchestratorRunning(true)
+    const unsub = api.orchestrator.onStarted((data: any) => {
+      if (data?.sessionId) setOrchestratorSessionId(data.sessionId)
     })
     return () => unsub()
   }, [])
 
-  // Listen for kickoff completion — focus follow-up session and rescan projects.
+  // Listen for kickoff completion
   useEffect(() => {
     const api = (window as any).cipherMux
     const unsub = api.projects.onCompleted((data: any) => {
       if (data?.status === 'complete' && data.event?.followupSessionId) {
-        setActiveSessionId(data.event.followupSessionId)
-        setActiveView('terminal')
-        // Project dir is now populated — refresh scan so the tile appears.
-        rescan().catch((err) => console.error('[App] rescan failed:', err))
-      } else if (data?.status === 'timeout') {
-        console.warn('[App] Kickoff timed out:', data.handle)
-      } else if (data?.status === 'error') {
-        console.error('[App] Kickoff error:', data.error)
+        addSession(data.event.followupSessionId)
+        setFocusedSessionId(data.event.followupSessionId)
+        rescan().catch(() => {})
       }
     })
     return () => unsub()
-  }, [rescan])
+  }, [addSession, rescan])
 
-  const handleOrchestratorToggle = useCallback(async () => {
-    const api = (window as any).cipherMux
-    try {
-      if (orchestratorRunning) {
-        await api.orchestrator.stop()
-        setOrchestratorRunning(false)
-      } else {
-        await api.orchestrator.start()
-        setOrchestratorRunning(true)
-      }
-    } catch (err) {
-      console.error('[App] Orchestrator toggle failed:', err)
-      // Re-sync UI state with backend on error
-      const status = await api.orchestrator.status()
-      setOrchestratorRunning(status.running)
-    }
-  }, [orchestratorRunning])
-
-  const handleViewChange = useCallback((view: ActiveView) => {
-    setActiveView(view)
-    if (view !== 'terminal') {
-      setActiveSessionId(null)
-    }
+  // Open project popup from launcher cell
+  const handleLaunch = useCallback((slotIndex: number) => {
+    setPopupTargetSessionId(null)
+    setPopupTargetSlotIndex(slotIndex)
+    setPopupVisible(true)
   }, [])
 
-  const handleSessionSelect = useCallback((sessionId: string) => {
-    setActiveSessionId(sessionId)
-    setActiveView('terminal')
-    if (layout.root) {
-      setActivePane(sessionId)
-    }
-  }, [layout.root, setActivePane])
-
-  const handleKickoff = useCallback(async (req: {
-    projectDir: string
-    requirementsFile?: string
-    extraContext?: string
-  }) => {
-    const api = (window as any).cipherMux
-    // Main process starts the launcher session; we just close the dialog.
-    // The focus switch to the follow-up session happens via the
-    // PROJECT_KICKOFF_COMPLETED event listener below.
-    await api.projects.kickoff(req)
-    setKickoffVisible(false)
+  // Open project popup for switching existing session's project
+  const handleSwitchProject = useCallback((sessionId: string) => {
+    setPopupTargetSessionId(sessionId)
+    setPopupTargetSlotIndex(null)
+    setPopupVisible(true)
   }, [])
 
-  const handleStartSession = useCallback(async (project: ProjectInfo) => {
+  // Handle project selection from popup
+  const handleProjectSelect = useCallback(async (project: ProjectInfo, targetSessionId: string | null) => {
+    setPopupVisible(false)
     try {
-      const session = await startSession({
-        name: project.name,
-        projectPath: project.path,
-        // Claude is launched by the main process once the renderer reports
-        // the real terminal size (TERMINAL_READY), so the TUI starts at the
-        // correct cols/rows instead of tmux's default 80x24.
-        autoLaunch: 'clear; claude --dangerously-skip-permissions\n',
-      })
-      setActiveSessionId(session.id)
-      setActiveView('terminal')
-    } catch (err) {
-      console.error('[App] Failed to start session:', err)
-    }
-  }, [startSession])
-
-  // Start a plain shell session in a user-selected directory (no claude)
-  const handleAddSession = useCallback(async () => {
-    const api = (window as any).cipherMux
-    const dir = await api.dialog.openDir({ title: 'Session-Verzeichnis wählen' })
-    if (!dir) return
-    try {
-      const name = dir.split('/').pop() || 'shell'
-      const session = await startSession({
-        name,
-        projectPath: dir,
-      })
-      setActiveSessionId(session.id)
-      setActiveView('terminal')
-    } catch (err) {
-      console.error('[App] Failed to start shell session:', err)
-    }
-  }, [startSession])
-
-  // Split active pane in given direction
-  const handleSplit = useCallback(async (direction: SplitDirection) => {
-    const api = (window as any).cipherMux
-    const dir = await api.dialog.openDir({ title: 'Session-Verzeichnis wählen' })
-    if (!dir) return
-    try {
-      const name = dir.split('/').pop() || 'shell'
-      const session = await startSession({ name, projectPath: dir })
-      const targetSessionId = layout.activePaneId ?? activeSessionId
       if (targetSessionId) {
-        splitPane(targetSessionId, direction, session.id)
+        // Switching project for existing session — stop old, start new in same slot
+        const slotIdx = grid.slots.findIndex((s) => s.sessionId === targetSessionId)
+        await stopSession(targetSessionId)
+        const session = await startSession({
+          name: project.name,
+          projectPath: project.path,
+          autoLaunch: 'clear; claude --dangerously-skip-permissions\n',
+        })
+        if (slotIdx >= 0) {
+          setSessionAtSlot(slotIdx, session.id)
+        } else {
+          addSession(session.id)
+        }
+        setFocusedSessionId(session.id)
       } else {
-        // No existing pane to split — just show the new session as single pane
-        setActiveSessionId(session.id)
+        // New session from launcher cell
+        const session = await startSession({
+          name: project.name,
+          projectPath: project.path,
+          autoLaunch: 'clear; claude --dangerously-skip-permissions\n',
+        })
+        if (popupTargetSlotIndex !== null) {
+          setSessionAtSlot(popupTargetSlotIndex, session.id)
+        } else {
+          addSession(session.id)
+        }
+        setFocusedSessionId(session.id)
       }
-      setActiveView('terminal')
     } catch (err) {
-      console.error('[App] Failed to split:', err)
+      console.error('[App] Failed to start/switch session:', err)
     }
-  }, [startSession, layout.activePaneId, activeSessionId, splitPane])
+  }, [grid.slots, startSession, stopSession, addSession, setSessionAtSlot, popupTargetSlotIndex])
 
-  const handleClosePane = useCallback(() => {
-    const target = layout.activePaneId
-    if (!target) return
-    closePane(target)
-  }, [layout.activePaneId, closePane])
+  const handleCloseSession = useCallback(async (sessionId: string) => {
+    await stopSession(sessionId)
+    removeSession(sessionId)
+    if (focusedSessionId === sessionId) {
+      const remaining = grid.slots.find((s) => s.sessionId && s.sessionId !== sessionId)
+      setFocusedSessionId(remaining?.sessionId ?? null)
+    }
+  }, [stopSession, removeSession, focusedSessionId, grid.slots])
 
-  // Prune layout when sessions change
-  useEffect(() => {
-    if (!layout.root) return
-    const validIds = new Set(sessions.map((s) => s.id))
-    pruneInvalidPanes(validIds)
-  }, [sessions, layout.root, pruneInvalidPanes])
-
-  const shortcutEntries = useMemo(() => {
-    const entries = [
-      { combo: 'Cmd+0', label: 'Cockpit', category: 'Navigation' as const, action: () => handleViewChange('cockpit') },
-      { combo: 'Cmd+K', label: 'Chatroom toggle', category: 'Navigation' as const, action: toggleChatroom },
-      { combo: 'Cmd+N', label: 'Neues Projekt', category: 'Aktionen' as const, action: () => setKickoffVisible((v) => !v) },
-      { combo: 'Cmd+B', label: 'Bugreport', category: 'Aktionen' as const, action: () => setBugreportVisible((v) => !v) },
-      { combo: 'Cmd+\\', label: 'Split vertikal', category: 'Layout' as const, action: () => handleSplit('vertical') },
-      { combo: 'Cmd+-', label: 'Split horizontal', category: 'Layout' as const, action: () => handleSplit('horizontal') },
-      { combo: 'Cmd+W', label: 'Pane schließen', category: 'Layout' as const, action: handleClosePane },
-    ]
-    // Cmd+1..9 — jump to session by index
-    sessions.slice(0, 9).forEach((s, i) => {
-      entries.push({
-        combo: `Cmd+${i + 1}`,
-        label: s.name,
-        category: 'Navigation' as const,
-        action: () => handleSessionSelect(s.id),
-      })
-    })
-    return entries
-  }, [handleViewChange, toggleChatroom, handleSplit, handleClosePane, sessions, handleSessionSelect])
-
-  const registeredShortcuts = useShortcuts(shortcutEntries)
-
-  const activeSession = activeSessionId
-    ? sessions.find((s) => s.id === activeSessionId)
-    : null
+  const handleResize = useCallback((cols: number, rows: number) => {
+    resize({ cols, rows })
+  }, [resize])
 
   return (
     <div class="app-shell">
-      {/* ── Drag Region / Title Bar ── */}
+      {/* drag region */}
       <div class="drag-region">
         <span class="title">cipher-mux</span>
-        <span class="title-version">v0.2.0</span>
       </div>
 
-      {/* ── Body: Rail + Content + Chatroom ── */}
+      {/* body: grid + chatroom */}
       <div class="app-body">
-        {/* Activity Rail */}
-        <ActivityRail
-          activeView={activeView}
+        <SessionGrid
+          grid={grid}
           sessions={sessions}
-          chatroomVisible={chatroomVisible}
-          activeSessionId={activeSessionId}
-          unreadCount={unreadCount}
-          orchestratorRunning={orchestratorRunning}
-          onViewChange={handleViewChange}
-          onToggleChatroom={toggleChatroom}
-          onSessionSelect={handleSessionSelect}
-          onOrchestratorToggle={handleOrchestratorToggle}
-          onAddSession={handleAddSession}
+          contextUsages={contextUsages}
+          focusedSessionId={focusedSessionId}
+          theme={theme}
+          orchestratorSessionId={orchestratorSessionId}
+          onFocusSession={setFocusedSessionId}
+          onCloseSession={handleCloseSession}
+          onSwitchProject={handleSwitchProject}
+          onLaunch={handleLaunch}
+          onResize={handleResize}
+          onSwap={swap}
         />
-
-        {/* Main Content */}
-        <main class="main-content">
-          <div class="content-viewport">
-            {activeView === 'cockpit' && (
-              <CockpitView
-                sessions={sessions}
-                contextUsages={contextUsages}
-                projects={projects}
-                scanning={scanning}
-                onRescan={rescan}
-                onStartSession={handleStartSession}
-              />
-            )}
-            {activeView === 'terminal' && layout.root && (
-              <SplitContainer
-                node={layout.root}
-                path={[]}
-                sessions={sessions}
-                contextUsages={contextUsages}
-                activePaneId={layout.activePaneId}
-                onUpdateRatio={updateRatio}
-                onPaneClick={setActivePane}
-              />
-            )}
-            {activeView === 'terminal' && !layout.root && activeSession && (
-              <TerminalPane
-                sessionId={activeSession.id}
-                sessionName={activeSession.name}
-                contextUsage={contextUsages[activeSession.id]?.usedPercentage}
-              />
-            )}
-            {activeView === 'terminal' && !layout.root && !activeSession && (
-              <div class="empty-state">
-                <div class="empty-state__title">Terminal</div>
-                <div class="empty-state__text">No active session. Start a session from the Cockpit.</div>
-              </div>
-            )}
-            {activeView === 'info' && (
-              <InfoSettingsView
-                shortcuts={registeredShortcuts}
-                onRescan={rescan}
-                scanning={scanning}
-              />
-            )}
-          </div>
-        </main>
-
-        {/* Chatroom Panel */}
         <ChatroomPanel visible={chatroomVisible} />
       </div>
 
-      {/* Status Bar */}
-      <StatusBar sessions={sessions} mcpPort={mcpPort} mcpRunning={mcpPort != null} orchestratorRunning={orchestratorRunning} />
-
-      {/* Kickoff Dialog (Cmd+N) */}
-      <KickoffDialog
-        visible={kickoffVisible}
-        onClose={() => setKickoffVisible(false)}
-        onKickoff={handleKickoff}
+      {/* floating chat toggle */}
+      <ChatToggleButton
+        visible={chatroomVisible}
+        unreadCount={unreadCount}
+        onToggle={() => setChatroomVisible((v) => !v)}
       />
 
-      {/* Recovery Dialog — shown on startup when orphaned sessions are found */}
-      <RecoveryDialog onDone={() => {}} />
+      {/* statusbar */}
+      <StatusBar
+        theme={theme}
+        onBugreport={() => setBugreportVisible(true)}
+        onToggleTheme={toggleTheme}
+        onInfo={() => setInfoVisible(true)}
+      />
 
-      {/* Bugreport Dialog (Cmd+B) */}
+      {/* dialogs */}
+      <ProjectPopup
+        visible={popupVisible}
+        projects={projects}
+        scanning={scanning}
+        targetSessionId={popupTargetSessionId}
+        onSelect={handleProjectSelect}
+        onRescan={rescan}
+        onClose={() => setPopupVisible(false)}
+      />
+      <RecoveryDialog onDone={() => {}} />
       <BugreportDialog
         visible={bugreportVisible}
         onClose={() => setBugreportVisible(false)}
       />
+      {infoVisible && (
+        <div class="modal-overlay" onClick={() => setInfoVisible(false)}>
+          <div class="modal-panel" style={{ width: '600px' }} onClick={(e) => e.stopPropagation()}>
+            <InfoSettingsView
+              shortcuts={[]}
+              onRescan={rescan}
+              scanning={scanning}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-
