@@ -34,3 +34,6 @@ __pycache__/
 
 # Superpowers brainstorm sessions
 .superpowers/
+
+# VAD assets (binary, ~38MB, not tracked in git)
+src/renderer/public/vad-assets/
