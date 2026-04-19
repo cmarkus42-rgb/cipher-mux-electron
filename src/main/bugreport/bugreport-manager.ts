@@ -124,7 +124,7 @@ ${diagnostics.logs.slice(-50).join('\n')}
     if (this.messageBus) {
       try {
         this.messageBus.send({
-          topic: 'bug' as any,
+          topic: 'bug',
           sender: 'bugreport-manager',
           payload: { bugId: id, projectPath: resolvedProjectPath },
         })
