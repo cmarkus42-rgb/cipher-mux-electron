@@ -141,8 +141,15 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
               <p class="bugreport-body__text">
                 {voiceAvailable ? 'beschreibe das problem oder nutze voice-interview.' : 'beschreibe das problem.'}
               </p>
-              <ChatBubbles turns={turns} />
-              {voiceAvailable && voiceError && <p class="bugreport-body__notice">voice: {voiceError}</p>}
+              {isVoiceActive && <ChatBubbles turns={turns} />}
+              {isVoiceActive && turns.length === 0 && (
+                <p class="bugreport-body__hint">sag &laquo;erstell jetzt den report&raquo; zum abschluss.</p>
+              )}
+              {voiceAvailable && voiceError && (
+                <p class="bugreport-body__notice">
+                  voice: {voiceError.length > 80 ? voiceError.slice(0, 80) + '…' : voiceError}
+                </p>
+              )}
 
               <textarea class="bugreport-textarea" rows={5} value={description}
                 onInput={(e) => { setDescription((e.target as HTMLTextAreaElement).value); if (enriched) { setEnriched(null); setPreview(''); setEnrichFailed(false) } }}

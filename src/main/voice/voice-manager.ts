@@ -13,6 +13,7 @@ import { EventEmitter } from 'node:events'
 import { STTRouter } from './stt-router'
 import { PiperTTS } from './tts-piper'
 import { ConversationEngine, type ConversationTransport } from './conversation-engine'
+import { VoiceState } from './voice-state'
 import { OllamaChat } from './ollama-chat'
 import { BugreportInterview, BUGREPORT_SYSTEM_PROMPT } from './bugreport-interview'
 
@@ -38,7 +39,7 @@ export interface VoiceManagerConfig {
 const DEFAULT_PIPER_VOICE = 'de_DE-dii-high'
 const DEFAULT_OLLAMA_HOST = '127.0.0.1'
 const DEFAULT_OLLAMA_PORT = 11433
-const DEFAULT_OLLAMA_MODEL = 'gemma3:4b'
+const DEFAULT_OLLAMA_MODEL = 'cipher-gemma4:latest'
 
 export class VoiceManager extends EventEmitter {
   private readonly config: Required<VoiceManagerConfig>
@@ -167,6 +168,9 @@ export class VoiceManager extends EventEmitter {
 
     // 5. Set always-listen mode for natural conversation flow
     this.conversation.setInteractionMode('always-listen')
+
+    // 6. Transition to READY so VAD events are accepted
+    this.conversation.stateMachine.transition(VoiceState.READY)
 
     return this.interview
   }

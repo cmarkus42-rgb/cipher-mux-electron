@@ -107,10 +107,9 @@ export function useVoiceBugreport() {
       audioQueueRef.current = []
       playingRef.current = false
 
-      // 1. Request microphone access
+      // 1. Request microphone access (use browser default sample rate)
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 16000,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
@@ -118,8 +117,8 @@ export function useVoiceBugreport() {
       })
       streamRef.current = stream
 
-      // 2. Create AudioContext (16kHz for VAD)
-      const audioCtx = new AudioContext({ sampleRate: 16000 })
+      // 2. Create AudioContext (default sample rate — VAD resamples internally to 16kHz)
+      const audioCtx = new AudioContext()
       audioCtxRef.current = audioCtx
 
       // 3. Start interview in main process (initializes STT + TTS)
@@ -176,6 +175,8 @@ export function useVoiceBugreport() {
     audioQueueRef.current = []
     playingRef.current = false
 
+    setError(null)
+    setTurns([])
     setVoiceState('idle')
   }, [])
 

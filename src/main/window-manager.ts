@@ -50,6 +50,12 @@ export class WindowManager {
       this.mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'))
     }
 
+    // Forward renderer console to main process for debugging
+    this.mainWindow.webContents.on('console-message', (_event, level, message) => {
+      const prefix = ['[renderer:verbose]','[renderer:info]','[renderer:warn]','[renderer:error]'][level] || '[renderer]'
+      console.log(`${prefix} ${message}`)
+    })
+
     this.mainWindow.on('closed', () => {
       this.mainWindow = null
     })

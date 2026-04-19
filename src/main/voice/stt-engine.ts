@@ -62,14 +62,15 @@ export class STTEngine extends EventEmitter {
   private readonly modelDir: string
   private readonly modelName: string
   private readonly language: string
-  private whisper: any = null
+  private context: any = null
   private ready = false
 
   constructor(opts: STTEngineOptions) {
     super()
     this.modelDir = opts.modelDir
     this.modelName = opts.model ?? 'ggml-small.bin'
-    this.language = opts.language ?? ''
+    const lang = opts.language ?? ''
+    this.language = lang === 'auto' ? '' : (lang || 'de')
   }
 
   /** Full path to the GGML model file */
@@ -78,7 +79,7 @@ export class STTEngine extends EventEmitter {
   }
 
   /**
-   * Lazy-import @fugood/whisper.node and verify model file exists.
+   * Initialize whisper.node context with GPU acceleration.
    * Throws if the native module is unavailable or model is missing.
    */
   async init(): Promise<void> {
@@ -89,12 +90,18 @@ export class STTEngine extends EventEmitter {
       throw new Error(`Whisper model not found: ${this.modelPath}`)
     }
 
-    // Lazy import — native module may not be installed
+    // Lazy import and init context — native module may not be installed
     try {
-      this.whisper = await import('@fugood/whisper.node')
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { initWhisper } = require('@fugood/whisper.node')
+      this.context = await initWhisper({
+        filePath: this.modelPath,
+        useGpu: true,
+      })
+      console.log('[STT] whisper.node context initialized (GPU enabled)')
     } catch (err) {
       throw new Error(
-        `Failed to load @fugood/whisper.node: ${(err as Error).message}`
+        `Failed to init whisper.node: ${(err as Error).message}`
       )
     }
 
@@ -107,20 +114,24 @@ export class STTEngine extends EventEmitter {
    * Returns filtered text or '' if hallucination/noise.
    */
   async transcribe(pcmBuffer: Buffer): Promise<string> {
-    if (!this.ready || !this.whisper) {
+    if (!this.ready || !this.context) {
       throw new Error('STTEngine not initialized — call init() first')
     }
 
-    const float32 = new Float32Array(pcmBuffer.length / 2)
-    for (let i = 0; i < float32.length; i++) {
-      float32[i] = pcmBuffer.readInt16LE(i * 2) / 32768.0
-    }
+    // Pass raw ArrayBuffer to whisper.node (expects Int16 PCM)
+    const arrayBuffer = pcmBuffer.buffer.slice(
+      pcmBuffer.byteOffset,
+      pcmBuffer.byteOffset + pcmBuffer.byteLength
+    )
 
-    const result = await this.whisper.transcribe(this.modelPath, float32, {
-      language: this.language || undefined,
+    const { promise } = this.context.transcribeData(arrayBuffer, {
+      language: this.language,
+      maxLen: 1,
+      tokenTimestamps: false,
     })
+    const { result } = await promise
 
-    const raw: string = typeof result === 'string' ? result : result?.text ?? ''
+    const raw: string = (result || '').trim()
 
     const filtered = filterHallucinations(raw)
     if (filtered === '' || isNoiseOnly(filtered)) return ''
@@ -136,7 +147,7 @@ export class STTEngine extends EventEmitter {
   /** Shut down the engine and release resources */
   shutdown(): void {
     this.ready = false
-    this.whisper = null
+    this.context = null
     this.emit('shutdown')
     this.removeAllListeners()
   }
