@@ -51,7 +51,7 @@ export class IpcHub {
         ?? '/Users/Shared/Nextcloud/Claude/ClaudeCode01/projectlauncher',
       timeoutMs: ((appConfig?.kickoffTimeoutMinutes ?? 15) * 60_000),
     })
-    this.bugreportManager = new BugreportManager()
+    this.bugreportManager = new BugreportManager({ messageBus: this.messageBus })
   }
 
   init(): void {
