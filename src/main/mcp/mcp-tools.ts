@@ -24,7 +24,7 @@ const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'sys
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
- * Register all 7 MCP tools on the given McpServer instance.
+ * Register all MCP tools on the given McpServer instance.
  */
 export function registerTools(server: McpServer, ctx: ToolContext): void {
   // 1. mux_send — Send a message to the message bus
@@ -254,6 +254,56 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: msg }) }],
           isError: true,
         }
+      }
+    }
+  )
+
+  // 9. mux_bugreport_resolve — Resolve a bugreport (outbox → inbox)
+  ;(server.registerTool as any)(
+    'mux_bugreport_resolve',
+    {
+      description:
+        'Resolve a bugreport: move from outbox to inbox with result, '
+        + 'send chatroom notification. Called by worker sessions after fixing or failing.',
+      inputSchema: {
+        bugId: z.string().describe('Bug ID (e.g. BUG-2026-04-19-abc123)'),
+        status: z.enum(['fixed', 'failed']).describe('Resolution status'),
+        summary: z.string().describe('What was done — analysis, fix description, or failure reason'),
+        branchName: z.string().optional().describe('Git branch with the fix (only for status=fixed)'),
+        filesChanged: z.array(z.string()).optional().describe('List of changed files'),
+      },
+    },
+    async (args: {
+      bugId: string
+      status: 'fixed' | 'failed'
+      summary: string
+      branchName?: string
+      filesChanged?: string[]
+    }) => {
+      const { resolveBugreport } = await import('../bugreport/bugreport-resolve.js')
+
+      const result = await resolveBugreport(args)
+      if (!result.ok) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+          isError: true,
+        }
+      }
+
+      // Send chatroom notification
+      if (ctx.messageBus) {
+        const statusText = args.status === 'fixed'
+          ? `fixed auf Branch ${args.branchName ?? '(unknown)'}`
+          : `failed nach Analyse`
+        ctx.messageBus.send({
+          topic: 'chat' as Topic,
+          sender: 'bugreport-orchestrator',
+          payload: { text: `${args.bugId}: ${statusText}. ${args.summary}` },
+        })
+      }
+
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result) }],
       }
     }
   )
