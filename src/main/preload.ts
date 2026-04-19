@@ -132,6 +132,45 @@ const api = {
     enrich: (description: string) =>
       ipcRenderer.invoke(IPC.BUGREPORT_ENRICH, { description }),
   },
+
+  // ─── Voice ──────────────────────────────────────────────
+  voice: {
+    start: () => ipcRenderer.invoke(IPC.VOICE_START),
+    stop: () => ipcRenderer.invoke(IPC.VOICE_STOP),
+    sendAudioChunk: (chunk: ArrayBuffer) =>
+      ipcRenderer.send(IPC.VOICE_AUDIO_CHUNK, chunk),
+    playbackDone: () => ipcRenderer.send(IPC.VOICE_PLAYBACK_DONE),
+    onState: (cb: (state: string) => void) => {
+      const handler = (_e: unknown, state: string) => cb(state)
+      ipcRenderer.on(IPC.VOICE_STATE, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_STATE, handler)
+    },
+    onTranscription: (cb: (text: string) => void) => {
+      const handler = (_e: unknown, text: string) => cb(text)
+      ipcRenderer.on(IPC.VOICE_TRANSCRIPTION, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_TRANSCRIPTION, handler)
+    },
+    onAgentText: (cb: (text: string) => void) => {
+      const handler = (_e: unknown, text: string) => cb(text)
+      ipcRenderer.on(IPC.VOICE_AGENT_TEXT, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_AGENT_TEXT, handler)
+    },
+    onAgentAudio: (cb: (base64Wav: string) => void) => {
+      const handler = (_e: unknown, b64: string) => cb(b64)
+      ipcRenderer.on(IPC.VOICE_AGENT_AUDIO, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_AGENT_AUDIO, handler)
+    },
+    onInterviewDone: (cb: (report: string) => void) => {
+      const handler = (_e: unknown, report: string) => cb(report)
+      ipcRenderer.on(IPC.VOICE_INTERVIEW_DONE, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_INTERVIEW_DONE, handler)
+    },
+    onError: (cb: (msg: string) => void) => {
+      const handler = (_e: unknown, msg: string) => cb(msg)
+      ipcRenderer.on(IPC.VOICE_ERROR, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_ERROR, handler)
+    },
+  },
 }
 
 contextBridge.exposeInMainWorld('cipherMux', api)
