@@ -111,12 +111,12 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
     setScreenshots((prev) => prev.filter((_, i) => i !== idx))
   }, [])
 
+  const isVoiceActive = voiceState === 'initializing' || voiceState === 'ready' || voiceState === 'user_speaking' || voiceState === 'recording' || voiceState === 'processing' || voiceState === 'agent_speaking'
+
   const handleVoiceClick = useCallback(() => {
     if (voiceState === 'idle' || voiceState === 'error') startVoiceInterview()
-    else if (voiceState === 'ready' || voiceState === 'recording') toggleRecording()
-  }, [voiceState, startVoiceInterview, toggleRecording])
-
-  const isVoiceActive = voiceState === 'initializing' || voiceState === 'ready' || voiceState === 'recording' || voiceState === 'processing' || voiceState === 'agent_speaking'
+    else if (isVoiceActive) stopVoiceInterview()
+  }, [voiceState, startVoiceInterview, stopVoiceInterview, isVoiceActive])
 
   if (!visible) return null
 
@@ -154,8 +154,8 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
                 </button>
                 {voiceAvailable && (
                   <button class="btn btn--sm" onClick={handleVoiceClick}
-                    disabled={voiceState === 'processing' || voiceState === 'agent_speaking' || voiceState === 'initializing'}>
-                    {voiceState === 'recording' ? 'aufnahme stoppen' : isVoiceActive ? 'bitte warten...' : 'voice'}
+                    disabled={voiceState === 'initializing'}>
+                    {isVoiceActive ? 'voice stoppen' : 'voice'}
                   </button>
                 )}
               </div>
