@@ -7,14 +7,20 @@ import type { BugreportData, SessionInfo } from '../../shared/types'
 import { APP_VERSION } from '../../shared/constants'
 import { runCommand } from '../util/exec-util'
 import { enrichBugreport, type EnrichedBugreport } from './ollama-client'
+import type { MessageBus } from '../message-bus/message-bus'
 
 const BUGREPORT_BASE = path.join(os.homedir(), '.config', 'cipher-mux', 'bugreports')
-const OUTBOX_DIR = path.join(BUGREPORT_BASE, 'outbox')
+const DEFAULT_OUTBOX_DIR = path.join(BUGREPORT_BASE, 'outbox')
 const INBOX_DIR = path.join(BUGREPORT_BASE, 'inbox')
 const ARCHIV_DIR = path.join(BUGREPORT_BASE, 'archiv')
 
-function ensureDirs(): void {
-  for (const dir of [OUTBOX_DIR, INBOX_DIR, ARCHIV_DIR]) {
+export interface BugreportManagerOptions {
+  messageBus?: MessageBus
+  outboxDir?: string
+}
+
+function ensureDirs(outboxDir: string): void {
+  for (const dir of [outboxDir, INBOX_DIR, ARCHIV_DIR]) {
     fs.mkdirSync(dir, { recursive: true })
   }
 }
@@ -44,6 +50,14 @@ function getRecentLogs(maxLines = 100): string[] {
 }
 
 export class BugreportManager {
+  private messageBus: MessageBus | undefined
+  private outboxDir: string
+
+  constructor(opts: BugreportManagerOptions = {}) {
+    this.messageBus = opts.messageBus
+    this.outboxDir = opts.outboxDir ?? DEFAULT_OUTBOX_DIR
+  }
+
   async collectDiagnostics(sessions: SessionInfo[]): Promise<BugreportData> {
     const tmuxVersion = await getTmuxVersion()
     return {
@@ -59,18 +73,25 @@ export class BugreportManager {
     }
   }
 
-  async submit(description: string, sessions: SessionInfo[], project?: string): Promise<string> {
-    ensureDirs()
+  async submit(
+    description: string,
+    sessions: SessionInfo[],
+    project?: string,
+    projectPath?: string,
+  ): Promise<string> {
+    ensureDirs(this.outboxDir)
     const diagnostics = await this.collectDiagnostics(sessions)
     const now = new Date()
     const dateStr = now.toISOString().slice(0, 10)
     const id = `BUG-${dateStr}-${ulid().slice(-6)}`
     const filename = `${id}.md`
+    const resolvedProjectPath = projectPath ?? process.cwd()
 
     const content = `---
 id: ${id}
 status: open
 project: ${project ?? 'cipher-mux-electron'}
+projectPath: ${resolvedProjectPath}
 created: ${now.toISOString()}
 ---
 
@@ -98,7 +119,20 @@ ${diagnostics.logs.slice(-50).join('\n')}
 \`\`\`
 `
 
-    fs.writeFileSync(path.join(OUTBOX_DIR, filename), content, 'utf-8')
+    fs.writeFileSync(path.join(this.outboxDir, filename), content, 'utf-8')
+
+    if (this.messageBus) {
+      try {
+        this.messageBus.send({
+          topic: 'bug' as any,
+          sender: 'bugreport-manager',
+          payload: { bugId: id, projectPath: resolvedProjectPath },
+        })
+      } catch (err) {
+        console.error('[BugreportManager] Failed to send bug message:', err)
+      }
+    }
+
     return id
   }
 
