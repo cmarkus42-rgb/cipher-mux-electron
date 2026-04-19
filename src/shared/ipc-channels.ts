@@ -53,6 +53,9 @@ export const IPC = {
   ORCHESTRATOR_STATUS: 'cipher-mux:orchestrator:status',
   ORCHESTRATOR_STARTED: 'cipher-mux:orchestrator:started',
 
+  // Window
+  WINDOW_FIT_GRID: 'cipher-mux:window:fit-grid',
+
   // Bugreport
   BUGREPORT_COLLECT: 'cipher-mux:bugreport:collect',
   BUGREPORT_SUBMIT: 'cipher-mux:bugreport:submit',

@@ -49,7 +49,10 @@ export function ChatroomPanel({ visible }: ChatroomPanelProps) {
   }, [handleSend])
 
   return (
-    <aside class={`chatroom-panel ${visible ? 'chatroom-panel--open' : ''}`}>
+    <aside
+      class="chatroom-panel"
+      style={{ display: visible ? 'flex' : 'none' }}
+    >
       <div class="chatroom-panel__header">
         <span>Chatroom</span>
         {unreadCount > 0 && (

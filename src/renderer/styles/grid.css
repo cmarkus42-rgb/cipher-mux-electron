@@ -123,6 +123,11 @@
   background: rgba(0,0,0,0.08);
 }
 
+.cell-btn--active {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
 /* terminal area inside cell */
 .cell-terminal {
   flex: 1;
@@ -299,6 +304,13 @@
   letter-spacing: 0.04em;
   font-size: var(--font-size-md);
   color: var(--color-text);
+}
+
+.project-popup__custom {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .project-popup__search {

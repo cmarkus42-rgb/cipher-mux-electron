@@ -10,9 +10,12 @@ interface SessionCellProps {
   focused: boolean
   isOrchestrator: boolean
   theme: ThemeName
+  rowSpan: number
+  maxRows: number
   onFocus: (sessionId: string) => void
   onClose: (sessionId: string) => void
   onSwitchProject: (sessionId: string) => void
+  onToggleExpand: (sessionId: string) => void
   onDragStart: (sessionId: string) => void
   onDragOver: (e: DragEvent) => void
   onDrop: (e: DragEvent) => void
@@ -20,7 +23,8 @@ interface SessionCellProps {
 
 export function SessionCell({
   session, contextUsage, focused, isOrchestrator, theme,
-  onFocus, onClose, onSwitchProject, onDragStart, onDragOver, onDrop,
+  rowSpan, maxRows,
+  onFocus, onClose, onSwitchProject, onToggleExpand, onDragStart, onDragOver, onDrop,
 }: SessionCellProps) {
   const { terminalRef } = useTerminal(session.id, theme, session.createdAt)
   const pct = contextUsage?.usedPercentage ?? 0
@@ -34,6 +38,10 @@ export function SessionCell({
     e.stopPropagation()
     onSwitchProject(session.id)
   }, [session.id, onSwitchProject])
+  const handleExpand = useCallback((e: Event) => {
+    e.stopPropagation()
+    onToggleExpand(session.id)
+  }, [session.id, onToggleExpand])
 
   const ctxClass = pct >= 85 ? 'ctx-error' : pct >= 60 ? 'ctx-warn' : 'ctx-ok'
   const dotClass = pct >= 85 ? 'neon-dot--error' : pct >= 60 ? 'neon-dot--warn' : 'neon-dot--ok'
@@ -43,9 +51,13 @@ export function SessionCell({
     isOrchestrator && 'session-cell--orchestrator',
   ].filter(Boolean).join(' ')
 
+  const expanded = rowSpan > 1
+  const cellStyle = expanded ? { gridRow: `span ${rowSpan}` } : undefined
+
   return (
     <div
       class={cellClass}
+      style={cellStyle}
       onClick={handleClick}
       onDragOver={onDragOver}
       onDrop={onDrop}
@@ -62,6 +74,13 @@ export function SessionCell({
           <span class={`cell-ctx ${ctxClass}`}>{pct}%</span>
         </div>
         <div class="cell-header__right">
+          {maxRows > 1 && (
+            <button
+              class={`cell-btn ${expanded ? 'cell-btn--active' : ''}`}
+              onClick={handleExpand}
+              title={expanded ? 'höhe zurücksetzen' : 'volle höhe'}
+            >{expanded ? '↥' : '↧'}</button>
+          )}
           {!isOrchestrator && (
             <button class="cell-btn" onClick={handleSwitch} title="projekt wechseln">⇄</button>
           )}

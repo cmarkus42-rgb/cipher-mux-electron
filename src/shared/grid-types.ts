@@ -23,7 +23,7 @@ export interface GridState {
 
 export type ThemeName = 'ivory' | 'dark'
 
-export const DEFAULT_GRID_CONFIG: GridConfig = { cols: 5, rows: 2 }
+export const DEFAULT_GRID_CONFIG: GridConfig = { cols: 2, rows: 2 }
 
 /** Create an empty grid state with all slots unoccupied. */
 export function createEmptyGrid(config: GridConfig = DEFAULT_GRID_CONFIG): GridState {
