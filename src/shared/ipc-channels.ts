@@ -60,6 +60,18 @@ export const IPC = {
   BUGREPORT_COLLECT: 'cipher-mux:bugreport:collect',
   BUGREPORT_SUBMIT: 'cipher-mux:bugreport:submit',
   BUGREPORT_ENRICH: 'cipher-mux:bugreport:enrich',
+
+  // Voice
+  VOICE_START: 'cipher-mux:voice:start',
+  VOICE_STOP: 'cipher-mux:voice:stop',
+  VOICE_AUDIO_CHUNK: 'cipher-mux:voice:audio-chunk',
+  VOICE_STATE: 'cipher-mux:voice:state',
+  VOICE_TRANSCRIPTION: 'cipher-mux:voice:transcription',
+  VOICE_AGENT_TEXT: 'cipher-mux:voice:agent-text',
+  VOICE_AGENT_AUDIO: 'cipher-mux:voice:agent-audio',
+  VOICE_INTERVIEW_DONE: 'cipher-mux:voice:interview-done',
+  VOICE_PLAYBACK_DONE: 'cipher-mux:voice:playback-done',
+  VOICE_ERROR: 'cipher-mux:voice:error',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

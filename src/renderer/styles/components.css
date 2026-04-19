@@ -836,3 +836,36 @@
 .bugreport-textarea:focus {
   border-color: var(--color-neon-green);
 }
+
+/* Voice Bugreport */
+.bugreport-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.bugreport-input-row .bugreport-textarea { flex: 1; }
+.bugreport-mic-btn {
+  flex-shrink: 0; width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: 18px; cursor: pointer;
+}
+.bugreport-mic--recording { animation: mic-pulse 1s infinite; color: #e74c3c; }
+.bugreport-mic--processing { animation: mic-spin 1s linear infinite; color: var(--color-text-secondary); }
+.bugreport-mic--speaking { color: var(--color-accent); }
+@keyframes mic-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes mic-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.bugreport-chat {
+  max-height: 200px; overflow-y: auto; display: flex; flex-direction: column;
+  gap: 6px; margin-bottom: 8px; padding: 8px;
+  background: var(--color-bg-secondary, #1a1a2e); border-radius: 6px;
+}
+.bugreport-chat__bubble {
+  max-width: 80%; padding: 6px 10px; border-radius: 8px;
+  font-size: 12px; line-height: 1.4;
+}
+.bugreport-chat__bubble--user {
+  align-self: flex-start; background: var(--color-bg-tertiary, #2a2a4a); color: var(--color-text-primary);
+}
+.bugreport-chat__bubble--assistant {
+  align-self: flex-end; background: var(--color-accent-dim, #3a2a4a); color: var(--color-text-primary);
+}

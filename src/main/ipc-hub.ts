@@ -11,6 +11,8 @@ import { McpServerManager } from './mcp/mcp-server'
 import { generateApiKey } from './mcp/mcp-auth'
 import { KickoffOrchestrator } from './project/kickoff-orchestrator'
 import { BugreportManager } from './bugreport/bugreport-manager'
+import { VoiceManager } from './voice/voice-manager'
+import type { ConversationTransport } from './voice/conversation-engine'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
 import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest } from '../shared/types'
@@ -28,6 +30,7 @@ export class IpcHub {
   private mcpServer: McpServerManager
   private kickoffOrchestrator: KickoffOrchestrator
   private bugreportManager: BugreportManager
+  private voiceManager: VoiceManager | null = null
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
 
   constructor(private windowManager: WindowManager) {
@@ -65,6 +68,7 @@ export class IpcHub {
     this.registerDialogChannels()
     this.registerOrchestratorChannels()
     this.registerBugreportChannels()
+    this.registerVoiceChannels()
     this.setupEventForwarding()
 
     // Start context usage monitor
@@ -469,7 +473,61 @@ export class IpcHub {
     })
   }
 
+  // ─── Voice ──────────────────────────────────────────────
+  private registerVoiceChannels(): void {
+    ipcMain.handle(IPC.VOICE_START, async () => {
+      try {
+        if (!this.voiceManager) {
+          this.voiceManager = new VoiceManager()
+          const transport: ConversationTransport = {
+            sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
+            sendStopCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'processing'),
+            sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
+            sendAudioPlayback: (b64) => this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_AUDIO, b64),
+            sendStateChange: (state) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state),
+          }
+          this.voiceManager.setTransport(transport)
+          await this.voiceManager.init()
+        }
+
+        const interview = this.voiceManager.startInterview()
+        interview.on('turn-update', (turn: { role: string; text: string }) => {
+          // Only forward assistant turns — user turns reach renderer via VOICE_TRANSCRIPTION
+          if (turn.role === 'assistant') {
+            this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_TEXT, turn.text)
+          }
+        })
+        interview.on('interview-complete', (report) => {
+          this.windowManager.sendToMainWindow(IPC.VOICE_INTERVIEW_DONE, report)
+        })
+        interview.on('error', (err) => {
+          this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, (err as Error).message)
+        })
+        interview.start()
+        return { ok: true }
+      } catch (err) {
+        const msg = (err as Error).message
+        this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, msg)
+        return { ok: false, error: msg }
+      }
+    })
+
+    ipcMain.handle(IPC.VOICE_STOP, () => {
+      this.voiceManager?.getConversation()?.handleToggle()
+      return { ok: true }
+    })
+
+    ipcMain.on(IPC.VOICE_AUDIO_CHUNK, (_event, chunk: ArrayBuffer) => {
+      this.voiceManager?.getConversation()?.receiveAudioChunk(chunk)
+    })
+
+    ipcMain.on(IPC.VOICE_PLAYBACK_DONE, () => {
+      this.voiceManager?.getConversation()?.onPlaybackComplete()
+    })
+  }
+
   async destroy(): Promise<void> {
+    this.voiceManager?.shutdown()
     await this.mcpServer.stop().catch(() => {})
     this.statusLineMonitor.stop()
     this.projectScanner.stopWatch()
