@@ -517,6 +517,10 @@ export class IpcHub {
             sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
             sendAudioPlayback: (b64) => this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_AUDIO, b64),
             sendStateChange: (state) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state),
+            sendStopPlayback: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'stop-playback'),
+            sendGenerationDone: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'generation-done'),
+            dispatchStatus: (text, level) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, `status:${level}:${text}`),
+            cancelStream: () => { /* stream cancellation handled by VoiceManager */ },
           }
           this.voiceManager.setTransport(transport)
           await this.voiceManager.init()
