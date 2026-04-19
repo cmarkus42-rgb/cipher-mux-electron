@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect, useRef } from 'preact/hooks'
-import { useVoiceBugreport, type ChatTurn, type VoiceBugreportState } from '../voice/use-voice-bugreport'
+import { useState, useCallback, useEffect } from 'preact/hooks'
+import { useVoiceBugreport, type ChatTurn } from '../voice/use-voice-bugreport'
 
 const api = () => (window as any).cipherMux
 
@@ -18,21 +18,33 @@ interface BugreportDialogProps {
   onClose: () => void
 }
 
+/** States where the voice interview is actively running. */
+const VOICE_ACTIVE_STATES = new Set(['initializing', 'ready', 'user_speaking', 'recording', 'processing', 'agent_speaking'])
+
+/** Format an enriched bugreport as a Markdown document. */
 function formatEnriched(e: EnrichedBugreport): string {
-  const lines: string[] = []
-  lines.push(`# ${e.title}`)
-  lines.push(``)
-  lines.push(`**Severity:** ${e.severity}`)
+  const lines: string[] = [
+    `# ${e.title}`,
+    '',
+    `**Severity:** ${e.severity}`,
+  ]
   if (e.tags.length) lines.push(`**Tags:** ${e.tags.join(', ')}`)
-  lines.push(``)
-  if (e.summary) { lines.push(`## Summary`); lines.push(e.summary); lines.push(``) }
-  if (e.steps_to_reproduce.length) {
-    lines.push(`## Steps to Reproduce`)
-    e.steps_to_reproduce.forEach((s, i) => lines.push(`${i + 1}. ${s}`))
-    lines.push(``)
+  lines.push('')
+
+  if (e.summary) {
+    lines.push('## Summary', e.summary, '')
   }
-  if (e.expected_behavior) { lines.push(`## Expected Behavior`); lines.push(e.expected_behavior); lines.push(``) }
-  if (e.actual_behavior) { lines.push(`## Actual Behavior`); lines.push(e.actual_behavior) }
+  if (e.steps_to_reproduce.length) {
+    lines.push('## Steps to Reproduce')
+    e.steps_to_reproduce.forEach((s, i) => lines.push(`${i + 1}. ${s}`))
+    lines.push('')
+  }
+  if (e.expected_behavior) {
+    lines.push('## Expected Behavior', e.expected_behavior, '')
+  }
+  if (e.actual_behavior) {
+    lines.push('## Actual Behavior', e.actual_behavior)
+  }
   return lines.join('\n').trim()
 }
 
@@ -58,7 +70,7 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   const [screenshots, setScreenshots] = useState<string[]>([])
   const [voiceAvailable, setVoiceAvailable] = useState(false)
 
-  const { voiceState, turns, report, error: voiceError, startVoiceInterview, toggleRecording, stopVoiceInterview } = useVoiceBugreport()
+  const { voiceState, turns, report, error: voiceError, startVoiceInterview, stopVoiceInterview } = useVoiceBugreport()
 
   // Check voice availability on mount
   useEffect(() => {
@@ -74,15 +86,33 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
     }
   }, [report, description, voiceState, stopVoiceInterview])
 
+  const resetForm = useCallback(() => {
+    setDescription('')
+    setEnriched(null)
+    setPreview('')
+    setEnrichFailed(false)
+    setScreenshots([])
+  }, [])
+
   const handleEnrich = useCallback(async () => {
     if (!description.trim()) return
-    setEnriching(true); setEnrichFailed(false); setEnriched(null)
+    setEnriching(true)
+    setEnrichFailed(false)
+    setEnriched(null)
     try {
       const res: EnrichedBugreport | null = await api().bugreport.enrich(description)
-      if (res) { setEnriched(res); setPreview(formatEnriched(res)) }
-      else setEnrichFailed(true)
-    } catch (err) { console.error('[BugreportDialog] enrich failed:', err); setEnrichFailed(true) }
-    finally { setEnriching(false) }
+      if (res) {
+        setEnriched(res)
+        setPreview(formatEnriched(res))
+      } else {
+        setEnrichFailed(true)
+      }
+    } catch (err) {
+      console.error('[BugreportDialog] enrich failed:', err)
+      setEnrichFailed(true)
+    } finally {
+      setEnriching(false)
+    }
   }, [description])
 
   const handleSubmit = useCallback(async () => {
@@ -90,17 +120,25 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
     if (!finalDescription.trim()) return
     setSubmitting(true)
     try {
-      const res = await api().bugreport.submit(finalDescription, undefined, screenshots.length > 0 ? screenshots : undefined)
-      setResult(res.id); setDescription(''); setEnriched(null); setPreview(''); setEnrichFailed(false); setScreenshots([])
-    } catch (err) { console.error('[BugreportDialog] submit failed:', err) }
-    finally { setSubmitting(false) }
-  }, [description, enriched, preview, screenshots])
+      const res = await api().bugreport.submit(
+        finalDescription, undefined,
+        screenshots.length > 0 ? screenshots : undefined,
+      )
+      setResult(res.id)
+      resetForm()
+    } catch (err) {
+      console.error('[BugreportDialog] submit failed:', err)
+    } finally {
+      setSubmitting(false)
+    }
+  }, [description, enriched, preview, screenshots, resetForm])
 
   const handleClose = useCallback(() => {
-    setResult(null); setDescription(''); setEnriched(null); setPreview(''); setEnrichFailed(false); setScreenshots([])
+    setResult(null)
+    resetForm()
     stopVoiceInterview()
     onClose()
-  }, [onClose, stopVoiceInterview])
+  }, [onClose, stopVoiceInterview, resetForm])
 
   const handleAttachScreenshot = useCallback(async () => {
     const paths: string[] = await api().bugreport.pickScreenshot()
@@ -111,7 +149,7 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
     setScreenshots((prev) => prev.filter((_, i) => i !== idx))
   }, [])
 
-  const isVoiceActive = voiceState === 'initializing' || voiceState === 'ready' || voiceState === 'user_speaking' || voiceState === 'recording' || voiceState === 'processing' || voiceState === 'agent_speaking'
+  const isVoiceActive = VOICE_ACTIVE_STATES.has(voiceState)
 
   const handleVoiceClick = useCallback(() => {
     if (voiceState === 'idle' || voiceState === 'error') startVoiceInterview()
@@ -152,7 +190,14 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
               )}
 
               <textarea class="bugreport-textarea" rows={5} value={description}
-                onInput={(e) => { setDescription((e.target as HTMLTextAreaElement).value); if (enriched) { setEnriched(null); setPreview(''); setEnrichFailed(false) } }}
+                onInput={(e) => {
+                  setDescription((e.target as HTMLTextAreaElement).value)
+                  if (enriched) {
+                    setEnriched(null)
+                    setPreview('')
+                    setEnrichFailed(false)
+                  }
+                }}
                 placeholder="was ist passiert? was hast du erwartet?" autoFocus disabled={isVoiceActive} />
 
               <div class="bugreport-actions">

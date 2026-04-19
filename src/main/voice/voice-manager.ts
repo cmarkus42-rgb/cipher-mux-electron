@@ -88,7 +88,6 @@ export class VoiceManager extends EventEmitter {
       throw new Error('VoiceManager: transport must be set before init(). Call setTransport() first.')
     }
 
-    // 1. Init STTRouter
     this.sttRouter = new STTRouter({
       local: { modelDir: this.config.whisperModelDir },
       onStatusChange: (msg, level) => {
@@ -97,7 +96,6 @@ export class VoiceManager extends EventEmitter {
     })
     await this.sttRouter.init()
 
-    // 2. Init PiperTTS
     const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
     this.piperTTS = new PiperTTS({
       voice: this.config.piperVoice,
@@ -106,14 +104,11 @@ export class VoiceManager extends EventEmitter {
     })
     await this.piperTTS.init()
 
-    // 3. Create ConversationEngine
     this.conversation = new ConversationEngine({
       sttRouter: this.sttRouter,
       transport: this.transport,
       interactionMode: this.config.interactionMode,
     })
-
-    // 4. Set TTS on conversation engine
     this.conversation.setTTS(this.piperTTS)
 
     this._initialized = true
@@ -130,32 +125,24 @@ export class VoiceManager extends EventEmitter {
       throw new Error('VoiceManager: not initialized. Call init() first.')
     }
 
-    // 1. Create OllamaChat with bugreport system prompt
     const chat = new OllamaChat({
       model: this.config.ollamaModel,
       host: this.config.ollamaHost,
       port: this.config.ollamaPort,
       systemPrompt: BUGREPORT_SYSTEM_PROMPT,
     })
-
-    // 2. Create BugreportInterview
     this.interview = new BugreportInterview(chat)
 
-    // 3. Wire conversation transcription → interview
-    // Remove any previous listener from a prior interview
+    // Wire: conversation transcription -> interview -> TTS playback
     this.conversation.removeAllListeners('transcription')
-    const onTranscription = (text: string): void => {
+    this.conversation.on('transcription', (text: string) => {
       this.interview?.onUserTranscription(text)
-    }
-    this.conversation.on('transcription', onTranscription)
-
-    // 4. Wire interview agent-speaking → conversation TTS playback
-    const onAgentSpeaking = (text: string): void => {
+    })
+    this.interview.on('agent-speaking', (text: string) => {
       this.conversation?.speakResponse(text)
-    }
-    this.interview.on('agent-speaking', onAgentSpeaking)
+    })
 
-    // Forward interview events
+    // Forward interview lifecycle events to VoiceManager consumers
     this.interview.on('interview-complete', (report: string) => {
       this.emit('interview-complete', report)
     })
@@ -166,10 +153,8 @@ export class VoiceManager extends EventEmitter {
       this.emit('error', err)
     })
 
-    // 5. Set always-listen mode for natural conversation flow
+    // Enable always-listen mode for natural conversation flow
     this.conversation.setInteractionMode('always-listen')
-
-    // 6. Transition to READY so VAD events are accepted
     this.conversation.stateMachine.transition(VoiceState.READY)
 
     return this.interview
