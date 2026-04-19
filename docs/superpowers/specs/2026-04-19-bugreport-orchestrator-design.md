@@ -168,7 +168,7 @@ Orchestrator-Flow (Bug melden → Session startet → Fix → inbox) wird manuel
 - `mux_projects` MCP-Tool (nicht nötig für Self-Fix-Flow)
 - Parallele Bug-Bearbeitung
 - Automatisches Push/PR-Erstellen
-- STT-Input für Bugreport (separates Feature)
+- STT-Input für Bugreport (separates Feature, geplant als Phase 7b: Voice → STT → Ollama-Enrichment → strukturierter Report. Ollama-Enrichment existiert bereits, STT-Pipeline aus cipher-desktop anbinden)
 
 ## Dateien (geschätzt)
 
