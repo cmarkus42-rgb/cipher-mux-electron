@@ -61,6 +61,7 @@ export class IpcHub {
     this.registerProjectChannels()
     this.registerContextChannels()
     this.registerConfigChannels()
+    this.registerWindowChannels()
     this.registerDialogChannels()
     this.registerOrchestratorChannels()
     this.registerBugreportChannels()
@@ -375,6 +376,22 @@ export class IpcHub {
     ipcMain.handle(IPC.CONFIG_SAVE_GRID, (_event, grid) => {
       const ui = configStore.get('ui')
       configStore.set('ui', { ...ui, grid })
+    })
+  }
+
+  // ─── Window ─────────────────────────────────────────────
+  private registerWindowChannels(): void {
+    ipcMain.handle(IPC.WINDOW_FIT_GRID, (_e, { cols }: { cols: number }) => {
+      const win = this.windowManager.getMainWindow()
+      if (!win) return
+      const cellWidth = 640
+      const panelWidth = 280 // chatroom
+      const padding = 20
+      const newWidth = cols * cellWidth + panelWidth + padding
+      const [, currentHeight] = win.getSize()
+      // Set minSize first — otherwise shrinking is blocked by old minimum
+      win.setMinimumSize(newWidth, 600)
+      win.setSize(newWidth, currentHeight)
     })
   }
 

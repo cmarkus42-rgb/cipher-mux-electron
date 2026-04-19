@@ -31,7 +31,7 @@ export function App() {
   const { unreadCount } = useMessages()
   const contextUsages = useContextUsage()
   const { projects, scanning, rescan } = useProjects()
-  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot } = useGrid()
+  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand } = useGrid()
   const { theme, toggleTheme } = useTheme()
 
   const [orchestratorSessionId, setOrchestratorSessionId] = useState<string | null>(null)
@@ -116,10 +116,23 @@ export function App() {
         }
         setFocusedSessionId(session.id)
       }
+      // Ensure the project's parent dir is in scan paths so it appears in future listings
+      const parentDir = project.path.replace(/\/[^/]+\/?$/, '')
+      if (parentDir) {
+        const appCfg = await (window as any).cipherMux.config.get('app') ?? {}
+        const scanPaths: string[] = appCfg.scanPaths ?? []
+        if (!scanPaths.includes(parentDir)) {
+          await (window as any).cipherMux.config.set('app', {
+            ...appCfg,
+            scanPaths: [...scanPaths, parentDir],
+          })
+          rescan().catch(() => {})
+        }
+      }
     } catch (err) {
       console.error('[App] Failed to start/switch session:', err)
     }
-  }, [grid.slots, startSession, stopSession, addSession, setSessionAtSlot, popupTargetSlotIndex])
+  }, [grid.slots, startSession, stopSession, addSession, setSessionAtSlot, popupTargetSlotIndex, rescan])
 
   const handleCloseSession = useCallback(async (sessionId: string) => {
     await stopSession(sessionId)
@@ -170,6 +183,7 @@ export function App() {
           onFocusSession={setFocusedSessionId}
           onCloseSession={handleCloseSession}
           onSwitchProject={handleSwitchProject}
+          onToggleExpand={toggleExpand}
           onLaunch={handleLaunch}
           onResize={handleResize}
           onSwap={swap}

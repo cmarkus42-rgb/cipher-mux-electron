@@ -46,7 +46,7 @@ export const DEFAULT_WINDOW_WIDTH = 1400
 export const DEFAULT_WINDOW_HEIGHT = 900
 
 /** Grid defaults */
-export const DEFAULT_GRID_COLS = 5
+export const DEFAULT_GRID_COLS = 2
 export const DEFAULT_GRID_ROWS = 2
 export const MAX_GRID_COLS = 5
 export const MAX_GRID_ROWS = 3

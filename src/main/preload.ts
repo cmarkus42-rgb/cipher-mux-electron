@@ -119,6 +119,11 @@ const api = {
     },
   },
 
+  // ─── Window ──────────────────────────────────────────────
+  window: {
+    fitGrid: (cols: number) => ipcRenderer.invoke(IPC.WINDOW_FIT_GRID, { cols }),
+  },
+
   // ─── Bugreport ─────────────────────────────────────────
   bugreport: {
     collect: () => ipcRenderer.invoke(IPC.BUGREPORT_COLLECT),

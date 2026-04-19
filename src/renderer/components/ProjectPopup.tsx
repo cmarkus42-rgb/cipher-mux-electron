@@ -2,6 +2,20 @@
 import { useState, useCallback, useMemo } from 'preact/hooks'
 import type { ProjectInfo } from '../../shared/types'
 
+const api = () => (window as any).cipherMux
+
+/** Create a minimal ProjectInfo from a raw filesystem path. */
+function projectFromPath(dirPath: string): ProjectInfo {
+  const name = dirPath.split('/').filter(Boolean).pop() ?? 'session'
+  return {
+    path: dirPath,
+    name,
+    hasClaudeMd: false,
+    gitBranch: null,
+    gitDirty: false,
+  } as ProjectInfo
+}
+
 interface ProjectPopupProps {
   visible: boolean
   projects: ProjectInfo[]
@@ -18,6 +32,7 @@ export function ProjectPopup({
   onSelect, onRescan, onClose,
 }: ProjectPopupProps) {
   const [filter, setFilter] = useState('')
+  const [customPath, setCustomPath] = useState('')
 
   const filtered = useMemo(() => {
     if (!filter) return projects
@@ -30,7 +45,28 @@ export function ProjectPopup({
   const handleSelect = useCallback((project: ProjectInfo) => {
     onSelect(project, targetSessionId)
     setFilter('')
+    setCustomPath('')
   }, [onSelect, targetSessionId])
+
+  const handleCustomPathOpen = useCallback(() => {
+    const p = customPath.trim()
+    if (!p) return
+    handleSelect(projectFromPath(p))
+  }, [customPath, handleSelect])
+
+  const handleCustomPathKey = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleCustomPathOpen()
+    }
+  }, [handleCustomPathOpen])
+
+  const handleBrowse = useCallback(async () => {
+    const dir = await api().dialog.openDir({ title: 'Projektordner auswählen' })
+    if (dir) {
+      handleSelect(projectFromPath(dir))
+    }
+  }, [handleSelect])
 
   if (!visible) return null
 
@@ -43,11 +79,26 @@ export function ProjectPopup({
           </span>
           <button class="cell-btn" onClick={onClose}>✕</button>
         </div>
+
+        {/* Custom path input + Finder browse */}
+        <div class="project-popup__custom">
+          <input
+            type="text"
+            class="project-popup__input"
+            placeholder="pfad einfügen..."
+            value={customPath}
+            onInput={(e) => setCustomPath((e.target as HTMLInputElement).value)}
+            onKeyDown={handleCustomPathKey}
+          />
+          <button class="cell-btn" onClick={handleCustomPathOpen} title="pfad öffnen">→</button>
+          <button class="cell-btn" onClick={handleBrowse} title="im finder auswählen">⋯</button>
+        </div>
+
         <div class="project-popup__search">
           <input
             type="text"
             class="project-popup__input"
-            placeholder="filter..."
+            placeholder="projekte filtern..."
             value={filter}
             onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
             autofocus

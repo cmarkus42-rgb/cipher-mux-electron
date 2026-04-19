@@ -95,17 +95,13 @@
    ================================================================ */
 
 .chatroom-panel {
-  display: none;
   flex-shrink: 0;
   width: 280px;
   overflow: hidden;
   background: var(--color-bg-sunken);
   border-left: 1px solid var(--color-border);
   flex-direction: column;
-}
-
-.chatroom-panel--open {
-  display: flex;
+  /* display toggled via inline style in ChatroomPanel.tsx */
 }
 
 .chatroom-panel__header {
