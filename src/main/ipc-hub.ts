@@ -517,10 +517,10 @@ export class IpcHub {
             sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
             sendAudioPlayback: (b64) => this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_AUDIO, b64),
             sendStateChange: (state) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state),
-            sendStopPlayback: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'stop-playback'),
-            sendGenerationDone: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'generation-done'),
-            dispatchStatus: (text, level) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, `status:${level}:${text}`),
-            cancelStream: () => { /* stream cancellation handled by VoiceManager */ },
+            sendStopPlayback: () => this.windowManager.sendToMainWindow(IPC.VOICE_STOP_PLAYBACK, undefined),
+            sendGenerationDone: () => this.windowManager.sendToMainWindow(IPC.VOICE_GENERATION_DONE, undefined),
+            dispatchStatus: (text: string, level: string) => console.log(`[Voice:${level}] ${text}`),
+            cancelStream: () => { /* no LLM stream cancel for bugreport */ },
           }
           this.voiceManager.setTransport(transport)
           await this.voiceManager.init()
@@ -559,6 +559,18 @@ export class IpcHub {
 
     ipcMain.on(IPC.VOICE_PLAYBACK_DONE, () => {
       this.voiceManager?.getConversation()?.onPlaybackComplete()
+    })
+
+    ipcMain.on(IPC.VOICE_VAD_SPEECH_START, () => {
+      this.voiceManager?.onVADSpeechStart()
+    })
+
+    ipcMain.on(IPC.VOICE_VAD_SPEECH_END, (_event, audioData: number[]) => {
+      this.voiceManager?.onVADSpeechEnd(audioData)
+    })
+
+    ipcMain.on(IPC.VOICE_VAD_MISFIRE, () => {
+      this.voiceManager?.onVADMisfire()
     })
   }
 

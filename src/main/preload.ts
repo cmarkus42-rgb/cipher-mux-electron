@@ -173,6 +173,19 @@ const api = {
       ipcRenderer.on(IPC.VOICE_ERROR, handler)
       return () => ipcRenderer.removeListener(IPC.VOICE_ERROR, handler)
     },
+    vadSpeechStart: () => ipcRenderer.send(IPC.VOICE_VAD_SPEECH_START),
+    vadSpeechEnd: (audioData: number[]) => ipcRenderer.send(IPC.VOICE_VAD_SPEECH_END, audioData),
+    vadMisfire: () => ipcRenderer.send(IPC.VOICE_VAD_MISFIRE),
+    onGenerationDone: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on(IPC.VOICE_GENERATION_DONE, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_GENERATION_DONE, handler)
+    },
+    onStopPlayback: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on(IPC.VOICE_STOP_PLAYBACK, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_STOP_PLAYBACK, handler)
+    },
   },
 }
 

@@ -74,6 +74,11 @@ export const IPC = {
   VOICE_INTERVIEW_DONE: 'cipher-mux:voice:interview-done',
   VOICE_PLAYBACK_DONE: 'cipher-mux:voice:playback-done',
   VOICE_ERROR: 'cipher-mux:voice:error',
+  VOICE_VAD_SPEECH_START: 'cipher-mux:voice:vad-speech-start',
+  VOICE_VAD_SPEECH_END: 'cipher-mux:voice:vad-speech-end',
+  VOICE_VAD_MISFIRE: 'cipher-mux:voice:vad-misfire',
+  VOICE_GENERATION_DONE: 'cipher-mux:voice:generation-done',
+  VOICE_STOP_PLAYBACK: 'cipher-mux:voice:stop-playback',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
