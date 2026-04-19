@@ -1,8 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks'
 import { initVAD, type MicVADInstance } from './vad-loader'
 
+/** Typed accessor for the preload-injected API bridge. */
 const api = () => (window as any).cipherMux
 
+/** Voice interview lifecycle states (mirrors VoiceState + UI-only states). */
 export type VoiceBugreportState =
   | 'idle'
   | 'initializing'
@@ -14,11 +16,18 @@ export type VoiceBugreportState =
   | 'complete'
   | 'error'
 
+/** A single turn in the voice interview conversation. */
 export interface ChatTurn {
   role: 'user' | 'assistant'
   text: string
 }
 
+/**
+ * Preact hook managing the voice bugreport interview lifecycle.
+ *
+ * Handles microphone access, VAD initialization, IPC event wiring,
+ * and audio playback queue. Returns reactive state for the UI.
+ */
 export function useVoiceBugreport() {
   const [voiceState, setVoiceState] = useState<VoiceBugreportState>('idle')
   const [turns, setTurns] = useState<ChatTurn[]>([])
@@ -31,7 +40,8 @@ export function useVoiceBugreport() {
   const audioQueueRef = useRef<string[]>([])
   const playingRef = useRef(false)
 
-  // ─── Audio Playback Queue ──────────────────────────────────
+  // ── Audio playback queue: drains base64 WAV chunks sequentially ──
+
   const playNextAudio = useCallback(() => {
     const queue = audioQueueRef.current
     if (queue.length === 0) {
@@ -48,7 +58,8 @@ export function useVoiceBugreport() {
     audio.play().catch(() => playNextAudio())
   }, [])
 
-  // ─── IPC Event Listeners ──────────────────────────────────
+  // ── IPC event listeners: wire main-process voice events to React state ──
+
   useEffect(() => {
     const voice = api()?.voice
     if (!voice) return
@@ -77,12 +88,10 @@ export function useVoiceBugreport() {
         setError(msg)
         setVoiceState('error')
       }))
-      // Stop playback on barge-in
       cleanups.push(voice.onStopPlayback(() => {
         audioQueueRef.current = []
         playingRef.current = false
       }))
-      // Generation done — wait for playback queue to drain
       cleanups.push(voice.onGenerationDone(() => {
         if (!playingRef.current && audioQueueRef.current.length === 0) {
           api().voice.playbackDone()
@@ -97,7 +106,8 @@ export function useVoiceBugreport() {
     }
   }, [playNextAudio])
 
-  // ─── Start Voice Interview ────────────────────────────────
+  // ── Start voice interview: mic access -> main-process init -> VAD ──
+
   const startVoiceInterview = useCallback(async () => {
     try {
       setVoiceState('initializing')
@@ -107,21 +117,14 @@ export function useVoiceBugreport() {
       audioQueueRef.current = []
       playingRef.current = false
 
-      // 1. Request microphone access (use browser default sample rate)
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-        },
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
       })
       streamRef.current = stream
 
-      // 2. Create AudioContext (default sample rate — VAD resamples internally to 16kHz)
       const audioCtx = new AudioContext()
       audioCtxRef.current = audioCtx
 
-      // 3. Start interview in main process (initializes STT + TTS)
       const result = await api().voice.start()
       if (result && !result.ok) {
         setError(result.error || 'Voice-Interview fehlgeschlagen')
@@ -129,7 +132,6 @@ export function useVoiceBugreport() {
         return
       }
 
-      // 4. Initialize VAD — sends events to main process via IPC
       const vad = await initVAD(stream, audioCtx, {
         onSpeechStart: () => {
           api().voice.vadSpeechStart()
@@ -143,8 +145,6 @@ export function useVoiceBugreport() {
       })
 
       vadRef.current = vad
-
-      // 5. Start VAD listening
       vad.start()
       setVoiceState('ready')
     } catch (err: any) {
@@ -153,7 +153,8 @@ export function useVoiceBugreport() {
     }
   }, [])
 
-  // ─── Stop Voice Interview ─────────────────────────────────
+  // ── Stop voice interview: destroy VAD, close mic, reset state ──
+
   const stopVoiceInterview = useCallback(() => {
     if (vadRef.current) {
       vadRef.current.destroy()
@@ -180,16 +181,12 @@ export function useVoiceBugreport() {
     setVoiceState('idle')
   }, [])
 
-  // toggleRecording kept for API compat but is a no-op with VAD
-  const toggleRecording = useCallback(() => {}, [])
-
   return {
     voiceState,
     turns,
     report,
     error,
     startVoiceInterview,
-    toggleRecording,
     stopVoiceInterview,
   }
 }

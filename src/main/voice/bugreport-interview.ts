@@ -65,6 +65,14 @@ export function extractReport(text: string): string {
   return lines.slice(startIdx, endIdx + 1).join('\n').trim()
 }
 
+/**
+ * Guided bug-report interview powered by a local LLM (Ollama).
+ *
+ * Drives a multi-turn conversation: the user describes a bug, the assistant
+ * asks clarifying questions, and after 2-3 turns generates a structured
+ * Markdown report. Emits 'agent-speaking', 'turn-update', 'interview-complete',
+ * and 'error' events.
+ */
 export class BugreportInterview extends EventEmitter {
   private readonly chat: OllamaChat
   private _complete = false
@@ -117,14 +125,17 @@ export class BugreportInterview extends EventEmitter {
     }
   }
 
+  /** Whether the interview has concluded with a complete report. */
   isComplete(): boolean {
     return this._complete
   }
 
+  /** The final structured Markdown report (empty string if not yet complete). */
   getReport(): string {
     return this._report
   }
 
+  /** Number of user turns processed so far. */
   getTurnCount(): number {
     return this._turnCount
   }

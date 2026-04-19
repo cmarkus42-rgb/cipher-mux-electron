@@ -1,10 +1,8 @@
 /**
  * vad-loader.ts — Initialize Silero VAD in Electron renderer.
  *
- * Loads MicVAD with local assets (no CDN). Shares the existing MediaStream
- * so only one getUserMedia() call is needed.
- *
- * Ported from cipher-desktop's vad-loader.js (proven, battle-tested).
+ * Loads MicVAD with local ONNX/WASM assets (no CDN). Reuses the existing
+ * MediaStream and AudioContext so only one getUserMedia() call is needed.
  */
 
 declare global {
@@ -58,55 +56,29 @@ export async function initVAD(
     preSpeechPadFrames: vadConfig.preSpeechPadFrames ?? 3,
   }
 
-  console.log('[VAD] Initializing Silero VAD with config:', config)
-  console.log('[VAD] Asset path:', VAD_ASSETS_PATH)
+  console.log('[VAD] Initializing Silero VAD')
 
-  // Disable multi-threaded WASM — blob workers can't resolve file:// paths
+  // Disable multi-threaded WASM — blob workers can't resolve file:// paths in Electron
   if (window.ort?.env?.wasm) {
     window.ort.env.wasm.numThreads = 1
-    console.log('[VAD] ONNX WASM threads set to 1 (single-thread)')
   }
 
   const micVAD = await window.vad.MicVAD.new({
-    // Use shared stream — no second getUserMedia call
     getStream: () => Promise.resolve(stream),
     pauseStream: () => Promise.resolve(),
     resumeStream: () => Promise.resolve(stream),
-
-    // Share AudioContext
     audioContext: audioCtx,
-
-    // Local asset paths (no CDN)
     baseAssetPath: VAD_ASSETS_PATH,
     onnxWASMBasePath: VAD_ASSETS_PATH,
-
-    // Model
     model: 'legacy',
-
-    // Don't start automatically
     startOnLoad: false,
-
-    // VAD sensitivity
     ...config,
 
-    // Callbacks
-    onSpeechStart: () => {
-      console.log('[VAD] Speech start detected')
-      callbacks.onSpeechStart()
-    },
-
-    onSpeechEnd: (audio: Float32Array) => {
-      const durationMs = Math.round((audio.length / 16000) * 1000)
-      console.log(`[VAD] Speech end — ${audio.length} samples (${durationMs}ms)`)
-      callbacks.onSpeechEnd(audio)
-    },
-
-    onVADMisfire: () => {
-      console.log('[VAD] Misfire (speech too short)')
-      callbacks.onVADMisfire?.()
-    },
+    onSpeechStart: () => callbacks.onSpeechStart(),
+    onSpeechEnd: (audio: Float32Array) => callbacks.onSpeechEnd(audio),
+    onVADMisfire: () => callbacks.onVADMisfire?.(),
   })
 
-  console.log('[VAD] Silero VAD initialized successfully')
+  console.log('[VAD] Silero VAD initialized')
   return micVAD
 }

@@ -1,15 +1,24 @@
+/** A single message in the Ollama chat history. */
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
 }
 
 export interface OllamaChatOpts {
-  model: string          // e.g. 'gemma3:4b'
-  host: string           // e.g. '127.0.0.1'
-  port: number           // e.g. 11433
+  model: string
+  host: string
+  port: number
   systemPrompt: string
 }
 
+/**
+ * Stateful chat client for a local Ollama instance.
+ *
+ * Maintains conversation history (system + user/assistant turns) and
+ * communicates via Ollama's /api/chat endpoint (non-streaming).
+ * On network or HTTP errors, the failed user message is rolled back
+ * so the history stays consistent.
+ */
 export class OllamaChat {
   private readonly model: string
   private readonly host: string
@@ -25,10 +34,15 @@ export class OllamaChat {
     this.history = [{ role: 'system', content: this.systemPrompt }]
   }
 
+  /** Full endpoint URL for Ollama's chat API. */
   get url(): string {
     return `http://${this.host}:${this.port}/api/chat`
   }
 
+  /**
+   * Send a user message and return the assistant's response.
+   * Rolls back the user message on error to keep history consistent.
+   */
   async send(userMessage: string): Promise<string> {
     this.history.push({ role: 'user', content: userMessage })
 
@@ -60,18 +74,22 @@ export class OllamaChat {
     return content
   }
 
+  /** Return a shallow copy of the full conversation history. */
   getHistory(): ChatMessage[] {
     return [...this.history]
   }
 
+  /** Inject a synthetic user message into history (for context seeding). */
   injectUserMessage(content: string): void {
     this.history.push({ role: 'user', content })
   }
 
+  /** Inject a synthetic assistant message into history (for context seeding). */
   injectAssistantMessage(content: string): void {
     this.history.push({ role: 'assistant', content })
   }
 
+  /** Clear conversation history, retaining only the system prompt. */
   reset(): void {
     this.history = [{ role: 'system', content: this.systemPrompt }]
   }

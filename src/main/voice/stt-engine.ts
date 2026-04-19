@@ -58,10 +58,17 @@ export interface STTEngineOptions {
   language?: string   // default: '' (auto-detect)
 }
 
+/**
+ * Local speech-to-text engine wrapping whisper.node (Whisper.cpp).
+ *
+ * Expects 16-bit PCM audio at 16 kHz mono. Applies hallucination and noise
+ * filtering to the raw transcription before returning results.
+ */
 export class STTEngine extends EventEmitter {
   private readonly modelDir: string
   private readonly modelName: string
   private readonly language: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- whisper.node context is untyped
   private context: any = null
   private ready = false
 

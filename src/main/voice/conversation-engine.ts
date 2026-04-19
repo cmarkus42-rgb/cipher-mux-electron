@@ -1,11 +1,17 @@
 /**
- * ConversationEngine — toggle-to-speak + always-listen turn management
+ * ConversationEngine — toggle-to-speak + always-listen turn management.
  *
- * Port of cipher-desktop's conversation engine with full VAD support.
- * Supports toggle mode (push-to-talk) and always-listen mode (VAD-driven).
+ * Manages the full voice conversation lifecycle: audio capture, STT transcription,
+ * response generation, and TTS playback. Supports two interaction modes:
  *
- * Flow (toggle):   user presses mic → records → STT → transcription → TTS → ready
- * Flow (VAD):      VAD detects speech → records → STT → transcription → streaming TTS → ready
+ *   toggle:        user presses mic -> records -> STT -> transcription -> TTS -> ready
+ *   always-listen: VAD detects speech -> records -> STT -> transcription -> streaming TTS -> ready
+ *
+ * Key features:
+ *   - Echo guard: suppresses VAD triggers caused by TTS speaker echo
+ *   - Barge-in: user can interrupt agent speech (via repeated VAD misfires)
+ *   - Streaming TTS: sentences are spoken as they arrive from the LLM
+ *   - Safety timeouts: auto-recovery from stuck states (recording, processing)
  */
 
 import { EventEmitter } from 'node:events'
@@ -13,6 +19,7 @@ import { VoiceStateMachine, VoiceState } from './voice-state'
 import { STTRouter } from './stt-router'
 import { TTSEngine } from './tts-engine'
 
+/** IPC bridge between the ConversationEngine (main process) and the renderer. */
 export interface ConversationTransport {
   sendStartCapture(): void
   sendStopCapture(): void
@@ -39,14 +46,19 @@ export interface ConversationEngineOptions {
   minAudioBytes?: number     // default: 16000
 }
 
-const DEFAULT_MAX_RECORDING_MS = 30000
-const DEFAULT_MIN_AUDIO_BYTES = 16000
+// ── Timing constants ──
+
+const DEFAULT_MAX_RECORDING_MS = 30_000
+const DEFAULT_MIN_AUDIO_BYTES = 16_000
+/** Grace period after stop-capture to accept in-flight audio chunks */
 const LATE_CHUNK_WINDOW_MS = 200
+/** Delay before auto-recovering from ERROR state */
 const ERROR_RECOVERY_MS = 1000
 const DEFAULT_ECHO_GUARD_MS = 300
 const DEFAULT_MIN_UTTERANCE_MS = 300
-const DEFAULT_MAX_UTTERANCE_MS = 30000
-const PROCESSING_TIMEOUT_MS = 90000
+const DEFAULT_MAX_UTTERANCE_MS = 30_000
+/** Auto-recover from PROCESSING if no LLM response arrives within this window */
+const PROCESSING_TIMEOUT_MS = 90_000
 
 export class ConversationEngine extends EventEmitter {
   readonly stateMachine: VoiceStateMachine
@@ -63,30 +75,30 @@ export class ConversationEngine extends EventEmitter {
   private lateChunkTimer: ReturnType<typeof setTimeout> | null = null
   private errorRecoveryTimer: ReturnType<typeof setTimeout> | null = null
 
-  // Interaction mode
+  // ── Interaction mode ──
   private _interactionMode: 'toggle' | 'always-listen'
 
-  // Echo guard (prevents VAD triggers from TTS echo)
+  // ── Echo guard: suppresses VAD triggers caused by TTS speaker echo ──
   private _echoGuardActive = false
   private _echoGuardTimer: ReturnType<typeof setTimeout> | null = null
   private _echoGuardDurationMs: number
 
-  // Barge-in (user interrupts agent)
+  // ── Barge-in: lets the user interrupt agent speech ──
   private _bargeInEnabled: boolean
   private _bargeInPending = false
   private _bargeInMisfireTimestamps: number[] = []
-  private _bargeInMisfireThreshold = 3
-  private _bargeInMisfireWindowMs = 2000
+  private readonly _bargeInMisfireThreshold = 3
+  private readonly _bargeInMisfireWindowMs = 2000
   private _lastSpokenText = ''
   private _interruptedContext: string | null = null
 
-  // Streaming TTS
+  // ── Streaming TTS: sentence-by-sentence playback while LLM generates ──
   private _streamBuffer = ''
   private _streamDone = false
   private _speakingStarted = false
   private _processingTimeout: ReturnType<typeof setTimeout> | null = null
 
-  // Endpointing
+  // ── VAD endpointing: min/max utterance duration thresholds ──
   private _endpointing: { minUtteranceDurationMs: number; maxUtteranceDurationMs: number }
 
   constructor(opts: ConversationEngineOptions) {
@@ -116,18 +128,26 @@ export class ConversationEngine extends EventEmitter {
     })
   }
 
+  /** Current voice state (delegated to the state machine). */
   get state(): VoiceState {
     return this.stateMachine.state
   }
 
+  /** Attach a TTS engine for agent speech playback. */
   setTTS(tts: TTSEngine): void {
     this.tts = tts
   }
 
+  /** Switch between toggle (push-to-talk) and always-listen (VAD) modes. */
   setInteractionMode(mode: 'toggle' | 'always-listen'): void {
     this._interactionMode = mode
   }
 
+  /**
+   * Handle a mic-button toggle press.
+   * Behavior depends on current state: starts recording, stops recording,
+   * or recovers from error.
+   */
   handleToggle(): void {
     switch (this.state) {
       case VoiceState.IDLE:
@@ -148,8 +168,8 @@ export class ConversationEngine extends EventEmitter {
     }
   }
 
+  /** Begin audio capture. Transitions IDLE -> READY -> RECORDING. */
   startRecording(): void {
-    // Ensure we're in ready state first
     if (this.state === VoiceState.IDLE) {
       this.stateMachine.transition(VoiceState.READY)
     }
@@ -158,13 +178,9 @@ export class ConversationEngine extends EventEmitter {
       return
     }
 
-    // Clear audio buffer
     this.audioBuffers = []
-
-    // Notify transport to start capturing
     this.transport.sendStartCapture()
 
-    // Safety timeout — auto-stop after maxRecordingMs
     this.clearRecordingTimer()
     this.recordingTimer = setTimeout(() => {
       if (this.state === VoiceState.RECORDING) {
@@ -173,6 +189,7 @@ export class ConversationEngine extends EventEmitter {
     }, this.maxRecordingMs)
   }
 
+  /** Stop audio capture, allow late chunks, then trigger STT processing. */
   stopRecording(): void {
     this.clearRecordingTimer()
 
@@ -181,8 +198,6 @@ export class ConversationEngine extends EventEmitter {
     }
 
     this.transport.sendStopCapture()
-
-    // Accept late chunks for a short window, then process
     this._acceptLateChunks = true
     this.lateChunkTimer = setTimeout(() => {
       this._acceptLateChunks = false
@@ -190,6 +205,7 @@ export class ConversationEngine extends EventEmitter {
     }, LATE_CHUNK_WINDOW_MS)
   }
 
+  /** Accept an incoming audio chunk from the renderer's AudioWorklet. */
   receiveAudioChunk(chunk: Buffer | ArrayBuffer): void {
     if (this.state !== VoiceState.RECORDING && !this._acceptLateChunks) {
       return
@@ -198,8 +214,9 @@ export class ConversationEngine extends EventEmitter {
     this.audioBuffers.push(buf)
   }
 
-  // ── VAD event handlers ──
+  // ── VAD event handlers (always-listen mode) ──
 
+  /** VAD detected speech onset. In always-listen mode, transition to USER_SPEAKING. */
   onVADSpeechStart(): void {
     if (this._interactionMode !== 'always-listen') return
     if (this._echoGuardActive) return
@@ -214,6 +231,10 @@ export class ConversationEngine extends EventEmitter {
     }
   }
 
+  /**
+   * VAD misfire — speech was too short to be meaningful.
+   * During agent playback, accumulate misfires to detect barge-in intent.
+   */
   onVADMisfire(): void {
     if (this.state !== VoiceState.AGENT_SPEAKING || !this._bargeInEnabled) return
     if (this._echoGuardActive) return
@@ -230,8 +251,26 @@ export class ConversationEngine extends EventEmitter {
     }
   }
 
+  /**
+   * VAD detected speech end with captured audio.
+   * Validates utterance duration, converts to PCM, and triggers STT processing.
+   */
   async onVADSpeechEnd(audioData: number[]): Promise<void> {
-    console.log(`[ConvEngine] onVADSpeechEnd: ${audioData.length} samples, state=${this.state}, mode=${this._interactionMode}`)
+    // -- Input validation --
+    // audioData arrives from the renderer via IPC as a serialized number[].
+    // Guard against non-array, non-numeric entries, or oversized payloads that
+    // could cause OOM when allocated as a typed array.
+    if (!Array.isArray(audioData)) {
+      console.warn('[ConvEngine] onVADSpeechEnd: audioData is not an array, ignoring')
+      return
+    }
+    // Cap at ~60s of 16 kHz mono audio (960 000 samples).
+    const MAX_SAMPLES = 960_000
+    if (audioData.length === 0 || audioData.length > MAX_SAMPLES) {
+      console.warn(`[ConvEngine] onVADSpeechEnd: sample count ${audioData.length} out of bounds [1..${MAX_SAMPLES}], ignoring`)
+      return
+    }
+
     if (this._interactionMode !== 'always-listen') return
 
     if (this._bargeInPending) {
@@ -239,12 +278,14 @@ export class ConversationEngine extends EventEmitter {
       this._handleBargeIn()
     }
 
-    if (this.state !== VoiceState.USER_SPEAKING) {
-      console.log(`[ConvEngine] onVADSpeechEnd: ignoring — state is ${this.state}, expected USER_SPEAKING`)
-      return
-    }
+    if (this.state !== VoiceState.USER_SPEAKING) return
 
-    const float32 = new Float32Array(audioData)
+    // Sanitize: coerce each value to a finite number (NaN/Infinity/non-number -> 0)
+    const float32 = new Float32Array(audioData.length)
+    for (let i = 0; i < audioData.length; i++) {
+      const v = Number(audioData[i])
+      float32[i] = Number.isFinite(v) ? v : 0
+    }
     const durationMs = (float32.length / 16000) * 1000
 
     if (durationMs < this._endpointing.minUtteranceDurationMs) {
@@ -272,10 +313,14 @@ export class ConversationEngine extends EventEmitter {
 
   // ── Streaming TTS ──
 
+  /**
+   * Feed a text chunk from the streaming LLM response into the TTS buffer.
+   * Once a complete sentence is buffered, streaming speech begins automatically.
+   */
   feedResponseChunk(delta: string): void {
     if (this.state !== VoiceState.PROCESSING && this.state !== VoiceState.AGENT_SPEAKING) return
 
-    this._streamBuffer = (this._streamBuffer || '') + delta
+    this._streamBuffer += delta
 
     if (!this._speakingStarted && this.tts?.isReady() && /[.!?]\s*$/.test(this._streamBuffer)) {
       this._speakingStarted = true
@@ -283,6 +328,10 @@ export class ConversationEngine extends EventEmitter {
     }
   }
 
+  /**
+   * Stream TTS playback: extract sentences from the buffer as they arrive,
+   * speak each one, then wait for more input or stream completion.
+   */
   private async _startStreamingSpeech(): Promise<void> {
     if (this._processingTimeout) clearTimeout(this._processingTimeout)
     if (this.state === VoiceState.PROCESSING) {
@@ -298,7 +347,7 @@ export class ConversationEngine extends EventEmitter {
         this._streamBuffer = this._streamBuffer.slice(sentenceMatch[0].length)
         if (sentence) await this._speakChunk(sentence)
       } else if (this._streamDone) {
-        const remaining = (this._streamBuffer || '').trim()
+        const remaining = this._streamBuffer.trim()
         this._streamBuffer = ''
         if (remaining) await this._speakChunk(remaining)
         break
@@ -315,6 +364,7 @@ export class ConversationEngine extends EventEmitter {
     }
   }
 
+  /** Synthesize and send a single sentence/segment to the renderer for playback. */
   private async _speakChunk(text: string): Promise<void> {
     if (!this.tts) return
     try {
@@ -329,8 +379,9 @@ export class ConversationEngine extends EventEmitter {
     }
   }
 
-  // ── Barge-in ──
+  // ── Barge-in: user interrupts the agent mid-speech ──
 
+  /** Execute barge-in: stop TTS, cancel stream, transition to USER_SPEAKING. */
   private _handleBargeIn(): void {
     if (this.tts) this.tts.stop()
     this.transport.sendStopPlayback()
@@ -354,6 +405,7 @@ export class ConversationEngine extends EventEmitter {
 
   // ── Echo guard ──
 
+  /** Block VAD events briefly after agent finishes speaking to avoid self-triggering. */
   private _activateEchoGuard(): void {
     this._echoGuardActive = true
     if (this._echoGuardTimer) clearTimeout(this._echoGuardTimer)
@@ -364,11 +416,14 @@ export class ConversationEngine extends EventEmitter {
 
   // ── Audio processing ──
 
+  /**
+   * Concatenate buffered audio, run STT transcription, and emit the result.
+   * Skips processing if the audio is too short (below minAudioBytes).
+   */
   async processAudio(): Promise<void> {
     const totalBytes = this.audioBuffers.reduce((sum, b) => sum + b.length, 0)
 
     if (totalBytes < this.minAudioBytes) {
-      // Too short — go back to ready
       this.stateMachine.transition(VoiceState.READY)
       return
     }
@@ -377,22 +432,17 @@ export class ConversationEngine extends EventEmitter {
     this.audioBuffers = []
 
     try {
-      console.log(`[ConvEngine] processAudio: ${totalBytes} bytes, state=${this.state}, transcribing...`)
       const text = await this.sttRouter.transcribeBatch(pcmBuffer)
-      console.log(`[ConvEngine] processAudio: transcription="${text?.slice(0, 100)}"`)
       this.emit('transcription', text)
 
       if (text && text.trim().length > 0) {
-        // Prepend interrupted context if available
         let fullText = text
-        const ctx = this._interruptedContext
-        if (ctx) {
+        if (this._interruptedContext) {
+          fullText = this._interruptedContext + '\n\n' + text
           this._interruptedContext = null
-          fullText = ctx + '\n\n' + text
         }
         this.transport.sendTranscription(fullText)
 
-        // Processing timeout — auto-recover if no response arrives
         this._processingTimeout = setTimeout(() => {
           if (this.state === VoiceState.PROCESSING) {
             this.stateMachine.transition(VoiceState.READY)
@@ -400,14 +450,12 @@ export class ConversationEngine extends EventEmitter {
           }
         }, PROCESSING_TIMEOUT_MS)
       } else {
-        // Empty transcription — go back to ready
         this.stateMachine.transition(VoiceState.READY)
       }
     } catch (err) {
       this.emit('error', err)
       this.stateMachine.transition(VoiceState.ERROR)
 
-      // Auto-recover after a delay
       this.errorRecoveryTimer = setTimeout(() => {
         if (this.state === VoiceState.ERROR) {
           this.stateMachine.transition(VoiceState.READY)
@@ -416,6 +464,10 @@ export class ConversationEngine extends EventEmitter {
     }
   }
 
+  /**
+   * Speak a complete response via TTS.
+   * If streaming TTS already started (via feedResponseChunk), signals stream-done instead.
+   */
   async speakResponse(text: string): Promise<void> {
     if (this._processingTimeout) clearTimeout(this._processingTimeout)
 
@@ -424,7 +476,6 @@ export class ConversationEngine extends EventEmitter {
       return
     }
 
-    // If streaming TTS already started, just signal done
     if (this._speakingStarted) {
       this._streamDone = true
       return
@@ -454,12 +505,14 @@ export class ConversationEngine extends EventEmitter {
     }
   }
 
+  /** Called by the renderer when audio playback finishes. Transitions back to READY. */
   onPlaybackComplete(): void {
     if (this.state === VoiceState.AGENT_SPEAKING) {
       this.stateMachine.transition(VoiceState.READY)
     }
   }
 
+  /** Tear down: clear all timers, reset state machine, remove event listeners. */
   shutdown(): void {
     this.clearRecordingTimer()
 
