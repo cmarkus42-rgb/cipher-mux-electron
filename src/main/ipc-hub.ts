@@ -460,8 +460,7 @@ export class IpcHub {
       description: string
       project?: string
     }) => {
-      const projectPath = app.getAppPath()
-      const id = await this.bugreportManager.submit(description, this.sessionManager.list(), project, projectPath)
+      const id = await this.bugreportManager.submit(description, this.sessionManager.list(), project)
       return { id }
     })
 
