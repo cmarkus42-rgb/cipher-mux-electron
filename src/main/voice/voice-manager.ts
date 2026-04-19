@@ -136,6 +136,8 @@ export class VoiceManager extends EventEmitter {
     this.interview = new BugreportInterview(chat)
 
     // 3. Wire conversation transcription → interview
+    // Remove any previous listener from a prior interview
+    this.conversation.removeAllListeners('transcription')
     const onTranscription = (text: string): void => {
       this.interview?.onUserTranscription(text)
     }

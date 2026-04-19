@@ -491,8 +491,11 @@ export class IpcHub {
         }
 
         const interview = this.voiceManager.startInterview()
-        interview.on('turn-update', (turn) => {
-          this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_TEXT, JSON.stringify(turn))
+        interview.on('turn-update', (turn: { role: string; text: string }) => {
+          // Only forward assistant turns — user turns reach renderer via VOICE_TRANSCRIPTION
+          if (turn.role === 'assistant') {
+            this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_TEXT, turn.text)
+          }
         })
         interview.on('interview-complete', (report) => {
           this.windowManager.sendToMainWindow(IPC.VOICE_INTERVIEW_DONE, report)
