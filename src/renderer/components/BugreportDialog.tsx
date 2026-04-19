@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'preact/hooks'
+import { useState, useCallback, useEffect } from 'preact/hooks'
 import { useVoiceBugreport, type ChatTurn, type VoiceBugreportState } from '../voice/use-voice-bugreport'
 
 const api = () => (window as any).cipherMux
@@ -72,10 +72,12 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   const { voiceState, turns, report, error: voiceError, startVoiceInterview, toggleRecording, stopVoiceInterview } = useVoiceBugreport()
 
   // When interview completes, put report into description
-  if (report && !description && voiceState === 'complete') {
-    setDescription(report)
-    stopVoiceInterview()
-  }
+  useEffect(() => {
+    if (report && !description && voiceState === 'complete') {
+      setDescription(report)
+      stopVoiceInterview()
+    }
+  }, [report, description, voiceState, stopVoiceInterview])
 
   const handleEnrich = useCallback(async () => {
     if (!description.trim()) return
