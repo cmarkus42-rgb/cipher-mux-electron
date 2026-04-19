@@ -51,7 +51,7 @@ export class IpcHub {
         ?? '~/projects/projectlauncher',
       timeoutMs: ((appConfig?.kickoffTimeoutMinutes ?? 15) * 60_000),
     })
-    this.bugreportManager = new BugreportManager()
+    this.bugreportManager = new BugreportManager({ messageBus: this.messageBus })
   }
 
   init(): void {
