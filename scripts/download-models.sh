@@ -7,7 +7,7 @@ echo "=== cipher-mux Voice Model Setup ==="
 echo ""
 
 # Whisper
-WHISPER_DIR="$HOME/Library/Application Support/cipher-mux/models/whisper"
+WHISPER_DIR="$HOME/Library/Application Support/cipher-mux-electron/models/whisper"
 WHISPER_MODEL="ggml-small.bin"
 WHISPER_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$WHISPER_MODEL"
 

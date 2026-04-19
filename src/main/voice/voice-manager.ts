@@ -95,9 +95,11 @@ export class VoiceManager extends EventEmitter {
     await this.sttRouter.init()
 
     // 2. Init PiperTTS
+    const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
     this.piperTTS = new PiperTTS({
       voice: this.config.piperVoice,
       modelsDir: this.config.piperModelsDir,
+      nodeModulesPath: appNodeModules,
     })
     await this.piperTTS.init()
 

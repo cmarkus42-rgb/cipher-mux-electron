@@ -220,6 +220,10 @@ export class PiperTTS extends TTSEngine {
           clearTimeout(timeout)
           this.worker?.removeListener('message', onMessage)
           resolve()
+        } else if (msg.type === 'error') {
+          clearTimeout(timeout)
+          this.worker?.removeListener('message', onMessage)
+          reject(new Error(msg.message ?? 'Piper worker init failed'))
         }
       }
       this.worker!.on('message', onMessage)

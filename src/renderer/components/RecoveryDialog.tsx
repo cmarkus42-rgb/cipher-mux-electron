@@ -48,7 +48,7 @@ export function RecoveryDialog({ onDone }: RecoveryDialogProps) {
   if (!visible) return null
 
   return (
-    <div class="dialog-overlay">
+    <div class="modal-overlay">
       <div class="dialog recovery-dialog">
         <h3 class="dialog__title">Session-Recovery</h3>
         <p class="dialog__text">

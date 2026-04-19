@@ -460,21 +460,53 @@ export class IpcHub {
       return this.bugreportManager.collectDiagnostics(this.sessionManager.list())
     })
 
-    ipcMain.handle(IPC.BUGREPORT_SUBMIT, async (_e, { description, project }: {
+    ipcMain.handle(IPC.BUGREPORT_SUBMIT, async (_e, { description, project, screenshots }: {
       description: string
       project?: string
+      screenshots?: string[]
     }) => {
-      const id = await this.bugreportManager.submit(description, this.sessionManager.list(), project)
+      const id = await this.bugreportManager.submit(description, this.sessionManager.list(), project, undefined, screenshots)
       return { id }
     })
 
     ipcMain.handle(IPC.BUGREPORT_ENRICH, async (_event, { description }: { description: string }) => {
       return this.bugreportManager.enrich(description)
     })
+
+    ipcMain.handle(IPC.BUGREPORT_PICK_SCREENSHOT, async () => {
+      const { dialog } = await import('electron')
+      const result = await dialog.showOpenDialog({
+        title: 'Screenshots anhängen',
+        filters: [{ name: 'Bilder', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
+        properties: ['openFile', 'multiSelections'],
+      })
+      return result.canceled ? [] : result.filePaths
+    })
   }
 
   // ─── Voice ──────────────────────────────────────────────
   private registerVoiceChannels(): void {
+    ipcMain.handle(IPC.VOICE_AVAILABLE, () => {
+      const fs = require('fs')
+      // Check native modules exist (don't import — ABI mismatch crashes)
+      try {
+        require.resolve('@fugood/whisper.node')
+      } catch {
+        return { available: false, reason: 'whisper.node nicht installiert' }
+      }
+      try {
+        require.resolve('sherpa-onnx-node')
+      } catch {
+        return { available: false, reason: 'sherpa-onnx-node nicht installiert' }
+      }
+      // Check whisper model
+      const modelPath = path.join(app.getPath('userData'), 'models', 'whisper', 'ggml-small.bin')
+      if (!fs.existsSync(modelPath)) {
+        return { available: false, reason: 'Whisper-Model fehlt — scripts/download-models.sh' }
+      }
+      return { available: true }
+    })
+
     ipcMain.handle(IPC.VOICE_START, async () => {
       try {
         if (!this.voiceManager) {

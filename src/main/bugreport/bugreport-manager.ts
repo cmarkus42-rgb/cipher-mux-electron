@@ -78,6 +78,7 @@ export class BugreportManager {
     sessions: SessionInfo[],
     project?: string,
     projectPath?: string,
+    screenshots?: string[],
   ): Promise<string> {
     ensureDirs(this.outboxDir)
     const diagnostics = await this.collectDiagnostics(sessions)
@@ -86,6 +87,27 @@ export class BugreportManager {
     const id = `BUG-${dateStr}-${ulid().slice(-6)}`
     const filename = `${id}.md`
     const resolvedProjectPath = projectPath ?? process.cwd()
+
+    // Copy screenshots to bugreport directory
+    const copiedScreenshots: string[] = []
+    if (screenshots && screenshots.length > 0) {
+      const screenshotDir = path.join(this.outboxDir, `${id}-screenshots`)
+      fs.mkdirSync(screenshotDir, { recursive: true })
+      for (const src of screenshots) {
+        const basename = path.basename(src)
+        const dest = path.join(screenshotDir, basename)
+        try {
+          fs.copyFileSync(src, dest)
+          copiedScreenshots.push(basename)
+        } catch (err) {
+          console.error(`[BugreportManager] Failed to copy screenshot ${src}:`, err)
+        }
+      }
+    }
+
+    const screenshotSection = copiedScreenshots.length > 0
+      ? `\n## Screenshots\n\n${copiedScreenshots.map((f) => `![${f}](${id}-screenshots/${f})`).join('\n')}\n`
+      : ''
 
     const content = `---
 id: ${id}
@@ -98,7 +120,7 @@ created: ${now.toISOString()}
 ## Beschreibung
 
 ${description}
-
+${screenshotSection}
 ## Diagnostik
 
 - **App-Version:** ${diagnostics.appVersion}
