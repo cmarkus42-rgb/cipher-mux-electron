@@ -33,4 +33,43 @@ describe('VoiceStateMachine', () => {
     fsm.reset()
     assert.equal(fsm.state, VoiceState.IDLE)
   })
+
+  // USER_SPEAKING (VAD support)
+  it('should transition ready → user_speaking', () => {
+    const sm = new VoiceStateMachine()
+    sm.transition(VoiceState.READY)
+    assert.ok(sm.transition(VoiceState.USER_SPEAKING))
+    assert.equal(sm.state, VoiceState.USER_SPEAKING)
+  })
+
+  it('should transition user_speaking → processing', () => {
+    const sm = new VoiceStateMachine()
+    sm.transition(VoiceState.READY)
+    sm.transition(VoiceState.USER_SPEAKING)
+    assert.ok(sm.transition(VoiceState.PROCESSING))
+  })
+
+  it('should transition agent_speaking → user_speaking (barge-in)', () => {
+    const sm = new VoiceStateMachine()
+    sm.transition(VoiceState.READY)
+    sm.transition(VoiceState.RECORDING)
+    sm.transition(VoiceState.PROCESSING)
+    sm.transition(VoiceState.AGENT_SPEAKING)
+    assert.ok(sm.transition(VoiceState.USER_SPEAKING))
+  })
+
+  it('should reject invalid transitions', () => {
+    const sm = new VoiceStateMachine()
+    assert.ok(!sm.transition(VoiceState.USER_SPEAKING)) // idle → user_speaking not valid
+  })
+
+  it('should fire transition callbacks', () => {
+    const sm = new VoiceStateMachine()
+    const transitions: [string, string][] = []
+    sm.onTransition((n, o) => transitions.push([n, o]))
+    sm.transition(VoiceState.READY)
+    sm.transition(VoiceState.USER_SPEAKING)
+    assert.equal(transitions.length, 2)
+    assert.deepEqual(transitions[1], [VoiceState.USER_SPEAKING, VoiceState.READY])
+  })
 })
