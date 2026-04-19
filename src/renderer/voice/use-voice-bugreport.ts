@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks'
+import { initVAD, type MicVADInstance } from './vad-loader'
 
 const api = () => (window as any).cipherMux
 
@@ -7,6 +8,7 @@ export type VoiceBugreportState =
   | 'initializing'
   | 'ready'
   | 'recording'
+  | 'user_speaking'
   | 'processing'
   | 'agent_speaking'
   | 'complete'
@@ -23,8 +25,8 @@ export function useVoiceBugreport() {
   const [report, setReport] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const vadRef = useRef<MicVADInstance | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
-  const workletNodeRef = useRef<AudioWorkletNode | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const audioQueueRef = useRef<string[]>([])
   const playingRef = useRef(false)
@@ -75,6 +77,17 @@ export function useVoiceBugreport() {
         setError(msg)
         setVoiceState('error')
       }))
+      // Stop playback on barge-in
+      cleanups.push(voice.onStopPlayback(() => {
+        audioQueueRef.current = []
+        playingRef.current = false
+      }))
+      // Generation done — wait for playback queue to drain
+      cleanups.push(voice.onGenerationDone(() => {
+        if (!playingRef.current && audioQueueRef.current.length === 0) {
+          api().voice.playbackDone()
+        }
+      }))
     } catch (err) {
       console.warn('[useVoiceBugreport] Failed to register listeners:', err)
     }
@@ -97,39 +110,19 @@ export function useVoiceBugreport() {
       // 1. Request microphone access
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 48000,
+          sampleRate: 16000,
           channelCount: 1,
           echoCancellation: true,
+          noiseSuppression: true,
         },
       })
       streamRef.current = stream
 
-      // 2. Create AudioContext
-      const audioCtx = new AudioContext({ sampleRate: 48000 })
+      // 2. Create AudioContext (16kHz for VAD)
+      const audioCtx = new AudioContext({ sampleRate: 16000 })
       audioCtxRef.current = audioCtx
 
-      // 3. Load AudioWorklet module (served from public/ dir)
-      await audioCtx.audioWorklet.addModule('./audio-capture-worklet.js')
-
-      // 4. Create AudioWorkletNode
-      const workletNode = new AudioWorkletNode(audioCtx, 'audio-capture')
-      workletNodeRef.current = workletNode
-
-      // 5. Connect audio graph: source -> worklet -> destination
-      const source = audioCtx.createMediaStreamSource(stream)
-      source.connect(workletNode)
-      workletNode.connect(audioCtx.destination)
-
-      // 6. Forward audio chunks to main process via IPC
-      workletNode.port.onmessage = (e: MessageEvent) => {
-        if (e.data.audio) {
-          api().voice.sendAudioChunk(e.data.audio)
-        }
-        // silenceTimeout and energy are handled by main process indirectly
-        // or can be used for UI feedback later
-      }
-
-      // 7. Start interview in main process
+      // 3. Start interview in main process (initializes STT + TTS)
       const result = await api().voice.start()
       if (result && !result.ok) {
         setError(result.error || 'Voice-Interview fehlgeschlagen')
@@ -137,46 +130,42 @@ export function useVoiceBugreport() {
         return
       }
 
-      // 8. Auto-start recording — no second click needed
-      workletNode.port.postMessage({ cmd: 'start' })
-      setVoiceState('recording')
+      // 4. Initialize VAD — sends events to main process via IPC
+      const vad = await initVAD(stream, audioCtx, {
+        onSpeechStart: () => {
+          api().voice.vadSpeechStart()
+        },
+        onSpeechEnd: (audio: Float32Array) => {
+          api().voice.vadSpeechEnd(Array.from(audio))
+        },
+        onVADMisfire: () => {
+          api().voice.vadMisfire()
+        },
+      })
+
+      vadRef.current = vad
+
+      // 5. Start VAD listening
+      vad.start()
+      setVoiceState('ready')
     } catch (err: any) {
       setError(err?.message || 'Failed to initialize voice interview')
       setVoiceState('error')
     }
   }, [])
 
-  // ─── Toggle Recording ─────────────────────────────────────
-  const toggleRecording = useCallback(() => {
-    const worklet = workletNodeRef.current
-    if (!worklet) return
-
-    if (voiceState === 'ready') {
-      worklet.port.postMessage({ cmd: 'start' })
-      setVoiceState('recording')
-    } else if (voiceState === 'recording') {
-      worklet.port.postMessage({ cmd: 'stop' })
-      setVoiceState('processing')
-      api().voice.stop()
-    }
-  }, [voiceState])
-
   // ─── Stop Voice Interview ─────────────────────────────────
   const stopVoiceInterview = useCallback(() => {
-    // Stop worklet capture
-    if (workletNodeRef.current) {
-      workletNodeRef.current.port.postMessage({ cmd: 'stop' })
-      workletNodeRef.current.disconnect()
-      workletNodeRef.current = null
+    if (vadRef.current) {
+      vadRef.current.destroy()
+      vadRef.current = null
     }
 
-    // Close AudioContext
     if (audioCtxRef.current) {
       audioCtxRef.current.close().catch(() => {})
       audioCtxRef.current = null
     }
 
-    // Stop media stream tracks
     if (streamRef.current) {
       for (const track of streamRef.current.getTracks()) {
         track.stop()
@@ -184,12 +173,14 @@ export function useVoiceBugreport() {
       streamRef.current = null
     }
 
-    // Clear playback queue
     audioQueueRef.current = []
     playingRef.current = false
 
     setVoiceState('idle')
   }, [])
+
+  // toggleRecording kept for API compat but is a no-op with VAD
+  const toggleRecording = useCallback(() => {}, [])
 
   return {
     voiceState,
