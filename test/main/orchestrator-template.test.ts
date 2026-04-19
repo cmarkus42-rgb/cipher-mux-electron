@@ -70,4 +70,22 @@ describe('generateOrchestratorClaudeMd', () => {
     const md = generateOrchestratorClaudeMd(defaultOpts)
     assert.ok(md.startsWith('# Orchestrator — cipher-mux'))
   })
+
+  it('contains bugreport consumption section', () => {
+    const md = generateOrchestratorClaudeMd(defaultOpts)
+    assert.ok(md.includes('## Bugreport-Verarbeitung'))
+    assert.ok(md.includes('mux_bugreport_resolve'))
+  })
+
+  it('contains bugreport outbox path', () => {
+    const md = generateOrchestratorClaudeMd(defaultOpts)
+    assert.ok(md.includes('.config/cipher-mux/bugreports/outbox'))
+  })
+
+  it('lists mux_bugreport_resolve in MCP tools section', () => {
+    const md = generateOrchestratorClaudeMd(defaultOpts)
+    // Should be in the MCP-Tools list at the top
+    const toolsSection = md.split('## Delegation-Regeln')[0]
+    assert.ok(toolsSection.includes('mux_bugreport_resolve'))
+  })
 })
