@@ -15,6 +15,7 @@ import { RecoveryDialog } from './components/RecoveryDialog'
 import { BugreportDialog } from './components/BugreportDialog'
 import { InfoSettingsView } from './components/InfoSettingsView'
 import { StatusBar } from './components/StatusBar'
+import { SessionDialog } from './components/SessionDialog'
 
 export function App() {
   const [chatroomVisible, setChatroomVisible] = useState(true)
@@ -75,6 +76,34 @@ export function App() {
     setPopupTargetSlotIndex(slotIndex)
     setPopupVisible(true)
   }, [])
+
+  // Session dialog state
+  const [sessionDialogVisible, setSessionDialogVisible] = useState(false)
+  const [sessionDialogSlotIndex, setSessionDialogSlotIndex] = useState<number | null>(null)
+
+  const handleOpenSession = useCallback((slotIndex: number) => {
+    setSessionDialogSlotIndex(slotIndex)
+    setSessionDialogVisible(true)
+  }, [])
+
+  const handleSessionStart = useCallback(async (dirPath: string) => {
+    setSessionDialogVisible(false)
+    try {
+      const name = dirPath ? dirPath.split('/').filter(Boolean).pop() ?? 'session' : 'session'
+      const session = await startSession({
+        name,
+        projectPath: dirPath,
+      })
+      if (sessionDialogSlotIndex !== null) {
+        setSessionAtSlot(sessionDialogSlotIndex, session.id)
+      } else {
+        addSession(session.id)
+      }
+      setFocusedSessionId(session.id)
+    } catch (err) {
+      console.error('[App] Failed to open session:', err)
+    }
+  }, [startSession, setSessionAtSlot, addSession, sessionDialogSlotIndex])
 
   // Open project popup for switching existing session's project
   const handleSwitchProject = useCallback((sessionId: string) => {
@@ -185,6 +214,7 @@ export function App() {
           onSwitchProject={handleSwitchProject}
           onToggleExpand={toggleExpand}
           onLaunch={handleLaunch}
+          onOpenSession={handleOpenSession}
           onResize={handleResize}
           onSwap={swap}
         />
@@ -221,6 +251,11 @@ export function App() {
         onClose={() => setPopupVisible(false)}
       />
       <RecoveryDialog onDone={() => {}} />
+      <SessionDialog
+        visible={sessionDialogVisible}
+        onStart={handleSessionStart}
+        onClose={() => setSessionDialogVisible(false)}
+      />
       <BugreportDialog
         visible={bugreportVisible}
         onClose={() => setBugreportVisible(false)}

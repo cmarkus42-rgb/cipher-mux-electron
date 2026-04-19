@@ -60,8 +60,10 @@ export const IPC = {
   BUGREPORT_COLLECT: 'cipher-mux:bugreport:collect',
   BUGREPORT_SUBMIT: 'cipher-mux:bugreport:submit',
   BUGREPORT_ENRICH: 'cipher-mux:bugreport:enrich',
+  BUGREPORT_PICK_SCREENSHOT: 'cipher-mux:bugreport:pick-screenshot',
 
   // Voice
+  VOICE_AVAILABLE: 'cipher-mux:voice:available',
   VOICE_START: 'cipher-mux:voice:start',
   VOICE_STOP: 'cipher-mux:voice:stop',
   VOICE_AUDIO_CHUNK: 'cipher-mux:voice:audio-chunk',

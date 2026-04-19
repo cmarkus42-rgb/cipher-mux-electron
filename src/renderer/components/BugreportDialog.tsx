@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'preact/hooks'
+import { useState, useCallback, useEffect, useRef } from 'preact/hooks'
 import { useVoiceBugreport, type ChatTurn, type VoiceBugreportState } from '../voice/use-voice-bugreport'
 
 const api = () => (window as any).cipherMux
@@ -36,19 +36,6 @@ function formatEnriched(e: EnrichedBugreport): string {
   return lines.join('\n').trim()
 }
 
-function MicIcon({ state }: { state: VoiceBugreportState }) {
-  const isRecording = state === 'recording'
-  const isProcessing = state === 'processing'
-  const isSpeaking = state === 'agent_speaking'
-  const className = [
-    'bugreport-mic',
-    isRecording ? 'bugreport-mic--recording' : '',
-    isProcessing ? 'bugreport-mic--processing' : '',
-    isSpeaking ? 'bugreport-mic--speaking' : '',
-  ].filter(Boolean).join(' ')
-  return <span class={className}>{isProcessing ? '\u27F3' : isSpeaking ? '\uD83D\uDD0A' : '\uD83C\uDF99'}</span>
-}
-
 function ChatBubbles({ turns }: { turns: ChatTurn[] }) {
   if (turns.length === 0) return null
   return (
@@ -68,10 +55,18 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   const [enrichFailed, setEnrichFailed] = useState(false)
   const [preview, setPreview] = useState('')
   const [result, setResult] = useState<string | null>(null)
+  const [screenshots, setScreenshots] = useState<string[]>([])
+  const [voiceAvailable, setVoiceAvailable] = useState(false)
 
   const { voiceState, turns, report, error: voiceError, startVoiceInterview, toggleRecording, stopVoiceInterview } = useVoiceBugreport()
 
-  // When interview completes, put report into description
+  // Check voice availability on mount
+  useEffect(() => {
+    api()?.voice?.available?.().then((res: { available: boolean }) => {
+      setVoiceAvailable(res?.available ?? false)
+    }).catch(() => setVoiceAvailable(false))
+  }, [])
+
   useEffect(() => {
     if (report && !description && voiceState === 'complete') {
       setDescription(report)
@@ -95,75 +90,111 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
     if (!finalDescription.trim()) return
     setSubmitting(true)
     try {
-      const res = await api().bugreport.submit(finalDescription)
-      setResult(res.id); setDescription(''); setEnriched(null); setPreview(''); setEnrichFailed(false)
+      const res = await api().bugreport.submit(finalDescription, undefined, screenshots.length > 0 ? screenshots : undefined)
+      setResult(res.id); setDescription(''); setEnriched(null); setPreview(''); setEnrichFailed(false); setScreenshots([])
     } catch (err) { console.error('[BugreportDialog] submit failed:', err) }
     finally { setSubmitting(false) }
-  }, [description, enriched, preview])
+  }, [description, enriched, preview, screenshots])
 
   const handleClose = useCallback(() => {
-    setResult(null); setDescription(''); setEnriched(null); setPreview(''); setEnrichFailed(false)
+    setResult(null); setDescription(''); setEnriched(null); setPreview(''); setEnrichFailed(false); setScreenshots([])
     stopVoiceInterview()
     onClose()
   }, [onClose, stopVoiceInterview])
 
-  const handleMicClick = useCallback(() => {
-    if (voiceState === 'idle') startVoiceInterview()
+  const handleAttachScreenshot = useCallback(async () => {
+    const paths: string[] = await api().bugreport.pickScreenshot()
+    if (paths.length > 0) setScreenshots((prev) => [...prev, ...paths])
+  }, [])
+
+  const handleRemoveScreenshot = useCallback((idx: number) => {
+    setScreenshots((prev) => prev.filter((_, i) => i !== idx))
+  }, [])
+
+  const handleVoiceClick = useCallback(() => {
+    if (voiceState === 'idle' || voiceState === 'error') startVoiceInterview()
     else if (voiceState === 'ready' || voiceState === 'recording') toggleRecording()
   }, [voiceState, startVoiceInterview, toggleRecording])
 
-  const isVoiceActive = voiceState !== 'idle' && voiceState !== 'complete' && voiceState !== 'error'
+  const isVoiceActive = voiceState === 'initializing' || voiceState === 'ready' || voiceState === 'recording' || voiceState === 'processing' || voiceState === 'agent_speaking'
 
   if (!visible) return null
 
   return (
-    <div class="dialog-overlay" onClick={handleClose}>
-      <div class="dialog bugreport-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3 class="dialog__title">Bugreport</h3>
-        {result ? (
-          <>
-            <p class="dialog__text">Report <strong>{result}</strong> in Outbox abgelegt.</p>
-            <div class="dialog__footer">
-              <button class="btn btn--sm btn--primary" onClick={handleClose}>OK</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <p class="dialog__text">Beschreibe das Problem oder nutze das Mikrofon für ein Voice-Interview.</p>
-            <ChatBubbles turns={turns} />
-            {voiceError && <p class="bugreport-dialog__notice">Voice-Fehler: {voiceError}</p>}
-            <div class="bugreport-input-row">
+    <div class="modal-overlay" onClick={handleClose}>
+      <div class="modal-panel bugreport-panel" onClick={(e) => e.stopPropagation()}>
+        <div class="modal-header">
+          <span class="modal-title">bug-assistant</span>
+          <button class="cell-btn" onClick={handleClose}>&times;</button>
+        </div>
+
+        <div class="bugreport-body">
+          {result ? (
+            <>
+              <p class="bugreport-body__text">Report <strong>{result}</strong> in Outbox abgelegt.</p>
+              <div class="bugreport-footer">
+                <button class="btn btn--sm btn--primary" onClick={handleClose}>OK</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p class="bugreport-body__text">
+                {voiceAvailable ? 'beschreibe das problem oder nutze voice-interview.' : 'beschreibe das problem.'}
+              </p>
+              <ChatBubbles turns={turns} />
+              {voiceAvailable && voiceError && <p class="bugreport-body__notice">voice: {voiceError}</p>}
+
               <textarea class="bugreport-textarea" rows={5} value={description}
                 onInput={(e) => { setDescription((e.target as HTMLTextAreaElement).value); if (enriched) { setEnriched(null); setPreview(''); setEnrichFailed(false) } }}
-                placeholder="Was ist passiert? Was hast du erwartet?" autoFocus disabled={isVoiceActive} />
-              <button class="btn btn--icon bugreport-mic-btn" onClick={handleMicClick}
-                disabled={voiceState === 'processing' || voiceState === 'agent_speaking' || voiceState === 'initializing'}
-                title={voiceState === 'idle' ? 'Voice-Interview starten' : voiceState === 'recording' ? 'Aufnahme stoppen' : 'Voice aktiv'}>
-                <MicIcon state={voiceState} />
-              </button>
-            </div>
-            {enrichFailed && <p class="bugreport-dialog__notice">Ollama nicht erreichbar — Rohtext wird verwendet.</p>}
-            {enriched && (
-              <>
-                <p class="bugreport-dialog__label">Vorschau (bearbeitbar):</p>
-                <textarea class="bugreport-textarea bugreport-textarea--preview" rows={10} value={preview}
-                  onInput={(e) => setPreview((e.target as HTMLTextAreaElement).value)} />
-              </>
-            )}
-            <div class="dialog__footer">
-              <button class="btn btn--sm" onClick={handleClose}>Abbrechen</button>
-              {!enriched && !isVoiceActive && (
-                <button class="btn btn--sm" onClick={handleEnrich} disabled={enriching || !description.trim()}>
-                  {enriching ? 'Analysiere\u2026' : 'Vorschau'}
+                placeholder="was ist passiert? was hast du erwartet?" autoFocus disabled={isVoiceActive} />
+
+              <div class="bugreport-actions">
+                <button class="btn btn--sm" onClick={handleAttachScreenshot} disabled={isVoiceActive}>
+                  screenshot
                 </button>
+                {voiceAvailable && (
+                  <button class="btn btn--sm" onClick={handleVoiceClick}
+                    disabled={voiceState === 'processing' || voiceState === 'agent_speaking' || voiceState === 'initializing'}>
+                    {voiceState === 'recording' ? 'aufnahme stoppen' : isVoiceActive ? 'bitte warten...' : 'voice'}
+                  </button>
+                )}
+              </div>
+
+              {screenshots.length > 0 && (
+                <div class="bugreport-screenshots__list">
+                  {screenshots.map((p, i) => (
+                    <div key={p} class="bugreport-screenshots__item">
+                      <img src={`file://${p}`} alt={`Screenshot ${i + 1}`} class="bugreport-screenshots__thumb" />
+                      <button class="bugreport-screenshots__remove" onClick={() => handleRemoveScreenshot(i)} title="Entfernen">&times;</button>
+                    </div>
+                  ))}
+                </div>
               )}
-              <button class="btn btn--sm btn--primary" onClick={handleSubmit}
-                disabled={submitting || isVoiceActive || (!description.trim() && !preview.trim())}>
-                {submitting ? 'Sende\u2026' : 'Absenden'}
-              </button>
-            </div>
-          </>
-        )}
+
+              {enrichFailed && <p class="bugreport-body__notice">ollama nicht erreichbar — rohtext wird verwendet.</p>}
+              {enriched && (
+                <>
+                  <p class="bugreport-body__label">vorschau (bearbeitbar):</p>
+                  <textarea class="bugreport-textarea bugreport-textarea--preview" rows={10} value={preview}
+                    onInput={(e) => setPreview((e.target as HTMLTextAreaElement).value)} />
+                </>
+              )}
+
+              <div class="bugreport-footer">
+                <button class="btn btn--sm" onClick={handleClose}>abbrechen</button>
+                {!enriched && !isVoiceActive && (
+                  <button class="btn btn--sm" onClick={handleEnrich} disabled={enriching || !description.trim()}>
+                    {enriching ? 'analysiere\u2026' : 'vorschau'}
+                  </button>
+                )}
+                <button class="btn btn--sm btn--primary" onClick={handleSubmit}
+                  disabled={submitting || isVoiceActive || (!description.trim() && !preview.trim())}>
+                  {submitting ? 'sende\u2026' : 'absenden'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

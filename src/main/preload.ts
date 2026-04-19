@@ -127,14 +127,17 @@ const api = {
   // ─── Bugreport ─────────────────────────────────────────
   bugreport: {
     collect: () => ipcRenderer.invoke(IPC.BUGREPORT_COLLECT),
-    submit: (description: string, project?: string) =>
-      ipcRenderer.invoke(IPC.BUGREPORT_SUBMIT, { description, project }),
+    submit: (description: string, project?: string, screenshots?: string[]) =>
+      ipcRenderer.invoke(IPC.BUGREPORT_SUBMIT, { description, project, screenshots }),
     enrich: (description: string) =>
       ipcRenderer.invoke(IPC.BUGREPORT_ENRICH, { description }),
+    pickScreenshot: (): Promise<string[]> =>
+      ipcRenderer.invoke(IPC.BUGREPORT_PICK_SCREENSHOT),
   },
 
   // ─── Voice ──────────────────────────────────────────────
   voice: {
+    available: () => ipcRenderer.invoke(IPC.VOICE_AVAILABLE),
     start: () => ipcRenderer.invoke(IPC.VOICE_START),
     stop: () => ipcRenderer.invoke(IPC.VOICE_STOP),
     sendAudioChunk: (chunk: ArrayBuffer) =>

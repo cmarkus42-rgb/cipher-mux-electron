@@ -96,10 +96,10 @@ async function handleInit(msg) {
       return
     }
 
-    // Create offline TTS config
+    // Create offline TTS config (sherpa-onnx-node v1.12+ API)
     const config = {
-      offlineTtsModelConfig: {
-        offlineTtsVitsModelConfig: {
+      model: {
+        vits: {
           model: modelPath,
           tokens: tokensPath,
           dataDir: dataDir,

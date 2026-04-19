@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, Menu } from 'electron'
+import { app, BrowserWindow, globalShortcut, Menu, session } from 'electron'
 import { WindowManager } from './window-manager'
 import { IpcHub } from './ipc-hub'
 import { patchEnvPath } from './util/exec-util'
@@ -17,6 +17,15 @@ let windowManager: WindowManager
 let ipcHub: IpcHub
 
 app.whenReady().then(() => {
+  // Grant microphone permission for voice bugreport interview
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    if (permission === 'media') {
+      callback(true)
+      return
+    }
+    callback(false)
+  })
+
   windowManager = new WindowManager()
   ipcHub = new IpcHub(windowManager)
   ipcHub.init()

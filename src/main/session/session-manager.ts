@@ -76,9 +76,10 @@ export class SessionManager extends EventEmitter {
       }
     }
 
-    // Create tmux session
+    // Create tmux session (empty projectPath → home dir)
+    const cwd = opts.projectPath || require('os').homedir()
     const tmuxSession = await this.tmux.createSession(tmuxName, {
-      cwd: opts.projectPath,
+      cwd,
       command: opts.command,
       env,
     })

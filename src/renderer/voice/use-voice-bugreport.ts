@@ -48,48 +48,36 @@ export function useVoiceBugreport() {
 
   // ─── IPC Event Listeners ──────────────────────────────────
   useEffect(() => {
+    const voice = api()?.voice
+    if (!voice) return
+
     const cleanups: Array<() => void> = []
 
-    cleanups.push(
-      api().voice.onState((state: string) => {
+    try {
+      cleanups.push(voice.onState((state: string) => {
         setVoiceState(state as VoiceBugreportState)
-      })
-    )
-
-    cleanups.push(
-      api().voice.onTranscription((text: string) => {
+      }))
+      cleanups.push(voice.onTranscription((text: string) => {
         setTurns((prev) => [...prev, { role: 'user', text }])
-      })
-    )
-
-    cleanups.push(
-      api().voice.onAgentText((text: string) => {
+      }))
+      cleanups.push(voice.onAgentText((text: string) => {
         setTurns((prev) => [...prev, { role: 'assistant', text }])
-      })
-    )
-
-    cleanups.push(
-      api().voice.onAgentAudio((base64Wav: string) => {
+      }))
+      cleanups.push(voice.onAgentAudio((base64Wav: string) => {
         audioQueueRef.current.push(base64Wav)
-        if (!playingRef.current) {
-          playNextAudio()
-        }
-      })
-    )
-
-    cleanups.push(
-      api().voice.onInterviewDone((reportText: string) => {
+        if (!playingRef.current) playNextAudio()
+      }))
+      cleanups.push(voice.onInterviewDone((reportText: string) => {
         setReport(reportText)
         setVoiceState('complete')
-      })
-    )
-
-    cleanups.push(
-      api().voice.onError((msg: string) => {
+      }))
+      cleanups.push(voice.onError((msg: string) => {
         setError(msg)
         setVoiceState('error')
-      })
-    )
+      }))
+    } catch (err) {
+      console.warn('[useVoiceBugreport] Failed to register listeners:', err)
+    }
 
     return () => {
       for (const cleanup of cleanups) cleanup()
@@ -120,9 +108,8 @@ export function useVoiceBugreport() {
       const audioCtx = new AudioContext({ sampleRate: 48000 })
       audioCtxRef.current = audioCtx
 
-      // 3. Load AudioWorklet module
-      const workletUrl = new URL('./audio-capture-worklet.js', import.meta.url)
-      await audioCtx.audioWorklet.addModule(workletUrl.href)
+      // 3. Load AudioWorklet module (served from public/ dir)
+      await audioCtx.audioWorklet.addModule('./audio-capture-worklet.js')
 
       // 4. Create AudioWorkletNode
       const workletNode = new AudioWorkletNode(audioCtx, 'audio-capture')
@@ -143,8 +130,16 @@ export function useVoiceBugreport() {
       }
 
       // 7. Start interview in main process
-      await api().voice.start()
-      setVoiceState('ready')
+      const result = await api().voice.start()
+      if (result && !result.ok) {
+        setError(result.error || 'Voice-Interview fehlgeschlagen')
+        setVoiceState('error')
+        return
+      }
+
+      // 8. Auto-start recording — no second click needed
+      workletNode.port.postMessage({ cmd: 'start' })
+      setVoiceState('recording')
     } catch (err: any) {
       setError(err?.message || 'Failed to initialize voice interview')
       setVoiceState('error')
