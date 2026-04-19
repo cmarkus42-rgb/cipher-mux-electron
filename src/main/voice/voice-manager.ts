@@ -32,6 +32,7 @@ export interface VoiceManagerConfig {
   ollamaHost?: string
   ollamaPort?: number
   ollamaModel?: string
+  interactionMode?: 'toggle' | 'always-listen'
 }
 
 const DEFAULT_PIPER_VOICE = 'de_DE-dii-high'
@@ -63,6 +64,7 @@ export class VoiceManager extends EventEmitter {
       ollamaHost: config?.ollamaHost ?? DEFAULT_OLLAMA_HOST,
       ollamaPort: config?.ollamaPort ?? DEFAULT_OLLAMA_PORT,
       ollamaModel: config?.ollamaModel ?? DEFAULT_OLLAMA_MODEL,
+      interactionMode: config?.interactionMode ?? 'toggle',
     }
   }
 
@@ -107,6 +109,7 @@ export class VoiceManager extends EventEmitter {
     this.conversation = new ConversationEngine({
       sttRouter: this.sttRouter,
       transport: this.transport,
+      interactionMode: this.config.interactionMode,
     })
 
     // 4. Set TTS on conversation engine
@@ -162,7 +165,30 @@ export class VoiceManager extends EventEmitter {
       this.emit('error', err)
     })
 
+    // 5. Set always-listen mode for natural conversation flow
+    this.conversation.setInteractionMode('always-listen')
+
     return this.interview
+  }
+
+  /** Delegate VAD speech-start event to the conversation engine */
+  onVADSpeechStart(): void {
+    this.conversation?.onVADSpeechStart()
+  }
+
+  /** Delegate VAD speech-end event (with audio data) to the conversation engine */
+  async onVADSpeechEnd(audioData: number[]): Promise<void> {
+    await this.conversation?.onVADSpeechEnd(audioData)
+  }
+
+  /** Delegate VAD misfire event to the conversation engine */
+  onVADMisfire(): void {
+    this.conversation?.onVADMisfire()
+  }
+
+  /** Propagate an interaction mode change to the conversation engine */
+  setInteractionMode(mode: 'toggle' | 'always-listen'): void {
+    this.conversation?.setInteractionMode(mode)
   }
 
   /** Get the conversation engine (null if not initialized) */
