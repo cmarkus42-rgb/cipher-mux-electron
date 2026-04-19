@@ -26,6 +26,19 @@ app.whenReady().then(() => {
     callback(false)
   })
 
+  // CSP via response headers — reliable for WASM in blob: workers
+  // (HTML meta tag CSP is not inherited by blob: workers in Electron)
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: file:; media-src 'self' data: blob:; worker-src 'self' blob:;",
+        ],
+      },
+    })
+  })
+
   windowManager = new WindowManager()
   ipcHub = new IpcHub(windowManager)
   ipcHub.init()

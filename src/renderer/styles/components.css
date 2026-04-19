@@ -864,6 +864,12 @@
   margin: 0;
 }
 
+.bugreport-body__hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim, #888);
+  margin: 4px 0 0;
+  font-style: italic;
+}
 .bugreport-body__notice {
   font-size: var(--font-size-xs);
   color: var(--color-red, #e74c3c);
@@ -948,19 +954,36 @@
   background: var(--color-red);
 }
 
-/* Voice Chat Bubbles */
+/* Voice Chat Bubbles — light theme matching the dialog panel */
 .bugreport-chat {
-  max-height: 200px; overflow-y: auto; display: flex; flex-direction: column;
-  gap: 6px; padding: 8px;
-  background: var(--color-bg-secondary, #1a1a2e);
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  margin: 8px 0;
+  background: #f5f5f0;
+  border: 1px solid #d0cfc8;
+  border-radius: 6px;
 }
 .bugreport-chat__bubble {
-  max-width: 80%; padding: 6px 10px;
-  font-size: 12px; line-height: 1.4;
+  max-width: 85%;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  border-radius: 8px;
+  word-wrap: break-word;
 }
 .bugreport-chat__bubble--user {
-  align-self: flex-start; background: var(--color-bg-tertiary, #2a2a4a); color: var(--color-text-primary);
+  align-self: flex-start;
+  background: #e8e8e0;
+  color: #1a1a1d;
+  border-bottom-left-radius: 2px;
 }
 .bugreport-chat__bubble--assistant {
-  align-self: flex-end; background: var(--color-accent-dim, #3a2a4a); color: var(--color-text-primary);
+  align-self: flex-end;
+  background: #d4e6d4;
+  color: #1a1a1d;
+  border-bottom-right-radius: 2px;
 }

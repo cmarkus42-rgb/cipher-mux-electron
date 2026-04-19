@@ -231,6 +231,7 @@ export class ConversationEngine extends EventEmitter {
   }
 
   async onVADSpeechEnd(audioData: number[]): Promise<void> {
+    console.log(`[ConvEngine] onVADSpeechEnd: ${audioData.length} samples, state=${this.state}, mode=${this._interactionMode}`)
     if (this._interactionMode !== 'always-listen') return
 
     if (this._bargeInPending) {
@@ -238,7 +239,10 @@ export class ConversationEngine extends EventEmitter {
       this._handleBargeIn()
     }
 
-    if (this.state !== VoiceState.USER_SPEAKING) return
+    if (this.state !== VoiceState.USER_SPEAKING) {
+      console.log(`[ConvEngine] onVADSpeechEnd: ignoring — state is ${this.state}, expected USER_SPEAKING`)
+      return
+    }
 
     const float32 = new Float32Array(audioData)
     const durationMs = (float32.length / 16000) * 1000
@@ -246,6 +250,11 @@ export class ConversationEngine extends EventEmitter {
     if (durationMs < this._endpointing.minUtteranceDurationMs) {
       this.stateMachine.transition(VoiceState.READY)
       this.transport.dispatchStatus('Voice: ready (listening...)', 'info')
+      return
+    }
+
+    // Transition to PROCESSING before transcription
+    if (!this.stateMachine.transition(VoiceState.PROCESSING)) {
       return
     }
 
@@ -368,7 +377,9 @@ export class ConversationEngine extends EventEmitter {
     this.audioBuffers = []
 
     try {
+      console.log(`[ConvEngine] processAudio: ${totalBytes} bytes, state=${this.state}, transcribing...`)
       const text = await this.sttRouter.transcribeBatch(pcmBuffer)
+      console.log(`[ConvEngine] processAudio: transcription="${text?.slice(0, 100)}"`)
       this.emit('transcription', text)
 
       if (text && text.trim().length > 0) {
