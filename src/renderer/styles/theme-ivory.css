@@ -1,0 +1,60 @@
+/* theme-ivory.css — Cipher Ivory (light) theme
+ * Ceramic ivory surfaces, anthracite borders, readable muted accents.
+ * This is the DEFAULT theme — variables live on :root.
+ */
+
+:root {
+  /* surfaces — ceramic ivory */
+  --color-bg:             #F2F2E8;
+  --color-bg-elevated:    #FFFFF0;
+  --color-bg-sunken:      #E8E8DE;
+  --color-bg-terminal:    #F5F5EC;
+
+  /* borders — anthracite chrome */
+  --color-border:         #3A3F47;
+  --color-border-light:   #5A5F67;
+  --color-border-focus:   #2d8a4e;
+
+  /* text */
+  --color-text:           #1A1A1D;
+  --color-text-secondary: #3A3A40;
+  --color-text-dim:       #6A6A72;
+  --color-text-accent:    #2d8a4e;
+
+  /* accents — readable on ivory (not raw neon) */
+  --color-neon-green:     #2d8a4e;
+  --color-neon-red:       #cc0030;
+  --color-neon-orange:    #c05000;
+  --color-neon-cyan:      #007a8a;
+
+  /* status dots — slightly more saturated than text accents */
+  --color-dot-ok:         #00CC40;
+  --color-dot-warn:       #E05500;
+  --color-dot-error:      #DD0035;
+  --color-dot-info:       #00AACC;
+
+  /* semantic */
+  --color-accent:         #2d8a4e;
+  --color-accent-soft:    rgba(45, 138, 78, 0.10);
+  --color-success:        #2d8a4e;
+  --color-error:          #cc0030;
+  --color-warning:        #c05000;
+  --color-info:           #007a8a;
+
+  /* context usage colors */
+  --color-ctx-ok:         #2d8a4e;
+  --color-ctx-warn:       #c05000;
+  --color-ctx-error:      #cc0030;
+
+  /* shadows — lighter for ivory */
+  --shadow-sm:            0 1px 2px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.06);
+  --shadow-md:            0 2px 4px rgba(0,0,0,0.10), 0 4px 16px rgba(0,0,0,0.10);
+  --shadow-lg:            0 4px 8px rgba(0,0,0,0.12), 0 8px 32px rgba(0,0,0,0.12);
+  --shadow-inset:         inset 0 1px 4px rgba(0,0,0,0.06);
+
+  /* overlay */
+  --color-bg-overlay:     rgba(242, 242, 232, 0.85);
+
+  /* scanline opacity — subtle on light */
+  --scanline-opacity:     0.012;
+}
