@@ -22,6 +22,13 @@ const api = {
       ipcRenderer.on(IPC.SESSION_STOPPED, handler)
       return () => ipcRenderer.removeListener(IPC.SESSION_STOPPED, handler)
     },
+    onRecoveryResult: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.SESSIONS_RECOVERY_RESULT, handler)
+      return () => ipcRenderer.removeListener(IPC.SESSIONS_RECOVERY_RESULT, handler)
+    },
+    recoveryAction: (action: string, tmuxSession: string, displayName?: string) =>
+      ipcRenderer.invoke(IPC.SESSIONS_RECOVERY_ACTION, { action, tmuxSession, displayName }),
   },
 
   // ─── Terminal ──────────────────────────────────────────
@@ -62,6 +69,11 @@ const api = {
     list: () => ipcRenderer.invoke(IPC.PROJECTS_LIST),
     scan: () => ipcRenderer.invoke(IPC.PROJECTS_SCAN),
     kickoff: (opts: unknown) => ipcRenderer.invoke(IPC.PROJECTS_KICKOFF, opts),
+    onCompleted: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.PROJECT_KICKOFF_COMPLETED, handler)
+      return () => ipcRenderer.removeListener(IPC.PROJECT_KICKOFF_COMPLETED, handler)
+    },
   },
 
   // ─── Context Usage ─────────────────────────────────────
@@ -84,7 +96,7 @@ const api = {
   config: {
     get: (key: string) => ipcRenderer.invoke(IPC.CONFIG_GET, { key }),
     set: (key: string, value: unknown) => ipcRenderer.invoke(IPC.CONFIG_SET, { key, value }),
-    saveLayout: (layout: unknown) => ipcRenderer.invoke(IPC.CONFIG_SAVE_LAYOUT, layout),
+    saveGrid: (grid: unknown) => ipcRenderer.invoke(IPC.CONFIG_SAVE_GRID, grid),
   },
 
   // ─── Dialogs ──────────────────────────────────────────────
@@ -107,10 +119,18 @@ const api = {
     },
   },
 
+  // ─── Window ──────────────────────────────────────────────
+  window: {
+    fitGrid: (cols: number) => ipcRenderer.invoke(IPC.WINDOW_FIT_GRID, { cols }),
+  },
+
   // ─── Bugreport ─────────────────────────────────────────
   bugreport: {
     collect: () => ipcRenderer.invoke(IPC.BUGREPORT_COLLECT),
-    export: (format: string) => ipcRenderer.invoke(IPC.BUGREPORT_EXPORT, { format }),
+    submit: (description: string, project?: string) =>
+      ipcRenderer.invoke(IPC.BUGREPORT_SUBMIT, { description, project }),
+    enrich: (description: string) =>
+      ipcRenderer.invoke(IPC.BUGREPORT_ENRICH, { description }),
   },
 }
 

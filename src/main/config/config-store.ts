@@ -2,12 +2,16 @@ import { app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 import type { AppConfig } from '../../shared/types'
+import { createEmptyGrid } from '../../shared/grid-types'
+import { deepMerge } from '../util/deep-merge'
 import {
   DEFAULT_SCAN_PATHS,
   DEFAULT_SCAN_DEPTH,
   DEFAULT_PROJECT_DIR,
   MAX_SESSIONS,
   MESSAGE_RETENTION_DAYS,
+  PROJECTLAUNCHER_DIR_DEFAULT,
+  KICKOFF_TIMEOUT_MIN_DEFAULT,
   MCP_DEFAULT_PORT,
   MCP_DEFAULT_HOST,
   ORCHESTRATOR_DIR,
@@ -23,6 +27,8 @@ const defaults: AppConfig = {
     defaultProjectDir: DEFAULT_PROJECT_DIR,
     maxSessions: MAX_SESSIONS,
     messageRetentionDays: MESSAGE_RETENTION_DAYS,
+    projectlauncherPath: PROJECTLAUNCHER_DIR_DEFAULT,
+    kickoffTimeoutMinutes: KICKOFF_TIMEOUT_MIN_DEFAULT,
   },
   mcp: {
     port: MCP_DEFAULT_PORT,
@@ -35,11 +41,8 @@ const defaults: AppConfig = {
   },
   ui: {
     chatroomVisible: false,
-    activeView: 'cockpit',
-    layout: {
-      root: null,
-      activePaneId: null,
-    },
+    theme: 'ivory' as const,
+    grid: createEmptyGrid(),
   },
   windows: {
     main: { x: 0, y: 0, width: DEFAULT_WINDOW_WIDTH, height: DEFAULT_WINDOW_HEIGHT },
@@ -53,7 +56,8 @@ function getConfigPath(): string {
 function loadConfig(): AppConfig {
   try {
     const raw = fs.readFileSync(getConfigPath(), 'utf-8')
-    return { ...defaults, ...JSON.parse(raw) }
+    if (!raw.trim()) return { ...defaults }
+    return deepMerge(defaults, JSON.parse(raw))
   } catch {
     return { ...defaults }
   }

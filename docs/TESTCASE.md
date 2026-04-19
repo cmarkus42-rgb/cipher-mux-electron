@@ -360,6 +360,104 @@ rm -rf /tmp/test-kickoff-ui
 
 ---
 
+## Test 11 — Kickoff mit Obsidian-Verzeichnis
+
+**Setup:**
+1. Erstelle in Nextcloud ein leeres Testverzeichnis, z.B. `/Users/Shared/Nextcloud/ClaudeCode01/kickoff-test-obsidian/`.
+2. Lege darin eine Datei `requirements.md` mit 3-5 Bullet-Points zum Projektkonzept an (beliebiges Thema).
+
+**Schritte:**
+1. Starte cipher-mux-electron.
+2. Drücke `Cmd+N` → Dialog "Neues Projekt aus Konzept" öffnet sich.
+3. Pastet den Pfad `.../kickoff-test-obsidian/` ins Feld "Projekt-Verzeichnis".
+4. Lass "Anforderungsdatei" leer (schon im Verzeichnis).
+5. Tippe im Freitext-Feld: "Stack-Präferenz: Python" (oder Equivalent).
+6. Klick "Projekt aufsetzen".
+
+**Erwartung:**
+- Dialog schließt sich.
+- Eine neue Session namens "Launcher: kickoff-test-obsidian" erscheint und läuft.
+- Nach einigen Sekunden startet Claude in dieser Session, bekommt den Launcher-Prompt und fängt an zu arbeiten (sichtbare Subagent-Dispatches idealerweise).
+- Wenn der Launcher fertig ist: Eine neue Session `kickoff-test-obsidian` wird automatisch gestartet, Focus wechselt dorthin, Claude läuft und startet `/interview`.
+- Das Projekt-Verzeichnis hat jetzt: `CLAUDE.md`, `.claude/`, `docs/SPEC.md`, `docs/todo.md`, `.gitignore`, ggf. `.git/`.
+
+## Test 12 — Kickoff mit externer `.docx`-Anforderungsdatei
+
+**Setup:**
+1. Leeres Testverzeichnis wie in Test 11 — **ohne** Anforderungsdatei drin.
+2. Eine externe `.docx`-Datei mit Anforderungen an einem beliebigen anderen Ort (z.B. Desktop).
+
+**Schritte:**
+1. `Cmd+N`, pastet den Verzeichnis-Pfad.
+2. Im Feld "Anforderungsdatei": pastet den `.docx`-Pfad.
+3. Klick "Projekt aufsetzen".
+
+**Erwartung:**
+- Vor dem Launcher-Start: im Projekt-Verzeichnis liegt jetzt `docs/requirements.docx` (Extension erhalten).
+- Launcher-Session läuft, Claude liest die `.docx`-Datei (über geeigneten Reader oder verweist auf Missing-Tool).
+- Folge-Session öffnet sich nach Completion.
+
+## Test 13 — Kickoff-Fehlerfälle
+
+**Testschritte:**
+1. `Cmd+N`, pastet einen **nicht existierenden** Pfad ins Verzeichnis-Feld → Klick "Projekt aufsetzen".
+   **Erwartung:** Dialog zeigt Fehler "Project directory does not exist", Dialog bleibt offen.
+2. `Cmd+N`, pastet einen Pfad zu einer **Datei** (nicht Verzeichnis) → Klick.
+   **Erwartung:** Fehler "Project path is not a directory".
+3. Starte einen gültigen Kickoff, dann **warte 15 Minuten ohne Interaktion** (oder setze in `ConfigStore` `kickoffTimeoutMinutes: 1` und warte 1 Minute).
+   **Erwartung:** Toast oder Console-Warning über Timeout. Launcher-Session bleibt sichtbar, Folge-Session startet nicht automatisch.
+
+---
+
+## Phase 6: Polish & Split-Layout
+
+### Test 11: Keyboard Shortcuts
+1. App starten
+2. Cmd+0 → sollte auf Cockpit wechseln
+3. Session starten, Cmd+1 → sollte Session 1 fokussieren
+4. Cmd+K → Chatroom sollte ein-/ausgeblendet werden
+5. Cmd+N → Kickoff-Dialog sollte sich öffnen
+6. Cmd+B → Bugreport-Dialog sollte sich öffnen
+
+### Test 12: Split-View
+1. Session starten (Cmd+N oder aus Cockpit)
+2. Cmd+\ → sollte nach Verzeichnis fragen, dann vertikal splitten
+3. Beide Terminals rendern und resizen unabhängig
+4. Divider ziehen — Ratio sollte sich anpassen
+5. Cmd+- → sollte die aktive Pane horizontal splitten
+6. Cmd+W → sollte aktive Pane schließen, Sibling kollabiert nach oben
+7. Alle Panes schließen → sollte zu Empty-State oder Cockpit zurückkehren
+
+### Test 13: Layout-Persistenz
+1. Split-Layout erstellen (2-3 Panes)
+2. App beenden (Cmd+Q)
+3. App neustarten → Layout sollte mit gleichen Split-Ratios wiederhergestellt werden
+4. Sessions sollten via Recovery reconnecten
+
+### Test 14: Session Recovery
+1. 2-3 Sessions erstellen
+2. Electron force-killen (kill -9)
+3. App neustarten
+4. Recovery-Dialog sollte verwaiste Sessions zeigen
+5. "Übernehmen" → Session erscheint in der Activity Rail
+6. "Beenden" → tmux-Session wird gekillt
+7. "Alle beenden" → alle Orphans werden entfernt
+
+### Test 15: Info & Einstellungen
+1. "i" in der Activity Rail klicken
+2. Drei Tabs sichtbar: Shortcuts, Features, Einstellungen
+3. Shortcuts-Tab zeigt alle registrierten Shortcuts aus der Registry
+4. Features-Tab zeigt Feature-Beschreibungen
+5. Einstellungen-Tab zeigt Scan-Pfade + Über
+
+### Test 16: Bugreport
+1. Cmd+B → Bugreport-Dialog öffnet sich
+2. Beschreibung eingeben, "Absenden" klicken
+3. Bestätigung zeigt Report-ID
+4. Prüfen: `~/.config/cipher-mux/bugreports/outbox/` → Datei existiert mit korrektem Frontmatter
+
+---
+
 ## Feedback erwünscht
 
 1. **Look & Feel** — Stimmt die cipher ivory Ästhetik? Farben, Fonts, Cut-Corners?

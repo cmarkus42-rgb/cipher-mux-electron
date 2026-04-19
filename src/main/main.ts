@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut } from 'electron'
+import { app, BrowserWindow, globalShortcut, Menu } from 'electron'
 import { WindowManager } from './window-manager'
 import { IpcHub } from './ipc-hub'
 import { patchEnvPath } from './util/exec-util'
@@ -22,6 +22,46 @@ app.whenReady().then(() => {
   ipcHub.init()
 
   windowManager.createMainWindow()
+
+  // Custom menu: keep Edit shortcuts (copy/paste/undo) but strip default
+  // zoom accelerators (Cmd+-, Cmd+=, Cmd+0) so they reach the renderer's
+  // capture-phase keydown handler for our shortcut registry.
+  const menu = Menu.buildFromTemplate([
+    {
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'close' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+  ])
+  Menu.setApplicationMenu(menu)
 
   // Cmd+Alt+I toggles DevTools
   globalShortcut.register('CommandOrControl+Alt+I', () => {

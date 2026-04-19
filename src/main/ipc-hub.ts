@@ -9,10 +9,11 @@ import { configStore } from './config/config-store'
 import { StatusLineMonitor } from './monitoring/statusline-monitor'
 import { McpServerManager } from './mcp/mcp-server'
 import { generateApiKey } from './mcp/mcp-auth'
-import { KickoffManager } from './project/kickoff-manager'
+import { KickoffOrchestrator } from './project/kickoff-orchestrator'
+import { BugreportManager } from './bugreport/bugreport-manager'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
-import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffOpts } from '../shared/types'
+import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest } from '../shared/types'
 
 /**
  * IPC Hub — Central router for all IPC channels.
@@ -25,7 +26,8 @@ export class IpcHub {
   private projectScanner: ProjectScanner
   private statusLineMonitor: StatusLineMonitor
   private mcpServer: McpServerManager
-  private kickoffManager: KickoffManager
+  private kickoffOrchestrator: KickoffOrchestrator
+  private bugreportManager: BugreportManager
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
 
   constructor(private windowManager: WindowManager) {
@@ -42,7 +44,14 @@ export class IpcHub {
     this.projectScanner = new ProjectScanner()
     this.statusLineMonitor = new StatusLineMonitor()
     this.mcpServer = new McpServerManager()
-    this.kickoffManager = new KickoffManager()
+    const appConfig = configStore.get('app')
+    this.kickoffOrchestrator = new KickoffOrchestrator({
+      sessionManager: this.sessionManager,
+      projectlauncherPath: appConfig?.projectlauncherPath
+        ?? '/Users/Shared/Nextcloud/Claude/ClaudeCode01/projectlauncher',
+      timeoutMs: ((appConfig?.kickoffTimeoutMinutes ?? 15) * 60_000),
+    })
+    this.bugreportManager = new BugreportManager()
   }
 
   init(): void {
@@ -52,6 +61,7 @@ export class IpcHub {
     this.registerProjectChannels()
     this.registerContextChannels()
     this.registerConfigChannels()
+    this.registerWindowChannels()
     this.registerDialogChannels()
     this.registerOrchestratorChannels()
     this.registerBugreportChannels()
@@ -66,7 +76,11 @@ export class IpcHub {
     })
 
     // Recover orphaned sessions
-    this.sessionManager.recover().catch((err) => {
+    this.sessionManager.recover().then((result) => {
+      if (result.orphaned.length > 0) {
+        this.windowManager.sendToMainWindow(IPC.SESSIONS_RECOVERY_RESULT, result)
+      }
+    }).catch((err) => {
       console.error('[IpcHub] session recovery failed:', err)
     })
 
@@ -95,6 +109,7 @@ export class IpcHub {
       sessionManager: this.sessionManager,
       messageBus: this.messageBus,
       statusLineMonitor: this.statusLineMonitor,
+      kickoffOrchestrator: this.kickoffOrchestrator,
     }).then(() => {
       // Auto-start orchestrator after MCP server is ready
       this.autoStartOrchestrator()
@@ -168,6 +183,54 @@ export class IpcHub {
     this.statusLineMonitor.on('usage-warning', (sessionId: string, usage: ContextUsage) => {
       this.windowManager.sendToMainWindow(IPC.CONTEXT_WARNING, { sessionId, usage })
     })
+
+    this.kickoffOrchestrator.on('kickoff-complete', (event) => {
+      // Persist the project's parent directory as a scan path, so that the
+      // renderer's post-completion rescan (and any future manual rescan) finds
+      // the new project even if it lives outside the default scan paths.
+      const projectPath = event.handle.projectDir
+      const parentDir = path.dirname(projectPath)
+      const appCfg = configStore.get('app')
+      const scanPaths = appCfg?.scanPaths ?? []
+      if (!scanPaths.includes(parentDir)) {
+        configStore.set('app', { ...appCfg, scanPaths: [...scanPaths, parentDir] })
+      }
+
+      // Pre-populate cachedProjects so the new project shows up immediately
+      // without waiting for the renderer's rescan round-trip.
+      this.projectScanner.inspectProject(projectPath).then((projectInfo) => {
+        if (projectInfo) {
+          this.cachedProjects = this.cachedProjects.filter((p) => p.path !== projectInfo.path)
+          this.cachedProjects.push(projectInfo)
+          this.cachedProjects.sort((a, b) => a.name.localeCompare(b.name))
+        }
+      }).catch((err) => {
+        console.warn('[IpcHub] kickoff-complete: inspectProject failed:', err)
+      })
+
+      this.windowManager.sendToMainWindow(
+        IPC.PROJECT_KICKOFF_COMPLETED,
+        { status: 'complete', event },
+      )
+    })
+
+    this.kickoffOrchestrator.on('kickoff-timeout', (data) => {
+      this.windowManager.sendToMainWindow(
+        IPC.PROJECT_KICKOFF_COMPLETED,
+        { status: 'timeout', ...data },
+      )
+    })
+
+    this.kickoffOrchestrator.on('kickoff-error', (data) => {
+      this.windowManager.sendToMainWindow(
+        IPC.PROJECT_KICKOFF_COMPLETED,
+        {
+          status: 'error',
+          handle: data.handle,
+          error: data.error instanceof Error ? data.error.message : String(data.error),
+        },
+      )
+    })
   }
 
   // ─── Sessions ──────────────────────────────────────────
@@ -187,6 +250,19 @@ export class IpcHub {
 
     ipcMain.handle(IPC.SESSIONS_RECOVER, async () => {
       return this.sessionManager.recover()
+    })
+
+    ipcMain.handle(IPC.SESSIONS_RECOVERY_ACTION, async (_e, { action, tmuxSession, displayName }: {
+      action: 'adopt' | 'kill'
+      tmuxSession: string
+      displayName?: string
+    }) => {
+      if (action === 'adopt') {
+        return this.sessionManager.adoptOrphan(tmuxSession, displayName)
+      } else {
+        await this.sessionManager.killOrphan(tmuxSession)
+        return { ok: true }
+      }
     })
   }
 
@@ -264,31 +340,9 @@ export class IpcHub {
       return this.cachedProjects
     })
 
-    ipcMain.handle(IPC.PROJECTS_KICKOFF, async (_e, opts: KickoffOpts) => {
-      const result = await this.kickoffManager.kickoff(opts)
-
-      // Inspect the project (new or existing) and refresh cachedProjects.
-      // Deduplicate by path so calling kickoff on an existing project doesn't
-      // produce a duplicate tile.
-      const projectInfo = await this.projectScanner.inspectProject(result.projectPath)
-      if (projectInfo) {
-        this.cachedProjects = this.cachedProjects.filter((p) => p.path !== projectInfo.path)
-        this.cachedProjects.push(projectInfo)
-        this.cachedProjects.sort((a, b) => a.name.localeCompare(b.name))
-      }
-
-      // Persist the project's parent directory as a scan path, so a subsequent
-      // PROJECTS_SCAN (e.g. from a rescan) will find the project too. Without
-      // this, rescan would drop the new project if it lives outside the
-      // default scan paths.
-      const parentDir = path.dirname(result.projectPath)
-      const appCfg = configStore.get('app')
-      const scanPaths = appCfg?.scanPaths ?? []
-      if (!scanPaths.includes(parentDir)) {
-        configStore.set('app', { ...appCfg, scanPaths: [...scanPaths, parentDir] })
-      }
-
-      return { ...result, project: projectInfo }
+    ipcMain.handle(IPC.PROJECTS_KICKOFF, async (_e, req: KickoffRequest) => {
+      const handle = await this.kickoffOrchestrator.start(req)
+      return handle
     })
   }
 
@@ -319,9 +373,25 @@ export class IpcHub {
       return { ok: true }
     })
 
-    ipcMain.handle(IPC.CONFIG_SAVE_LAYOUT, async (_e, layout) => {
-      configStore.set('ui', { ...configStore.get('ui'), layout })
-      return { ok: true }
+    ipcMain.handle(IPC.CONFIG_SAVE_GRID, (_event, grid) => {
+      const ui = configStore.get('ui')
+      configStore.set('ui', { ...ui, grid })
+    })
+  }
+
+  // ─── Window ─────────────────────────────────────────────
+  private registerWindowChannels(): void {
+    ipcMain.handle(IPC.WINDOW_FIT_GRID, (_e, { cols }: { cols: number }) => {
+      const win = this.windowManager.getMainWindow()
+      if (!win) return
+      const cellWidth = 640
+      const panelWidth = 280 // chatroom
+      const padding = 20
+      const newWidth = cols * cellWidth + panelWidth + padding
+      const [, currentHeight] = win.getSize()
+      // Set minSize first — otherwise shrinking is blocked by old minimum
+      win.setMinimumSize(newWidth, 600)
+      win.setSize(newWidth, currentHeight)
     })
   }
 
@@ -383,11 +453,19 @@ export class IpcHub {
   // ─── Bugreport ─────────────────────────────────────────
   private registerBugreportChannels(): void {
     ipcMain.handle(IPC.BUGREPORT_COLLECT, async () => {
-      return { error: 'Not implemented' }
+      return this.bugreportManager.collectDiagnostics(this.sessionManager.list())
     })
 
-    ipcMain.handle(IPC.BUGREPORT_EXPORT, async (_e, _opts) => {
-      return { error: 'Not implemented' }
+    ipcMain.handle(IPC.BUGREPORT_SUBMIT, async (_e, { description, project }: {
+      description: string
+      project?: string
+    }) => {
+      const id = await this.bugreportManager.submit(description, this.sessionManager.list(), project)
+      return { id }
+    })
+
+    ipcMain.handle(IPC.BUGREPORT_ENRICH, async (_event, { description }: { description: string }) => {
+      return this.bugreportManager.enrich(description)
     })
   }
 
@@ -395,6 +473,7 @@ export class IpcHub {
     await this.mcpServer.stop().catch(() => {})
     this.statusLineMonitor.stop()
     this.projectScanner.stopWatch()
+    this.kickoffOrchestrator.destroy()
     if (this.messageBus) this.messageBus.destroy()
     await this.sessionManager.destroy()
   }

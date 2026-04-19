@@ -3,6 +3,8 @@ import * as path from 'path'
 import {
   DEFAULT_WINDOW_WIDTH,
   DEFAULT_WINDOW_HEIGHT,
+  DEFAULT_GRID_COLS,
+  CHATROOM_PANEL_WIDTH,
 } from '../shared/constants'
 
 export class WindowManager {
@@ -14,11 +16,17 @@ export class WindowManager {
     const width = Math.min(DEFAULT_WINDOW_WIDTH, screenWidth)
     const height = Math.min(DEFAULT_WINDOW_HEIGHT, screenHeight)
 
+    // Calculate min width from grid: cols × 640px cell + chatroom + padding
+    const cellWidth = 640
+    const gridPadding = 20 // 6px padding + gaps + borders
+    const minW = DEFAULT_GRID_COLS * cellWidth + CHATROOM_PANEL_WIDTH + gridPadding
+
     this.mainWindow = new BrowserWindow({
       width,
       height,
-      minWidth: 800,
+      minWidth: minW,
       minHeight: 600,
+      resizable: false,
       title: 'cipher-mux',
       titleBarStyle: 'hiddenInset',
       backgroundColor: '#1A1A1D',

@@ -1,5 +1,7 @@
 /** Shared type definitions for cipher-mux-electron */
 
+import type { GridState, ThemeName } from './grid-types'
+
 // ─── Session ───────────────────────────────────────────────
 
 export type SessionStatus = 'active' | 'stopped' | 'orphaned'
@@ -31,6 +33,7 @@ export interface StartSessionOpts {
 export interface RecoveryResult {
   recovered: SessionInfo[]
   orphaned: SessionInfo[]
+  killed: SessionInfo[]
 }
 
 // ─── Messages ──────────────────────────────────────────────
@@ -74,35 +77,13 @@ export interface ContextUsage {
   updatedAt: number
 }
 
-// ─── Layout ────────────────────────────────────────────────
+// ─── Grid ──────────────────────────────────────────────────
 
-export type SplitDirection = 'horizontal' | 'vertical'
-
-export interface SplitNode {
-  type: 'split'
-  direction: SplitDirection
-  ratio: number
-  children: LayoutNode[]
-}
-
-export interface PaneNode {
-  type: 'pane'
-  sessionId: string
-}
-
-export type LayoutNode = SplitNode | PaneNode
-
-export interface LayoutState {
-  root: LayoutNode | null
-  activePaneId: string | null
-}
-
-export type ActiveView = 'cockpit' | 'terminal' | 'info'
+// Re-export grid types for backward compat
+export type { GridConfig, GridSlot, GridState, ThemeName } from './grid-types'
 
 export interface AppState {
-  activeView: ActiveView
   activeSessionId: string | null
-  splitLayout: LayoutState
   chatroomVisible: boolean
 }
 
@@ -116,6 +97,10 @@ export interface AppConfig {
     defaultProjectDir: string
     maxSessions: number
     messageRetentionDays: number
+    /** Path to the projectlauncher working directory. */
+    projectlauncherPath: string
+    /** Minutes to wait for a kickoff completion signal before warning. */
+    kickoffTimeoutMinutes: number
   }
   mcp: {
     port: number
@@ -128,8 +113,8 @@ export interface AppConfig {
   }
   ui: {
     chatroomVisible: boolean
-    activeView: ActiveView
-    layout: LayoutState
+    theme: ThemeName
+    grid: GridState
   }
   windows: {
     main: { x: number; y: number; width: number; height: number }
@@ -138,11 +123,51 @@ export interface AppConfig {
 
 // ─── Kickoff ───────────────────────────────────────────────
 
-export interface KickoffOpts {
-  requirementsFile: string
-  targetDir: string
+export interface KickoffRequest {
+  /** Absoluter Pfad zum existierenden Projekt-Verzeichnis (aus Obsidian). */
+  projectDir: string
+  /** Optional: absoluter Pfad zu einer externen Anforderungsdatei beliebigen Formats. */
+  requirementsFile?: string
+  /** Optional: zusätzlicher Freitext-Kontext für den Launcher-Prompt. */
+  extraContext?: string
+}
+
+export interface KickoffHandle {
+  /** ID der sichtbaren Launcher-tmux-Session. */
+  launcherSessionId: string
+  /** Normalisierter absoluter Pfad zum Projekt-Verzeichnis. */
+  projectDir: string
+  /** Aus Verzeichnisnamen abgeleiteter Projektname. */
   projectName: string
-  autoInterview: boolean
+}
+
+export interface KickoffCompletionPayload {
+  /** Absoluter Pfad zum fertig aufgesetzten Projekt-Verzeichnis. */
+  projectPath: string
+  /** Projektname (aus Verzeichnisnamen). */
+  projectName: string
+  /** Vom /launch-Skill erkannter Tech-Stack — optional. */
+  detectedStack?: string
+}
+
+/**
+ * Grund, warum die Kickoff-Arbeit als abgeschlossen behandelt wurde.
+ *
+ * - `normal`  — /launch hat das MCP-Tool `kickoff_complete` aufgerufen.
+ * - `marker`  — /launch hat die `.kickoff-complete`-Datei geschrieben (Bonus-Pfad
+ *               aus Skill-Sicht, aber der Primary-Pfad in der neuen Skill-Version).
+ * - `implicit`— Timeout ist abgelaufen, aber CLAUDE.md existiert im Zielverzeichnis.
+ *               Wir interpretieren das als „Scaffold fertig, nur Exit-Gate verpasst".
+ */
+export type KickoffCompleteReason = 'normal' | 'marker' | 'implicit'
+
+export interface KickoffCompletedEvent {
+  handle: KickoffHandle
+  payload: KickoffCompletionPayload
+  /** ID der neu gestarteten Folge-Session (im Projekt-Verzeichnis). */
+  followupSessionId: string
+  /** Welcher Pfad hat den Complete ausgelöst. */
+  reason: KickoffCompleteReason
 }
 
 // ─── Bugreport ─────────────────────────────────────────────
@@ -157,4 +182,9 @@ export interface BugreportData {
   config: Partial<AppConfig>
   logs: string[]
   timestamp: number
+}
+
+export interface BugreportSubmission {
+  description: string
+  project?: string
 }

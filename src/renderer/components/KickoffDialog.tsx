@@ -3,66 +3,57 @@ import { useState, useCallback } from 'preact/hooks'
 interface KickoffDialogProps {
   visible: boolean
   onClose: () => void
-  onKickoff: (opts: {
-    requirementsFile: string
-    targetDir: string
-    projectName: string
-    autoInterview: boolean
+  onKickoff: (req: {
+    projectDir: string
+    requirementsFile?: string
+    extraContext?: string
   }) => void
 }
 
 const api = (window as any).cipherMux
 
 export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProps) {
+  const [projectDir, setProjectDir] = useState('')
   const [requirementsFile, setRequirementsFile] = useState('')
-  const [targetDir, setTargetDir] = useState('')
-  const [projectName, setProjectName] = useState('')
-  const [autoInterview, setAutoInterview] = useState(true)
+  const [extraContext, setExtraContext] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const handlePickFile = useCallback(async () => {
-    const path = await api.dialog.openFile({
-      title: 'Requirements-Datei wählen',
-      filters: [{ name: 'Markdown / Text', extensions: ['md', 'txt', 'yaml', 'yml'] }],
+  const handlePickDir = useCallback(async () => {
+    const selected = await api.dialog.openDir({
+      title: 'Projekt-Verzeichnis wählen (das Obsidian-Verzeichnis)',
     })
-    if (path) setRequirementsFile(path)
+    if (selected) setProjectDir(selected)
   }, [])
 
-  const handlePickDir = useCallback(async () => {
-    const path = await api.dialog.openDir({ title: 'Zielverzeichnis wählen' })
-    if (path) setTargetDir(path)
+  const handlePickReqFile = useCallback(async () => {
+    // No extension filter — all formats allowed.
+    const selected = await api.dialog.openFile({
+      title: 'Externe Anforderungsdatei wählen',
+    })
+    if (selected) setRequirementsFile(selected)
   }, [])
 
   const handleSubmit = useCallback(async () => {
     setError(null)
-    if (!requirementsFile.trim()) {
-      setError('Requirements-Datei fehlt')
-      return
-    }
-    if (!targetDir.trim()) {
-      setError('Zielverzeichnis fehlt')
-      return
-    }
-    if (!projectName.trim()) {
-      setError('Projektname fehlt')
+    if (!projectDir.trim()) {
+      setError('Projekt-Verzeichnis fehlt')
       return
     }
 
     setLoading(true)
     try {
       await onKickoff({
-        requirementsFile: requirementsFile.trim(),
-        targetDir: targetDir.trim(),
-        projectName: projectName.trim(),
-        autoInterview,
+        projectDir: projectDir.trim(),
+        requirementsFile: requirementsFile.trim() || undefined,
+        extraContext: extraContext.trim() || undefined,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
-  }, [requirementsFile, targetDir, projectName, autoInterview, onKickoff])
+  }, [projectDir, requirementsFile, extraContext, onKickoff])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose()
@@ -75,65 +66,60 @@ export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProp
     <div class="kickoff-overlay" onKeyDown={handleKeyDown}>
       <div class="kickoff-dialog card card--flat">
         <div class="kickoff-dialog__header">
-          <span>Neues Projekt</span>
+          <span>Neues Projekt aus Konzept</span>
           <span class="kickoff-dialog__close" onClick={onClose}>✕</span>
         </div>
 
         <div class="kickoff-dialog__body">
-          {/* Project Name */}
+          {/* Project Directory */}
           <label class="kickoff-dialog__label">
-            <span>Projektname</span>
-            <input
-              class="input"
-              type="text"
-              placeholder="my-project"
-              value={projectName}
-              onInput={(e) => setProjectName((e.target as HTMLInputElement).value)}
-              autoFocus
-            />
-          </label>
-
-          {/* Requirements File */}
-          <label class="kickoff-dialog__label">
-            <span>Requirements-Datei</span>
+            <span>Projekt-Verzeichnis</span>
             <div class="kickoff-dialog__file-row">
               <input
                 class="input"
                 type="text"
-                placeholder="/path/to/requirements.md"
-                value={requirementsFile}
-                onInput={(e) => setRequirementsFile((e.target as HTMLInputElement).value)}
+                placeholder="/Users/cipher/Nextcloud/…"
+                value={projectDir}
+                onInput={(e) => setProjectDir((e.target as HTMLInputElement).value)}
+                autoFocus
               />
-              <button class="btn btn--sm" onClick={handlePickFile}>...</button>
-            </div>
-          </label>
-
-          {/* Target Directory */}
-          <label class="kickoff-dialog__label">
-            <span>Zielverzeichnis</span>
-            <div class="kickoff-dialog__file-row">
-              <input
-                class="input"
-                type="text"
-                placeholder="Parent-Dir (neues Projekt) oder existierender Pfad"
-                value={targetDir}
-                onInput={(e) => setTargetDir((e.target as HTMLInputElement).value)}
-              />
-              <button class="btn btn--sm" onClick={handlePickDir}>...</button>
+              <button class="btn btn--sm" onClick={handlePickDir}>…</button>
             </div>
             <span class="text-xs text-dim" style={{ marginTop: '4px' }}>
-              Tipp: Endet der Pfad auf den Projektnamen, wird dort hineingelegt (docs/requirements.md + CLAUDE.md falls fehlt).
+              Das Obsidian-Verzeichnis, in dem dein Konzept liegt.
             </span>
           </label>
 
-          {/* Auto Interview Toggle */}
-          <div
-            class={`toggle ${autoInterview ? 'toggle--active' : ''}`}
-            onClick={() => setAutoInterview((v) => !v)}
-          >
-            <div class="toggle__track" />
-            <span>Auto-Interview starten</span>
-          </div>
+          {/* External Requirements File (optional) */}
+          <label class="kickoff-dialog__label">
+            <span>Anforderungsdatei (optional)</span>
+            <div class="kickoff-dialog__file-row">
+              <input
+                class="input"
+                type="text"
+                placeholder="Leer lassen, wenn schon im Projekt-Verzeichnis"
+                value={requirementsFile}
+                onInput={(e) => setRequirementsFile((e.target as HTMLInputElement).value)}
+              />
+              <button class="btn btn--sm" onClick={handlePickReqFile}>…</button>
+            </div>
+            <span class="text-xs text-dim" style={{ marginTop: '4px' }}>
+              Beliebiges Format (.md, .txt, .docx, .yaml …). Wird als docs/requirements.&lt;ext&gt; ins Projekt kopiert.
+            </span>
+          </label>
+
+          {/* Extra Context (optional) */}
+          <label class="kickoff-dialog__label">
+            <span>Zusätzlicher Kontext (optional)</span>
+            <textarea
+              class="input"
+              rows={6}
+              placeholder="Alles, was Claude zusätzlich wissen soll: Stack-Präferenzen, Referenz-Projekte, Miro-URLs, …"
+              value={extraContext}
+              onInput={(e) => setExtraContext((e.target as HTMLTextAreaElement).value)}
+              style={{ fontFamily: "'Fira Code', monospace", fontSize: '12px', resize: 'vertical' }}
+            />
+          </label>
 
           {error && <div class="kickoff-dialog__error">{error}</div>}
         </div>
@@ -141,7 +127,7 @@ export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProp
         <div class="kickoff-dialog__footer">
           <button class="btn" onClick={onClose}>Abbrechen</button>
           <button class="btn btn--primary" onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Erstelle...' : 'Projekt erstellen'}
+            {loading ? 'Starte Launcher…' : 'Projekt aufsetzen'}
           </button>
         </div>
       </div>

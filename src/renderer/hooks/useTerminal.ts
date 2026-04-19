@@ -4,24 +4,28 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { CanvasAddon } from '@xterm/addon-canvas'
 import '@xterm/xterm/css/xterm.css'
+import { getTerminalTheme } from './useTheme'
+import type { ThemeName } from '../../shared/grid-types'
 
 const api = () => (window as any).cipherMux
 
 /**
- * Tracks sessionIds that have been mounted at least once in this renderer
- * process. First mount → we assume the session is fresh and don't replay
- * captured pane content (would clobber an in-flight autoLaunch TUI like
- * `claude`). Subsequent mounts (session switch) → restore so the xterm canvas
- * reflects the current pane state.
+ * Tracks sessionIds that have already been capture-restored in this renderer
+ * process. We skip capture on brand-new sessions (createdAt within last 10s)
+ * on their very first mount to avoid clobbering an in-flight autoLaunch TUI.
+ * Recovered sessions (older createdAt) always get captured, even on first mount.
  */
-const firstMountDone = new Set<string>()
+const capturedSessions = new Set<string>()
+
+/** Threshold: sessions created more than 10s ago are considered recovered. */
+const RECOVERED_THRESHOLD_MS = 10_000
 
 export interface UseTerminalResult {
   terminalRef: preact.RefObject<HTMLDivElement>
   fit: () => void
 }
 
-export function useTerminal(sessionId: string): UseTerminalResult {
+export function useTerminal(sessionId: string, theme: ThemeName = 'ivory', createdAt?: number): UseTerminalResult {
   const terminalRef = useRef<HTMLDivElement>(null!)
   const termRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -48,28 +52,7 @@ export function useTerminal(sessionId: string): UseTerminalResult {
       lineHeight: 1.3,
       cursorBlink: true,
       cursorStyle: 'block',
-      theme: {
-        background: '#222228',
-        foreground: '#D8D8E0',
-        cursor: '#5C9A6E',
-        selectionBackground: 'rgba(92, 154, 110, 0.25)',
-        black: '#222228',
-        brightBlack: '#6E6E80',
-        white: '#D8D8E0',
-        brightWhite: '#FFFFFF',
-        green: '#5C9A6E',
-        brightGreen: '#8CC8A0',
-        red: '#B85060',
-        brightRed: '#D06070',
-        yellow: '#C07840',
-        brightYellow: '#D09060',
-        blue: '#5090A8',
-        brightBlue: '#70B0C8',
-        cyan: '#5090A8',
-        brightCyan: '#70B0C8',
-        magenta: '#8060A0',
-        brightMagenta: '#A080C0',
-      },
+      theme: getTerminalTheme(theme),
       allowProposedApi: true,
     })
 
@@ -110,7 +93,7 @@ export function useTerminal(sessionId: string): UseTerminalResult {
       // be scrolled off the live region because xterm stored the shell prompt
       // + command echo in scrollback before claude's RIS+clear landed. Nudge
       // the viewport to the cursor a few times to catch up.
-      const nudge = () => term.scrollToBottom()
+      const nudge = () => term.write('', () => term.scrollToBottom())
       setTimeout(nudge, 400)
       setTimeout(nudge, 900)
       setTimeout(nudge, 1500)
@@ -149,22 +132,36 @@ export function useTerminal(sessionId: string): UseTerminalResult {
       }
     }, 200)
 
-    // Restore pane content from tmux when re-mounting (e.g. switching sessions).
-    // Skip on first mount: a freshly-created session may have a queued autoLaunch
-    // (e.g. `claude --...`) in flight. Capturing + term.reset() + replay would
-    // wipe the TUI mid-draw and leave the input line in the wrong row.
-    const isFirstMount = !firstMountDone.has(sessionId)
-    firstMountDone.add(sessionId)
-    const restoreTimer = isFirstMount
+    // Aggressive auto-scroll: poll every 200ms for the first 8 seconds after
+    // mount to keep the viewport at the bottom. This catches all async writes,
+    // late-arriving data from tmux, and TUI startup sequences (claude CLI).
+    const AUTO_SCROLL_MS = 8000
+    const scrollInterval = setInterval(() => {
+      term.write('', () => term.scrollToBottom())
+    }, 200)
+    const scrollTimeout = setTimeout(() => clearInterval(scrollInterval), AUTO_SCROLL_MS)
+
+    // Restore pane content from tmux via capture-pane.
+    // Skip ONLY for brand-new sessions (created <10s ago) on their first mount,
+    // because they may have an autoLaunch TUI (claude) starting up. Recovered
+    // sessions (app restart) always need capture to show existing content.
+    const alreadyCaptured = capturedSessions.has(sessionId)
+    const sessionAge = createdAt ? Date.now() - createdAt : Infinity
+    const isBrandNew = !alreadyCaptured && sessionAge < RECOVERED_THRESHOLD_MS
+    capturedSessions.add(sessionId)
+
+    const restoreTimer = isBrandNew
       ? null
       : setTimeout(() => {
           api().terminal.capture(sessionId).then((content: string) => {
             if (content?.trim() && term) {
               term.reset()
-              term.write(content.replace(/\n/g, '\r\n'))
+              term.write(content.replace(/\n/g, '\r\n'), () => {
+                term.scrollToBottom()
+              })
             }
           }).catch(() => {
-            // session may not be ready yet on first creation
+            // session may not be ready yet
           })
         }, 500)
 
@@ -183,6 +180,8 @@ export function useTerminal(sessionId: string): UseTerminalResult {
     )
 
     return () => {
+      clearInterval(scrollInterval)
+      clearTimeout(scrollTimeout)
       if (restoreTimer) clearTimeout(restoreTimer)
       resizeObserver.disconnect()
       inputDisposable.dispose()
@@ -191,7 +190,7 @@ export function useTerminal(sessionId: string): UseTerminalResult {
       termRef.current = null
       fitAddonRef.current = null
     }
-  }, [sessionId])
+  }, [sessionId, theme])
 
   return { terminalRef, fit }
 }
