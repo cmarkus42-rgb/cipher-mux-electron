@@ -34,6 +34,14 @@ export function ProjectPopup({
   const [filter, setFilter] = useState('')
   const [customPath, setCustomPath] = useState('')
 
+  // Kickoff accordion state
+  const [kickoffOpen, setKickoffOpen] = useState(false)
+  const [kickoffDir, setKickoffDir] = useState('')
+  const [kickoffReqFile, setKickoffReqFile] = useState('')
+  const [kickoffContext, setKickoffContext] = useState('')
+  const [kickoffError, setKickoffError] = useState<string | null>(null)
+  const [kickoffLoading, setKickoffLoading] = useState(false)
+
   const filtered = useMemo(() => {
     if (!filter) return projects
     const q = filter.toLowerCase()
@@ -68,6 +76,43 @@ export function ProjectPopup({
     }
   }, [handleSelect])
 
+  // Kickoff handlers
+  const handleKickoffPickDir = useCallback(async () => {
+    const selected = await api().dialog.openDir({ title: 'Projekt-Verzeichnis wählen' })
+    if (selected) setKickoffDir(selected)
+  }, [])
+
+  const handleKickoffPickReqFile = useCallback(async () => {
+    const selected = await api().dialog.openFile({ title: 'Anforderungsdatei wählen' })
+    if (selected) setKickoffReqFile(selected)
+  }, [])
+
+  const handleKickoffSubmit = useCallback(async () => {
+    setKickoffError(null)
+    if (!kickoffDir.trim()) {
+      setKickoffError('Projekt-Verzeichnis fehlt')
+      return
+    }
+    setKickoffLoading(true)
+    try {
+      await api().projects.kickoff({
+        projectDir: kickoffDir.trim(),
+        requirementsFile: kickoffReqFile.trim() || undefined,
+        extraContext: kickoffContext.trim() || undefined,
+      })
+      // Reset and close on success
+      setKickoffDir('')
+      setKickoffReqFile('')
+      setKickoffContext('')
+      setKickoffOpen(false)
+      onClose()
+    } catch (err) {
+      setKickoffError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setKickoffLoading(false)
+    }
+  }, [kickoffDir, kickoffReqFile, kickoffContext, onClose])
+
   if (!visible) return null
 
   return (
@@ -77,7 +122,7 @@ export function ProjectPopup({
           <span class="modal-title">
             {targetSessionId ? 'projekt wechseln' : 'projekt auswählen'}
           </span>
-          <button class="cell-btn" onClick={onClose}>✕</button>
+          <button class="cell-btn" onClick={onClose}>&#x2715;</button>
         </div>
 
         {/* Custom path input + Finder browse */}
@@ -90,8 +135,8 @@ export function ProjectPopup({
             onInput={(e) => setCustomPath((e.target as HTMLInputElement).value)}
             onKeyDown={handleCustomPathKey}
           />
-          <button class="cell-btn" onClick={handleCustomPathOpen} title="pfad öffnen">→</button>
-          <button class="cell-btn" onClick={handleBrowse} title="im finder auswählen">⋯</button>
+          <button class="cell-btn" onClick={handleCustomPathOpen} title="pfad öffnen">&rarr;</button>
+          <button class="cell-btn" onClick={handleBrowse} title="im finder auswählen">&ctdot;</button>
         </div>
 
         <div class="project-popup__search">
@@ -108,7 +153,7 @@ export function ProjectPopup({
             onClick={onRescan}
             disabled={scanning}
           >
-            {scanning ? '...' : '↻'}
+            {scanning ? '...' : '\u21BB'}
           </button>
         </div>
         <div class="project-popup__list">
@@ -133,6 +178,71 @@ export function ProjectPopup({
             </div>
           )}
         </div>
+
+        {/* Kickoff accordion — only show when opening new session, not when switching */}
+        {!targetSessionId && (
+          <div class="project-popup__kickoff">
+            <button
+              class="project-popup__kickoff-toggle"
+              onClick={() => setKickoffOpen((v) => !v)}
+            >
+              <span class={`project-popup__kickoff-arrow ${kickoffOpen ? 'project-popup__kickoff-arrow--open' : ''}`}>&#x25B6;</span>
+              neues projekt launchen
+            </button>
+
+            {kickoffOpen && (
+              <div class="project-popup__kickoff-body">
+                <label class="project-popup__kickoff-label">
+                  <span>Projekt-Verzeichnis</span>
+                  <div class="project-popup__kickoff-row">
+                    <input
+                      class="project-popup__input"
+                      type="text"
+                      placeholder="/pfad/zum/neuen/projekt..."
+                      value={kickoffDir}
+                      onInput={(e) => setKickoffDir((e.target as HTMLInputElement).value)}
+                    />
+                    <button class="cell-btn" onClick={handleKickoffPickDir} title="verzeichnis auswählen">&ctdot;</button>
+                  </div>
+                </label>
+
+                <label class="project-popup__kickoff-label">
+                  <span>Anforderungsdatei (optional)</span>
+                  <div class="project-popup__kickoff-row">
+                    <input
+                      class="project-popup__input"
+                      type="text"
+                      placeholder="leer lassen, wenn schon im projekt"
+                      value={kickoffReqFile}
+                      onInput={(e) => setKickoffReqFile((e.target as HTMLInputElement).value)}
+                    />
+                    <button class="cell-btn" onClick={handleKickoffPickReqFile} title="datei auswählen">&ctdot;</button>
+                  </div>
+                </label>
+
+                <label class="project-popup__kickoff-label">
+                  <span>Zusätzlicher Kontext (optional)</span>
+                  <textarea
+                    class="project-popup__input project-popup__kickoff-textarea"
+                    rows={4}
+                    placeholder="stack-präferenzen, referenz-projekte, URLs..."
+                    value={kickoffContext}
+                    onInput={(e) => setKickoffContext((e.target as HTMLTextAreaElement).value)}
+                  />
+                </label>
+
+                {kickoffError && <div class="project-popup__kickoff-error">{kickoffError}</div>}
+
+                <div class="project-popup__kickoff-footer">
+                  <button class="btn btn--sm" onClick={() => setKickoffOpen(false)}>abbrechen</button>
+                  <button class="btn btn--sm btn--primary" onClick={handleKickoffSubmit} disabled={kickoffLoading}>
+                    {kickoffLoading ? 'starte...' : 'projekt aufsetzen'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
