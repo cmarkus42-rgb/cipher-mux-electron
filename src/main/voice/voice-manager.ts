@@ -60,7 +60,7 @@ export class VoiceManager extends EventEmitter {
       whisperModelDir: config?.whisperModelDir
         ?? path.join(userDataDir, 'models', 'whisper'),
       piperModelsDir: config?.piperModelsDir
-        ?? path.join(process.env.HOME ?? '', 'Library', 'Application Support', 'cipher-desktop', 'models', 'piper'),
+        ?? path.join(userDataDir, 'models', 'piper'),
       piperVoice: config?.piperVoice ?? DEFAULT_PIPER_VOICE,
       ollamaHost: config?.ollamaHost ?? DEFAULT_OLLAMA_HOST,
       ollamaPort: config?.ollamaPort ?? DEFAULT_OLLAMA_PORT,

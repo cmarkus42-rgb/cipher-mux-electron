@@ -107,7 +107,7 @@ export class PiperTTS extends TTSEngine {
     this.voice = config?.voice ?? DEFAULT_VOICE
     this.modelsDir = config?.modelsDir ?? path.join(
       process.env.HOME ?? '',
-      'Library', 'Application Support', 'cipher-desktop', 'models', 'piper'
+      'Library', 'Application Support', 'cipher-mux-electron', 'models', 'piper'
     )
     this.numThreads = config?.numThreads ?? 2
     this.nodeModulesPath = config?.nodeModulesPath
