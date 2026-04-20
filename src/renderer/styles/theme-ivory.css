@@ -25,13 +25,13 @@
   --color-neon-green:     #2d8a4e;
   --color-neon-red:       #cc0030;
   --color-neon-orange:    #c05000;
-  --color-neon-cyan:      #007a8a;
+  --color-neon-cyan:      #006B7A;
 
   /* status dots — slightly more saturated than text accents */
   --color-dot-ok:         #00CC40;
   --color-dot-warn:       #E05500;
   --color-dot-error:      #DD0035;
-  --color-dot-info:       #00AACC;
+  --color-dot-info:       #0088A0;
 
   /* semantic */
   --color-accent:         #2d8a4e;
@@ -39,7 +39,7 @@
   --color-success:        #2d8a4e;
   --color-error:          #cc0030;
   --color-warning:        #c05000;
-  --color-info:           #007a8a;
+  --color-info:           #006B7A;
 
   /* context usage colors */
   --color-ctx-ok:         #2d8a4e;
