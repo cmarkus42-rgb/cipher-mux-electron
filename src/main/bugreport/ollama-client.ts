@@ -31,9 +31,10 @@ export async function enrichBugreport(description: string): Promise<EnrichedBugr
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'llama3.2',
+        model: 'gemma4:26b',
         prompt: `${ENRICH_PROMPT}\n\nBug description:\n${description}`,
         stream: false,
+        keep_alive: -1,
       }),
       signal: controller.signal,
     })
