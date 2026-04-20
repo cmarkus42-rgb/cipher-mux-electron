@@ -16,8 +16,8 @@ export function LauncherCell({ onLaunch, onOpenSession, onDragOver, onDrop }: La
     >
       <div class="launcher-circle"><span>+</span></div>
       <div class="launcher-buttons">
-        <button class="btn btn--sm" onClick={onLaunch}>projekt auswählen</button>
-        <button class="btn btn--sm" onClick={onOpenSession}>session öffnen</button>
+        <button class="btn btn--sm" onClick={onLaunch}>projekt</button>
+        <button class="btn btn--sm" onClick={onOpenSession}>session</button>
       </div>
     </div>
   )
