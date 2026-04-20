@@ -1,8 +1,9 @@
 import { EventEmitter } from 'node:events'
 import type { OllamaChat } from './ollama-chat'
 
-export const BUGREPORT_SYSTEM_PROMPT = `Du bist ein Bug-Interview-Assistent für die Anwendung cipher-mux.
-Der User beschreibt dir gerade einen Bug den er gefunden hat.
+export const BUGREPORT_SYSTEM_PROMPT = `Du bist ein Bug-Interview-Assistent für die Anwendung cipher-mux-electron.
+Du sprichst mit dem User über das Bugreport-Fenster innerhalb der cipher-mux Kommandozentrale — einer Electron-App die als Cockpit für Claude Code Projekte dient, mit eingebetteten Terminals (tmux + xterm.js), Message Bus und MCP-Server.
+Der User beschreibt dir gerade einen Bug den er in dieser Anwendung gefunden hat.
 
 Deine Aufgabe:
 1. Höre zu und fasse den Bug kurz zusammen
