@@ -543,6 +543,11 @@ export class IpcHub {
         return { ok: true }
       } catch (err) {
         const msg = (err as Error).message
+        // Reset voice manager on init failure so next attempt retries from scratch
+        if (this.voiceManager && !this.voiceManager.isInitialized()) {
+          this.voiceManager.shutdown()
+          this.voiceManager = undefined as any
+        }
         this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, msg)
         return { ok: false, error: msg }
       }
