@@ -122,7 +122,7 @@ export function ProjectPopup({
           <span class="modal-title">
             {targetSessionId ? 'projekt wechseln' : 'projekt auswählen'}
           </span>
-          <button class="cell-btn" onClick={onClose}>&#x2715;</button>
+          <button class="cell-btn" onClick={onClose}>{'\u2715'}</button>
         </div>
 
         {/* Custom path input + Finder browse */}
@@ -135,8 +135,8 @@ export function ProjectPopup({
             onInput={(e) => setCustomPath((e.target as HTMLInputElement).value)}
             onKeyDown={handleCustomPathKey}
           />
-          <button class="cell-btn" onClick={handleCustomPathOpen} title="pfad öffnen">&rarr;</button>
-          <button class="cell-btn" onClick={handleBrowse} title="im finder auswählen">&ctdot;</button>
+          <button class="cell-btn" onClick={handleCustomPathOpen} title="pfad öffnen">{'\u2192'}</button>
+          <button class="cell-btn" onClick={handleBrowse} title="im finder auswählen">{'\u22EF'}</button>
         </div>
 
         <div class="project-popup__search">
@@ -186,7 +186,7 @@ export function ProjectPopup({
               class="project-popup__kickoff-toggle"
               onClick={() => setKickoffOpen((v) => !v)}
             >
-              <span class={`project-popup__kickoff-arrow ${kickoffOpen ? 'project-popup__kickoff-arrow--open' : ''}`}>&#x25B6;</span>
+              <span class={`project-popup__kickoff-arrow ${kickoffOpen ? 'project-popup__kickoff-arrow--open' : ''}`}>{'\u25B6'}</span>
               neues projekt launchen
             </button>
 
@@ -202,7 +202,7 @@ export function ProjectPopup({
                       value={kickoffDir}
                       onInput={(e) => setKickoffDir((e.target as HTMLInputElement).value)}
                     />
-                    <button class="cell-btn" onClick={handleKickoffPickDir} title="verzeichnis auswählen">&ctdot;</button>
+                    <button class="cell-btn" onClick={handleKickoffPickDir} title="verzeichnis auswählen">{'\u22EF'}</button>
                   </div>
                 </label>
 
@@ -216,7 +216,7 @@ export function ProjectPopup({
                       value={kickoffReqFile}
                       onInput={(e) => setKickoffReqFile((e.target as HTMLInputElement).value)}
                     />
-                    <button class="cell-btn" onClick={handleKickoffPickReqFile} title="datei auswählen">&ctdot;</button>
+                    <button class="cell-btn" onClick={handleKickoffPickReqFile} title="datei auswählen">{'\u22EF'}</button>
                   </div>
                 </label>
 
