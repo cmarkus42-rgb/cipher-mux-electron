@@ -489,18 +489,10 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
-   * Destroy all sessions and disconnect tmux.
+   * Disconnect from tmux without killing sessions.
+   * Sessions survive app quit and are recovered on next launch.
    */
   async destroy(): Promise<void> {
-    for (const session of this.sessions.values()) {
-      if (session.status === 'active') {
-        try {
-          await this.tmux.killSession(session.tmuxSession)
-        } catch {
-          // ignore
-        }
-      }
-    }
     this.sessions.clear()
     this.tmux.disconnect()
   }
