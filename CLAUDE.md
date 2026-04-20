@@ -4,7 +4,7 @@ Electron-basierte Kommandozentrale für Claude Code Projekte. Ein Fenster mit ei
 
 ## Aktueller Status
 
-**Phase: 5 → 6 — Review & Test**
+**Phase: Komplett — Polish & Erweiterung**
 
 Phasen-Übersicht:
 1. ~~Anforderungsinterview (Touchpoint) → `docs/requirements.md`~~ ✅ (2026-04-13)
@@ -12,9 +12,10 @@ Phasen-Übersicht:
 3. ~~Technische Entscheidungen (Touchpoint) → `docs/decisions/`~~ ✅ (2026-04-13)
 4. ~~Task-Dekomposition (Autonom) → `docs/todo.md`~~ ✅ (2026-04-13)
 5. ~~Autonome Implementierung (Autonom) → Code~~ ✅ (2026-04-14)
-6. **Review, Test & Iteration (Touchpoint) → Feedback-Loop** ← aktuell
+6. ~~Review, Test & Iteration → Feedback-Loop~~ ✅ (2026-04-17)
+7. ~~Bugreport-Orchestrator + Voice-Pipeline (VAD)~~ ✅ (2026-04-19)
 
-**Nächster Schritt:** Auftraggeber testet Phase 5 (Orchestrator, Kickoff, MCP-Injection) via `docs/TESTCASE.md` Tests 6–10. Danach Phase 6 (Polish: Recovery, Layout-Persistenz, Info-Seite, Bugreport, Keyboard-Shortcuts).
+**Status:** v0.4.0-alpha, 164 Tests grün, Build sauber. Shortcut-Verdrahtung offen (Hook existiert, nicht eingebunden).
 
 ## Build & Test
 
