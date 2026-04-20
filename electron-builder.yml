@@ -18,4 +18,7 @@ dmg:
   icon: assets/icon.icns
 asarUnpack:
   - "**/node_modules/better-sqlite3/**"
+  - "**/node_modules/sherpa-onnx-node/**"
+  - "**/node_modules/sherpa-onnx-darwin-*/**"
+  - "**/dist/main/main/voice/piper-worker.js"
 npmRebuild: true

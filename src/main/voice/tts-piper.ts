@@ -134,18 +134,26 @@ export class PiperTTS extends TTSEngine {
     }
 
     // 3. Fork the worker under system Node.js
-    const workerPath = path.join(__dirname, 'piper-worker.js')
+    let workerPath = path.join(__dirname, 'piper-worker.js')
+    let nodeModulesPath = this.nodeModulesPath
+      ?? path.join(__dirname, '..', '..', '..', '..', 'node_modules')
+
+    // In packaged Electron apps, files are inside app.asar — system Node.js can't read them.
+    // electron-builder asarUnpack puts them in app.asar.unpacked instead.
+    if (workerPath.includes('app.asar')) {
+      workerPath = workerPath.replace('app.asar', 'app.asar.unpacked')
+      nodeModulesPath = nodeModulesPath.replace('app.asar', 'app.asar.unpacked')
+    }
 
     const env: Record<string, string> = {
       ...process.env as Record<string, string>,
     }
 
     // Set DYLD_LIBRARY_PATH so sherpa-onnx native libs can be found
-    if (this.nodeModulesPath) {
-      const sherpaLib = path.join(this.nodeModulesPath, 'sherpa-onnx-node')
-      env.DYLD_LIBRARY_PATH = [sherpaLib, env.DYLD_LIBRARY_PATH].filter(Boolean).join(':')
-      env.NODE_PATH = [this.nodeModulesPath, env.NODE_PATH].filter(Boolean).join(':')
-    }
+    const sherpaLibDir = path.join(nodeModulesPath,
+      `sherpa-onnx-${process.platform === 'win32' ? 'win' : process.platform}-${process.arch}`)
+    env.DYLD_LIBRARY_PATH = [sherpaLibDir, env.DYLD_LIBRARY_PATH].filter(Boolean).join(':')
+    env.NODE_PATH = [nodeModulesPath, env.NODE_PATH].filter(Boolean).join(':')
 
     this.worker = fork(workerPath, [], {
       execPath: nodePath,
@@ -212,8 +220,8 @@ export class PiperTTS extends TTSEngine {
     // 5. Wait for ready (10s timeout)
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('Piper worker init timed out after 10s'))
-      }, 10_000)
+        reject(new Error('Piper worker init timed out after 30s'))
+      }, 30_000)
 
       const onMessage = (msg: WorkerMessage) => {
         if (msg.type === 'ready') {
