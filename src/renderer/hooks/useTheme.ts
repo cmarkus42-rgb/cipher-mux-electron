@@ -81,8 +81,8 @@ export function getTerminalTheme(theme: ThemeName) {
     green: '#2d8a4e', brightGreen: '#1a6b38',
     red: '#cc0030', brightRed: '#aa0028',
     yellow: '#c05000', brightYellow: '#a04400',
-    blue: '#007a8a', brightBlue: '#006070',
-    cyan: '#007a8a', brightCyan: '#006070',
+    blue: '#006B7A', brightBlue: '#006070',
+    cyan: '#006B7A', brightCyan: '#006070',
     magenta: '#7a4a90', brightMagenta: '#603878',
   }
 }
