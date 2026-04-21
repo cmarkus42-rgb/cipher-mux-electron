@@ -13,18 +13,19 @@ export class WindowManager {
   createMainWindow(): BrowserWindow {
     const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize
 
-    const width = Math.min(DEFAULT_WINDOW_WIDTH, screenWidth)
-    const height = Math.min(DEFAULT_WINDOW_HEIGHT, screenHeight)
-
-    // Calculate min width from grid: cols × 640px cell + chatroom + padding
-    const cellWidth = 640
+    // Calculate width from grid: cols × cell + chatroom + padding
+    // Cells are minmax(640px, 1fr) — use 664px target to give ~83 terminal cols
+    const targetCellWidth = 664
     const gridPadding = 20 // 6px padding + gaps + borders
-    const minW = DEFAULT_GRID_COLS * cellWidth + CHATROOM_PANEL_WIDTH + gridPadding
+    const gridWidth = DEFAULT_GRID_COLS * targetCellWidth + CHATROOM_PANEL_WIDTH + gridPadding
+
+    const width = Math.min(gridWidth, screenWidth)
+    const height = Math.min(DEFAULT_WINDOW_HEIGHT, screenHeight)
 
     this.mainWindow = new BrowserWindow({
       width,
       height,
-      minWidth: minW,
+      minWidth: gridWidth,
       minHeight: 600,
       resizable: false,
       title: 'cipher-mux',

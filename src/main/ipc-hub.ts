@@ -117,8 +117,11 @@ export class IpcHub {
       // Start bugreport task source
       const sourceConfig = orchConfig?.taskSources?.bugreport
       if (sourceConfig?.enabled !== false) {
-        const outboxPath = sourceConfig?.path
+        const rawPath = sourceConfig?.path
           ?? path.join(app.getPath('home'), '.config', 'cipher-mux', 'bugreports', 'outbox')
+        const outboxPath = rawPath.startsWith('~/')
+          ? path.join(app.getPath('home'), rawPath.slice(2))
+          : rawPath
         this.bugreportSource = new BugreportTaskSource(outboxPath)
         this.bugreportSource.start((opts) => this.taskManager!.create(opts))
       }
@@ -471,10 +474,10 @@ export class IpcHub {
     ipcMain.handle(IPC.WINDOW_FIT_GRID, (_e, { cols }: { cols: number }) => {
       const win = this.windowManager.getMainWindow()
       if (!win) return
-      const cellWidth = 640
+      const targetCellWidth = 664
       const panelWidth = 280 // chatroom
       const padding = 20
-      const newWidth = cols * cellWidth + panelWidth + padding
+      const newWidth = cols * targetCellWidth + panelWidth + padding
       const [, currentHeight] = win.getSize()
       // Set minSize first — otherwise shrinking is blocked by old minimum
       win.setMinimumSize(newWidth, 600)
