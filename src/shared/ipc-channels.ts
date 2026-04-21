@@ -79,6 +79,14 @@ export const IPC = {
   VOICE_VAD_MISFIRE: 'cipher-mux:voice:vad-misfire',
   VOICE_GENERATION_DONE: 'cipher-mux:voice:generation-done',
   VOICE_STOP_PLAYBACK: 'cipher-mux:voice:stop-playback',
+
+  // Tasks
+  TASKS_LIST: 'cipher-mux:tasks:list',
+  TASKS_GET: 'cipher-mux:tasks:get',
+  TASKS_RETRY: 'cipher-mux:tasks:retry',
+  TASKS_CANCEL: 'cipher-mux:tasks:cancel',
+  TASK_CREATED: 'cipher-mux:task:created',
+  TASK_STATE_CHANGED: 'cipher-mux:task:state-changed',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
