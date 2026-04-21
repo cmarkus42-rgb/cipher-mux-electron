@@ -23,13 +23,14 @@ interface ProjectPopupProps {
   /** Session ID if switching project for an existing session, null if new session. */
   targetSessionId: string | null
   onSelect: (project: ProjectInfo, targetSessionId: string | null) => void
+  onKickoffStarted: (launcherSessionId: string) => void
   onRescan: () => void
   onClose: () => void
 }
 
 export function ProjectPopup({
   visible, projects, scanning, targetSessionId,
-  onSelect, onRescan, onClose,
+  onSelect, onKickoffStarted, onRescan, onClose,
 }: ProjectPopupProps) {
   const [filter, setFilter] = useState('')
   const [customPath, setCustomPath] = useState('')
@@ -95,11 +96,13 @@ export function ProjectPopup({
     }
     setKickoffLoading(true)
     try {
-      await api().projects.kickoff({
+      const handle = await api().projects.kickoff({
         projectDir: kickoffDir.trim(),
         requirementsFile: kickoffReqFile.trim() || undefined,
         extraContext: kickoffContext.trim() || undefined,
       })
+      // Add launcher session to grid so the user can see it
+      onKickoffStarted(handle.launcherSessionId)
       // Reset and close on success
       setKickoffDir('')
       setKickoffReqFile('')
@@ -111,7 +114,7 @@ export function ProjectPopup({
     } finally {
       setKickoffLoading(false)
     }
-  }, [kickoffDir, kickoffReqFile, kickoffContext, onClose])
+  }, [kickoffDir, kickoffReqFile, kickoffContext, onKickoffStarted, onClose])
 
   if (!visible) return null
 
