@@ -58,8 +58,21 @@ export function decodeOctal(str: string): string {
         i++;
       }
     } else {
-      bytes.push(str.charCodeAt(i));
-      i++;
+      // Non-backslash character.  ASCII (0–127) can be pushed as-is
+      // because charCodeAt == byte value.  For characters > 127 (raw
+      // UTF-8 passed through by tmux 3.3+), we must encode them as
+      // proper multi-byte UTF-8 — charCodeAt returns the Unicode code
+      // point, NOT a single byte value.
+      const cp = str.codePointAt(i)!;
+      if (cp <= 0x7f) {
+        bytes.push(cp);
+        i++;
+      } else {
+        const char = String.fromCodePoint(cp);
+        const encoded = Buffer.from(char, 'utf-8');
+        for (let j = 0; j < encoded.length; j++) bytes.push(encoded[j]);
+        i += char.length; // 1 for BMP, 2 for surrogate pairs
+      }
     }
   }
   return Buffer.from(bytes).toString('utf-8');

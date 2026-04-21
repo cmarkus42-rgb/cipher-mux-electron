@@ -1,5 +1,5 @@
 // src/renderer/app.tsx
-import { useState, useCallback, useEffect } from 'preact/hooks'
+import { useState, useCallback, useEffect, useMemo } from 'preact/hooks'
 import type { ProjectInfo } from '../shared/types'
 import { useSessions } from './hooks/useSessions'
 import { useMessages } from './hooks/useMessages'
@@ -7,6 +7,7 @@ import { useContextUsage } from './hooks/useContextUsage'
 import { useProjects } from './hooks/useProjects'
 import { useGrid } from './hooks/useGrid'
 import { useTheme } from './hooks/useTheme'
+import { useShortcuts } from './hooks/useShortcuts'
 import { SessionGrid } from './components/SessionGrid'
 import { ChatroomPanel } from './components/ChatroomPanel'
 import { ChatToggleButton } from './components/ChatToggleButton'
@@ -34,6 +35,28 @@ export function App() {
   const { projects, scanning, rescan } = useProjects()
   const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand } = useGrid()
   const { theme, toggleTheme } = useTheme()
+
+  // Global keyboard shortcuts
+  const shortcutEntries = useMemo(() => [
+    {
+      combo: 'Cmd+B',
+      label: 'bugreport dialog öffnen',
+      category: 'Aktionen' as const,
+      action: () => setBugreportVisible(true),
+    },
+    {
+      combo: 'Escape',
+      label: 'dialog / overlay schließen',
+      category: 'Navigation' as const,
+      action: () => {
+        setBugreportVisible(false)
+        setInfoVisible(false)
+        setPopupVisible(false)
+        setSessionDialogVisible(false)
+      },
+    },
+  ], [])
+  useShortcuts(shortcutEntries)
 
   const [orchestratorSessionId, setOrchestratorSessionId] = useState<string | null>(null)
 

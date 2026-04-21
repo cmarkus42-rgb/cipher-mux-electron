@@ -64,6 +64,49 @@ describe('decodeOctal', () => {
   it('decodes 4-byte UTF-8 emoji: 🚀 (\\360\\237\\232\\200)', () => {
     assert.equal(decodeOctal('\\360\\237\\232\\200'), '🚀');
   });
+
+  // --- Raw UTF-8 pass-through (tmux 3.3+ with UTF-8 locale) ---------------
+
+  it('passes through raw ä without corruption', () => {
+    assert.equal(decodeOctal('ä'), 'ä');
+  });
+
+  it('passes through raw öüß without corruption', () => {
+    assert.equal(decodeOctal('öüß'), 'öüß');
+  });
+
+  it('handles mixed raw UTF-8 and octal escapes', () => {
+    // tmux 3.6a sends: raw ä + octal backspace + raw äöü
+    assert.equal(decodeOctal('ä\\010äöü'), 'ä\bäöü');
+  });
+
+  it('handles raw UTF-8 mixed with octal CR/LF', () => {
+    assert.equal(decodeOctal('Ärger\\015\\012'), 'Ärger\r\n');
+  });
+
+  it('handles raw 3-byte UTF-8 (€) without corruption', () => {
+    assert.equal(decodeOctal('€100'), '€100');
+  });
+
+  it('handles raw 4-byte UTF-8 emoji without corruption', () => {
+    assert.equal(decodeOctal('🚀launch'), '🚀launch');
+  });
+
+  it('handles raw emoji mixed with octal escapes', () => {
+    assert.equal(decodeOctal('🎉\\015\\012done'), '🎉\r\ndone');
+  });
+
+  it('handles full tmux output line with raw Umlaute', () => {
+    // Real tmux 3.6a control mode output for "zsh: command not found: äöü"
+    assert.equal(
+      decodeOctal('zsh: command not found: äöü\\015\\012'),
+      'zsh: command not found: äöü\r\n'
+    );
+  });
+
+  it('handles Japanese characters passed through raw', () => {
+    assert.equal(decodeOctal('日本語\\015\\012'), '日本語\r\n');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -335,5 +378,87 @@ describe('TmuxParser', () => {
     parser.feed('%exit\n');
     assert.equal(events.length, 1);
     assert.deepEqual(events[0], { type: 'exit', reason: '' });
+  });
+
+  it('handles raw UTF-8 in output lines', () => {
+    const parser = new TmuxParser();
+    const events: TmuxEvent[] = [];
+    parser.onEvent((e) => events.push(e));
+
+    // Simulate what tmux 3.6a actually sends (raw UTF-8 for printable chars)
+    parser.feed('%output %42 zsh: command not found: äöü\\015\\012\n');
+    assert.equal(events.length, 1);
+    assert.equal(events[0].type, 'output');
+    if (events[0].type === 'output') {
+      assert.equal(events[0].data, 'zsh: command not found: äöü\r\n');
+    }
+  });
+
+  it('handles raw UTF-8 split across chunks at line level', () => {
+    const parser = new TmuxParser();
+    const events: TmuxEvent[] = [];
+    parser.onEvent((e) => events.push(e));
+
+    // Line split mid-word with Umlaut — safe because TmuxParser buffers lines
+    parser.feed('%output %0 Ärg');
+    assert.equal(events.length, 0);
+
+    parser.feed('er\\015\\012\n');
+    assert.equal(events.length, 1);
+    if (events[0].type === 'output') {
+      assert.equal(events[0].data, 'Ärger\r\n');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StringDecoder integration (chunk boundary safety)
+// ---------------------------------------------------------------------------
+
+describe('StringDecoder chunk boundary safety', () => {
+  it('StringDecoder handles UTF-8 split at byte boundary', () => {
+    // This tests the pattern used in tmux-manager.ts
+    const { StringDecoder } = require('string_decoder');
+    const decoder = new StringDecoder('utf-8');
+    const parser = new TmuxParser();
+    const events: TmuxEvent[] = [];
+    parser.onEvent((e) => events.push(e));
+
+    // ä in UTF-8 is [0xC3, 0xA4] — split across two chunks
+    const fullLine = Buffer.from('%output %0 ä\\015\\012\n', 'utf-8');
+    // Find position of 0xC3 (first byte of ä)
+    const splitPos = fullLine.indexOf(0xc3) + 1; // split after first byte of ä
+
+    const chunk1 = fullLine.subarray(0, splitPos);
+    const chunk2 = fullLine.subarray(splitPos);
+
+    // Without StringDecoder: chunk1.toString('utf-8') would produce \uFFFD
+    // With StringDecoder: it holds the incomplete byte and completes with chunk2
+    parser.feed(decoder.write(chunk1));
+    parser.feed(decoder.write(chunk2));
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0].type, 'output');
+    if (events[0].type === 'output') {
+      assert.equal(events[0].data, 'ä\r\n');
+    }
+  });
+
+  it('toString corrupts but StringDecoder preserves at boundary', () => {
+    const { StringDecoder } = require('string_decoder');
+    // Prove the bug: toString('utf-8') corrupts, StringDecoder doesn't
+    const aBuf = Buffer.from('ä', 'utf-8'); // [0xC3, 0xA4]
+    assert.equal(aBuf.length, 2);
+
+    // Corrupt path: split and toString each half
+    const half1 = aBuf.subarray(0, 1).toString('utf-8');
+    const half2 = aBuf.subarray(1).toString('utf-8');
+    assert.notEqual(half1 + half2, 'ä'); // CORRUPTED
+
+    // Safe path: StringDecoder
+    const decoder = new StringDecoder('utf-8');
+    const safe1 = decoder.write(aBuf.subarray(0, 1));
+    const safe2 = decoder.write(aBuf.subarray(1));
+    assert.equal(safe1 + safe2, 'ä'); // CORRECT
   });
 });

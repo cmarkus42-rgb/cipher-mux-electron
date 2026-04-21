@@ -103,6 +103,29 @@ cipher-mux-electron/
 - **ADR-007:** 7 Tage zeitbasierte Message-Retention — `docs/decisions/ADR-007-message-retention.md`
 - **ADR-008:** Strukturiertes Orchestrator CLAUDE.md Template — `docs/decisions/ADR-008-orchestrator-template.md`
 
+## MCP-Server: Worker-Session-Handling
+
+Der MCP-Server stellt Tools bereit (`mux_create_session`, `mux_send`, etc.), die von der Orchestrator-Session genutzt werden. **Wichtig für Konsumenten (Orchestrator/Clients):**
+
+### Worker-Startup-Protokoll (Pflicht)
+
+`mux_send` schreibt auf den Message Bus, aber Claude-Sessions lesen den Bus **nicht automatisch als Prompt-Input**. Messages die vor Claude-Startup gesendet werden, gehen verloren (Race Condition).
+
+**Korrektes Vorgehen:**
+
+1. `mux_create_session` — Session erstellen
+2. **8-10s warten** — tmux + zsh + Claude CLI muessen starten
+3. `tmux capture-pane -t <tmuxSession> -p | tail -30` — Pruefen ob Claude-Prompt (❯) sichtbar
+4. Falls nicht bereit: weitere 5s warten, erneut pruefen
+5. **`tmux send-keys -t <tmuxSession> "<instruktion>" Enter`** — Instruktion DIREKT in den Pane schicken
+6. **15s warten** — Claude muss Task parsen
+7. `tmux capture-pane` — Pruefen ob Worker tatsaechlich arbeitet
+8. **Monitoring-Loop (alle 2min):** `tmux capture-pane` + `mux_context_usage` bis Worker fertig
+
+### Warum nicht mux_send?
+
+`mux_send` ist fuer Inter-Session-Kommunikation gedacht (z.B. Status-Updates, Bug-Notifications). Es ist **kein Prompt-Input-Mechanismus**. Claude liest den Bus nur wenn es explizit `mux_read` aufruft — was ein idle Worker nicht tut.
+
 ## Bekannte Constraints
 
 - **macOS-only:** tmux als harte Abhängigkeit, osascript-Integration
