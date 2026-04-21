@@ -13,6 +13,11 @@ import { KickoffOrchestrator } from './project/kickoff-orchestrator'
 import { BugreportManager } from './bugreport/bugreport-manager'
 import { VoiceManager } from './voice/voice-manager'
 import type { ConversationTransport } from './voice/conversation-engine'
+import { TaskManager } from './task/task-manager'
+import { TaskWatcher } from './task/task-watcher'
+import { TaskHooks } from './task/task-hooks'
+import { BugreportTaskSource } from './task/sources/bugreport-source'
+import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
 import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest } from '../shared/types'
@@ -31,6 +36,10 @@ export class IpcHub {
   private kickoffOrchestrator: KickoffOrchestrator
   private bugreportManager: BugreportManager
   private voiceManager: VoiceManager | null = null
+  private taskManager: TaskManager | null = null
+  private taskWatcher: TaskWatcher | null = null
+  private taskHooks: TaskHooks | null = null
+  private bugreportSource: BugreportTaskSource | null = null
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
 
   constructor(private windowManager: WindowManager) {
@@ -55,6 +64,17 @@ export class IpcHub {
       timeoutMs: ((appConfig?.kickoffTimeoutMinutes ?? 15) * 60_000),
     })
     this.bugreportManager = new BugreportManager({ messageBus: this.messageBus })
+
+    // Initialize TaskManager — reuse MessageBus DB for single-writer consistency
+    try {
+      if (this.messageBus) {
+        const db = this.messageBus.getDatabase()
+        db.exec(TASK_SCHEMA_SQL)
+        this.taskManager = new TaskManager(db)
+      }
+    } catch (err) {
+      console.error('[IpcHub] TaskManager init failed:', err)
+    }
   }
 
   init(): void {
@@ -69,10 +89,40 @@ export class IpcHub {
     this.registerOrchestratorChannels()
     this.registerBugreportChannels()
     this.registerVoiceChannels()
+    this.registerTaskChannels()
     this.setupEventForwarding()
 
     // Start context usage monitor
     this.statusLineMonitor.start()
+
+    // Start Task infrastructure
+    if (this.taskManager) {
+      const orchConfig = configStore.get('orchestrator')
+
+      this.taskHooks = new TaskHooks(orchConfig?.defaultHooks ? {
+        beforeRun: orchConfig.defaultHooks.beforeRun,
+        afterRun: orchConfig.defaultHooks.afterRun,
+        timeout: orchConfig.defaultHooks.timeout,
+      } : undefined)
+
+      this.taskWatcher = new TaskWatcher({
+        taskManager: this.taskManager,
+        sessionManager: this.sessionManager as any,
+        tmuxManager: this.tmux as any,
+        watchInterval: orchConfig?.watchInterval,
+        defaultStallTimeout: orchConfig?.stallTimeout,
+      })
+      this.taskWatcher.start()
+
+      // Start bugreport task source
+      const sourceConfig = orchConfig?.taskSources?.bugreport
+      if (sourceConfig?.enabled !== false) {
+        const outboxPath = sourceConfig?.path
+          ?? path.join(app.getPath('home'), '.config', 'cipher-mux', 'bugreports', 'outbox')
+        this.bugreportSource = new BugreportTaskSource(outboxPath)
+        this.bugreportSource.start((opts) => this.taskManager!.create(opts))
+      }
+    }
 
     // Connect tmux control mode
     this.tmux.connect().catch((err) => {
@@ -114,6 +164,7 @@ export class IpcHub {
       messageBus: this.messageBus,
       statusLineMonitor: this.statusLineMonitor,
       kickoffOrchestrator: this.kickoffOrchestrator,
+      taskManager: this.taskManager,
     }).then(() => {
       // Auto-start orchestrator after MCP server is ready
       this.autoStartOrchestrator()
@@ -235,6 +286,38 @@ export class IpcHub {
         },
       )
     })
+
+    // Task events → renderer
+    if (this.taskManager) {
+      this.taskManager.on('task:created', (task) => {
+        this.windowManager.sendToMainWindow(IPC.TASK_CREATED, task)
+      })
+      this.taskManager.on('task:state-changed', (task, previousState) => {
+        this.windowManager.sendToMainWindow(IPC.TASK_STATE_CHANGED, { task, previousState })
+      })
+    }
+
+    // Completion verification hooks
+    if (this.taskManager && this.taskHooks) {
+      const tm = this.taskManager
+      const hooks = this.taskHooks
+      tm.on('task:state-changed', async (task) => {
+        if (task.state === 'validating') {
+          const session = task.sessionId ? this.sessionManager.get(task.sessionId) : null
+          const projectPath = session?.projectPath ?? '/tmp'
+          const result = await hooks.runAfterRun(task, projectPath)
+          if (result.success) {
+            tm.markCompleted(task.id, {
+              summary: result.stdout.slice(0, 500), exitCode: result.exitCode,
+            })
+          } else {
+            tm.markFailed(task.id,
+              result.timedOut ? 'hook timed out' : `hook failed: ${result.stderr.slice(0, 500)}`
+            )
+          }
+        }
+      })
+    }
   }
 
   // ─── Sessions ──────────────────────────────────────────
@@ -579,7 +662,33 @@ export class IpcHub {
     })
   }
 
+  // ─── Tasks ────────────────────────────────────────────
+  private registerTaskChannels(): void {
+    if (!this.taskManager) return
+
+    ipcMain.handle(IPC.TASKS_LIST, async (_e, filter?: any) => {
+      return this.taskManager!.list(filter)
+    })
+
+    ipcMain.handle(IPC.TASKS_GET, async (_e, { id }: { id: string }) => {
+      const task = this.taskManager!.get(id)
+      if (!task) return { task: null, children: [] }
+      const children = this.taskManager!.children(id)
+      return { task, children }
+    })
+
+    ipcMain.handle(IPC.TASKS_RETRY, async (_e, { id }: { id: string }) => {
+      return this.taskManager!.retry(id)
+    })
+
+    ipcMain.handle(IPC.TASKS_CANCEL, async (_e, { id }: { id: string }) => {
+      return this.taskManager!.markFailed(id, 'cancelled by user')
+    })
+  }
+
   async destroy(): Promise<void> {
+    this.bugreportSource?.stop()
+    this.taskWatcher?.stop()
     this.voiceManager?.shutdown()
     await this.mcpServer.stop().catch(() => {})
     this.statusLineMonitor.stop()
