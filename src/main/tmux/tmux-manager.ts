@@ -1,4 +1,5 @@
 import { spawn, ChildProcess } from 'child_process'
+import { StringDecoder } from 'string_decoder'
 import { EventEmitter } from 'events'
 import { TmuxParser, TmuxEvent } from './tmux-parser'
 import { OutputBatcher } from './output-batcher'
@@ -80,9 +81,10 @@ export class TmuxManager extends EventEmitter {
       })
 
       let startupResolved = false
+      const decoder = new StringDecoder('utf-8')
 
       this.controlProcess.stdout?.on('data', (chunk: Buffer) => {
-        this.parser.feed(chunk.toString('utf-8'))
+        this.parser.feed(decoder.write(chunk))
         if (!startupResolved) {
           startupResolved = true
           this.connected = true
@@ -135,6 +137,7 @@ export class TmuxManager extends EventEmitter {
     })
 
     const sessionParser = new TmuxParser()
+    const sessionDecoder = new StringDecoder('utf-8')
     sessionParser.onEvent((event: TmuxEvent) => {
       if (event.type === 'output') {
         // Remap tmux pane ID → session ULID for renderer matching
@@ -143,7 +146,7 @@ export class TmuxManager extends EventEmitter {
     })
 
     proc.stdout?.on('data', (chunk: Buffer) => {
-      sessionParser.feed(chunk.toString('utf-8'))
+      sessionParser.feed(sessionDecoder.write(chunk))
     })
 
     proc.stderr?.on('data', (chunk: Buffer) => {
