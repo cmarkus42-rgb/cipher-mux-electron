@@ -4,6 +4,7 @@ import type { SessionManager } from '../session/session-manager'
 import type { MessageBus } from '../message-bus/message-bus'
 import type { StatusLineMonitor } from '../monitoring/statusline-monitor'
 import type { KickoffOrchestrator } from '../project/kickoff-orchestrator'
+import type { TaskManager } from '../task/task-manager'
 import type { Topic } from '../../shared/types'
 
 /**
@@ -14,6 +15,7 @@ export interface ToolContext {
   messageBus: MessageBus | null
   statusLineMonitor: StatusLineMonitor | null
   kickoffOrchestrator: KickoffOrchestrator | null
+  taskManager: TaskManager | null
 }
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']
@@ -304,6 +306,180 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+      }
+    }
+  )
+
+  // 10. mux_task_create — Create a task in the queue
+  ;(server.registerTool as any)(
+    'mux_task_create',
+    {
+      description: 'Create a task in the cipher-mux task queue',
+      inputSchema: {
+        title: z.string().describe('Task title'),
+        description: z.string().optional().describe('Task description'),
+        source: z.string().optional().describe('Task source (default: orchestrator)'),
+        parent_id: z.string().optional().describe('Parent task ID'),
+        policy: z.object({
+          stall_timeout: z.number().optional(),
+          max_retries: z.number().optional(),
+          before_run: z.string().optional(),
+          after_run: z.string().optional(),
+        }).optional().describe('Task policy'),
+      },
+    },
+    async (args: {
+      title: string
+      description?: string
+      source?: string
+      parent_id?: string
+      policy?: {
+        stall_timeout?: number
+        max_retries?: number
+        before_run?: string
+        after_run?: string
+      }
+    }) => {
+      if (!ctx.taskManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'TaskManager not available' }) }], isError: true }
+      }
+      try {
+        const task = ctx.taskManager.create({
+          title: args.title,
+          description: args.description,
+          source: args.source ?? 'orchestrator',
+          parentId: args.parent_id,
+          policy: args.policy ? {
+            stallTimeout: args.policy.stall_timeout,
+            maxRetries: args.policy.max_retries,
+            beforeRun: args.policy.before_run,
+            afterRun: args.policy.after_run,
+          } : undefined,
+        })
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, task }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: errMsg }) }],
+          isError: true,
+        }
+      }
+    }
+  )
+
+  // 11. mux_task_update — Update task state/progress
+  ;(server.registerTool as any)(
+    'mux_task_update',
+    {
+      description: 'Update a task state or progress in the cipher-mux task queue',
+      inputSchema: {
+        task_id: z.string().describe('Task ID'),
+        state: z.enum(['dispatched', 'running', 'done', 'failed']).optional().describe('New task state'),
+        session_id: z.string().optional().describe('Session ID (required for dispatched→running)'),
+        result: z.object({
+          summary: z.string().optional(),
+          data: z.unknown().optional(),
+        }).optional().describe('Task result'),
+      },
+    },
+    async (args: {
+      task_id: string
+      state?: 'dispatched' | 'running' | 'done' | 'failed'
+      session_id?: string
+      result?: { summary?: string; data?: unknown }
+    }) => {
+      if (!ctx.taskManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'TaskManager not available' }) }], isError: true }
+      }
+      try {
+        let task
+        if (args.state === 'done') {
+          task = ctx.taskManager.markValidating(args.task_id)
+        } else if (args.state === 'dispatched') {
+          task = ctx.taskManager.dispatch(args.task_id)
+        } else if (args.state === 'running') {
+          task = ctx.taskManager.markRunning(args.task_id, args.session_id)
+        } else if (args.state === 'failed') {
+          task = ctx.taskManager.markFailed(args.task_id, args.result as any)
+        } else {
+          // No state change — update via patch
+          task = ctx.taskManager.update(args.task_id, {
+            sessionId: args.session_id,
+            result: args.result as any,
+          })
+        }
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, task }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: errMsg }) }],
+          isError: true,
+        }
+      }
+    }
+  )
+
+  // 12. mux_task_list — List tasks with filters
+  ;(server.registerTool as any)(
+    'mux_task_list',
+    {
+      description: 'List tasks in the cipher-mux task queue with optional filters',
+      inputSchema: {
+        state: z.string().optional().describe('Filter by state'),
+        source: z.string().optional().describe('Filter by source'),
+        parent_id: z.string().optional().describe('Filter by parent task ID'),
+        session_id: z.string().optional().describe('Filter by session ID'),
+      },
+    },
+    async (args: {
+      state?: string
+      source?: string
+      parent_id?: string
+      session_id?: string
+    }) => {
+      if (!ctx.taskManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'TaskManager not available' }) }], isError: true }
+      }
+      const filter: Record<string, unknown> = {}
+      if (args.state !== undefined) filter['state'] = args.state
+      if (args.source !== undefined) filter['source'] = args.source
+      if (args.parent_id !== undefined) filter['parentId'] = args.parent_id
+      if (args.session_id !== undefined) filter['sessionId'] = args.session_id
+
+      const tasks = ctx.taskManager.list(Object.keys(filter).length > 0 ? filter as any : undefined)
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(tasks, null, 2) }],
+      }
+    }
+  )
+
+  // 13. mux_task_get — Get task by ID with children
+  ;(server.registerTool as any)(
+    'mux_task_get',
+    {
+      description: 'Get a task by ID including its children',
+      inputSchema: {
+        task_id: z.string().describe('Task ID'),
+      },
+    },
+    async (args: { task_id: string }) => {
+      if (!ctx.taskManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'TaskManager not available' }) }], isError: true }
+      }
+      const task = ctx.taskManager.get(args.task_id)
+      if (!task) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: `Task not found: ${args.task_id}` }) }],
+          isError: true,
+        }
+      }
+      const children = ctx.taskManager.children(args.task_id)
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, task, children }, null, 2) }],
       }
     }
   )
