@@ -66,7 +66,7 @@ export function SessionGrid({
   }, [dragSourceIdx, onSwap])
 
   const gridStyle = {
-    gridTemplateColumns: `repeat(${cols}, 640px)`,
+    gridTemplateColumns: `repeat(${cols}, minmax(640px, 1fr))`,
     gridTemplateRows: `repeat(${rows}, 1fr)`,
   }
 
