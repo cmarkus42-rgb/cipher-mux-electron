@@ -323,8 +323,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         policy: z.object({
           stall_timeout: z.number().optional(),
           max_retries: z.number().optional(),
-          before_run: z.string().optional(),
-          after_run: z.string().optional(),
+          hooks: z.object({
+            before_run: z.string().optional(),
+            after_run: z.string().optional(),
+            timeout: z.number().optional(),
+          }).optional(),
         }).optional().describe('Task policy'),
       },
     },
@@ -336,8 +339,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       policy?: {
         stall_timeout?: number
         max_retries?: number
-        before_run?: string
-        after_run?: string
+        hooks?: { before_run?: string; after_run?: string; timeout?: number }
       }
     }) => {
       if (!ctx.taskManager) {
@@ -352,8 +354,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           policy: args.policy ? {
             stallTimeout: args.policy.stall_timeout,
             maxRetries: args.policy.max_retries,
-            beforeRun: args.policy.before_run,
-            afterRun: args.policy.after_run,
+            hooks: args.policy.hooks ? {
+              beforeRun: args.policy.hooks.before_run,
+              afterRun: args.policy.hooks.after_run,
+              timeout: args.policy.hooks.timeout,
+            } : undefined,
           } : undefined,
         })
         return {

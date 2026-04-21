@@ -311,9 +311,9 @@ export class IpcHub {
               summary: result.stdout.slice(0, 500), exitCode: result.exitCode,
             })
           } else {
-            tm.markFailed(task.id,
-              result.timedOut ? 'hook timed out' : `hook failed: ${result.stderr.slice(0, 500)}`
-            )
+            tm.markFailed(task.id, {
+              error: result.timedOut ? 'hook timed out' : `hook failed: ${result.stderr.slice(0, 500)}`,
+            })
           }
         }
       })
@@ -682,7 +682,7 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.TASKS_CANCEL, async (_e, { id }: { id: string }) => {
-      return this.taskManager!.markFailed(id, 'cancelled by user')
+      return this.taskManager!.markFailed(id, { error: 'cancelled by user' })
     })
   }
 
