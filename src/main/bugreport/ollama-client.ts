@@ -1,4 +1,7 @@
-const OLLAMA_URL = 'http://127.0.0.1:11433'
+import * as http from 'node:http'
+
+const OLLAMA_HOST = '127.0.0.1'
+const OLLAMA_PORT = 11433
 const TIMEOUT_MS = 120_000 // 2 minutes — local models can be slow
 
 const ENRICH_PROMPT = `You are a professional QA engineer. Given a raw bug description, produce a structured bug report in YAML format with these fields:
@@ -22,34 +25,65 @@ export interface EnrichedBugreport {
   summary: string
 }
 
+/**
+ * POST JSON to Ollama via Node's http module.
+ * Electron's main-process fetch() uses net.fetch (Chromium network stack)
+ * which can fail for localhost due to system proxy settings.
+ * Node's http module bypasses Chromium entirely.
+ */
+function ollamaPost(path: string, body: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: OLLAMA_HOST,
+        port: OLLAMA_PORT,
+        path,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+        timeout: TIMEOUT_MS,
+      },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (chunk: Buffer) => chunks.push(chunk))
+        res.on('end', () => {
+          if (res.statusCode !== 200) {
+            reject(new Error(`Ollama HTTP ${res.statusCode}`))
+            return
+          }
+          resolve(Buffer.concat(chunks).toString('utf-8'))
+        })
+      },
+    )
+    req.on('error', reject)
+    req.on('timeout', () => {
+      req.destroy()
+      reject(new Error('Ollama request timed out'))
+    })
+    req.write(body)
+    req.end()
+  })
+}
+
 export async function enrichBugreport(description: string): Promise<EnrichedBugreport | null> {
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
-
-    const response = await fetch(`${OLLAMA_URL}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gemma4:26b',
-        prompt: `${ENRICH_PROMPT}\n\nBug description:\n${description}`,
-        stream: false,
-        keep_alive: -1,
-      }),
-      signal: controller.signal,
+    const body = JSON.stringify({
+      model: 'gemma4:26b',
+      prompt: `${ENRICH_PROMPT}\n\nBug description:\n${description}`,
+      stream: false,
+      keep_alive: -1,
     })
 
-    clearTimeout(timeout)
-
-    if (!response.ok) return null
-
-    const data = await response.json() as Record<string, unknown>
+    const raw = await ollamaPost('/api/generate', body)
+    const data = JSON.parse(raw) as Record<string, unknown>
     const text = (data.response as string | undefined)?.trim()
     if (!text) return null
 
     return parseEnrichedOutput(text)
   } catch {
-    // Ollama not available — return null for fallback
+    // Ollama not available or request failed — return null for fallback
     return null
   }
 }
