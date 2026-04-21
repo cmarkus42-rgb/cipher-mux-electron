@@ -57,6 +57,12 @@ export function App() {
     return () => unsub()
   }, [placeOrchestrator])
 
+  // Handle kickoff started — add launcher session to grid
+  const handleKickoffStarted = useCallback((launcherSessionId: string) => {
+    addSession(launcherSessionId)
+    setFocusedSessionId(launcherSessionId)
+  }, [addSession])
+
   // Listen for kickoff completion
   useEffect(() => {
     const api = (window as any).cipherMux
@@ -65,6 +71,10 @@ export function App() {
         addSession(data.event.followupSessionId)
         setFocusedSessionId(data.event.followupSessionId)
         rescan().catch(() => {})
+      } else if (data?.status === 'timeout') {
+        console.warn('[App] Kickoff timed out for project:', data.handle?.projectName)
+      } else if (data?.status === 'error') {
+        console.error('[App] Kickoff error:', data.error)
       }
     })
     return () => unsub()
@@ -247,6 +257,7 @@ export function App() {
         scanning={scanning}
         targetSessionId={popupTargetSessionId}
         onSelect={handleProjectSelect}
+        onKickoffStarted={handleKickoffStarted}
         onRescan={rescan}
         onClose={() => setPopupVisible(false)}
       />
