@@ -110,6 +110,19 @@ export interface AppConfig {
   orchestrator: {
     dir: string
     maxRetries: number
+    stallTimeout: number
+    watchInterval: number
+    defaultHooks: {
+      beforeRun?: string
+      afterRun?: string
+      timeout?: number
+    }
+    taskSources: {
+      bugreport: {
+        enabled: boolean
+        path: string
+      }
+    }
   }
   ui: {
     chatroomVisible: boolean

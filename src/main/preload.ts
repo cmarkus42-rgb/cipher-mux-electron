@@ -135,6 +135,24 @@ const api = {
       ipcRenderer.invoke(IPC.BUGREPORT_PICK_SCREENSHOT),
   },
 
+  // ─── Tasks ──────────────────────────────────────────────
+  tasks: {
+    list: (filter?: unknown) => ipcRenderer.invoke(IPC.TASKS_LIST, filter),
+    get: (id: string) => ipcRenderer.invoke(IPC.TASKS_GET, { id }),
+    retry: (id: string) => ipcRenderer.invoke(IPC.TASKS_RETRY, { id }),
+    cancel: (id: string) => ipcRenderer.invoke(IPC.TASKS_CANCEL, { id }),
+    onCreated: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.TASK_CREATED, handler)
+      return () => ipcRenderer.removeListener(IPC.TASK_CREATED, handler)
+    },
+    onStateChanged: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.TASK_STATE_CHANGED, handler)
+      return () => ipcRenderer.removeListener(IPC.TASK_STATE_CHANGED, handler)
+    },
+  },
+
   // ─── Voice ──────────────────────────────────────────────
   voice: {
     available: () => ipcRenderer.invoke(IPC.VOICE_AVAILABLE),
