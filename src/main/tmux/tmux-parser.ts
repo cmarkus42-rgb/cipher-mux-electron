@@ -29,23 +29,40 @@ export type TmuxEvent =
 // Octal decoding
 // ---------------------------------------------------------------------------
 
-const OCTAL_RE = /\\(\d{3})/g;
-const BACKSLASH_RE = /\\\\/g;
-
 /**
  * Decode tmux octal-encoded sequences in a string.
  *
  * tmux encodes non-printable bytes as three-digit octal escapes
  * (e.g. `\015` for CR, `\012` for LF, `\033` for ESC).
  * Literal backslashes are encoded as `\\`.
+ *
+ * Multi-byte UTF-8 characters (e.g. `ä` = `\303\244`) are encoded as
+ * separate octal escapes per byte. We collect all bytes into a Buffer
+ * and decode as UTF-8 to reconstruct them correctly.
  */
 export function decodeOctal(str: string): string {
-  // First pass: decode octal sequences like \015 → char
-  const decoded = str.replace(OCTAL_RE, (_match, digits: string) => {
-    return String.fromCharCode(parseInt(digits, 8));
-  });
-  // Second pass: unescape literal backslashes
-  return decoded.replace(BACKSLASH_RE, '\\');
+  const bytes: number[] = [];
+  let i = 0;
+  while (i < str.length) {
+    if (str[i] === '\\' && i + 1 < str.length) {
+      if (str[i + 1] === '\\') {
+        // Escaped backslash → literal 0x5C
+        bytes.push(0x5c);
+        i += 2;
+      } else if (i + 3 < str.length && /^\d{3}$/.test(str.substring(i + 1, i + 4))) {
+        // Octal escape \NNN → raw byte value
+        bytes.push(parseInt(str.substring(i + 1, i + 4), 8));
+        i += 4;
+      } else {
+        bytes.push(str.charCodeAt(i));
+        i++;
+      }
+    } else {
+      bytes.push(str.charCodeAt(i));
+      i++;
+    }
+  }
+  return Buffer.from(bytes).toString('utf-8');
 }
 
 // ---------------------------------------------------------------------------

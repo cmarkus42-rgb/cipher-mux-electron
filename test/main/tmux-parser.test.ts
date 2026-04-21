@@ -39,6 +39,31 @@ describe('decodeOctal', () => {
   it('decodes \\000 as NUL', () => {
     assert.equal(decodeOctal('\\000'), '\x00');
   });
+
+  it('decodes multi-byte UTF-8: ä (\\303\\244)', () => {
+    assert.equal(decodeOctal('\\303\\244'), 'ä');
+  });
+
+  it('decodes multi-byte UTF-8: ü (\\303\\274)', () => {
+    assert.equal(decodeOctal('\\303\\274'), 'ü');
+  });
+
+  it('decodes multi-byte UTF-8: ö (\\303\\266)', () => {
+    assert.equal(decodeOctal('\\303\\266'), 'ö');
+  });
+
+  it('decodes UTF-8 umlauts embedded in text', () => {
+    // "läuft" with ä encoded as \303\244
+    assert.equal(decodeOctal('l\\303\\244uft'), 'läuft');
+  });
+
+  it('decodes 3-byte UTF-8: € (\\342\\202\\254)', () => {
+    assert.equal(decodeOctal('\\342\\202\\254'), '€');
+  });
+
+  it('decodes 4-byte UTF-8 emoji: 🚀 (\\360\\237\\232\\200)', () => {
+    assert.equal(decodeOctal('\\360\\237\\232\\200'), '🚀');
+  });
 });
 
 // ---------------------------------------------------------------------------
