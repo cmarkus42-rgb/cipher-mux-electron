@@ -62,3 +62,9 @@ export const PROJECTLAUNCHER_DIR_DEFAULT =
 
 /** Default kickoff timeout (minutes) — how long we wait for a completion signal. */
 export const KICKOFF_TIMEOUT_MIN_DEFAULT = 15
+
+/** Task stall detection defaults */
+export const TASK_STALL_TIMEOUT_MS = 300_000       // 5 minutes
+export const TASK_WATCH_INTERVAL_MS = 30_000       // 30 seconds
+export const TASK_HOOK_TIMEOUT_MS = 60_000         // 60 seconds
+export const TASK_DEFAULT_MAX_RETRIES = 2
