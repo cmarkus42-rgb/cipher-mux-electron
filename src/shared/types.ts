@@ -188,3 +188,71 @@ export interface BugreportSubmission {
   description: string
   project?: string
 }
+
+// ─── Tasks ──────────────────────────────────────────────
+
+export type TaskState =
+  | 'queued'
+  | 'dispatched'
+  | 'running'
+  | 'validating'
+  | 'completed'
+  | 'failed'
+  | 'stalled'
+
+export interface TaskPolicy {
+  stallTimeout?: number
+  maxRetries?: number
+  hooks?: {
+    beforeRun?: string
+    afterRun?: string
+    timeout?: number
+  }
+}
+
+export interface TaskResult {
+  summary?: string
+  branch?: string
+  exitCode?: number
+  error?: string
+}
+
+export interface Task {
+  id: string
+  parentId: string | null
+  sessionId: string | null
+  source: string
+  title: string
+  description: string | null
+  state: TaskState
+  policy: TaskPolicy | null
+  retryCount: number
+  maxRetries: number
+  result: TaskResult | null
+  createdAt: number
+  updatedAt: number
+  completedAt: number | null
+}
+
+export interface CreateTaskOpts {
+  title: string
+  description?: string
+  source: string
+  parentId?: string
+  policy?: TaskPolicy
+}
+
+export interface TaskPatch {
+  state?: TaskState
+  sessionId?: string
+  description?: string
+  policy?: TaskPolicy
+  result?: TaskResult
+}
+
+export interface TaskFilter {
+  state?: TaskState | TaskState[]
+  source?: string
+  parentId?: string | null
+  sessionId?: string
+}
