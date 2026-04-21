@@ -165,6 +165,11 @@ export class MessageBus extends EventEmitter {
     return result.changes
   }
 
+  /** Expose the underlying database for shared table access (tasks) */
+  getDatabase(): Database.Database {
+    return this.db
+  }
+
   /** Stop cleanup timer and close the database */
   destroy(): void {
     if (this.cleanupTimer) {

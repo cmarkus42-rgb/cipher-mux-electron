@@ -16,6 +16,8 @@ import {
   MCP_DEFAULT_HOST,
   ORCHESTRATOR_DIR,
   ORCHESTRATOR_MAX_RETRIES,
+  TASK_STALL_TIMEOUT_MS,
+  TASK_WATCH_INTERVAL_MS,
   DEFAULT_WINDOW_WIDTH,
   DEFAULT_WINDOW_HEIGHT,
 } from '../../shared/constants'
@@ -38,6 +40,15 @@ const defaults: AppConfig = {
   orchestrator: {
     dir: ORCHESTRATOR_DIR,
     maxRetries: ORCHESTRATOR_MAX_RETRIES,
+    stallTimeout: TASK_STALL_TIMEOUT_MS,
+    watchInterval: TASK_WATCH_INTERVAL_MS,
+    defaultHooks: {},
+    taskSources: {
+      bugreport: {
+        enabled: true,
+        path: '~/.config/cipher-mux/bugreports/outbox',
+      },
+    },
   },
   ui: {
     chatroomVisible: false,
