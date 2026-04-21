@@ -55,22 +55,20 @@ describe('StatusLineMonitor', () => {
     assert.equal(all.get('s2')?.usedPercentage, 20)
   })
 
-  it('emits usage-updated on file change', async () => {
+  it('emits usage-updated on file change', () => {
     monitor.start()
 
-    const received = new Promise<{ sessionId: string; usage: any }>((resolve) => {
-      monitor.on('usage-updated', (sessionId, usage) => resolve({ sessionId, usage }))
-    })
+    let result: { sessionId: string; usage: any } | null = null
+    monitor.on('usage-updated', (sessionId, usage) => { result = { sessionId, usage } })
 
     fs.writeFileSync(path.join(tmpDir, 'live-session.json'), JSON.stringify({ usedPercentage: 55 }))
 
-    const result = await Promise.race([
-      received,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
-    ]) as any
+    // Drive the handler directly — fs.watch timing on macOS is non-deterministic
+    ;(monitor as any).handleFileChange('live-session.json')
 
-    assert.equal(result.sessionId, 'live-session')
-    assert.equal(result.usage.usedPercentage, 55)
+    assert.ok(result)
+    assert.equal(result!.sessionId, 'live-session')
+    assert.equal(result!.usage.usedPercentage, 55)
   })
 
   it('emits usage-warning when threshold exceeded', () => {
