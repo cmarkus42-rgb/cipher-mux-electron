@@ -88,4 +88,16 @@ describe('generateOrchestratorClaudeMd', () => {
     const toolsSection = md.split('## Delegation-Regeln')[0]
     assert.ok(toolsSection.includes('mux_bugreport_resolve'))
   })
+
+  it('should include task management tools in the template', () => {
+    const md = generateOrchestratorClaudeMd({
+      mcpHost: '127.0.0.1', mcpPort: 3100, mcpApiKey: 'key', maxRetries: 2,
+    })
+    assert.ok(md.includes('mux_task_create'))
+    assert.ok(md.includes('mux_task_update'))
+    assert.ok(md.includes('mux_task_list'))
+    assert.ok(md.includes('mux_task_get'))
+    assert.ok(md.includes('Task Management'))
+    assert.ok(md.includes('Stall Detection'))
+  })
 })
