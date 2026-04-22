@@ -17,6 +17,9 @@
     "test": "npm run rebuild:node && node --test --import tsx $(find test -name '*.test.ts' | sort)",
     "rebuild:node": "cd node_modules/better-sqlite3 && npx node-gyp rebuild --release 2>/dev/null",
     "rebuild:electron": "npx electron-rebuild -f -w better-sqlite3",
+    "build:community": "BUILD_PROFILE=community npm run build",
+    "build:cipher": "BUILD_PROFILE=cipher npm run build",
+    "profile-lint": "tsx scripts/profile-lint.ts",
     "lint": "eslint src/ --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "postinstall": "electron-builder install-app-deps"

@@ -37,3 +37,6 @@ __pycache__/
 
 # VAD assets (binary, ~38MB, not tracked in git)
 src/renderer/public/vad-assets/
+
+# Private profile (never commit)
+profile.cipher.yaml
