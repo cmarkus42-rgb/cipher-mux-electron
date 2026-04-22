@@ -30,10 +30,10 @@ export function useGrid() {
     api().config.get('ui').then((ui: any) => {
       if (ui?.grid?.config && ui.grid.slots) {
         setGrid(ui.grid)
-        api().window.fitGrid(ui.grid.config.cols).catch(() => {})
+        api().window.fitGrid(ui.grid.config.cols, ui.grid.config.rows).catch(() => {})
       } else {
         // Fit window to default grid
-        api().window.fitGrid(grid.config.cols).catch(() => {})
+        api().window.fitGrid(grid.config.cols, grid.config.rows).catch(() => {})
       }
     }).catch(() => {})
     return () => {
@@ -70,7 +70,7 @@ export function useGrid() {
       const next = resizeGrid(prev, newConfig)
       persist(next)
       // Resize window to fit new grid
-      api().window.fitGrid(newConfig.cols).catch(() => {})
+      api().window.fitGrid(newConfig.cols, newConfig.rows).catch(() => {})
       return next
     })
   }, [persist])

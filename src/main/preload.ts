@@ -121,7 +121,7 @@ const api = {
 
   // ─── Window ──────────────────────────────────────────────
   window: {
-    fitGrid: (cols: number) => ipcRenderer.invoke(IPC.WINDOW_FIT_GRID, { cols }),
+    fitGrid: (cols: number, rows: number) => ipcRenderer.invoke(IPC.WINDOW_FIT_GRID, { cols, rows }),
   },
 
   // ─── Bugreport ─────────────────────────────────────────
