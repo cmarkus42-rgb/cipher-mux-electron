@@ -50,9 +50,18 @@ describe('buildLauncherPrompt', () => {
     assert.ok(prompt.includes('.kickoff-complete'))
   })
 
-  it('ends with /launch invocation', () => {
+  it('ends with /launch invocation by default', () => {
     const prompt = buildLauncherPrompt({ projectDir: '/any' })
     assert.match(prompt.trimEnd(), /\/launch\s*$/)
+  })
+
+  it('uses custom launcher skill command when provided', () => {
+    const prompt = buildLauncherPrompt({
+      projectDir: '/tmp/test',
+      launcherSkillCmd: '/codex-start',
+    })
+    assert.ok(prompt.includes('/codex-start'))
+    assert.ok(!prompt.trimEnd().endsWith('/launch'))
   })
 
   it('includes quality baseline when BRAND provides one', () => {
