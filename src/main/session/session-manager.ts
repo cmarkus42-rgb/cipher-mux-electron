@@ -7,8 +7,8 @@ import type { SessionInfo, SessionStatus, StartSessionOpts, RecoveryResult } fro
 import { MAX_SESSIONS, ORCHESTRATOR_DIR, ORCHESTRATOR_MAX_RETRIES } from '../../shared/constants'
 import { TmuxManager } from '../tmux/tmux-manager'
 import { generateOrchestratorClaudeMd } from './orchestrator-template'
-import { runCommand } from '../util/exec-util'
-import { injectStatusLineHook } from '../monitoring/statusline-hook'
+import type { AgentAdapter } from '../agent/agent-adapter'
+import type { AdapterRegistry } from '../agent/registry'
 
 /**
  * SessionManager — Registry for cipher-mux sessions.
@@ -25,6 +25,8 @@ export interface OrchestratorConfig {
 export class SessionManager extends EventEmitter {
   private sessions: Map<string, SessionInfo> = new Map()
   private tmux: TmuxManager
+  private adapterRegistry: AdapterRegistry
+  private sessionAdapters: Map<string, AgentAdapter> = new Map()
   private orchestratorSessionId: string | null = null
   private mcpConfig: OrchestratorConfig | null = null
   /**
@@ -34,9 +36,10 @@ export class SessionManager extends EventEmitter {
    */
   private pendingLaunch: Map<string, { command: string; timer: NodeJS.Timeout }> = new Map()
 
-  constructor(tmux: TmuxManager) {
+  constructor(tmux: TmuxManager, adapterRegistry: AdapterRegistry) {
     super()
     this.tmux = tmux
+    this.adapterRegistry = adapterRegistry
   }
 
   /**
@@ -67,6 +70,9 @@ export class SessionManager extends EventEmitter {
       CIPHER_MUX_SESSION_ID: id,
     }
 
+    // Resolve adapter for this session
+    const adapter = this.adapterRegistry.getDefault()
+
     // Merge MCP env vars if config is set
     if (this.mcpConfig) {
       const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}`
@@ -76,20 +82,28 @@ export class SessionManager extends EventEmitter {
         CIPHER_MUX_MCP_KEY: this.mcpConfig.mcpApiKey,
       }
 
-      // Register MCP server in Claude Code project-level settings
-      // so claude CLI can discover it on startup (env vars alone are ignored)
-      if (opts.projectPath) {
-        await this.registerMcpForProject(opts.projectPath, this.mcpConfig)
+      // Inject MCP config via adapter (handles CLI + direct settings.json)
+      if (opts.projectPath && adapter.supports('mcp-injection') && adapter.postLaunchInjection) {
+        const mcpFullUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}/mcp`
+        try {
+          await adapter.postLaunchInjection({
+            projectPath: opts.projectPath,
+            mcpUrl: mcpFullUrl,
+            mcpApiKey: this.mcpConfig.mcpApiKey,
+            sessionId: id,
+          })
+        } catch (err) {
+          console.warn('[SessionManager] Adapter MCP injection failed:', err)
+        }
       }
     }
 
-    // Register StatusLine hook so Claude Code writes context usage data
-    // to /tmp/cipher-mux/context/$CIPHER_MUX_SESSION_ID.json
-    if (opts.projectPath) {
+    // Inject status hook via adapter
+    if (opts.projectPath && adapter.supports('status-line') && adapter.attachStatusHook) {
       try {
-        injectStatusLineHook(opts.projectPath)
+        await adapter.attachStatusHook(opts.projectPath)
       } catch (err) {
-        console.warn('[SessionManager] StatusLine hook injection failed:', err)
+        console.warn('[SessionManager] Adapter statusline hook injection failed:', err)
       }
     }
 
@@ -110,9 +124,12 @@ export class SessionManager extends EventEmitter {
       status: 'active',
       createdAt: now,
       updatedAt: now,
+      adapterId: adapter.id,
+      capabilities: adapter.getCapabilities(),
     }
 
     this.sessions.set(id, session)
+    this.sessionAdapters.set(id, adapter)
 
     // Start output watcher — emits terminal data with session ULID as ID
     this.tmux.watchSession(tmuxName, id)
@@ -149,6 +166,7 @@ export class SessionManager extends EventEmitter {
     session.updatedAt = Date.now()
     this.emit('session-stopped', session)
     this.sessions.delete(sessionId)
+    this.sessionAdapters.delete(sessionId)
   }
 
   /**
@@ -358,33 +376,13 @@ export class SessionManager extends EventEmitter {
     return this.tmux.capturePane(target, lines)
   }
 
-  // ─── MCP Registration ───────────────────────────────────
+  // ─── Adapter ──────────────────────────────────────────
 
   /**
-   * Register the cipher-mux MCP server for a project directory.
-   * Uses `claude mcp add-json` with local scope so Claude Code discovers it on startup.
+   * Get the adapter associated with a session.
    */
-  private async registerMcpForProject(projectPath: string, config: OrchestratorConfig): Promise<void> {
-    const mcpUrl = `http://${config.mcpHost}:${config.mcpPort}/mcp`
-    const serverJson = JSON.stringify({
-      type: 'http',
-      url: mcpUrl,
-      headers: { Authorization: `Bearer ${config.mcpApiKey}` },
-    })
-
-    try {
-      // Remove existing entry first (ignore errors if it doesn't exist)
-      await runCommand('claude', [
-        'mcp', 'remove', '-s', 'local', 'cipher-mux',
-      ], { cwd: projectPath, timeout: 10_000 }).catch(() => {})
-
-      await runCommand('claude', [
-        'mcp', 'add-json', '-s', 'local', 'cipher-mux', serverJson,
-      ], { cwd: projectPath, timeout: 15_000 })
-      console.log(`[SessionManager] MCP registered for project: ${projectPath}`)
-    } catch (err) {
-      console.warn(`[SessionManager] MCP registration failed for ${projectPath}:`, err)
-    }
+  getAdapterForSession(sessionId: string): AgentAdapter | undefined {
+    return this.sessionAdapters.get(sessionId)
   }
 
   // ─── Orchestrator ─────────────────────────────────────
@@ -416,12 +414,14 @@ export class SessionManager extends EventEmitter {
     // Ensure directory exists
     fs.mkdirSync(orchestratorDir, { recursive: true })
 
-    // Generate and write CLAUDE.md
+    // Generate and write CLAUDE.md with adapter-specific prompt fragment
+    const adapter = this.adapterRegistry.getDefault()
     const claudeMd = generateOrchestratorClaudeMd({
       mcpHost: config.mcpHost,
       mcpPort: config.mcpPort,
       mcpApiKey: config.mcpApiKey,
       maxRetries: ORCHESTRATOR_MAX_RETRIES,
+      adapterFragment: adapter.buildOrchestratorPromptFragment('de'),
     })
     fs.writeFileSync(path.join(orchestratorDir, 'CLAUDE.md'), claudeMd, 'utf-8')
 
@@ -466,14 +466,18 @@ export class SessionManager extends EventEmitter {
     if (!this.orchestratorSessionId) {
       throw new Error('Orchestrator is not running')
     }
-    // Prepending `clear` wipes the shell prompt + command-echo before claude
-    // takes over the pane; without it xterm's viewport could remain scrolled
-    // above Claude's TUI. Do NOT send RIS (ESC c) here — tmux's per-pane
-    // charset state doesn't survive it, leaving DEC line-drawing chars
-    // rendered as `@`/`0` glyphs.
+    // Build launch command from adapter — structured {cmd, args}, no shell injection risk.
+    // Prepending `clear` wipes the shell prompt before the TUI takes over.
+    const adapter = this.adapterRegistry.getDefault()
+    const launchCmd = adapter.buildLaunchCommand({
+      projectPath: this.resolveOrchestratorDir(),
+      sessionName: 'Orchestrator',
+      isOrchestrator: true,
+    })
+    const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
     this.setPendingLaunch(
       this.orchestratorSessionId,
-      'clear; claude --dangerously-skip-permissions\n',
+      `clear; ${cmdStr}\n`,
     )
   }
 
