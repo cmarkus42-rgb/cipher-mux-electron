@@ -481,12 +481,13 @@ export class IpcHub {
       const panelWidth = 280 // chatroom
       const padding = 20
       const newWidth = cols * targetCellWidth + panelWidth + padding
-      // Height: row cells + drag region (38px) + status bar (28px) + grid padding (12px) + grid gaps
-      const targetCellHeight = 200 // MIN_ROW_HEIGHT_PX
+      // Height: fixed cell height × rows + chrome
+      const cellHeight = 380 // SESSION_CELL_HEIGHT — sized for 3 rows on QHD
       const chromeHeight = 38 + 28 // drag region + status bar
       const gridPadding = 12 // 6px padding top+bottom on .session-grid-area
+      const gridControls = 22 // grid controls bar height
       const gridGaps = (rows - 1) * 4 // 4px gap between rows
-      const newHeight = rows * targetCellHeight + chromeHeight + gridPadding + gridGaps
+      const newHeight = rows * cellHeight + chromeHeight + gridPadding + gridControls + gridGaps
       // Set minSize first — otherwise shrinking is blocked by old minimum
       win.setMinimumSize(newWidth, newHeight)
       win.setSize(newWidth, newHeight)

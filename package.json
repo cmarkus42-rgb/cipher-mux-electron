@@ -1,6 +1,6 @@
 {
   "name": "cipher-mux-electron",
-  "version": "0.8.2-beta",
+  "version": "0.8.3-beta",
   "description": "Electron-basierte Kommandozentrale für Claude Code Projekte",
   "main": "dist/main/main/main.js",
   "scripts": {

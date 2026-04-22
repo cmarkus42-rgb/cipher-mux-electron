@@ -103,29 +103,26 @@ describe('grid-types', () => {
       assert.ok(style.gridTemplateRows.includes('repeat(3,'))
     })
 
-    it('row template enforces minimum row height so rows do not squish', () => {
+    it('row template uses fixed cell height', () => {
       const style = computeGridStyle(2, 3)
-      // Must use minmax with a minimum pixel value, not bare 1fr
+      // Must use fixed pixel height per row, not flexible 1fr
       assert.ok(
-        style.gridTemplateRows.includes('minmax('),
-        `Row template should use minmax() for minimum height, got: ${style.gridTemplateRows}`,
-      )
-      assert.ok(
-        style.gridTemplateRows.includes('1fr'),
-        `Row template should still use 1fr as max, got: ${style.gridTemplateRows}`,
+        style.gridTemplateRows.includes('380px'),
+        `Row template should use fixed 380px height, got: ${style.gridTemplateRows}`,
       )
     })
 
-    it('row minimum height is consistent regardless of row count', () => {
+    it('row height is consistent regardless of row count', () => {
       const style2 = computeGridStyle(2, 2)
       const style3 = computeGridStyle(2, 3)
-      // Both should have the same minmax pattern (same min-height per row)
-      // Extract the minmax(...) portion — it should be identical
-      const minmax2 = style2.gridTemplateRows.match(/minmax\([^)]+\)/)
-      const minmax3 = style3.gridTemplateRows.match(/minmax\([^)]+\)/)
-      assert.ok(minmax2, `2-row grid should use minmax, got: ${style2.gridTemplateRows}`)
-      assert.ok(minmax3, `3-row grid should use minmax, got: ${style3.gridTemplateRows}`)
-      assert.strictEqual(minmax2![0], minmax3![0], 'Min row height should be the same regardless of row count')
+      assert.strictEqual(
+        style2.gridTemplateRows, 'repeat(2, 380px)',
+        `2-row grid should use fixed height, got: ${style2.gridTemplateRows}`,
+      )
+      assert.strictEqual(
+        style3.gridTemplateRows, 'repeat(3, 380px)',
+        `3-row grid should use fixed height, got: ${style3.gridTemplateRows}`,
+      )
     })
 
     it('does not touch column template (width unchanged)', () => {

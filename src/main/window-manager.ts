@@ -27,7 +27,6 @@ export class WindowManager {
       height,
       minWidth: gridWidth,
       minHeight: 600,
-      resizable: false,
       title: 'cipher-mux',
       titleBarStyle: 'hiddenInset',
       backgroundColor: '#1A1A1D',
@@ -50,6 +49,9 @@ export class WindowManager {
     } else {
       this.mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'))
     }
+
+    // Block manual resize — size is controlled programmatically by fitGrid
+    this.mainWindow.on('will-resize', (e) => { e.preventDefault() })
 
     // Forward renderer console to main process for debugging
     this.mainWindow.webContents.on('console-message', (_event, level, message) => {
