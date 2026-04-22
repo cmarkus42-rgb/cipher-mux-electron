@@ -15,7 +15,7 @@ interface Toast {
   type: 'transcription' | 'dispatched' | 'error'
 }
 
-export function useVoiceSession(focusedSessionId: string | null, focusedSessionName: string | null) {
+export function useVoiceSession(focusedSessionId: string | null, _focusedSessionName: string | null) {
   const [active, setActive] = useState(false)
   const [recording, setRecording] = useState(false)
   const [processing, setProcessing] = useState(false)

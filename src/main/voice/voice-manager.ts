@@ -17,7 +17,6 @@ import { VoiceState } from './voice-state'
 import { OllamaChat } from './ollama-chat'
 import { BugreportInterview, BUGREPORT_SYSTEM_PROMPT } from './bugreport-interview'
 import { VoiceInputRouter } from './voice-input-router'
-import { CODING_BIAS_PROMPT } from './stt-engine'
 
 // Optional import — app may not be available in all contexts (e.g. tests)
 let electronApp: { getPath(name: string): string } | undefined
