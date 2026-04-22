@@ -4,6 +4,7 @@ import * as path from 'path'
 import type { AppConfig } from '../../shared/types'
 import { createEmptyGrid } from '../../shared/grid-types'
 import { deepMerge } from '../util/deep-merge'
+import { BRAND } from '../../shared/brand'
 import {
   DEFAULT_SCAN_PATHS,
   DEFAULT_SCAN_DEPTH,
@@ -46,7 +47,7 @@ const defaults: AppConfig = {
     taskSources: {
       bugreport: {
         enabled: true,
-        path: '~/.config/cipher-mux/bugreports/outbox',
+        path: `~/.config/${BRAND.appName}/bugreports/outbox`,
       },
     },
   },

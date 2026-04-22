@@ -21,6 +21,7 @@ import { BugreportTaskSource } from './task/sources/bugreport-source'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
+import { BRAND } from '../shared/brand'
 import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest } from '../shared/types'
 
 /**
@@ -61,8 +62,7 @@ export class IpcHub {
     const appConfig = configStore.get('app')
     this.kickoffOrchestrator = new KickoffOrchestrator({
       sessionManager: this.sessionManager,
-      projectlauncherPath: appConfig?.projectlauncherPath
-        ?? '/Users/Shared/Nextcloud/Claude/ClaudeCode01/projectlauncher',
+      projectlauncherPath: appConfig?.projectlauncherPath || BRAND.projectLauncherDir,
       timeoutMs: ((appConfig?.kickoffTimeoutMinutes ?? 15) * 60_000),
     })
     this.bugreportManager = new BugreportManager({ messageBus: this.messageBus })
@@ -700,7 +700,8 @@ export class IpcHub {
 
   // ─── Input Requests (MPO) ─────────────────────────────
   private registerInputRequestChannels(): void {
-    const INPUT_REQUESTS_PATH = '/Users/Shared/Nextcloud/Claude/MultiProjectOrchestrator - MPO/state/input-requests.json'
+    const INPUT_REQUESTS_PATH = BRAND.inputRequestsPath
+    if (!INPUT_REQUESTS_PATH) return
 
     this.inputRequestWatcher = new InputRequestWatcher(INPUT_REQUESTS_PATH)
 

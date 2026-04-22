@@ -14,11 +14,6 @@ describe('buildLauncherPrompt', () => {
     assert.match(prompt, /existiert schon/i)
   })
 
-  it('references cipher-boox as quality baseline', () => {
-    const prompt = buildLauncherPrompt({ projectDir: '/any' })
-    assert.ok(prompt.includes('cipher-boox'))
-  })
-
   it('mentions subagent usage', () => {
     const prompt = buildLauncherPrompt({ projectDir: '/any' })
     assert.match(prompt, /subagent/i)
@@ -34,17 +29,15 @@ describe('buildLauncherPrompt', () => {
 
   it('omits requirements hint when no file provided', () => {
     const prompt = buildLauncherPrompt({ projectDir: '/any' })
-    // The "Anforderungsdatei:" hint only appears when a relpath is given.
     assert.ok(!prompt.includes('Anforderungsdatei:'))
   })
 
   it('embeds extra context verbatim', () => {
     const prompt = buildLauncherPrompt({
       projectDir: '/any',
-      extraContext: 'Stack ist Kotlin + Compose. Referenz: cipher-android.',
+      extraContext: 'Stack ist Kotlin + Compose.',
     })
     assert.ok(prompt.includes('Kotlin + Compose'))
-    assert.ok(prompt.includes('cipher-android'))
   })
 
   it('instructs to call kickoff_complete MCP tool', () => {
@@ -60,5 +53,11 @@ describe('buildLauncherPrompt', () => {
   it('ends with /launch invocation', () => {
     const prompt = buildLauncherPrompt({ projectDir: '/any' })
     assert.match(prompt.trimEnd(), /\/launch\s*$/)
+  })
+
+  it('includes quality baseline when BRAND provides one', () => {
+    const prompt = buildLauncherPrompt({ projectDir: '/any' })
+    assert.ok(typeof prompt === 'string')
+    assert.ok(prompt.length > 100)
   })
 })

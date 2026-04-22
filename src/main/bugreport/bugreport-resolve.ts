@@ -1,8 +1,9 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
+import { BRAND } from '../../shared/brand'
 
-const BUGREPORT_BASE = path.join(os.homedir(), '.config', 'cipher-mux', 'bugreports')
+const BUGREPORT_BASE = path.join(os.homedir(), '.config', BRAND.appName, 'bugreports')
 
 export interface ResolveArgs {
   bugId: string

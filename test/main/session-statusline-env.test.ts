@@ -27,7 +27,8 @@ describe('SessionManager statusLine integration', () => {
     const settingsPath = path.join(tmpProjectDir, '.claude', 'settings.local.json')
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
 
-    const command = settings.hooks.StatusLine[0].hooks[0].command
+    // statusLine is now a top-level setting (not hooks.StatusLine)
+    const command = settings.statusLine.command
     // The command must use $CIPHER_MUX_SESSION_ID so each session writes to its own file
     assert.ok(
       command.includes('$CIPHER_MUX_SESSION_ID'),

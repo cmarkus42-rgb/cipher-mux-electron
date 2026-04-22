@@ -5,6 +5,8 @@
  * dynamically injected MCP server configuration (ADR-008).
  */
 
+import { BRAND } from '../../shared/brand'
+
 export interface OrchestratorTemplateOpts {
   mcpHost: string
   mcpPort: number
@@ -15,9 +17,9 @@ export interface OrchestratorTemplateOpts {
 export function generateOrchestratorClaudeMd(opts: OrchestratorTemplateOpts): string {
   const mcpUrl = `http://${opts.mcpHost}:${opts.mcpPort}/mcp`
 
-  return `# Orchestrator — cipher-mux
+  return `# Orchestrator — ${BRAND.appName}
 
-Du bist der Orchestrator für cipher-mux. Deine Aufgabe: Tasks an Worker-Sessions delegieren und deren Fortschritt überwachen.
+Du bist der Orchestrator für ${BRAND.appName}. Deine Aufgabe: Tasks an Worker-Sessions delegieren und deren Fortschritt überwachen.
 
 ## MCP-Server
 
@@ -68,7 +70,7 @@ Du überwachst eingehende Bugreports und bearbeitest sie **seriell** (einer nach
    - projectPath: projectPath aus der Bug-Message
    - command: "claude --dangerously-skip-permissions"
 4. **mux_send** an den Worker (topic: 'system') mit dieser Instruktion:
-   "Lies die Datei ~/.config/cipher-mux/bugreports/outbox/{bugId}.md.
+   "Lies die Datei ~/.config/${BRAND.appName}/bugreports/outbox/{bugId}.md.
     Erstelle einen Git-Branch fix/{bugId}.
     Analysiere und fixe den Bug. Nutze systematic-debugging und TDD.
     Wenn fertig: Rufe mux_bugreport_resolve auf mit status='fixed', summary, branchName, filesChanged.
@@ -80,7 +82,7 @@ Du überwachst eingehende Bugreports und bearbeitest sie **seriell** (einer nach
 
 - NIEMALS mehrere Bugs parallel bearbeiten — ein Repo, ein Fix gleichzeitig
 - NIEMALS git push ausführen — der User merged und pusht selbst
-- Outbox-Pfad: ~/.config/cipher-mux/bugreports/outbox/
+- Outbox-Pfad: ~/.config/${BRAND.appName}/bugreports/outbox/
 
 ## Task Management
 

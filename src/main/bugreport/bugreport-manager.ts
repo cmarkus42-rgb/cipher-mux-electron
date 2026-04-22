@@ -8,8 +8,9 @@ import { APP_VERSION } from '../../shared/constants'
 import { runCommand } from '../util/exec-util'
 import { enrichBugreport, type EnrichedBugreport } from './ollama-client'
 import type { MessageBus } from '../message-bus/message-bus'
+import { BRAND } from '../../shared/brand'
 
-const BUGREPORT_BASE = path.join(os.homedir(), '.config', 'cipher-mux', 'bugreports')
+const BUGREPORT_BASE = path.join(os.homedir(), '.config', BRAND.appName, 'bugreports')
 const DEFAULT_OUTBOX_DIR = path.join(BUGREPORT_BASE, 'outbox')
 const INBOX_DIR = path.join(BUGREPORT_BASE, 'inbox')
 const ARCHIV_DIR = path.join(BUGREPORT_BASE, 'archiv')

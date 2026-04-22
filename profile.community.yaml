@@ -1,0 +1,12 @@
+# Community profile — neutral defaults for public builds.
+# See docs/contributing/profile-system.md for details.
+
+appName: cipher-mux
+scanPaths: []
+defaultProjectDir: ""
+orchestratorDir: "~/.config/cipher-mux/orchestrator"
+statusLineDir: "/tmp/cipher-mux/context"
+projectLauncherDir: ""
+qualityBaselineDir: ""
+ipcPrefix: cipher-mux
+inputRequestsPath: ""
