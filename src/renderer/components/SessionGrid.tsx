@@ -1,6 +1,7 @@
 // src/renderer/components/SessionGrid.tsx
 import { useState, useCallback } from 'preact/hooks'
 import type { SessionInfo, ContextUsage } from '../../shared/types'
+import { computeGridStyle } from '../../shared/grid-types'
 import type { GridState, ThemeName } from '../../shared/grid-types'
 import { SessionCell } from './SessionCell'
 import { LauncherCell } from './LauncherCell'
@@ -65,10 +66,7 @@ export function SessionGrid({
     setDragSourceIdx(null)
   }, [dragSourceIdx, onSwap])
 
-  const gridStyle = {
-    gridTemplateColumns: `repeat(${cols}, minmax(640px, 1fr))`,
-    gridTemplateRows: `repeat(${rows}, 1fr)`,
-  }
+  const gridStyle = computeGridStyle(cols, rows)
 
   const covered = getCoveredSlots(grid.slots, cols, rows)
 

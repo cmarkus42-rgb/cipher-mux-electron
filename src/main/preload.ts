@@ -153,6 +153,25 @@ const api = {
     },
   },
 
+  // ─── Input Requests (MPO) ──────────────────────────────
+  inputRequests: {
+    get: () => ipcRenderer.invoke(IPC.MPO_INPUT_REQUESTS),
+    answer: (id: string, answer: string) =>
+      ipcRenderer.invoke(IPC.MPO_REQUEST_ANSWERED, { id, answer }),
+    openReview: (filePath: string) =>
+      ipcRenderer.invoke(IPC.MPO_OPEN_REVIEW, { filePath }),
+    onChanged: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.MPO_INPUT_REQUESTS, handler)
+      return () => ipcRenderer.removeListener(IPC.MPO_INPUT_REQUESTS, handler)
+    },
+    onUpdate: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.MPO_REQUEST_UPDATE, handler)
+      return () => ipcRenderer.removeListener(IPC.MPO_REQUEST_UPDATE, handler)
+    },
+  },
+
   // ─── Voice ──────────────────────────────────────────────
   voice: {
     available: () => ipcRenderer.invoke(IPC.VOICE_AVAILABLE),

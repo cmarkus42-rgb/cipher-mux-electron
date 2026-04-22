@@ -69,6 +69,17 @@ export function swapSlots(state: GridState, idxA: number, idxB: number): GridSta
   return { ...state, slots: newSlots }
 }
 
+/** Minimum row height in pixels — prevents sessions from being squished when rows are added. */
+export const MIN_ROW_HEIGHT_PX = 200
+
+/** Compute CSS grid style for the session grid. */
+export function computeGridStyle(cols: number, rows: number): { gridTemplateColumns: string; gridTemplateRows: string } {
+  return {
+    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+    gridTemplateRows: `repeat(${rows}, minmax(${MIN_ROW_HEIGHT_PX}px, 1fr))`,
+  }
+}
+
 /** Resize grid. Keeps existing sessions in their slots where possible. */
 export function resizeGrid(state: GridState, newConfig: GridConfig): GridState {
   const newTotal = newConfig.cols * newConfig.rows
