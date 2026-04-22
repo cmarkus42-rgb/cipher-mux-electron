@@ -8,6 +8,7 @@ import { MAX_SESSIONS, ORCHESTRATOR_DIR, ORCHESTRATOR_MAX_RETRIES } from '../../
 import { TmuxManager } from '../tmux/tmux-manager'
 import { generateOrchestratorClaudeMd } from './orchestrator-template'
 import { runCommand } from '../util/exec-util'
+import { injectStatusLineHook } from '../monitoring/statusline-hook'
 
 /**
  * SessionManager — Registry for cipher-mux sessions.
@@ -59,8 +60,14 @@ export class SessionManager extends EventEmitter {
     const tmuxName = `cmux-${id.slice(-8).toLowerCase()}`
     const now = Date.now()
 
+    // Inject CIPHER_MUX_SESSION_ID so the StatusLine hook writes to the
+    // correct per-session file in /tmp/cipher-mux/context/.
+    let env: Record<string, string> = {
+      ...opts.env,
+      CIPHER_MUX_SESSION_ID: id,
+    }
+
     // Merge MCP env vars if config is set
-    let env = opts.env
     if (this.mcpConfig) {
       const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}`
       env = {
@@ -73,6 +80,16 @@ export class SessionManager extends EventEmitter {
       // so claude CLI can discover it on startup (env vars alone are ignored)
       if (opts.projectPath) {
         await this.registerMcpForProject(opts.projectPath, this.mcpConfig)
+      }
+    }
+
+    // Register StatusLine hook so Claude Code writes context usage data
+    // to /tmp/cipher-mux/context/$CIPHER_MUX_SESSION_ID.json
+    if (opts.projectPath) {
+      try {
+        injectStatusLineHook(opts.projectPath)
+      } catch (err) {
+        console.warn('[SessionManager] StatusLine hook injection failed:', err)
       }
     }
 
