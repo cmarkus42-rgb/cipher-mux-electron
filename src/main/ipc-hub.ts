@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain } from 'electron'
+import { app, dialog, ipcMain, screen } from 'electron'
 import * as path from 'path'
 import { WindowManager } from './window-manager'
 import { SessionManager } from './session/session-manager'
@@ -19,6 +19,7 @@ import { InputRequestWatcher } from './mpo/input-request-watcher'
 import { TaskHooks } from './task/task-hooks'
 import { BugreportTaskSource } from './task/sources/bugreport-source'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
+import { AdapterRegistry } from './agent/registry'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
 import { BRAND } from '../shared/brand'
@@ -45,9 +46,12 @@ export class IpcHub {
   private inputRequestWatcher: InputRequestWatcher | null = null
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
 
+  private adapterRegistry: AdapterRegistry
+
   constructor(private windowManager: WindowManager) {
+    this.adapterRegistry = new AdapterRegistry()
     this.tmux = new TmuxManager()
-    this.sessionManager = new SessionManager(this.tmux)
+    this.sessionManager = new SessionManager(this.tmux, this.adapterRegistry)
     try {
       this.messageBus = new MessageBus({
         dbPath: path.join(app.getPath('userData'), 'messages.db'),
@@ -62,6 +66,7 @@ export class IpcHub {
     const appConfig = configStore.get('app')
     this.kickoffOrchestrator = new KickoffOrchestrator({
       sessionManager: this.sessionManager,
+      adapterRegistry: this.adapterRegistry,
       projectlauncherPath: appConfig?.projectlauncherPath || BRAND.projectLauncherDir,
       timeoutMs: ((appConfig?.kickoffTimeoutMinutes ?? 15) * 60_000),
     })
@@ -477,19 +482,23 @@ export class IpcHub {
     ipcMain.handle(IPC.WINDOW_FIT_GRID, (_e, { cols, rows }: { cols: number; rows: number }) => {
       const win = this.windowManager.getMainWindow()
       if (!win) return
+      const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
       const targetCellWidth = 664
       const panelWidth = 280 // chatroom
       const padding = 20
-      const newWidth = cols * targetCellWidth + panelWidth + padding
+      const idealWidth = cols * targetCellWidth + panelWidth + padding
       // Height: fixed cell height × rows + chrome
-      const cellHeight = 380 // SESSION_CELL_HEIGHT — sized for 3 rows on QHD
+      const cellHeight = 380 // SESSION_CELL_HEIGHT
       const chromeHeight = 38 + 28 // drag region + status bar
       const gridPadding = 12 // 6px padding top+bottom on .session-grid-area
       const gridControls = 22 // grid controls bar height
       const gridGaps = (rows - 1) * 4 // 4px gap between rows
-      const newHeight = rows * cellHeight + chromeHeight + gridPadding + gridControls + gridGaps
+      const idealHeight = rows * cellHeight + chromeHeight + gridPadding + gridControls + gridGaps
+      // Cap to screen dimensions — grid scrolls when content exceeds window
+      const newWidth = Math.min(idealWidth, screenW)
+      const newHeight = Math.min(idealHeight, screenH)
       // Set minSize first — otherwise shrinking is blocked by old minimum
-      win.setMinimumSize(newWidth, newHeight)
+      win.setMinimumSize(Math.min(newWidth, screenW), Math.min(newHeight, screenH))
       win.setSize(newWidth, newHeight)
     })
   }
@@ -727,13 +736,20 @@ export class IpcHub {
       return { ok: true }
     })
 
-    // Open review file in CotEditor
+    // Open review file in system editor (platform-aware)
     ipcMain.handle(IPC.MPO_OPEN_REVIEW, async (_e, { filePath }: { filePath: string }) => {
       const { execFile } = await import('child_process')
       return new Promise((resolve) => {
-        execFile('open', ['-a', 'CotEditor', filePath], (err) => {
-          resolve({ ok: !err, error: err?.message })
-        })
+        if (process.platform === 'darwin') {
+          execFile('open', ['-a', 'CotEditor', filePath], (err) => {
+            resolve({ ok: !err, error: err?.message })
+          })
+        } else {
+          // Linux: use xdg-open as fallback
+          execFile('xdg-open', [filePath], (err) => {
+            resolve({ ok: !err, error: err?.message })
+          })
+        }
       })
     })
   }
