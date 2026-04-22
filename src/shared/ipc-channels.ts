@@ -86,6 +86,12 @@ export const IPC = {
   MPO_OPEN_REVIEW: 'cipher-mux:mpo:open-review',
   MPO_REQUEST_UPDATE: 'cipher-mux:mpo:request-update',
 
+  // Voice Session Input
+  VOICE_START_SESSION: 'cipher-mux:voice:start-session',
+  VOICE_SET_ROUTING_MODE: 'cipher-mux:voice:set-routing-mode',
+  VOICE_SESSION_TARGET: 'cipher-mux:voice:session-target',
+  VOICE_DISPATCHED: 'cipher-mux:voice:dispatched',
+
   // Tasks
   TASKS_LIST: 'cipher-mux:tasks:list',
   TASKS_GET: 'cipher-mux:tasks:get',
