@@ -89,6 +89,27 @@ describe('generateOrchestratorClaudeMd', () => {
     assert.ok(toolsSection.includes('mux_bugreport_resolve'))
   })
 
+  it('includes adapter fragment when provided', () => {
+    const md = generateOrchestratorClaudeMd({
+      ...defaultOpts,
+      adapterFragment: 'Start workers with: `claude --dangerously-skip-permissions`',
+    })
+    assert.ok(md.includes('claude --dangerously-skip-permissions'))
+    assert.ok(md.includes('Agent-spezifische Hinweise'))
+  })
+
+  it('omits adapter section heading when no fragment provided', () => {
+    const md = generateOrchestratorClaudeMd(defaultOpts)
+    // The heading "## Agent-spezifische Hinweise" should not appear as a section
+    assert.ok(!md.includes('## Agent-spezifische Hinweise'))
+  })
+
+  it('bugreport section does not contain hardcoded claude command', () => {
+    const md = generateOrchestratorClaudeMd(defaultOpts)
+    assert.ok(!md.includes('command: "claude --dangerously-skip-permissions"'))
+    assert.ok(md.includes('Agent-spezifische Hinweise'))
+  })
+
   it('should include task management tools in the template', () => {
     const md = generateOrchestratorClaudeMd({
       mcpHost: '127.0.0.1', mcpPort: 3100, mcpApiKey: 'key', maxRetries: 2,
