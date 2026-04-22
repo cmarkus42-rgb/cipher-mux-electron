@@ -45,6 +45,9 @@ export const MAX_SCAN_DEPTH = 5
 export const DEFAULT_WINDOW_WIDTH = 1400
 export const DEFAULT_WINDOW_HEIGHT = 900
 
+/** Fixed session cell height in pixels — sized so 3 rows fit on QHD (1440p) with macOS taskbar */
+export const SESSION_CELL_HEIGHT = 380
+
 /** Grid defaults */
 export const DEFAULT_GRID_COLS = 2
 export const DEFAULT_GRID_ROWS = 2
