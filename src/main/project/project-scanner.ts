@@ -67,13 +67,16 @@ export class ProjectScanner extends EventEmitter {
 
   /**
    * Inspect a single directory and return ProjectInfo if it's a recognized project.
+   * @param extraMarkers  Additional filenames to check beyond the defaults (CLAUDE.md, .claude, docs).
+   *                      Useful for multi-agent detection via adapter.getProjectMarkers().
    */
-  async inspectProject(projectPath: string): Promise<ProjectInfo | null> {
+  async inspectProject(projectPath: string, extraMarkers: string[] = []): Promise<ProjectInfo | null> {
     const hasClaudeMd = fs.existsSync(path.join(projectPath, 'CLAUDE.md'))
     const hasClaudeDir = fs.existsSync(path.join(projectPath, '.claude'))
     const hasDocs = fs.existsSync(path.join(projectPath, 'docs'))
+    const hasExtraMarker = extraMarkers.some(m => fs.existsSync(path.join(projectPath, m)))
 
-    if (!hasClaudeMd && !hasClaudeDir && !hasDocs) {
+    if (!hasClaudeMd && !hasClaudeDir && !hasDocs && !hasExtraMarker) {
       return null
     }
 
