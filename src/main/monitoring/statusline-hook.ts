@@ -24,28 +24,25 @@ export function injectStatusLineHook(projectPath: string): void {
     // File doesn't exist or invalid JSON
   }
 
-  // Ensure hooks object
-  if (!settings.hooks) {
-    settings.hooks = {}
-  }
-
-  // Skip if StatusLine hook already present
-  if (Array.isArray(settings.hooks.StatusLine) && settings.hooks.StatusLine.length > 0) {
+  // Skip if statusLine already configured
+  if (settings.statusLine?.command) {
     return
   }
 
-  // Add StatusLine hook — writes stdin JSON to per-session file
-  settings.hooks.StatusLine = [
-    {
-      matcher: '',
-      hooks: [
-        {
-          type: 'command',
-          command: `cat > ${STATUSLINE_DIR}/$CIPHER_MUX_SESSION_ID.json`,
-        },
-      ],
-    },
-  ]
+  // Add statusLine — top-level setting, receives JSON on stdin
+  settings.statusLine = {
+    type: 'command',
+    command: `cat > ${STATUSLINE_DIR}/$CIPHER_MUX_SESSION_ID.json`,
+    padding: 0,
+  }
+
+  // Remove legacy hooks.StatusLine if present
+  if (settings.hooks?.StatusLine) {
+    delete settings.hooks.StatusLine
+    if (Object.keys(settings.hooks).length === 0) {
+      delete settings.hooks
+    }
+  }
 
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
 }
