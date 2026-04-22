@@ -5,6 +5,7 @@ import { SessionManager } from './session/session-manager'
 import { TmuxManager } from './tmux/tmux-manager'
 import { MessageBus } from './message-bus/message-bus'
 import { ProjectScanner } from './project/project-scanner'
+import { AdapterRegistry } from './agent/registry'
 import { configStore } from './config/config-store'
 import { IPC } from '../shared/ipc-channels'
 import type { StartSessionOpts, SendMessage, Topic } from '../shared/types'
@@ -22,7 +23,7 @@ export class IpcHub {
 
   constructor(private windowManager: WindowManager) {
     this.tmux = new TmuxManager()
-    this.sessionManager = new SessionManager(this.tmux)
+    this.sessionManager = new SessionManager(this.tmux, new AdapterRegistry())
     this.messageBus = new MessageBus({
       dbPath: path.join(app.getPath('userData'), 'messages.db'),
     })
