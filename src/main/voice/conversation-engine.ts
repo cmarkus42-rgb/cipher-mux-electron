@@ -54,7 +54,7 @@ const DEFAULT_MIN_AUDIO_BYTES = 16_000
 const LATE_CHUNK_WINDOW_MS = 200
 /** Delay before auto-recovering from ERROR state */
 const ERROR_RECOVERY_MS = 1000
-const DEFAULT_ECHO_GUARD_MS = 300
+const DEFAULT_ECHO_GUARD_MS = 800
 const DEFAULT_MIN_UTTERANCE_MS = 300
 const DEFAULT_MAX_UTTERANCE_MS = 30_000
 /** Auto-recover from PROCESSING if no LLM response arrives within this window */
@@ -121,7 +121,12 @@ export class ConversationEngine extends EventEmitter {
       this.transport.sendStateChange(newState)
       this.emit('stateChange', newState, oldState)
 
-      // After agent stops speaking, block VAD events briefly
+      // Activate echo guard when agent starts speaking (suppress speaker echo from VAD)
+      if (newState === VoiceState.AGENT_SPEAKING) {
+        this._activateEchoGuard()
+      }
+
+      // Re-activate echo guard after agent stops speaking (tail echo from external speakers)
       if (oldState === VoiceState.AGENT_SPEAKING && newState === VoiceState.READY) {
         this._activateEchoGuard()
       }
@@ -224,7 +229,7 @@ export class ConversationEngine extends EventEmitter {
     if (this.state === VoiceState.READY) {
       this.stateMachine.transition(VoiceState.USER_SPEAKING)
       this.transport.dispatchStatus('Listening...', 'info')
-    } else if (this.state === VoiceState.AGENT_SPEAKING && this._bargeInEnabled) {
+    } else if (this.state === VoiceState.AGENT_SPEAKING && this._bargeInEnabled && !this._echoGuardActive) {
       if (!this._bargeInPending) {
         this._bargeInPending = true
       }
@@ -237,7 +242,7 @@ export class ConversationEngine extends EventEmitter {
    */
   onVADMisfire(): void {
     if (this.state !== VoiceState.AGENT_SPEAKING || !this._bargeInEnabled) return
-    if (this._echoGuardActive) return
+    if (this._echoGuardActive) return  // Suppress speaker echo misfires
 
     const now = Date.now()
     this._bargeInMisfireTimestamps.push(now)
@@ -405,9 +410,10 @@ export class ConversationEngine extends EventEmitter {
 
   // ── Echo guard ──
 
-  /** Block VAD events briefly after agent finishes speaking to avoid self-triggering. */
+  /** Block VAD events to avoid speaker echo triggering false barge-ins or recordings. */
   private _activateEchoGuard(): void {
     this._echoGuardActive = true
+    this._bargeInMisfireTimestamps = []
     if (this._echoGuardTimer) clearTimeout(this._echoGuardTimer)
     this._echoGuardTimer = setTimeout(() => {
       this._echoGuardActive = false
