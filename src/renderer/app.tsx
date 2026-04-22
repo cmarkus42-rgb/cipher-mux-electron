@@ -10,6 +10,8 @@ import { useTheme } from './hooks/useTheme'
 import { useShortcuts } from './hooks/useShortcuts'
 import { SessionGrid } from './components/SessionGrid'
 import { ChatroomPanel } from './components/ChatroomPanel'
+import { InputRequestsPanel } from './components/InputRequestsPanel'
+import { useInputRequests } from './hooks/useInputRequests'
 import { ChatToggleButton } from './components/ChatToggleButton'
 import { ProjectPopup } from './components/ProjectPopup'
 import { RecoveryDialog } from './components/RecoveryDialog'
@@ -20,6 +22,7 @@ import { SessionDialog } from './components/SessionDialog'
 
 export function App() {
   const [chatroomVisible, setChatroomVisible] = useState(true)
+  const [requestsVisible, setRequestsVisible] = useState(false)
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null)
   const [bugreportVisible, setBugreportVisible] = useState(false)
   const [infoVisible, setInfoVisible] = useState(false)
@@ -35,6 +38,7 @@ export function App() {
   const { projects, scanning, rescan } = useProjects()
   const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand } = useGrid()
   const { theme, toggleTheme } = useTheme()
+  const { openCount: requestsOpenCount } = useInputRequests()
 
   // Global keyboard shortcuts
   const shortcutEntries = useMemo(() => [
@@ -252,6 +256,7 @@ export function App() {
           onSwap={swap}
         />
         <ChatroomPanel visible={chatroomVisible} />
+        <InputRequestsPanel visible={requestsVisible} />
       </div>
 
       {/* floating chat toggle */}
@@ -265,10 +270,13 @@ export function App() {
       <StatusBar
         theme={theme}
         chatroomVisible={chatroomVisible}
+        requestsVisible={requestsVisible}
+        requestsOpenCount={requestsOpenCount}
         orchestratorRunning={!!orchestratorSessionId}
         onOrchestrator={handleOrchestratorToggle}
         onBugreport={() => setBugreportVisible(true)}
         onToggleChatroom={() => setChatroomVisible((v) => !v)}
+        onToggleRequests={() => setRequestsVisible((v) => !v)}
         onToggleTheme={toggleTheme}
         onInfo={() => setInfoVisible(true)}
       />

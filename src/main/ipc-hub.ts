@@ -15,6 +15,7 @@ import { VoiceManager } from './voice/voice-manager'
 import type { ConversationTransport } from './voice/conversation-engine'
 import { TaskManager } from './task/task-manager'
 import { TaskWatcher } from './task/task-watcher'
+import { InputRequestWatcher } from './mpo/input-request-watcher'
 import { TaskHooks } from './task/task-hooks'
 import { BugreportTaskSource } from './task/sources/bugreport-source'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
@@ -40,6 +41,7 @@ export class IpcHub {
   private taskWatcher: TaskWatcher | null = null
   private taskHooks: TaskHooks | null = null
   private bugreportSource: BugreportTaskSource | null = null
+  private inputRequestWatcher: InputRequestWatcher | null = null
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
 
   constructor(private windowManager: WindowManager) {
@@ -90,6 +92,7 @@ export class IpcHub {
     this.registerBugreportChannels()
     this.registerVoiceChannels()
     this.registerTaskChannels()
+    this.registerInputRequestChannels()
     this.setupEventForwarding()
 
     // Start context usage monitor
@@ -689,7 +692,47 @@ export class IpcHub {
     })
   }
 
+  // ─── Input Requests (MPO) ─────────────────────────────
+  private registerInputRequestChannels(): void {
+    const INPUT_REQUESTS_PATH = '/Users/Shared/Nextcloud/Claude/MultiProjectOrchestrator - MPO/state/input-requests.json'
+
+    this.inputRequestWatcher = new InputRequestWatcher(INPUT_REQUESTS_PATH)
+
+    // Forward changes to renderer
+    this.inputRequestWatcher.on('requests-changed', (requests: any[]) => {
+      this.windowManager.sendToMainWindow(IPC.MPO_INPUT_REQUESTS, { requests })
+    })
+
+    this.inputRequestWatcher.on('request-update', (update: any) => {
+      this.windowManager.sendToMainWindow(IPC.MPO_REQUEST_UPDATE, update)
+    })
+
+    this.inputRequestWatcher.start()
+
+    // Get all requests
+    ipcMain.handle(IPC.MPO_INPUT_REQUESTS, () => {
+      return { requests: this.inputRequestWatcher?.getRequests() ?? [] }
+    })
+
+    // Answer a request
+    ipcMain.handle(IPC.MPO_REQUEST_ANSWERED, (_e, { id, answer }: { id: string; answer: string }) => {
+      this.inputRequestWatcher?.answerRequest(id, answer)
+      return { ok: true }
+    })
+
+    // Open review file in CotEditor
+    ipcMain.handle(IPC.MPO_OPEN_REVIEW, async (_e, { filePath }: { filePath: string }) => {
+      const { execFile } = await import('child_process')
+      return new Promise((resolve) => {
+        execFile('open', ['-a', 'CotEditor', filePath], (err) => {
+          resolve({ ok: !err, error: err?.message })
+        })
+      })
+    })
+  }
+
   async destroy(): Promise<void> {
+    this.inputRequestWatcher?.stop()
     this.bugreportSource?.stop()
     this.taskWatcher?.stop()
     this.voiceManager?.shutdown()

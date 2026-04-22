@@ -5,17 +5,20 @@ import { APP_VERSION } from '../../shared/constants'
 interface StatusBarProps {
   theme: ThemeName
   chatroomVisible: boolean
+  requestsVisible: boolean
+  requestsOpenCount: number
   orchestratorRunning: boolean
   onOrchestrator: () => void
   onBugreport: () => void
   onToggleChatroom: () => void
+  onToggleRequests: () => void
   onToggleTheme: () => void
   onInfo: () => void
 }
 
 export function StatusBar({
-  theme, chatroomVisible, orchestratorRunning,
-  onOrchestrator, onBugreport, onToggleChatroom, onToggleTheme, onInfo,
+  theme, chatroomVisible, requestsVisible, requestsOpenCount, orchestratorRunning,
+  onOrchestrator, onBugreport, onToggleChatroom, onToggleRequests, onToggleTheme, onInfo,
 }: StatusBarProps) {
   return (
     <div class="status-bar">
@@ -33,6 +36,15 @@ export function StatusBar({
           onClick={onToggleChatroom}
         >
           chatroom
+        </button>
+        <button
+          class={`status-bar__btn${requestsVisible ? ' status-bar__btn--active' : ''}`}
+          onClick={onToggleRequests}
+        >
+          requests
+          {requestsOpenCount > 0 && (
+            <span class="status-bar__badge">{requestsOpenCount}</span>
+          )}
         </button>
         <button class="status-bar__btn status-bar__btn--active" onClick={onToggleTheme}>
           theme: {theme}

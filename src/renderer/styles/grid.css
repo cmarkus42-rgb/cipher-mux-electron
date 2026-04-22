@@ -9,13 +9,13 @@
   min-width: 0;
   min-height: 0;
   overflow-x: auto;
+  overflow-y: auto;
 }
 
 .session-grid {
-  flex: 1;
+  flex: 1 0 auto;
   display: grid;
   gap: 4px;
-  min-height: 0;
 }
 
 /* session cell */

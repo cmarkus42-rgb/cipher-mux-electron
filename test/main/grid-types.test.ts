@@ -7,6 +7,7 @@ import {
   removeSessionFromGrid,
   swapSlots,
   resizeGrid,
+  computeGridStyle,
 } from '../../src/shared/grid-types'
 
 describe('grid-types', () => {
@@ -69,5 +70,71 @@ describe('grid-types', () => {
     assert.strictEqual(resized.slots.length, 6)
     assert.strictEqual(resized.slots[0].sessionId, 'ses-1')
     assert.strictEqual(findFirstEmptySlot(resized), 1)
+  })
+
+  describe('computeGridStyle', () => {
+    it('columns use flexible min-width so they scale with container', () => {
+      const style = computeGridStyle(3, 2)
+      // Must NOT contain a fixed pixel minimum like 640px
+      assert.ok(
+        !style.gridTemplateColumns.includes('640px'),
+        `Column template should not have fixed 640px minimum, got: ${style.gridTemplateColumns}`,
+      )
+      // Should use repeat with the correct column count
+      assert.ok(
+        style.gridTemplateColumns.includes('repeat(3,'),
+        `Should use repeat(3, ...), got: ${style.gridTemplateColumns}`,
+      )
+    })
+
+    it('column template adjusts when column count changes', () => {
+      const style2 = computeGridStyle(2, 2)
+      const style3 = computeGridStyle(3, 2)
+      // Both should use 1fr-based flexible columns
+      assert.ok(style2.gridTemplateColumns.includes('1fr'))
+      assert.ok(style3.gridTemplateColumns.includes('1fr'))
+      // Column count in the repeat should differ
+      assert.ok(style2.gridTemplateColumns.includes('repeat(2,'))
+      assert.ok(style3.gridTemplateColumns.includes('repeat(3,'))
+    })
+
+    it('row template uses correct row count', () => {
+      const style = computeGridStyle(2, 3)
+      assert.ok(style.gridTemplateRows.includes('repeat(3,'))
+    })
+
+    it('row template enforces minimum row height so rows do not squish', () => {
+      const style = computeGridStyle(2, 3)
+      // Must use minmax with a minimum pixel value, not bare 1fr
+      assert.ok(
+        style.gridTemplateRows.includes('minmax('),
+        `Row template should use minmax() for minimum height, got: ${style.gridTemplateRows}`,
+      )
+      assert.ok(
+        style.gridTemplateRows.includes('1fr'),
+        `Row template should still use 1fr as max, got: ${style.gridTemplateRows}`,
+      )
+    })
+
+    it('row minimum height is consistent regardless of row count', () => {
+      const style2 = computeGridStyle(2, 2)
+      const style3 = computeGridStyle(2, 3)
+      // Both should have the same minmax pattern (same min-height per row)
+      // Extract the minmax(...) portion — it should be identical
+      const minmax2 = style2.gridTemplateRows.match(/minmax\([^)]+\)/)
+      const minmax3 = style3.gridTemplateRows.match(/minmax\([^)]+\)/)
+      assert.ok(minmax2, `2-row grid should use minmax, got: ${style2.gridTemplateRows}`)
+      assert.ok(minmax3, `3-row grid should use minmax, got: ${style3.gridTemplateRows}`)
+      assert.strictEqual(minmax2![0], minmax3![0], 'Min row height should be the same regardless of row count')
+    })
+
+    it('does not touch column template (width unchanged)', () => {
+      const style = computeGridStyle(3, 2)
+      assert.strictEqual(
+        style.gridTemplateColumns,
+        'repeat(3, minmax(0, 1fr))',
+        'Column template must remain unchanged',
+      )
+    })
   })
 })

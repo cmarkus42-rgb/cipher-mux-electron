@@ -80,6 +80,12 @@ export const IPC = {
   VOICE_GENERATION_DONE: 'cipher-mux:voice:generation-done',
   VOICE_STOP_PLAYBACK: 'cipher-mux:voice:stop-playback',
 
+  // Input Requests (MPO)
+  MPO_INPUT_REQUESTS: 'cipher-mux:mpo:input-requests',
+  MPO_REQUEST_ANSWERED: 'cipher-mux:mpo:request-answered',
+  MPO_OPEN_REVIEW: 'cipher-mux:mpo:open-review',
+  MPO_REQUEST_UPDATE: 'cipher-mux:mpo:request-update',
+
   // Tasks
   TASKS_LIST: 'cipher-mux:tasks:list',
   TASKS_GET: 'cipher-mux:tasks:get',
