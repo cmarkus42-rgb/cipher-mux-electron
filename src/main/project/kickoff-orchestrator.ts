@@ -2,6 +2,7 @@ import { EventEmitter } from 'events'
 import * as fs from 'fs'
 import * as path from 'path'
 import type { SessionManager } from '../session/session-manager'
+import type { AdapterRegistry } from '../agent/registry'
 import type {
   KickoffRequest,
   KickoffHandle,
@@ -14,6 +15,7 @@ import { KickoffWatcher } from './kickoff-watcher'
 
 export interface KickoffOrchestratorDeps {
   sessionManager: SessionManager
+  adapterRegistry: AdapterRegistry
   projectlauncherPath: string
   /** Timeout for kickoff completion signal. */
   timeoutMs: number
@@ -33,8 +35,6 @@ interface ActiveKickoff {
 
 const DEFAULT_PROMPT_SEND_DELAY_MS = 5_000
 const DEFAULT_INTERVIEW_SEND_DELAY_MS = 5_000
-
-const AUTOLAUNCH_CLAUDE = 'clear; claude --dangerously-skip-permissions\n'
 
 export class KickoffOrchestrator extends EventEmitter {
   private active: ActiveKickoff | null = null
@@ -76,18 +76,26 @@ export class KickoffOrchestrator extends EventEmitter {
 
     const projectName = path.basename(projectDir)
 
-    // 3. Build the launcher prompt.
+    // 3. Build the launcher prompt with adapter-specific suffix.
+    const adapter = this.deps.adapterRegistry.getDefault()
     const prompt = buildLauncherPrompt({
       projectDir,
       requirementsRelPath,
       extraContext: req.extraContext,
+      launcherSkillCmd: adapter.buildLauncherPromptFragment('de'),
     })
 
-    // 4. Start the launcher tmux session in projectlauncherPath.
+    // 4. Build launch command from adapter (structured, no shell injection).
+    const launchCmd = adapter.buildLaunchCommand({
+      projectPath: this.deps.projectlauncherPath,
+      sessionName: `Launcher: ${projectName}`,
+    })
+    const autoLaunchStr = `clear; ${[launchCmd.cmd, ...launchCmd.args].join(' ')}\n`
+
     const session = await this.deps.sessionManager.start({
       name: `Launcher: ${projectName}`,
       projectPath: this.deps.projectlauncherPath,
-      autoLaunch: AUTOLAUNCH_CLAUDE,
+      autoLaunch: autoLaunchStr,
     })
 
     const handle: KickoffHandle = {
@@ -149,18 +157,27 @@ export class KickoffOrchestrator extends EventEmitter {
 
     const interviewDelay = this.deps.interviewSendDelayMs ?? DEFAULT_INTERVIEW_SEND_DELAY_MS
 
-    // Start the follow-up session in the project dir.
+    // Start the follow-up session using adapter launch command.
+    const adapter = this.deps.adapterRegistry.getDefault()
+    const followLaunchCmd = adapter.buildLaunchCommand({
+      projectPath: active.handle.projectDir,
+      sessionName: active.handle.projectName,
+    })
+    const followAutoLaunch = `clear; ${[followLaunchCmd.cmd, ...followLaunchCmd.args].join(' ')}\n`
+
     this.deps.sessionManager.start({
       name: active.handle.projectName,
       projectPath: active.handle.projectDir,
-      autoLaunch: AUTOLAUNCH_CLAUDE,
+      autoLaunch: followAutoLaunch,
     }).then((followup) => {
-      // Queue the /interview prompt after claude has booted.
+      // Queue the launcher skill prompt after agent has booted.
+      const launcherFragment = adapter.buildLauncherPromptFragment('de')
+      const followUpCmd = launcherFragment || '/interview'
       setTimeout(() => {
         this.deps.sessionManager
-          .sendKeys(followup.id, '/interview\n')
+          .sendKeys(followup.id, followUpCmd + '\n')
           .catch((err) => {
-            console.error('[KickoffOrchestrator] /interview sendKeys failed:', err)
+            console.error('[KickoffOrchestrator] follow-up sendKeys failed:', err)
           })
       }, interviewDelay)
 
