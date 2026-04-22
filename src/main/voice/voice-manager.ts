@@ -16,6 +16,8 @@ import { ConversationEngine, type ConversationTransport } from './conversation-e
 import { VoiceState } from './voice-state'
 import { OllamaChat } from './ollama-chat'
 import { BugreportInterview, BUGREPORT_SYSTEM_PROMPT } from './bugreport-interview'
+import { VoiceInputRouter } from './voice-input-router'
+import { CODING_BIAS_PROMPT } from './stt-engine'
 
 // Optional import — app may not be available in all contexts (e.g. tests)
 let electronApp: { getPath(name: string): string } | undefined
@@ -34,6 +36,7 @@ export interface VoiceManagerConfig {
   ollamaPort?: number
   ollamaModel?: string
   interactionMode?: 'toggle' | 'always-listen'
+  skipTTS?: boolean
 }
 
 const DEFAULT_PIPER_VOICE = 'de_DE-dii-high'
@@ -47,6 +50,7 @@ export class VoiceManager extends EventEmitter {
   private piperTTS: PiperTTS | null = null
   private conversation: ConversationEngine | null = null
   private interview: BugreportInterview | null = null
+  private inputRouter: VoiceInputRouter | null = null
   private transport: ConversationTransport | null = null
   private _initialized = false
 
@@ -66,6 +70,7 @@ export class VoiceManager extends EventEmitter {
       ollamaPort: config?.ollamaPort ?? DEFAULT_OLLAMA_PORT,
       ollamaModel: config?.ollamaModel ?? DEFAULT_OLLAMA_MODEL,
       interactionMode: config?.interactionMode ?? 'toggle',
+      skipTTS: config?.skipTTS ?? false,
     }
   }
 
@@ -96,20 +101,24 @@ export class VoiceManager extends EventEmitter {
     })
     await this.sttRouter.init()
 
-    const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
-    this.piperTTS = new PiperTTS({
-      voice: this.config.piperVoice,
-      modelsDir: this.config.piperModelsDir,
-      nodeModulesPath: appNodeModules,
-    })
-    await this.piperTTS.init()
+    if (!this.config.skipTTS) {
+      const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
+      this.piperTTS = new PiperTTS({
+        voice: this.config.piperVoice,
+        modelsDir: this.config.piperModelsDir,
+        nodeModulesPath: appNodeModules,
+      })
+      await this.piperTTS.init()
+    }
 
     this.conversation = new ConversationEngine({
       sttRouter: this.sttRouter,
       transport: this.transport,
       interactionMode: this.config.interactionMode,
     })
-    this.conversation.setTTS(this.piperTTS)
+    if (this.piperTTS) {
+      this.conversation.setTTS(this.piperTTS)
+    }
 
     this._initialized = true
     this.emit('initialized')
@@ -160,6 +169,37 @@ export class VoiceManager extends EventEmitter {
     return this.interview
   }
 
+  /**
+   * Start session-input mode: STT-only pipeline, no LLM/TTS/interview.
+   * Transcriptions are routed through VoiceInputRouter to the focused session.
+   * Uses coding bias prompt for better recognition of programming terms.
+   */
+  startSessionMode(sessionManager: import('../session/session-manager').SessionManager): VoiceInputRouter {
+    if (!this._initialized || !this.conversation) {
+      throw new Error('VoiceManager: not initialized. Call init() first.')
+    }
+
+    this.inputRouter = new VoiceInputRouter({ sessionManager })
+    this.inputRouter.setMode('session')
+
+    // Wire: conversation transcription -> input router (session dispatch)
+    this.conversation.removeAllListeners('transcription')
+    this.conversation.on('transcription', (text: string) => {
+      this.inputRouter?.routeTranscription(text)
+    })
+
+    // Session mode uses PTT (toggle), not always-listen
+    this.conversation.setInteractionMode('toggle')
+    this.conversation.stateMachine.transition(VoiceState.READY)
+
+    return this.inputRouter
+  }
+
+  /** Get the input router (null if not in session mode) */
+  getInputRouter(): VoiceInputRouter | null {
+    return this.inputRouter
+  }
+
   /** Delegate VAD speech-start event to the conversation engine */
   onVADSpeechStart(): void {
     this.conversation?.onVADSpeechStart()
@@ -198,6 +238,11 @@ export class VoiceManager extends EventEmitter {
   /** Shut down all subsystems and release references */
   shutdown(): void {
     this._initialized = false
+
+    if (this.inputRouter) {
+      this.inputRouter.removeAllListeners()
+      this.inputRouter = null
+    }
 
     if (this.interview) {
       this.interview.removeAllListeners()
