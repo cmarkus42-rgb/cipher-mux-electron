@@ -474,17 +474,22 @@ export class IpcHub {
 
   // ─── Window ─────────────────────────────────────────────
   private registerWindowChannels(): void {
-    ipcMain.handle(IPC.WINDOW_FIT_GRID, (_e, { cols }: { cols: number }) => {
+    ipcMain.handle(IPC.WINDOW_FIT_GRID, (_e, { cols, rows }: { cols: number; rows: number }) => {
       const win = this.windowManager.getMainWindow()
       if (!win) return
       const targetCellWidth = 664
       const panelWidth = 280 // chatroom
       const padding = 20
       const newWidth = cols * targetCellWidth + panelWidth + padding
-      const [, currentHeight] = win.getSize()
+      // Height: row cells + drag region (38px) + status bar (28px) + grid padding (12px) + grid gaps
+      const targetCellHeight = 200 // MIN_ROW_HEIGHT_PX
+      const chromeHeight = 38 + 28 // drag region + status bar
+      const gridPadding = 12 // 6px padding top+bottom on .session-grid-area
+      const gridGaps = (rows - 1) * 4 // 4px gap between rows
+      const newHeight = rows * targetCellHeight + chromeHeight + gridPadding + gridGaps
       // Set minSize first — otherwise shrinking is blocked by old minimum
-      win.setMinimumSize(newWidth, 600)
-      win.setSize(newWidth, currentHeight)
+      win.setMinimumSize(newWidth, newHeight)
+      win.setSize(newWidth, newHeight)
     })
   }
 
