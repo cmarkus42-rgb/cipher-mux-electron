@@ -1,6 +1,9 @@
+import type { AdapterCapabilities } from '../../shared/types'
+
 interface PaneHeaderProps {
   sessionName: string
   contextUsage?: number // 0–100 percentage
+  capabilities?: AdapterCapabilities
 }
 
 function contextColorClass(pct: number): string {
@@ -9,7 +12,8 @@ function contextColorClass(pct: number): string {
   return 'text-accent'
 }
 
-export function PaneHeader({ sessionName, contextUsage }: PaneHeaderProps) {
+export function PaneHeader({ sessionName, contextUsage, capabilities }: PaneHeaderProps) {
+  const showContextUsage = capabilities?.['status-line'] !== false
   return (
     <div class="tab-bar">
       <div class="tab-bar__tab tab-bar__tab--active">
@@ -17,7 +21,7 @@ export function PaneHeader({ sessionName, contextUsage }: PaneHeaderProps) {
         <span>{sessionName}</span>
       </div>
       <div style={{ flex: 1 }} />
-      {contextUsage != null && (
+      {showContextUsage && contextUsage != null && (
         <div
           class="tab-bar__tab"
           style={{ cursor: 'default', borderRight: 'none' }}
@@ -25,6 +29,14 @@ export function PaneHeader({ sessionName, contextUsage }: PaneHeaderProps) {
           <span class={`text-xs ${contextColorClass(contextUsage)}`}>
             CTX {contextUsage}%
           </span>
+        </div>
+      )}
+      {!showContextUsage && (
+        <div
+          class="tab-bar__tab"
+          style={{ cursor: 'default', borderRight: 'none' }}
+        >
+          <span class="text-xs text-muted">CTX —</span>
         </div>
       )}
     </div>

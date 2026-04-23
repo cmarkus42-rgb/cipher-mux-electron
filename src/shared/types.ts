@@ -2,6 +2,18 @@
 
 import type { GridState, ThemeName } from './grid-types'
 
+// ─── Agent Adapter ────────────────────────────────────────
+
+export type AdapterFeature =
+  | 'mcp-injection'
+  | 'status-line'
+  | 'skip-permissions'
+  | 'sub-agents'
+  | 'project-instructions'
+  | 'message-bus-participant'
+
+export type AdapterCapabilities = Record<AdapterFeature, boolean>
+
 // ─── Session ───────────────────────────────────────────────
 
 export type SessionStatus = 'active' | 'stopped' | 'orphaned'
@@ -15,6 +27,10 @@ export interface SessionInfo {
   status: SessionStatus
   createdAt: number
   updatedAt: number
+  /** Agent adapter ID for this session, e.g. 'claude-code' */
+  adapterId?: string
+  /** Capability flags from the agent adapter */
+  capabilities?: AdapterCapabilities
 }
 
 export interface StartSessionOpts {
