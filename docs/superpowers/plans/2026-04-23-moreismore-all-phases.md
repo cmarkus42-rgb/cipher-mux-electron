@@ -1357,78 +1357,70 @@ cd /Users/Shared/Nextcloud/Claude/ClaudeCode01/cipher-mux-electron
 npm run build && npm start
 ```
 
-### Test Suite: Personas (Phase D)
+### Personas (Phase D)
 
-| # | Test | Steps | Expected |
-|---|------|-------|----------|
-| P1 | **Personas tab opens** | Settings → Personas tab | Left: persona list with colored dots. Right: editor panel. Seeded personas visible (Orchestrator, MPO, Worker, empty, + custom ones). |
-| P2 | **Built-in persona locked** | Select "Orchestrator" | Name field disabled, color swatches disabled, delete button disabled. Only prompt textarea editable. |
-| P3 | **Custom persona editable** | Select "Developer" | Name editable, color swatches clickable, delete enabled. |
-| P4 | **Create new persona** | Click "+ NEW" | New entry appears in list with default name "NEW PERSONA". Editor opens for it. |
-| P5 | **Delete custom persona** | Select custom persona → Delete → Confirm | Persona removed from list. If used in workspaces, cells fall back to (empty). |
-| P6 | **Duplicate persona** | Select any → Duplicate | Copy appears with " COPY" suffix, fully editable. |
-| P7 | **Save persona prompt** | Edit prompt → Save | Prompt persists across app restart. |
-| P8 | **Usage counter** | Check bottom of editor | Shows which workspaces reference this persona. |
+- [ ] **P1 — Personas tab opens.** Settings → Personas tab. Links: Persona-Liste mit farbigen Dots. Rechts: Editor-Panel. Seeded Personas sichtbar (Orchestrator, MPO, Worker, empty + custom).
+- [ ] **P2 — Built-in persona locked.** "Orchestrator" selektieren. Name-Feld disabled, Farbswatches disabled, Delete disabled. Nur Prompt-Textarea editierbar.
+- [ ] **P3 — Custom persona editierbar.** "Developer" selektieren. Name editierbar, Farbswatches klickbar, Delete enabled.
+- [ ] **P4 — Neue Persona erstellen.** "+ NEW" klicken. Neuer Eintrag in Liste mit Name "NEW PERSONA". Editor oeffnet sich dafuer.
+- [ ] **P5 — Custom persona loeschen.** Custom Persona selektieren → Delete → Confirm. Persona weg aus Liste.
+- [ ] **P6 — Persona duplizieren.** Beliebige selektieren → Duplicate. Kopie erscheint mit " COPY" Suffix, voll editierbar.
+- [ ] **P7 — Persona prompt speichern.** Prompt editieren → Save. App neu starten → Prompt bleibt.
+- [ ] **P8 — Usage counter.** Unten im Editor: zeigt welche Workspaces diese Persona referenzieren.
 
-### Test Suite: Workspaces (Phase D)
+### Workspaces (Phase D)
 
-| # | Test | Steps | Expected |
-|---|------|-------|----------|
-| W1 | **Workspaces tab opens** | Settings → Workspaces tab | Left: workspace list with mini thumbnails. Right: grid editor. |
-| W2 | **Grid editor interactive** | Click cells in editor | Cell Inspector updates: shows persona, project, prompt with source note. |
-| W3 | **Dimension stepper** | Click Cols +/- and Rows +/- | Grid resizes (1-10 cols, 1-6 rows). Existing cells preserved, new cells empty. |
-| W4 | **Merge handle** | Hover bottom edge of cell → click | Cell merges with cell below (grid-row: span 2). Click again → unmerge. |
-| W5 | **Prompt resolution display** | Cell with no prompt, persona has default | Inspector shows "Using persona default from Personas tab" source note. |
-| W6 | **Workspace override** | Set override in Persona Prompt Overrides section | Cells with that persona show "Using this workspace's persona override" source note. |
-| W7 | **Cell prompt wins** | Type prompt in cell inspector textarea | Source note changes to "Per-cell override in effect". |
-| W8 | **Create workspace** | Click "+ NEW" in list | New workspace with default 3×2 grid, all empty cells. |
-| W9 | **Delete workspace** | Select → Delete → Confirm | Workspace removed. |
-| W10 | **Save/Revert** | Make changes → Revert | Changes undone. Make changes → Save → restart app | Changes persist. |
+- [ ] **W1 — Workspaces tab opens.** Settings → Workspaces tab. Links: Workspace-Liste mit Mini-Thumbnails. Rechts: Grid-Editor.
+- [ ] **W2 — Grid editor interaktiv.** Zellen im Editor klicken. Cell Inspector updated: zeigt Persona, Project, Prompt mit Source-Note.
+- [ ] **W3 — Dimension stepper.** Cols +/- und Rows +/- klicken. Grid resized (1-10 Cols, 1-6 Rows). Bestehende Zellen bleiben, neue sind empty.
+- [ ] **W4 — Merge handle.** Untere Kante einer Zelle hovern → klicken. Zelle merged mit Zelle darunter (grid-row: span 2). Nochmal klicken → unmerge.
+- [ ] **W5 — Prompt resolution.** Zelle ohne Prompt, Persona hat Default. Inspector zeigt "Using persona default" Source-Note.
+- [ ] **W6 — Workspace override.** Override in Persona Prompt Overrides setzen. Zellen mit der Persona zeigen "workspace override" Source-Note.
+- [ ] **W7 — Cell prompt wins.** Prompt in Cell Inspector Textarea tippen. Source-Note wechselt auf "Per-cell override".
+- [ ] **W8 — Workspace erstellen.** "+ NEW" in Liste. Neuer Workspace mit 3×2 Grid, alle Zellen empty.
+- [ ] **W9 — Workspace loeschen.** Selektieren → Delete → Confirm. Workspace weg.
+- [ ] **W10 — Save/Revert.** Aendern → Revert → Aenderungen weg. Aendern → Save → App neu starten → Aenderungen bleiben.
 
-### Test Suite: Workspace Popup (Phase D)
+### Workspace Popup (Phase D)
 
-| # | Test | Steps | Expected |
-|---|------|-------|----------|
-| WP1 | **Popup opens** | Click "workspaces" in statusbar | Popup appears above statusbar. Shows workspace list with color-coded thumbnails. |
-| WP2 | **Persona legend** | Select different workspaces | Legend updates showing which personas are in the workspace + count. |
-| WP3 | **Load workspace** | Select workspace → Load | Grid resizes, sessions spawn per non-empty cells with correct project paths. |
-| WP4 | **Quick links** | Click "personas..." / "edit..." | Opens Settings on correct tab. |
+- [ ] **WP1 — Popup oeffnet.** "workspaces" in Statusbar klicken. Popup erscheint ueber Statusbar mit Workspace-Liste + farbigen Thumbnails.
+- [ ] **WP2 — Persona-Legende.** Verschiedene Workspaces selektieren. Legende updated mit Personas + Count.
+- [ ] **WP3 — Workspace laden.** Workspace selektieren → Load. Grid resized, Sessions spawnen fuer non-empty Cells.
+- [ ] **WP4 — Quick links.** "personas..." / "edit..." klicken. Oeffnet Settings auf korrektem Tab.
 
-### Test Suite: Communication (Phase E)
+### Communication (Phase E)
 
-| # | Test | Steps | Expected |
-|---|------|-------|----------|
-| E1 | **mux_send without target** | MCP call: `mux_send(topic: "chat", sender: "test", text: "hello")` | Message appears in chatroom. No push delivery. Response: `{ ok: true, id: "..." }` |
-| E2 | **mux_send with push** | MCP call: `mux_send(topic: "system", sender: "Orch", text: "do X", sessionName: "Worker-1")` | Message in bus AND injected into Worker-1 tmux pane. Response: `{ ok: true, id: "...", delivered: true }` |
-| E3 | **mux_send to dead session** | Send to stopped/nonexistent session | Response: `{ ok: true, id: "...", delivered: false }` |
-| E4 | **Visible session** | MCP call: `mux_create_session(name: "visible-test", visible: true)` | Session appears in grid automatically, focus shifts to it. |
-| E5 | **Background session cards** | Create session via MCP (no visible flag) → open chatroom | Session appears as card in chatroom. Click card → session placed in grid. |
+- [ ] **E1 — mux_send ohne Target.** MCP: `mux_send(topic:"chat", sender:"test", text:"hello")`. Message im Chatroom. Response: `{ok:true, id:"..."}`.
+- [ ] **E2 — mux_send mit Push.** MCP: `mux_send(topic:"system", sender:"Orch", text:"do X", sessionName:"Worker-1")`. Message im Bus UND in Worker-1 tmux injiziert. Response: `{delivered:true}`.
+- [ ] **E3 — mux_send an tote Session.** An gestoppte/nicht-existente Session senden. Response: `{delivered:false}`.
+- [ ] **E4 — Visible session.** MCP: `mux_create_session(name:"visible-test", visible:true)`. Session erscheint automatisch im Grid.
+- [ ] **E5 — Background session cards.** Session via MCP erstellen (ohne visible) → Chatroom oeffnen. Session als Card sichtbar. Klick → Session ins Grid.
 
-### Test Suite: Voice (Phase F)
+### Voice (Phase F)
 
-| # | Test | Steps | Expected |
-|---|------|-------|----------|
-| V1 | **Voice available** | Click mic toggle in statusbar | No ABI mismatch error. Toggle activates (LED on). |
-| V2 | **Speech transcription** | Activate mic → speak | Text appears in focused session's terminal input. |
-| V3 | **Voice commands** | Say "abschicken" | Sends Enter to terminal. |
-| V4 | **Bugreport voice** | Open bugreport dialog → activate voice toggle | Speech transcribed into description field. |
+- [ ] **V1 — Voice available.** Mic-Toggle in Statusbar klicken. Kein ABI-Mismatch-Fehler. Toggle aktiviert (LED an).
+- [ ] **V2 — Sprache transkribieren.** Mic aktivieren → sprechen. Text erscheint im fokussierten Session-Terminal.
+- [ ] **V3 — Voice commands.** "abschicken" sagen. Sendet Enter ans Terminal.
+- [ ] **V4 — Bugreport voice.** Bugreport Dialog oeffnen → Voice Toggle aktivieren. Sprache wird ins Description-Feld transkribiert.
 
-### Test Suite: StatusBar (Phase C4 + General)
+### StatusBar (Phase C4 + General)
 
-| # | Test | Steps | Expected |
-|---|------|-------|----------|
-| S1 | **Orchestrator button** | Click orchestrator | Session starts. Button shows active state with orange dot. |
-| S2 | **MPO button** | Click mpo | MPO session starts. Button shows active state with green dot. |
-| S3 | **Grid controls** | Click +/- for cols/rows | Grid resizes live. |
-| S4 | **Theme display** | Theme name shown in statusbar | Clicking opens settings on themes tab. |
+- [ ] **S1 — Orchestrator button.** Klicken → Session startet. Button zeigt Active-State mit orangem Dot + Glow.
+- [ ] **S2 — MPO button.** Klicken → MPO startet. Button zeigt Active-State mit gruenem Dot + Glow.
+- [ ] **S3 — Grid controls.** +/- fuer Cols/Rows klicken. Grid resized live.
+- [ ] **S4 — Theme display.** Theme-Name in Statusbar sichtbar. Klick oeffnet Settings auf Themes-Tab.
 
-### Test Suite: Automated (npm run test)
+### Shell Button (Phase G1)
 
-| # | Test | Expected |
-|---|------|----------|
-| T1 | **All unit tests pass** | `npm run test` → 470+ tests, 0 failures |
-| T2 | **Build clean** | `npm run build` → no TS errors, no warnings |
-| T3 | **Lint clean** | `npm run lint` → 0 errors |
+- [ ] **G1 — Shell button sichtbar.** Session-Cell hat `$` Button im Header (zwischen ⇄ und ✕).
+- [ ] **G2 — Shell session oeffnet.** `$` klicken → neue Shell-Session im gleichen Projekt-Verzeichnis. Kein Claude CLI, nur zsh.
+- [ ] **G3 — Shell im Grid.** Neue Shell-Session erscheint im naechsten freien Slot. Focus springt dorthin.
+
+### Automated
+
+- [ ] **T1 — Unit tests.** `npm run test` → 500+ Tests, 0 Failures.
+- [ ] **T2 — Build clean.** `npm run build` → kein TS-Fehler.
+- [ ] **T3 — Lint clean.** `npm run lint` → 0 Errors.
 
 ---
 
