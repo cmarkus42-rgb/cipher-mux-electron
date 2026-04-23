@@ -7,7 +7,9 @@ import {
   removeSessionFromGrid,
   swapSlots,
   resizeGrid,
+  findFirstEmptySlot,
 } from '../../shared/grid-types'
+import { MAX_GRID_COLS } from '../../shared/constants'
 import { GRID_SAVE_DEBOUNCE_MS } from '../../shared/constants'
 
 const api = () => (window as any).cipherMux
@@ -43,8 +45,15 @@ export function useGrid() {
 
   const addSession = useCallback((sessionId: string) => {
     setGrid((prev) => {
-      const { state } = assignSessionToGrid(prev, sessionId)
+      let target = prev
+      // Auto-expand grid columns when all slots are occupied
+      if (findFirstEmptySlot(prev) === -1 && prev.config.cols < MAX_GRID_COLS) {
+        target = resizeGrid(prev, { cols: prev.config.cols + 1, rows: prev.config.rows })
+      }
+      const { state } = assignSessionToGrid(target, sessionId)
       persist(state)
+      // Resize window to fit (possibly expanded) grid
+      api().window.fitGrid(state.config.cols, state.config.rows).catch(() => {})
       return state
     })
   }, [persist])
@@ -53,6 +62,8 @@ export function useGrid() {
     setGrid((prev) => {
       const next = removeSessionFromGrid(prev, sessionId)
       persist(next)
+      // Re-fit window in case grid can shrink
+      api().window.fitGrid(next.config.cols, next.config.rows).catch(() => {})
       return next
     })
   }, [persist])

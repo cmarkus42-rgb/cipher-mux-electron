@@ -73,12 +73,12 @@ describe('grid-types', () => {
   })
 
   describe('computeGridStyle', () => {
-    it('columns use flexible min-width so they scale with container', () => {
+    it('columns enforce fixed minimum width to prevent compression', () => {
       const style = computeGridStyle(3, 2)
-      // Must NOT contain a fixed pixel minimum like 640px
+      // Must contain a fixed pixel minimum (640px) so cells don't compress
       assert.ok(
-        !style.gridTemplateColumns.includes('640px'),
-        `Column template should not have fixed 640px minimum, got: ${style.gridTemplateColumns}`,
+        style.gridTemplateColumns.includes('640px'),
+        `Column template must enforce 640px minimum, got: ${style.gridTemplateColumns}`,
       )
       // Should use repeat with the correct column count
       assert.ok(
@@ -125,12 +125,12 @@ describe('grid-types', () => {
       )
     })
 
-    it('does not touch column template (width unchanged)', () => {
+    it('uses fixed minimum width for columns (640px)', () => {
       const style = computeGridStyle(3, 2)
       assert.strictEqual(
         style.gridTemplateColumns,
-        'repeat(3, minmax(0, 1fr))',
-        'Column template must remain unchanged',
+        'repeat(3, minmax(640px, 1fr))',
+        'Column template must enforce 640px minimum cell width',
       )
     })
   })
