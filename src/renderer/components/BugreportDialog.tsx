@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'preact/hooks'
+import { useState, useCallback, useEffect, useRef } from 'preact/hooks'
 import { useVoiceBugreport, type ChatTurn } from '../voice/use-voice-bugreport'
 
 const api = () => (window as any).cipherMux
@@ -49,12 +49,19 @@ function formatEnriched(e: EnrichedBugreport): string {
 }
 
 function ChatBubbles({ turns }: { turns: ChatTurn[] }) {
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [turns.length])
+
   if (turns.length === 0) return null
   return (
     <div class="bugreport-chat">
       {turns.map((turn, i) => (
         <div key={i} class={`bugreport-chat__bubble bugreport-chat__bubble--${turn.role}`}>{turn.text}</div>
       ))}
+      <div ref={bottomRef} />
     </div>
   )
 }

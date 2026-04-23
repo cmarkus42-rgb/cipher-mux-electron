@@ -39,6 +39,8 @@ export function useVoiceBugreport() {
   const streamRef = useRef<MediaStream | null>(null)
   const audioQueueRef = useRef<string[]>([])
   const playingRef = useRef(false)
+  /** Whether session voice was active before bugreport took over */
+  const sessionVoiceWasActiveRef = useRef(false)
 
   // ── Audio playback queue: drains base64 WAV chunks sequentially ──
 
@@ -117,6 +119,16 @@ export function useVoiceBugreport() {
       audioQueueRef.current = []
       playingRef.current = false
 
+      // Suspend session voice mode if it's active — bugreport takes over the pipeline.
+      // Check the global flag set by useVoiceSession when session voice is active.
+      const w = window as any
+      const sessionVoiceActive = !!w.__cipherMuxSessionVoiceActive
+      if (sessionVoiceActive) {
+        console.log('[VoiceBugreport] Suspending session voice mode')
+        api().voice.setRoutingMode('off')
+      }
+      sessionVoiceWasActiveRef.current = sessionVoiceActive
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       })
@@ -175,6 +187,13 @@ export function useVoiceBugreport() {
 
     audioQueueRef.current = []
     playingRef.current = false
+
+    // Restore session voice mode if it was active before bugreport
+    if (sessionVoiceWasActiveRef.current) {
+      console.log('[VoiceBugreport] Restoring session voice mode')
+      api().voice.setRoutingMode('session')
+      sessionVoiceWasActiveRef.current = false
+    }
 
     setError(null)
     setTurns([])
