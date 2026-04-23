@@ -71,10 +71,13 @@ export function swapSlots(state: GridState, idxA: number, idxB: number): GridSta
 
 import { SESSION_CELL_HEIGHT } from './constants'
 
+/** Minimum cell width in pixels — prevents grid compression when window is narrow */
+export const SESSION_CELL_MIN_WIDTH = 640
+
 /** Compute CSS grid style for the session grid. */
 export function computeGridStyle(cols: number, rows: number): { gridTemplateColumns: string; gridTemplateRows: string } {
   return {
-    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+    gridTemplateColumns: `repeat(${cols}, minmax(${SESSION_CELL_MIN_WIDTH}px, 1fr))`,
     gridTemplateRows: `repeat(${rows}, ${SESSION_CELL_HEIGHT}px)`,
   }
 }
