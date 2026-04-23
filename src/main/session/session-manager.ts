@@ -610,9 +610,13 @@ export class SessionManager extends EventEmitter {
    */
   async stopMpo(): Promise<void> {
     if (!this.mpoSessionId) {
-      throw new Error('MPO is not running')
+      return // already stopped — no-op
     }
-    await this.stop(this.mpoSessionId)
+    try {
+      await this.stop(this.mpoSessionId)
+    } catch {
+      // Session may already be gone (killed externally)
+    }
     this.mpoSessionId = null
     this.emit('mpo-stopped')
   }

@@ -45,6 +45,8 @@ export function useGrid() {
 
   const addSession = useCallback((sessionId: string) => {
     setGrid((prev) => {
+      // Skip if session is already in the grid (idempotent)
+      if (prev.slots.some((s) => s.sessionId === sessionId)) return prev
       let target = prev
       // Auto-expand grid columns when all slots are occupied
       if (findFirstEmptySlot(prev) === -1 && prev.config.cols < MAX_GRID_COLS) {
