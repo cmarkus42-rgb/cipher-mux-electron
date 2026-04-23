@@ -26,6 +26,7 @@ import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
 import { BRAND } from '../shared/brand'
 import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest } from '../shared/types'
 import type { Persona, Workspace } from '../shared/persona-types'
+import { applyWorkspace } from './workspace/workspace-manager'
 
 /**
  * IPC Hub — Central router for all IPC channels.
@@ -966,12 +967,17 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.WORKSPACES_APPLY, async (_e, workspaceId: string) => {
-      // Stub — full apply logic comes in D8
       const workspaces = configStore.get('workspaces')
       const ws = workspaces.find(w => w.id === workspaceId)
-      if (!ws) return { applied: false, error: 'Workspace not found' }
+      if (!ws) return { applied: false, sessionsStarted: 0, warnings: ['Workspace not found'] }
+
+      const personas = configStore.get('personas')
+      const result = await applyWorkspace(ws, personas, this.sessionManager, (cols, rows) => {
+        this.windowManager.sendToMainWindow(IPC.SESSION_CHANGED, { gridResize: { cols, rows } })
+      })
+
       configStore.set('activeWorkspaceId', workspaceId)
-      return { applied: true, sessionsStarted: 0, warnings: ['Apply logic not yet implemented'] }
+      return result
     })
 
     ipcMain.handle(IPC.WORKSPACES_ACTIVE, (_e, id?: string) => {

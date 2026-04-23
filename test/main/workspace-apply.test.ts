@@ -1,0 +1,112 @@
+import { describe, it } from 'node:test'
+import * as assert from 'node:assert/strict'
+import { applyWorkspace } from '../../src/main/workspace/workspace-manager'
+import type { Workspace, Persona } from '../../src/shared/persona-types'
+
+const PERSONAS: Persona[] = [
+  { id: 'orchestrator', name: 'Orchestrator', color: '#B8601A', builtin: true, defaultPrompt: 'coordinate' },
+  { id: 'worker', name: 'Worker', color: '#6A6A72', builtin: true, defaultPrompt: 'execute tasks' },
+  { id: 'empty', name: '(empty)', color: '#D4D4C8', builtin: true, defaultPrompt: '' },
+]
+
+function makeMockStarter() {
+  const started: { name: string; projectPath: string; autoLaunch?: string }[] = []
+  return {
+    started,
+    start: async (opts: { name: string; projectPath: string; autoLaunch?: string }) => {
+      started.push(opts)
+      return { id: `session-${started.length}` }
+    },
+  }
+}
+
+describe('applyWorkspace', () => {
+  it('spawns sessions for non-empty cells with projects', async () => {
+    const ws: Workspace = {
+      id: 'test', name: 'Test', cols: 2, rows: 1,
+      cells: [
+        { persona: 'orchestrator', project: '/proj/a', prompt: '' },
+        { persona: 'worker', project: '/proj/b', prompt: '' },
+      ],
+      merges: {}, promptOverrides: {},
+    }
+    const starter = makeMockStarter()
+    let gridSize: { cols: number; rows: number } | null = null
+    const result = await applyWorkspace(ws, PERSONAS, starter, (c, r) => { gridSize = { cols: c, rows: r } })
+
+    assert.equal(result.applied, true)
+    assert.equal(result.sessionsStarted, 2)
+    assert.equal(result.warnings.length, 0)
+    assert.deepEqual(gridSize, { cols: 2, rows: 1 })
+    assert.equal(starter.started.length, 2)
+    assert.equal(starter.started[0].name, 'Orchestrator')
+    assert.equal(starter.started[0].projectPath, '/proj/a')
+  })
+
+  it('skips empty cells', async () => {
+    const ws: Workspace = {
+      id: 'test', name: 'Test', cols: 2, rows: 1,
+      cells: [
+        { persona: 'orchestrator', project: '/proj/a', prompt: '' },
+        { persona: 'empty', project: '', prompt: '' },
+      ],
+      merges: {}, promptOverrides: {},
+    }
+    const starter = makeMockStarter()
+    const result = await applyWorkspace(ws, PERSONAS, starter, () => {})
+    assert.equal(result.sessionsStarted, 1)
+    assert.equal(starter.started.length, 1)
+  })
+
+  it('warns on cells with no project', async () => {
+    const ws: Workspace = {
+      id: 'test', name: 'Test', cols: 1, rows: 1,
+      cells: [{ persona: 'worker', project: '', prompt: '' }],
+      merges: {}, promptOverrides: {},
+    }
+    const starter = makeMockStarter()
+    const result = await applyWorkspace(ws, PERSONAS, starter, () => {})
+    assert.equal(result.sessionsStarted, 0)
+    assert.equal(result.warnings.length, 1)
+    assert.ok(result.warnings[0].includes('no project'))
+  })
+
+  it('warns on unknown persona', async () => {
+    const ws: Workspace = {
+      id: 'test', name: 'Test', cols: 1, rows: 1,
+      cells: [{ persona: 'unknown-persona', project: '/proj/a', prompt: '' }],
+      merges: {}, promptOverrides: {},
+    }
+    const starter = makeMockStarter()
+    const result = await applyWorkspace(ws, PERSONAS, starter, () => {})
+    assert.equal(result.sessionsStarted, 0)
+    assert.equal(result.warnings.length, 1)
+    assert.ok(result.warnings[0].includes('not found'))
+  })
+
+  it('uses resolved prompt as autoLaunch', async () => {
+    const ws: Workspace = {
+      id: 'test', name: 'Test', cols: 1, rows: 1,
+      cells: [{ persona: 'worker', project: '/proj/a', prompt: 'run tests' }],
+      merges: {}, promptOverrides: {},
+    }
+    const starter = makeMockStarter()
+    await applyWorkspace(ws, PERSONAS, starter, () => {})
+    assert.ok(starter.started[0].autoLaunch?.includes('run tests'))
+  })
+
+  it('catches start failures and adds warning', async () => {
+    const ws: Workspace = {
+      id: 'test', name: 'Test', cols: 1, rows: 1,
+      cells: [{ persona: 'worker', project: '/proj/a', prompt: '' }],
+      merges: {}, promptOverrides: {},
+    }
+    const failStarter = {
+      start: async () => { throw new Error('tmux failed') },
+    }
+    const result = await applyWorkspace(ws, PERSONAS, failStarter, () => {})
+    assert.equal(result.sessionsStarted, 0)
+    assert.equal(result.warnings.length, 1)
+    assert.ok(result.warnings[0].includes('tmux failed'))
+  })
+})
