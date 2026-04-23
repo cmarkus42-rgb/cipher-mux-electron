@@ -46,6 +46,7 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
     const api = (window as any).cipherMux
     if (active) {
       // Deactivate
+      console.log('[VoiceSession] Deactivating voice session')
       api.voice.setRoutingMode('off')
       if (vadRef.current) {
         vadRef.current.destroy()
@@ -68,39 +69,65 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
 
     // Activate
     try {
-      const { available } = await api.voice.available()
-      if (!available) {
-        setError('Voice not available — native modules missing')
+      console.log('[VoiceSession] Checking voice availability...')
+      const availResult = await api.voice.available()
+      console.log('[VoiceSession] voice.available() =>', availResult)
+      if (!availResult.available) {
+        const msg = `Voice not available: ${availResult.reason ?? 'native modules missing'}`
+        console.log('[VoiceSession] BLOCKED:', msg)
+        setError(msg)
         return
       }
+
+      console.log('[VoiceSession] Starting voice session mode...')
       const result = await api.voice.startSession()
+      console.log('[VoiceSession] voice.startSession() =>', result)
       if (!result.ok) {
         setError(result.error ?? 'Failed to start voice session mode')
         return
       }
 
       // Get mic access
+      console.log('[VoiceSession] Requesting microphone access...')
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
       })
       streamRef.current = stream
+      console.log('[VoiceSession] Microphone access granted, tracks:', stream.getAudioTracks().length)
+
       const audioCtx = new AudioContext({ sampleRate: 16000 })
       audioCtxRef.current = audioCtx
+      console.log('[VoiceSession] AudioContext created, sampleRate:', audioCtx.sampleRate)
 
       // Initialize VAD
+      console.log('[VoiceSession] Initializing VAD...')
       const { initVAD } = await import('../voice/vad-loader')
       vadRef.current = await initVAD(stream, audioCtx, {
-        onSpeechStart: () => api.voice.vadSpeechStart(),
-        onSpeechEnd: (audio: Float32Array) => api.voice.vadSpeechEnd(Array.from(audio)),
-        onVADMisfire: () => api.voice.vadMisfire(),
+        onSpeechStart: () => {
+          console.log('[VoiceSession] VAD: speech start detected')
+          api.voice.vadSpeechStart()
+        },
+        onSpeechEnd: (audio: Float32Array) => {
+          console.log('[VoiceSession] VAD: speech end, samples:', audio.length)
+          api.voice.vadSpeechEnd(Array.from(audio))
+        },
+        onVADMisfire: () => {
+          console.log('[VoiceSession] VAD: misfire')
+          api.voice.vadMisfire()
+        },
       })
+      console.log('[VoiceSession] VAD initialized, starting...')
+      vadRef.current.start()
+      console.log('[VoiceSession] VAD started')
 
       api.voice.setRoutingMode('session')
       api.voice.setSessionTarget(focusedSessionId)
       setActive(true)
       setVoiceState('ready')
       setError(null)
+      console.log('[VoiceSession] Voice session ACTIVE, focusedSession:', focusedSessionId)
     } catch (err) {
+      console.error('[VoiceSession] Activation error:', err)
       setError((err as Error).message)
     }
   }, [active, focusedSessionId])
@@ -133,7 +160,10 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
     return () => unsubs.forEach(fn => fn())
   }, [active, showToast])
 
-  // PTT hotkey handler
+  // PTT hotkey handler (Ctrl+Shift+Space)
+  // In session mode, VAD handles speech detection automatically.
+  // PTT serves as a manual override: keydown forces speech-start,
+  // keyup is a no-op (VAD's onSpeechEnd delivers the audio).
   useEffect(() => {
     if (!active) return
 
@@ -145,6 +175,7 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
         e.preventDefault()
         if (!pttDown) {
           pttDown = true
+          console.log('[VoiceSession] PTT keydown — sending vadSpeechStart')
           api.voice.vadSpeechStart()
         }
       }
@@ -153,8 +184,9 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === PTT_COMBO.code && pttDown) {
         pttDown = false
-        // Stop recording via the toggle mechanism
-        api.voice.stop()
+        console.log('[VoiceSession] PTT keyup — VAD handles speech end automatically')
+        // No action needed: VAD's onSpeechEnd callback delivers the audio
+        // to the main process for STT processing.
       }
     }
 
