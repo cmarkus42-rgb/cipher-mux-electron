@@ -263,13 +263,15 @@ export class TmuxManager extends EventEmitter {
    */
   async listSessions(): Promise<TmuxSessionInfo[]> {
     try {
+      // Use tab separator instead of colon — session names can contain colons
+      const sep = '\t'
       const output = await runCommand('tmux', [
         'list-sessions',
         '-F',
-        '#{session_id}:#{session_name}:#{session_width}:#{session_height}:#{session_created}',
+        `#{session_id}${sep}#{session_name}${sep}#{session_width}${sep}#{session_height}${sep}#{session_created}`,
       ])
-      return output.split('\n').filter(Boolean).map((line) => {
-        const [id, name, width, height, created] = line.split(':')
+      const sessions = output.split('\n').filter(Boolean).map((line) => {
+        const [id, name, width, height, created] = line.split(sep)
         return {
           id,
           name,
@@ -278,7 +280,10 @@ export class TmuxManager extends EventEmitter {
           created: parseInt(created, 10),
         }
       })
-    } catch {
+      console.log(`[TmuxManager] listSessions found ${sessions.length} tmux sessions:`, sessions.map(s => s.name).join(', '))
+      return sessions
+    } catch (err) {
+      console.warn('[TmuxManager] listSessions failed (no tmux server?):', err)
       return []
     }
   }

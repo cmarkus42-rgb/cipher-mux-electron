@@ -5,9 +5,10 @@ const api = () => (window as any).cipherMux
 
 interface RecoveryDialogProps {
   onDone: () => void
+  onAdopt?: (sessionId: string) => void
 }
 
-export function RecoveryDialog({ onDone }: RecoveryDialogProps) {
+export function RecoveryDialog({ onDone, onAdopt }: RecoveryDialogProps) {
   const [orphans, setOrphans] = useState<SessionInfo[]>([])
   const [visible, setVisible] = useState(false)
 
@@ -22,9 +23,14 @@ export function RecoveryDialog({ onDone }: RecoveryDialogProps) {
   }, [])
 
   const handleAdopt = useCallback(async (orphan: SessionInfo) => {
-    await api().sessions.recoveryAction('adopt', orphan.tmuxSession, orphan.name)
+    const adopted = await api().sessions.recoveryAction('adopt', orphan.tmuxSession, orphan.name)
+    // Place adopted session in the grid
+    const adoptedId = adopted?.id
+    if (adoptedId && onAdopt) {
+      onAdopt(adoptedId)
+    }
     setOrphans((prev) => prev.filter((o) => o.id !== orphan.id))
-  }, [])
+  }, [onAdopt])
 
   const handleKill = useCallback(async (orphan: SessionInfo) => {
     await api().sessions.recoveryAction('kill', orphan.tmuxSession)
