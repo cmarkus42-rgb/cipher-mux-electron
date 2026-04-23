@@ -19,6 +19,8 @@ export interface LauncherPromptInput {
   requirementsRelPath?: string
   /** Optional free-form context the user typed in the dialog. */
   extraContext?: string
+  /** Agent-specific launcher suffix, e.g. '/launch' for Claude Code. */
+  launcherSkillCmd?: string
 }
 
 export function buildLauncherPrompt(input: LauncherPromptInput): string {
@@ -43,5 +45,5 @@ ${reqHint}Lies die Anforderungen gründlich — nicht oberflächlich — und ver
 Das Verzeichnis existiert schon, also merge das Template rein statt neu anzulegen: vorhandene Dateien bleiben, \`.claude/\`, \`docs/SPEC.md\`-Skelett, \`.gitignore\`, Platzhalter etc. kommen dazu.
 ${baselineBlock}${extra}Wenn du fertig bist, ruf das MCP-Tool \`kickoff_complete\` auf mit \`{ projectPath, projectName, detectedStack }\`. Als Fallback: schreib eine leere Datei \`.kickoff-complete\` ins Projekt-Verzeichnis.
 
-/launch`
+${input.launcherSkillCmd ?? '/launch'}`
 }

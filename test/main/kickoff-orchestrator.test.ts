@@ -5,6 +5,7 @@ import * as path from 'path'
 import * as os from 'os'
 import { EventEmitter } from 'events'
 import { KickoffOrchestrator } from '../../src/main/project/kickoff-orchestrator'
+import { AdapterRegistry } from '../../src/main/agent/registry'
 import type { SessionInfo, StartSessionOpts } from '../../src/shared/types'
 
 /** Captures console.log + console.warn + console.error output for assertions. */
@@ -67,6 +68,7 @@ describe('KickoffOrchestrator', () => {
     mockSm = new MockSessionManager()
     orchestrator = new KickoffOrchestrator({
       sessionManager: mockSm as any,
+      adapterRegistry: new AdapterRegistry(),
       projectlauncherPath: launcherDir,
       timeoutMs: 60_000,
       pollIntervalMs: 30,
@@ -175,6 +177,7 @@ describe('KickoffOrchestrator', () => {
     // Short-timeout orchestrator for this test.
     const shortOrch = new KickoffOrchestrator({
       sessionManager: mockSm as any,
+      adapterRegistry: new AdapterRegistry(),
       projectlauncherPath: launcherDir,
       timeoutMs: 100,
       pollIntervalMs: 30,
@@ -224,6 +227,7 @@ describe('KickoffOrchestrator', () => {
   it('treats timeout as implicit complete when CLAUDE.md exists in projectDir', async () => {
     const shortOrch = new KickoffOrchestrator({
       sessionManager: mockSm as any,
+      adapterRegistry: new AdapterRegistry(),
       projectlauncherPath: launcherDir,
       timeoutMs: 80,
       pollIntervalMs: 30,
@@ -252,6 +256,7 @@ describe('KickoffOrchestrator', () => {
   it('still fires kickoff-timeout when CLAUDE.md is absent at timeout', async () => {
     const shortOrch = new KickoffOrchestrator({
       sessionManager: mockSm as any,
+      adapterRegistry: new AdapterRegistry(),
       projectlauncherPath: launcherDir,
       timeoutMs: 80,
       pollIntervalMs: 30,
@@ -289,6 +294,7 @@ describe('KickoffOrchestrator', () => {
     // Pfad B: reason=marker (via marker file).
     const fresh = new KickoffOrchestrator({
       sessionManager: mockSm as any,
+      adapterRegistry: new AdapterRegistry(),
       projectlauncherPath: launcherDir,
       timeoutMs: 60_000,
       pollIntervalMs: 30,
@@ -309,6 +315,7 @@ describe('KickoffOrchestrator', () => {
     // Pfad C: reason=implicit (Timeout mit CLAUDE.md).
     const impl = new KickoffOrchestrator({
       sessionManager: mockSm as any,
+      adapterRegistry: new AdapterRegistry(),
       projectlauncherPath: launcherDir,
       timeoutMs: 80,
       pollIntervalMs: 30,
@@ -329,6 +336,7 @@ describe('KickoffOrchestrator', () => {
     // Pfad D: reason=hard-fail (Timeout ohne CLAUDE.md).
     const hard = new KickoffOrchestrator({
       sessionManager: mockSm as any,
+      adapterRegistry: new AdapterRegistry(),
       projectlauncherPath: launcherDir,
       timeoutMs: 80,
       pollIntervalMs: 30,

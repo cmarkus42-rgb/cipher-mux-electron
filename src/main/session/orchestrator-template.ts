@@ -12,6 +12,8 @@ export interface OrchestratorTemplateOpts {
   mcpPort: number
   mcpApiKey: string
   maxRetries: number
+  /** Agent-specific orchestrator instructions from adapter */
+  adapterFragment?: string
 }
 
 export function generateOrchestratorClaudeMd(opts: OrchestratorTemplateOpts): string {
@@ -68,7 +70,7 @@ Du überwachst eingehende Bugreports und bearbeitest sie **seriell** (einer nach
 3. **mux_create_session** mit:
    - name: "fix-{bugId}"
    - projectPath: projectPath aus der Bug-Message
-   - command: "claude --dangerously-skip-permissions"
+   - command: (siehe "Agent-spezifische Hinweise" unten)
 4. **mux_send** an den Worker (topic: 'system') mit dieser Instruktion:
    "Lies die Datei ~/.config/${BRAND.appName}/bugreports/outbox/{bugId}.md.
     Erstelle einen Git-Branch fix/{bugId}.
@@ -119,5 +121,6 @@ Fuer grosse Projekte: Erstelle Parent-Task, dann Child-Tasks pro Launcher-Sessio
 Sessions werden automatisch ueberwacht. Wenn ein Worker >5 Minuten keinen Output produziert,
 wird er als "stalled" markiert und automatisch retried (bis max_retries erreicht).
 Du musst NICHT manuell pollen. Bei Eskalation (max retries ueberschritten) wirst du benachrichtigt.
+${opts.adapterFragment ? `\n## Agent-spezifische Hinweise\n\n${opts.adapterFragment}` : ''}
 `
 }
