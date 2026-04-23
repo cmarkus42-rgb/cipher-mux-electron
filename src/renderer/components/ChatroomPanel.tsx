@@ -1,14 +1,19 @@
 import { useState, useRef, useEffect, useCallback } from 'preact/hooks'
-import type { Message } from '../../shared/types'
+import type { Message, SessionInfo, ContextUsage } from '../../shared/types'
 import { useMessages } from '../hooks/useMessages'
 
 interface ChatroomPanelProps {
   visible: boolean
+  sessions: SessionInfo[]
+  gridSessionIds: string[]
+  contextUsages: Record<string, ContextUsage>
+  onAddToGrid: (sessionId: string) => void
 }
 
-export function ChatroomPanel({ visible }: ChatroomPanelProps) {
+export function ChatroomPanel({ visible, sessions, gridSessionIds, contextUsages, onAddToGrid }: ChatroomPanelProps) {
   const { messages, unreadCount, send, markAllRead } = useMessages()
   const [input, setInput] = useState('')
+  const [bgExpanded, setBgExpanded] = useState(false)
   const feedRef = useRef<HTMLDivElement>(null!)
   const inputRef = useRef<HTMLInputElement>(null!)
 
@@ -59,6 +64,41 @@ export function ChatroomPanel({ visible }: ChatroomPanelProps) {
           <span class="badge badge--info">{unreadCount}</span>
         )}
       </div>
+
+      {(() => {
+        const backgroundSessions = sessions.filter(s =>
+          s.status === 'active' && !gridSessionIds.includes(s.id)
+        )
+        return backgroundSessions.length > 0 ? (
+          <div class="chatroom-bg-sessions">
+            <div
+              class="chatroom-bg-sessions__head"
+              onClick={() => setBgExpanded(v => !v)}
+            >
+              <span>{bgExpanded ? '▾' : '▸'} Background ({backgroundSessions.length})</span>
+            </div>
+            {bgExpanded && backgroundSessions.map(s => (
+              <div
+                key={s.id}
+                class="chatroom-bg-session"
+                onClick={() => onAddToGrid(s.id)}
+                title="Click to place in grid"
+              >
+                <div class="chatroom-bg-session__name">{s.name}</div>
+                <div class="chatroom-bg-session__path">{s.projectPath ?? ''}</div>
+                {contextUsages[s.id] && (
+                  <div class="chatroom-bg-session__bar">
+                    <div
+                      class="chatroom-bg-session__fill"
+                      style={{ width: `${contextUsages[s.id].usedPercentage}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : null
+      })()}
 
       <div class="chatroom-panel__messages" ref={feedRef}>
         {messages.length === 0 ? (
