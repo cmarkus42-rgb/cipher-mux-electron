@@ -223,6 +223,7 @@ export class ConversationEngine extends EventEmitter {
 
   /** VAD detected speech onset. In always-listen mode, transition to USER_SPEAKING. */
   onVADSpeechStart(): void {
+    console.log('[ConvEngine] onVADSpeechStart — mode:', this._interactionMode, 'state:', this.state, 'echoGuard:', this._echoGuardActive)
     if (this._interactionMode !== 'always-listen') return
     if (this._echoGuardActive) return
 
@@ -261,6 +262,7 @@ export class ConversationEngine extends EventEmitter {
    * Validates utterance duration, converts to PCM, and triggers STT processing.
    */
   async onVADSpeechEnd(audioData: number[]): Promise<void> {
+    console.log('[ConvEngine] onVADSpeechEnd — mode:', this._interactionMode, 'state:', this.state, 'samples:', audioData?.length)
     // -- Input validation --
     // audioData arrives from the renderer via IPC as a serialized number[].
     // Guard against non-array, non-numeric entries, or oversized payloads that
@@ -428,8 +430,10 @@ export class ConversationEngine extends EventEmitter {
    */
   async processAudio(): Promise<void> {
     const totalBytes = this.audioBuffers.reduce((sum, b) => sum + b.length, 0)
+    console.log('[ConvEngine] processAudio — totalBytes:', totalBytes, 'minRequired:', this.minAudioBytes)
 
     if (totalBytes < this.minAudioBytes) {
+      console.log('[ConvEngine] processAudio — audio too short, returning to READY')
       this.stateMachine.transition(VoiceState.READY)
       return
     }
@@ -438,7 +442,10 @@ export class ConversationEngine extends EventEmitter {
     this.audioBuffers = []
 
     try {
-      const text = await this.sttRouter.transcribeBatch(pcmBuffer)
+      console.log('[ConvEngine] processAudio — running STT on', pcmBuffer.length, 'bytes...')
+      const { CODING_BIAS_PROMPT } = await import('./stt-engine')
+      const text = await this.sttRouter.transcribeBatch(pcmBuffer, CODING_BIAS_PROMPT)
+      console.log('[ConvEngine] processAudio — STT result:', JSON.stringify(text?.slice(0, 100)))
       this.emit('transcription', text)
 
       if (text && text.trim().length > 0) {

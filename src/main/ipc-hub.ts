@@ -591,23 +591,33 @@ export class IpcHub {
   // ─── Voice ──────────────────────────────────────────────
   private registerVoiceChannels(): void {
     ipcMain.handle(IPC.VOICE_AVAILABLE, () => {
+      console.log('[Voice] VOICE_AVAILABLE check starting...')
       const fs = require('fs')
       // Check native modules exist (don't import — ABI mismatch crashes)
       try {
         require.resolve('@fugood/whisper.node')
+        console.log('[Voice] whisper.node: found')
       } catch {
+        console.log('[Voice] whisper.node: NOT found')
         return { available: false, reason: 'whisper.node nicht installiert' }
       }
       try {
         require.resolve('sherpa-onnx-node')
+        console.log('[Voice] sherpa-onnx-node: found')
       } catch {
-        return { available: false, reason: 'sherpa-onnx-node nicht installiert' }
+        console.log('[Voice] sherpa-onnx-node: NOT found — skipping (optional for session mode)')
+        // sherpa-onnx-node is only needed for VAD in main process (bugreport mode).
+        // Session mode uses renderer-side VAD (Silero ONNX via vad-loader.ts).
+        // Don't block voice availability for missing sherpa-onnx-node.
       }
       // Check whisper model
       const modelPath = path.join(app.getPath('userData'), 'models', 'whisper', 'ggml-small.bin')
       if (!fs.existsSync(modelPath)) {
-        return { available: false, reason: 'Whisper-Model fehlt — scripts/download-models.sh' }
+        console.log('[Voice] Whisper model NOT found at:', modelPath)
+        return { available: false, reason: `Whisper-Model fehlt: ${modelPath} — scripts/download-models.sh` }
       }
+      console.log('[Voice] Whisper model found at:', modelPath)
+      console.log('[Voice] VOICE_AVAILABLE => true')
       return { available: true }
     })
 
@@ -671,22 +681,27 @@ export class IpcHub {
     })
 
     ipcMain.on(IPC.VOICE_VAD_SPEECH_START, () => {
+      console.log('[Voice] IPC: VAD_SPEECH_START received, voiceManager:', !!this.voiceManager)
       this.voiceManager?.onVADSpeechStart()
     })
 
     ipcMain.on(IPC.VOICE_VAD_SPEECH_END, (_event, audioData: number[]) => {
+      console.log('[Voice] IPC: VAD_SPEECH_END received, samples:', audioData?.length)
       this.voiceManager?.onVADSpeechEnd(audioData)
     })
 
     ipcMain.on(IPC.VOICE_VAD_MISFIRE, () => {
+      console.log('[Voice] IPC: VAD_MISFIRE received')
       this.voiceManager?.onVADMisfire()
     })
 
     // ── Session Voice Mode ──
 
     ipcMain.handle(IPC.VOICE_START_SESSION, async () => {
+      console.log('[Voice] VOICE_START_SESSION handler invoked')
       try {
         if (!this.voiceManager) {
+          console.log('[Voice] Creating new VoiceManager (skipTTS: true)')
           this.voiceManager = new VoiceManager({ skipTTS: true })
           const transport: ConversationTransport = {
             sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
@@ -703,13 +718,17 @@ export class IpcHub {
           await this.voiceManager.init()
         }
 
+        console.log('[Voice] Starting session mode...')
         const inputRouter = this.voiceManager.startSessionMode(this.sessionManager)
         inputRouter.on('dispatched', (data: { sessionId: string; sessionName: string; text: string }) => {
+          console.log('[Voice] Dispatched to session:', data.sessionName, 'text:', data.text.slice(0, 80))
           this.windowManager.sendToMainWindow(IPC.VOICE_DISPATCHED, data)
         })
         inputRouter.on('error', (data: { code: string; message: string }) => {
+          console.log('[Voice] InputRouter error:', data.code, data.message)
           this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, data.message)
         })
+        console.log('[Voice] VOICE_START_SESSION => ok')
         return { ok: true }
       } catch (err) {
         const msg = (err as Error).message

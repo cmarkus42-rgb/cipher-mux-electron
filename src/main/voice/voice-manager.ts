@@ -88,6 +88,7 @@ export class VoiceManager extends EventEmitter {
    * 3. ConversationEngine (turn management)
    */
   async init(): Promise<void> {
+    console.log('[Voice] VoiceManager.init() starting...')
     if (!this.transport) {
       throw new Error('VoiceManager: transport must be set before init(). Call setTransport() first.')
     }
@@ -120,6 +121,7 @@ export class VoiceManager extends EventEmitter {
     }
 
     this._initialized = true
+    console.log('[Voice] VoiceManager.init() complete — pipeline ready')
     this.emit('initialized')
   }
 
@@ -187,9 +189,11 @@ export class VoiceManager extends EventEmitter {
       this.inputRouter?.routeTranscription(text)
     })
 
-    // Session mode uses PTT (toggle), not always-listen
-    this.conversation.setInteractionMode('toggle')
+    // Session mode uses always-listen: VAD captures speech segments automatically.
+    // PTT (Ctrl+Shift+Space) provides additional manual control overlay.
+    this.conversation.setInteractionMode('always-listen')
     this.conversation.stateMachine.transition(VoiceState.READY)
+    console.log('[Voice] Session mode started — interaction: always-listen, state: READY')
 
     return this.inputRouter
   }
@@ -201,16 +205,19 @@ export class VoiceManager extends EventEmitter {
 
   /** Delegate VAD speech-start event to the conversation engine */
   onVADSpeechStart(): void {
+    console.log('[Voice] onVADSpeechStart — state:', this.conversation?.state, 'initialized:', this._initialized)
     this.conversation?.onVADSpeechStart()
   }
 
   /** Delegate VAD speech-end event (with audio data) to the conversation engine */
   async onVADSpeechEnd(audioData: number[]): Promise<void> {
+    console.log('[Voice] onVADSpeechEnd — samples:', audioData?.length, 'state:', this.conversation?.state)
     await this.conversation?.onVADSpeechEnd(audioData)
   }
 
   /** Delegate VAD misfire event to the conversation engine */
   onVADMisfire(): void {
+    console.log('[Voice] onVADMisfire — state:', this.conversation?.state)
     this.conversation?.onVADMisfire()
   }
 
