@@ -223,6 +223,17 @@ const api = {
       ipcRenderer.on(IPC.VOICE_STOP_PLAYBACK, handler)
       return () => ipcRenderer.removeListener(IPC.VOICE_STOP_PLAYBACK, handler)
     },
+    // Session voice input
+    startSession: () => ipcRenderer.invoke(IPC.VOICE_START_SESSION),
+    setRoutingMode: (mode: 'session' | 'off') =>
+      ipcRenderer.send(IPC.VOICE_SET_ROUTING_MODE, { mode }),
+    setSessionTarget: (sessionId: string | null) =>
+      ipcRenderer.send(IPC.VOICE_SESSION_TARGET, { sessionId }),
+    onDispatched: (cb: (data: { sessionId: string; sessionName: string; text: string }) => void) => {
+      const handler = (_e: unknown, data: { sessionId: string; sessionName: string; text: string }) => cb(data)
+      ipcRenderer.on(IPC.VOICE_DISPATCHED, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_DISPATCHED, handler)
+    },
   },
 }
 

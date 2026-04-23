@@ -681,6 +681,54 @@ export class IpcHub {
     ipcMain.on(IPC.VOICE_VAD_MISFIRE, () => {
       this.voiceManager?.onVADMisfire()
     })
+
+    // ── Session Voice Mode ──
+
+    ipcMain.handle(IPC.VOICE_START_SESSION, async () => {
+      try {
+        if (!this.voiceManager) {
+          this.voiceManager = new VoiceManager({ skipTTS: true })
+          const transport: ConversationTransport = {
+            sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
+            sendStopCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'processing'),
+            sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
+            sendAudioPlayback: () => {},
+            sendStateChange: (state) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state),
+            sendStopPlayback: () => {},
+            sendGenerationDone: () => {},
+            dispatchStatus: (text: string, level: string) => console.log(`[Voice:${level}] ${text}`),
+            cancelStream: () => {},
+          }
+          this.voiceManager.setTransport(transport)
+          await this.voiceManager.init()
+        }
+
+        const inputRouter = this.voiceManager.startSessionMode(this.sessionManager)
+        inputRouter.on('dispatched', (data: { sessionId: string; sessionName: string; text: string }) => {
+          this.windowManager.sendToMainWindow(IPC.VOICE_DISPATCHED, data)
+        })
+        inputRouter.on('error', (data: { code: string; message: string }) => {
+          this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, data.message)
+        })
+        return { ok: true }
+      } catch (err) {
+        const msg = (err as Error).message
+        if (this.voiceManager && !this.voiceManager.isInitialized()) {
+          this.voiceManager.shutdown()
+          this.voiceManager = null
+        }
+        this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, msg)
+        return { ok: false, error: msg }
+      }
+    })
+
+    ipcMain.on(IPC.VOICE_SET_ROUTING_MODE, (_event, { mode }: { mode: 'session' | 'off' }) => {
+      this.voiceManager?.getInputRouter()?.setMode(mode)
+    })
+
+    ipcMain.on(IPC.VOICE_SESSION_TARGET, (_event, { sessionId }: { sessionId: string | null }) => {
+      this.voiceManager?.getInputRouter()?.setFocusedSession(sessionId)
+    })
   }
 
   // ─── Tasks ────────────────────────────────────────────

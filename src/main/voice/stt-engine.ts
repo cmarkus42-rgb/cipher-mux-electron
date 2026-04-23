@@ -25,6 +25,18 @@ const HALLUCINATION_STRIP_RE = /\[.*?\]|\(.*?\)|♪.*?♪/g
 const NOISE_RE = /^[.,!?\-\u2013\u2014\u2026\s]+$/
 
 /**
+ * Coding-terminology bias prompt for Whisper.
+ * WHY: Whisper often misrecognizes programming terms as natural language
+ * (e.g., "const" → "Konst", "async" → "a sync"). Providing a prompt with
+ * common coding vocabulary biases the decoder toward these tokens.
+ * Used only in session-input mode — not in bugreport mode where natural
+ * language transcription quality matters more.
+ */
+export const CODING_BIAS_PROMPT =
+  'programming: function, variable, class, return, async, await, ' +
+  'TypeScript, React, import, export, const, let, interface, component'
+
+/**
  * Filter known Whisper hallucination patterns.
  * Returns cleaned text or '' if the input is a hallucination.
  */
@@ -120,7 +132,7 @@ export class STTEngine extends EventEmitter {
    * Transcribe a PCM audio buffer (16-bit, 16 kHz, mono).
    * Returns filtered text or '' if hallucination/noise.
    */
-  async transcribe(pcmBuffer: Buffer): Promise<string> {
+  async transcribe(pcmBuffer: Buffer, prompt?: string): Promise<string> {
     if (!this.ready || !this.context) {
       throw new Error('STTEngine not initialized — call init() first')
     }
@@ -135,6 +147,7 @@ export class STTEngine extends EventEmitter {
       language: this.language,
       maxLen: 1,
       tokenTimestamps: false,
+      ...(prompt ? { prompt } : {}),
     })
     const { result } = await promise
 

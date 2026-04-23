@@ -54,8 +54,8 @@ export class STTRouter extends EventEmitter {
    * Transcribe a PCM audio buffer (16-bit, 16 kHz, mono).
    * Delegates to the local STTEngine.
    */
-  async transcribeBatch(pcmBuffer: Buffer): Promise<string> {
-    return this.engine.transcribe(pcmBuffer)
+  async transcribeBatch(pcmBuffer: Buffer, prompt?: string): Promise<string> {
+    return this.engine.transcribe(pcmBuffer, prompt)
   }
 
   /** Shut down the engine and remove all listeners */
