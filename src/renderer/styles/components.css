@@ -989,7 +989,7 @@
 }
 
 /* ================================================================
-   Voice Control Floating Pill
+   Voice Control — Cyberpunk Toggle Switch
    ================================================================ */
 
 .voice-pill {
@@ -1004,43 +1004,74 @@
 }
 
 .voice-pill--active {
-  background: var(--surface-elevated, #1a1a2e);
-  border: 1px solid var(--border-subtle, #333);
-  border-radius: 20px;
-  padding: 4px 12px 4px 4px;
+  background: var(--color-bg-elevated, #1a1a2e);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 0;
+  padding: 4px 12px 4px 6px;
 }
 
-.voice-pill__btn {
-  display: flex;
+/* Toggle switch — hidden checkbox + square track */
+.voice-switch {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  background: var(--surface-elevated, #1a1a2e);
-  border: 1px solid var(--border-subtle, #333);
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  justify-content: center;
   cursor: pointer;
-  color: var(--text-secondary, #aaa);
-  font-size: 14px;
-  transition: all 0.15s ease;
+  user-select: none;
 }
 
-.voice-pill--active .voice-pill__btn {
-  border: none;
-  background: transparent;
+.voice-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
 }
 
-.voice-pill__btn:hover {
-  border-color: var(--accent, #e8d5b7);
-  color: var(--text-primary, #eee);
+.voice-switch__track {
+  position: relative;
+  display: block;
+  width: 32px;
+  height: 18px;
+  background: var(--color-bg-sunken, #0d0d0d);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 0;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.voice-pill__icon {
-  font-size: 14px;
-  line-height: 1;
+.voice-switch__track::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  background: var(--color-text-secondary, #aaa);
+  border-radius: 0;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* Checked state — knob slides right, neon green glow */
+.voice-switch input:checked + .voice-switch__track {
+  border-color: var(--color-neon-green, #2d8a4e);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-neon-green, #2d8a4e) 40%, transparent);
+}
+
+.voice-switch input:checked + .voice-switch__track::after {
+  transform: translateX(14px);
+  background: var(--color-neon-green, #2d8a4e);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--color-neon-green, #2d8a4e) 50%, transparent);
+}
+
+/* Hover */
+.voice-switch:hover .voice-switch__track {
+  border-color: var(--color-text-secondary, #aaa);
+}
+
+.voice-switch input:checked + .voice-switch__track:hover {
+  border-color: var(--color-neon-green, #2d8a4e);
+}
+
+/* Expanded info */
 .voice-pill__info {
   display: flex;
   flex-direction: column;
@@ -1050,44 +1081,44 @@
 .voice-pill__mode {
   font-family: 'Rajdhani', sans-serif;
   font-size: 11px;
-  color: var(--text-secondary, #aaa);
+  color: var(--color-text-secondary, #aaa);
   white-space: nowrap;
 }
 
 .voice-pill__hint {
   font-family: 'Fira Code', monospace;
   font-size: 9px;
-  color: var(--text-muted, #666);
+  color: var(--color-text-dim, #666);
 }
 
-/* LED indicator */
+/* LED indicator — 7x7px square */
 .voice-led {
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 0;
   flex-shrink: 0;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .voice-led--off {
-  background: var(--text-muted, #444);
+  background: var(--color-text-dim, #444);
 }
 
 .voice-led--ready {
-  background: #4ade80;
-  box-shadow: 0 0 4px #4ade8066;
+  background: var(--color-neon-green, #2d8a4e);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--color-neon-green, #2d8a4e) 40%, transparent);
 }
 
 .voice-led--recording {
-  background: #ef4444;
-  box-shadow: 0 0 6px #ef444488;
+  background: var(--color-neon-red, #ef4444);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-neon-red, #ef4444) 50%, transparent);
   animation: voice-pulse 1s ease-in-out infinite;
 }
 
 .voice-led--processing {
-  background: #f59e0b;
-  box-shadow: 0 0 4px #f59e0b66;
+  background: var(--color-neon-orange, #f59e0b);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--color-neon-orange, #f59e0b) 40%, transparent);
   animation: voice-pulse 0.6s ease-in-out infinite;
 }
 
@@ -1101,13 +1132,13 @@
   position: absolute;
   bottom: 40px;
   left: 0;
-  background: var(--surface-elevated, #1a1a2e);
-  border: 1px solid var(--border-subtle, #333);
-  border-radius: 8px;
+  background: var(--color-bg-elevated, #1a1a2e);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 0;
   padding: 6px 12px;
   font-family: 'Fira Code', monospace;
   font-size: 11px;
-  color: var(--text-secondary, #aaa);
+  color: var(--color-text-secondary, #aaa);
   white-space: nowrap;
   max-width: 300px;
   overflow: hidden;
@@ -1117,13 +1148,13 @@
 }
 
 .voice-toast--dispatched {
-  border-color: #4ade8044;
-  color: #4ade80;
+  border-color: color-mix(in srgb, var(--color-neon-green, #2d8a4e) 25%, transparent);
+  color: var(--color-neon-green, #2d8a4e);
 }
 
 .voice-toast--error {
-  border-color: #ef444444;
-  color: #ef4444;
+  border-color: color-mix(in srgb, var(--color-neon-red, #ef4444) 25%, transparent);
+  color: var(--color-neon-red, #ef4444);
 }
 
 .voice-toast--transcription {

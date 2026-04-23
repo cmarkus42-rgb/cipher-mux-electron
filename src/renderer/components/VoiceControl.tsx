@@ -1,9 +1,9 @@
 /**
  * VoiceControl — Floating Pill for voice-to-session input.
  *
- * Sits bottom-left of the app. Collapsed: mic icon with LED dot.
- * Expanded (when active): LED + mode badge + recording indicator.
- * Shows toast overlays for transcription preview and dispatch feedback.
+ * Sits bottom-left of the app. Shows a cyberpunk CSS toggle switch
+ * with LED indicator. Expanded (when active): LED + mode badge + hint.
+ * Toast overlays for transcription preview and dispatch feedback.
  */
 
 import { useVoiceSession } from '../hooks/useVoiceSession'
@@ -45,17 +45,19 @@ export function VoiceControl({ focusedSessionId, focusedSessionName }: VoiceCont
         <div class="voice-toast voice-toast--error">{error}</div>
       )}
 
-      {/* Pill body */}
-      <button
-        class="voice-pill__btn"
-        onClick={toggle}
+      {/* Toggle switch + LED */}
+      <label
+        class="voice-switch"
         title={active ? 'Disable voice input (Ctrl+Shift+Space to talk)' : 'Enable voice input'}
       >
-        <span class={ledClass} />
-        <span class="voice-pill__icon">
-          {recording ? '\u23FA' : '\u{1F3A4}'}
-        </span>
-      </button>
+        <input
+          type="checkbox"
+          checked={active}
+          onChange={toggle}
+        />
+        <span class="voice-switch__track" />
+      </label>
+      <span class={ledClass} />
 
       {/* Expanded info */}
       {active && (
