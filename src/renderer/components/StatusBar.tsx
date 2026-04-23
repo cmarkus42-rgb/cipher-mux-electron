@@ -20,6 +20,7 @@ interface StatusBarProps {
   requestsOpenCount: number
   orchestratorRunning: boolean
   mpoRunning: boolean
+  workspacesPopupVisible: boolean
   gridCols: number
   gridRows: number
   focusedSessionId: string | null
@@ -30,6 +31,7 @@ interface StatusBarProps {
   onToggleChatroom: () => void
   onToggleRequests: () => void
   onToggleTheme: () => void
+  onToggleWorkspaces: () => void
   onInfo: () => void
   onGridResize: (cols: number, rows: number) => void
 }
@@ -38,7 +40,7 @@ export function StatusBar({
   theme, chatroomVisible, requestsVisible, requestsOpenCount, orchestratorRunning,
   gridCols, gridRows, focusedSessionId, focusedSessionName,
   onOrchestrator, onMpo, onBugreport, onToggleChatroom, onToggleRequests, onToggleTheme, onInfo,
-  onGridResize, mpoRunning,
+  onGridResize, mpoRunning, workspacesPopupVisible, onToggleWorkspaces,
 }: StatusBarProps) {
   return (
     <div class="status-bar">
@@ -51,6 +53,12 @@ export function StatusBar({
         <span class="status-bar__sep">|</span>
         <GridControls cols={gridCols} rows={gridRows} onResize={onGridResize} inline />
         <span class="status-bar__sep">|</span>
+        <button
+          class={`status-bar__btn${workspacesPopupVisible ? ' status-bar__btn--active' : ''}`}
+          onClick={onToggleWorkspaces}
+        >
+          workspaces
+        </button>
         <button
           class={`status-bar__btn status-bar__btn--session${orchestratorRunning ? ' status-bar__btn--active' : ''}`}
           onClick={onOrchestrator}

@@ -19,6 +19,7 @@ import { BugreportDialog } from './components/BugreportDialog'
 import { InfoSettingsView } from './components/InfoSettingsView'
 import { StatusBar } from './components/StatusBar'
 import { SessionDialog } from './components/SessionDialog'
+import { WorkspacePopup } from './components/WorkspacePopup'
 
 export function App() {
   const [chatroomVisible, setChatroomVisible] = useState(true)
@@ -26,6 +27,7 @@ export function App() {
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null)
   const [bugreportVisible, setBugreportVisible] = useState(false)
   const [infoVisible, setInfoVisible] = useState(false)
+  const [workspacesPopupVisible, setWorkspacesPopupVisible] = useState(false)
 
   // Project popup state
   const [popupVisible, setPopupVisible] = useState(false)
@@ -64,6 +66,7 @@ export function App() {
         setInfoVisible(false)
         setPopupVisible(false)
         setSessionDialogVisible(false)
+        setWorkspacesPopupVisible(false)
       },
     },
   ], [])
@@ -248,6 +251,24 @@ export function App() {
     resize({ cols, rows })
   }, [resize])
 
+  const handleToggleWorkspaces = useCallback(() => {
+    setWorkspacesPopupVisible((v) => !v)
+  }, [])
+
+  const handleWorkspaceApply = useCallback(async (workspaceId: string) => {
+    try {
+      await (window as any).cipherMux.workspaces.apply(workspaceId)
+    } catch (err) {
+      console.error('[App] Failed to apply workspace:', err)
+    }
+    setWorkspacesPopupVisible(false)
+  }, [])
+
+  const handleWorkspaceOpenSettings = useCallback((_tab: 'personas' | 'workspaces') => {
+    setWorkspacesPopupVisible(false)
+    setInfoVisible(true)
+  }, [])
+
   const handleOrchestratorToggle = useCallback(async () => {
     const api = (window as any).cipherMux
     try {
@@ -324,6 +345,7 @@ export function App() {
         requestsOpenCount={requestsOpenCount}
         orchestratorRunning={!!orchestratorSessionId}
         mpoRunning={!!mpoSessionId}
+        workspacesPopupVisible={workspacesPopupVisible}
         onMpo={handleMpoToggle}
         gridCols={grid.config.cols}
         gridRows={grid.config.rows}
@@ -334,8 +356,17 @@ export function App() {
         onToggleChatroom={() => setChatroomVisible((v) => !v)}
         onToggleRequests={() => setRequestsVisible((v) => !v)}
         onToggleTheme={toggleTheme}
+        onToggleWorkspaces={handleToggleWorkspaces}
         onInfo={() => setInfoVisible(true)}
         onGridResize={handleResize}
+      />
+
+      {/* workspace popup */}
+      <WorkspacePopup
+        visible={workspacesPopupVisible}
+        onClose={() => setWorkspacesPopupVisible(false)}
+        onApply={handleWorkspaceApply}
+        onOpenSettings={handleWorkspaceOpenSettings}
       />
 
       {/* dialogs */}
