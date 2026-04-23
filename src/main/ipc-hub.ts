@@ -182,6 +182,7 @@ export class IpcHub {
       kickoffOrchestrator: this.kickoffOrchestrator,
       taskManager: this.taskManager,
       inputRequestWatcher: this.inputRequestWatcher,
+      windowManager: this.windowManager,
     }).then(() => {
       // Auto-start orchestrator after MCP server is ready
       this.autoStartOrchestrator()

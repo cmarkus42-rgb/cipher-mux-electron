@@ -146,6 +146,17 @@ export function App() {
     return () => unsub()
   }, [addSession, rescan])
 
+  // Handle visible-add from MCP mux_create_session with visible:true
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api.sessions?.onVisibleAdd) return
+    const unsub = api.sessions.onVisibleAdd((data: { sessionId: string }) => {
+      addSession(data.sessionId)
+      setFocusedSessionId(data.sessionId)
+    })
+    return () => unsub()
+  }, [addSession])
+
   // Open project popup from launcher cell
   const handleLaunch = useCallback((slotIndex: number) => {
     setPopupTargetSessionId(null)

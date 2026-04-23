@@ -10,6 +10,7 @@ export const IPC = {
   SESSIONS_RECOVERY_ACTION: 'cipher-mux:sessions:recovery-action',
   SESSION_CHANGED: 'cipher-mux:session-changed',
   SESSION_STOPPED: 'cipher-mux:session-stopped',
+  SESSION_VISIBLE_ADD: 'cipher-mux:session:visible-add',
 
   // Terminals
   TERMINAL_DATA: 'cipher-mux:terminal:data',
@@ -97,6 +98,18 @@ export const IPC = {
   VOICE_SET_ROUTING_MODE: 'cipher-mux:voice:set-routing-mode',
   VOICE_SESSION_TARGET: 'cipher-mux:voice:session-target',
   VOICE_DISPATCHED: 'cipher-mux:voice:dispatched',
+
+  // Personas
+  PERSONAS_LIST: 'cipher-mux:personas:list',
+  PERSONAS_SAVE: 'cipher-mux:personas:save',
+  PERSONAS_DELETE: 'cipher-mux:personas:delete',
+
+  // Workspaces
+  WORKSPACES_LIST: 'cipher-mux:workspaces:list',
+  WORKSPACES_SAVE: 'cipher-mux:workspaces:save',
+  WORKSPACES_DELETE: 'cipher-mux:workspaces:delete',
+  WORKSPACES_APPLY: 'cipher-mux:workspaces:apply',
+  WORKSPACES_ACTIVE: 'cipher-mux:workspaces:active',
 
   // Tasks
   TASKS_LIST: 'cipher-mux:tasks:list',
