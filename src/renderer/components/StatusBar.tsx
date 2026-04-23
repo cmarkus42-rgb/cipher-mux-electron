@@ -52,18 +52,16 @@ export function StatusBar({
         <GridControls cols={gridCols} rows={gridRows} onResize={onGridResize} inline />
         <span class="status-bar__sep">|</span>
         <button
-          class={`status-bar__btn${orchestratorRunning ? ' status-bar__btn--active' : ''}`}
-          style={{ color: '#B8601A' }}
+          class={`status-bar__btn status-bar__btn--session${orchestratorRunning ? ' status-bar__btn--active' : ''}`}
           onClick={onOrchestrator}
         >
-          <span style={{ marginRight: '4px' }}>●</span>orchestrator
+          <span class="status-bar__dot status-bar__dot--orchestrator" />orchestrator
         </button>
         <button
-          class={`status-bar__btn${mpoRunning ? ' status-bar__btn--active' : ''}`}
-          style={{ color: '#2d8a4e' }}
+          class={`status-bar__btn status-bar__btn--session${mpoRunning ? ' status-bar__btn--active' : ''}`}
           onClick={onMpo}
         >
-          <span style={{ marginRight: '4px' }}>●</span>mpo
+          <span class="status-bar__dot status-bar__dot--mpo" />mpo
         </button>
         <button class="status-bar__btn" onClick={onBugreport}>bugreport</button>
         <button
