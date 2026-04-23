@@ -156,6 +156,18 @@ Abstraktion für verschiedene AI-Agent-Backends:
 - `ReferenceStubAdapter` (Tier-2): Stub für Dokumentation
 - `AdapterRegistry`: Discovery + Registrierung
 
+## MPO (Multi-Project Orchestrator)
+
+Eingebaute Funktion von cipher-mux. Empfaengt Anforderungspakete, zerlegt sie in Teilprojekte, startet N parallele Launcher-Sessions und koordiniert deren Arbeit.
+
+- **Managed Dir:** `~/.config/cipher-mux/mpo` (CLAUDE.md + .mcp.json generiert)
+- **Session-Name:** `MPO` (recovery-faehig)
+- **Template:** `src/main/session/mpo-template.ts` (Persona, 10-Phase-Lifecycle, 5-Level-Eskalation, Monitoring)
+- **MCP-Tool:** `mux_input_request_create` fuer Bubble-Requests an die Sidebar
+- **StatusBar:** `mpo`-Button mit Active-State
+- **Kein Auto-Start** — manuell per Button
+- **Grid-Placement:** Naechster freier Slot (oben-links, links-nach-rechts)
+
 ## Bekannte Constraints
 
 - **macOS-only:** tmux als harte Abhängigkeit, osascript-Integration
