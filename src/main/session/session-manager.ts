@@ -4,7 +4,8 @@ import * as path from 'path'
 import * as os from 'os'
 import { ulid } from 'ulidx'
 import type { SessionInfo, SessionStatus, StartSessionOpts, RecoveryResult } from '../../shared/types'
-import { MAX_SESSIONS, ORCHESTRATOR_DIR, ORCHESTRATOR_MAX_RETRIES } from '../../shared/constants'
+import { MAX_SESSIONS, ORCHESTRATOR_MAX_RETRIES } from '../../shared/constants'
+import { BRAND } from '../../shared/brand'
 import { TmuxManager } from '../tmux/tmux-manager'
 import { generateOrchestratorClaudeMd } from './orchestrator-template'
 import type { AgentAdapter } from '../agent/agent-adapter'
@@ -181,9 +182,14 @@ export class SessionManager extends EventEmitter {
     const orphaned: SessionInfo[] = []
     const killed: SessionInfo[] = []
 
+    console.log(`[SessionManager] recover: ${tmuxSessions.length} tmux sessions found, ${this.sessions.size} in registry`)
+
     for (const tmuxSession of tmuxSessions) {
       // Check if this is one of our sessions (prefix cmux-)
-      if (!tmuxSession.name.startsWith('cmux-')) continue
+      if (!tmuxSession.name.startsWith('cmux-')) {
+        console.log(`[SessionManager] recover: skipping non-cmux session "${tmuxSession.name}"`)
+        continue
+      }
 
       // Try to find in our registry
       let found = false
@@ -237,6 +243,7 @@ export class SessionManager extends EventEmitter {
       }
     }
 
+    console.log(`[SessionManager] recover result: ${recovered.length} recovered, ${orphaned.length} orphaned, ${killed.length} killed`)
     return { recovered, orphaned, killed }
   }
 
@@ -258,6 +265,7 @@ export class SessionManager extends EventEmitter {
     }
     this.sessions.set(id, session)
     this.tmux.watchSession(tmuxSessionName, id)
+    console.log(`[SessionManager] adopted orphan "${tmuxSessionName}" as session ${id}`)
     this.emit('session-changed', session)
     return session
   }
@@ -391,7 +399,7 @@ export class SessionManager extends EventEmitter {
    * Resolve the orchestrator directory path (expand ~).
    */
   private resolveOrchestratorDir(): string {
-    return ORCHESTRATOR_DIR.replace(/^~/, os.homedir())
+    return BRAND.orchestratorDir.replace(/^~/, os.homedir())
   }
 
   /**

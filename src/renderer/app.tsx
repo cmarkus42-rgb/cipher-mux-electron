@@ -305,7 +305,7 @@ export function App() {
         onRescan={rescan}
         onClose={() => setPopupVisible(false)}
       />
-      <RecoveryDialog onDone={() => {}} />
+      <RecoveryDialog onDone={() => {}} onAdopt={addSession} />
       <SessionDialog
         visible={sessionDialogVisible}
         onStart={handleSessionStart}
