@@ -25,6 +25,7 @@ import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
 import { BRAND } from '../shared/brand'
 import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest } from '../shared/types'
+import type { Persona, Workspace } from '../shared/persona-types'
 
 /**
  * IPC Hub — Central router for all IPC channels.
@@ -100,6 +101,8 @@ export class IpcHub {
     this.registerVoiceChannels()
     this.registerTaskChannels()
     this.registerInputRequestChannels()
+    this.registerPersonaChannels()
+    this.registerWorkspaceChannels()
     this.setupEventForwarding()
 
     // Start context usage monitor
@@ -910,6 +913,72 @@ export class IpcHub {
           })
         }
       })
+    })
+  }
+
+  // ─── Personas ─────────────────────────────────────────
+  private registerPersonaChannels(): void {
+    ipcMain.handle(IPC.PERSONAS_LIST, () => {
+      return configStore.get('personas')
+    })
+
+    ipcMain.handle(IPC.PERSONAS_SAVE, (_e, persona: Persona) => {
+      const personas = [...configStore.get('personas')]
+      const idx = personas.findIndex(p => p.id === persona.id)
+      if (idx >= 0) {
+        // Preserve builtin flag — users can't promote/demote
+        personas[idx] = { ...persona, builtin: personas[idx].builtin }
+      } else {
+        personas.push({ ...persona, builtin: false })
+      }
+      configStore.set('personas', personas)
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.PERSONAS_DELETE, (_e, personaId: string) => {
+      const personas = configStore.get('personas')
+      const target = personas.find(p => p.id === personaId)
+      if (target?.builtin) return { ok: false, error: 'Cannot delete built-in persona' }
+      configStore.set('personas', personas.filter(p => p.id !== personaId))
+      return { ok: true }
+    })
+  }
+
+  // ─── Workspaces ───────────────────────────────────────
+  private registerWorkspaceChannels(): void {
+    ipcMain.handle(IPC.WORKSPACES_LIST, () => {
+      return configStore.get('workspaces')
+    })
+
+    ipcMain.handle(IPC.WORKSPACES_SAVE, (_e, workspace: Workspace) => {
+      const workspaces = [...configStore.get('workspaces')]
+      const idx = workspaces.findIndex(w => w.id === workspace.id)
+      if (idx >= 0) workspaces[idx] = workspace
+      else workspaces.push(workspace)
+      configStore.set('workspaces', workspaces)
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.WORKSPACES_DELETE, (_e, workspaceId: string) => {
+      const workspaces = configStore.get('workspaces')
+      configStore.set('workspaces', workspaces.filter(w => w.id !== workspaceId))
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.WORKSPACES_APPLY, async (_e, workspaceId: string) => {
+      // Stub — full apply logic comes in D8
+      const workspaces = configStore.get('workspaces')
+      const ws = workspaces.find(w => w.id === workspaceId)
+      if (!ws) return { applied: false, error: 'Workspace not found' }
+      configStore.set('activeWorkspaceId', workspaceId)
+      return { applied: true, sessionsStarted: 0, warnings: ['Apply logic not yet implemented'] }
+    })
+
+    ipcMain.handle(IPC.WORKSPACES_ACTIVE, (_e, id?: string) => {
+      if (id !== undefined) {
+        configStore.set('activeWorkspaceId', id)
+      }
+      return configStore.get('activeWorkspaceId')
     })
   }
 
