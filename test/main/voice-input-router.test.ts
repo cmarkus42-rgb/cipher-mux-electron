@@ -30,13 +30,29 @@ describe('VoiceInputRouter', () => {
     assert.equal(sentKeys.length, 0)
   })
 
-  it('dispatches text to focused session in session mode', async () => {
+  it('dispatches text to focused session in session mode (no Enter)', async () => {
     router.setMode('session')
     router.setFocusedSession('sess-1')
     await router.routeTranscription('hello world')
     assert.equal(sentKeys.length, 1)
     assert.equal(sentKeys[0].sessionId, 'sess-1')
-    assert.equal(sentKeys[0].keys, 'hello world\n')
+    assert.equal(sentKeys[0].keys, 'hello world')
+  })
+
+  it('sends Enter on "abschicken" voice command', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    await router.routeTranscription('abschicken')
+    assert.equal(sentKeys.length, 1)
+    assert.equal(sentKeys[0].keys, '\r')
+  })
+
+  it('sends Enter on "senden" voice command (with punctuation)', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    await router.routeTranscription('Senden.')
+    assert.equal(sentKeys.length, 1)
+    assert.equal(sentKeys[0].keys, '\r')
   })
 
   it('emits dispatched event with session info', async () => {
