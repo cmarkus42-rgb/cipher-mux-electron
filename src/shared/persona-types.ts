@@ -1,0 +1,152 @@
+// src/shared/persona-types.ts — Persona & Workspace type definitions
+
+export interface Persona {
+  id: string
+  name: string
+  color: string
+  defaultPrompt: string
+  builtin?: boolean
+}
+
+export interface WorkspaceCell {
+  persona: string    // persona.id
+  project: string    // project path or slug
+  prompt: string     // per-cell override (empty = use persona/workspace default)
+}
+
+export interface Workspace {
+  id: string
+  name: string
+  cols: number       // 1..10
+  rows: number       // 1..6
+  cells: WorkspaceCell[]  // row-major, length === cols * rows
+  merges: Record<string, true>  // "col:row" → merged DOWN
+  promptOverrides: Record<string, string>  // personaId → workspace-level prompt
+}
+
+export type PromptSource = 'cell' | 'workspace-override' | 'persona-default'
+
+export interface ResolvedPrompt {
+  text: string
+  source: PromptSource
+}
+
+export const BUILTIN_PERSONA_IDS = ['orchestrator', 'mpo', 'worker', 'empty'] as const
+
+export const BUILTIN_PERSONAS: readonly Persona[] = [
+  {
+    id: 'orchestrator',
+    name: 'Orchestrator',
+    color: '#B8601A',
+    builtin: true,
+    defaultPrompt:
+      'You coordinate the work in this session grid. Read the user goal, split it into concrete tasks, assign them to worker cells, and gate merges via the MPO. Keep a short running plan at the top of every reply.',
+  },
+  {
+    id: 'mpo',
+    name: 'MPO',
+    color: '#2d8a4e',
+    builtin: true,
+    defaultPrompt:
+      'You are the Meta-Prompt Officer. Verify every claim the orchestrator or workers make by reading source. Block merges with concrete evidence. Keep a compact log: file:line → claim → verdict.',
+  },
+  {
+    id: 'worker',
+    name: 'Worker',
+    color: '#6A6A72',
+    builtin: true,
+    defaultPrompt:
+      'You execute one focused task at a time. Read what you need, do the thing, report back concisely. No speculation, no extra work. Surface blockers immediately.',
+  },
+  {
+    id: 'empty',
+    name: '(empty)',
+    color: '#D4D4C8',
+    builtin: true,
+    defaultPrompt: '',
+  },
+]
+
+export const SEED_CUSTOM_PERSONAS: readonly Persona[] = [
+  {
+    id: 'requirements-engineer',
+    name: 'Requirements Engineer',
+    color: '#4A6FA5',
+    builtin: false,
+    defaultPrompt:
+      'You elicit and structure requirements. Conduct stakeholder interviews, write user stories with acceptance criteria, and maintain docs/requirements.md. Ask clarifying questions before assuming.',
+  },
+  {
+    id: 'system-engineer',
+    name: 'System Engineer',
+    color: '#0E7FA8',
+    builtin: false,
+    defaultPrompt:
+      'You handle system architecture, infrastructure, CI/CD, deployment, and cross-subsystem integration. Focus on reliability, monitoring, and performance. Document decisions in ADRs.',
+  },
+  {
+    id: 'developer',
+    name: 'Developer',
+    color: '#7B3F99',
+    builtin: false,
+    defaultPrompt:
+      'You implement features and fix bugs. Write clean, tested code. Follow TDD — failing test first, then minimal implementation. Small focused commits. Surface blockers immediately.',
+  },
+  {
+    id: 'architect',
+    name: 'Architect',
+    color: '#C79A2B',
+    builtin: false,
+    defaultPrompt:
+      'You make technical decisions and write ADRs. Design APIs, evaluate tradeoffs, analyze dependencies. Keep specs in docs/SPEC.md. Patterns over point solutions.',
+  },
+  {
+    id: 'auditor',
+    name: 'Auditor',
+    color: '#A8322E',
+    builtin: false,
+    defaultPrompt:
+      'You review code for quality and security. Check OWASP top 10, test coverage, performance bottlenecks, and style drift. Output line-referenced findings as structured reports.',
+  },
+]
+
+export const PERSONA_SWATCHES = [
+  '#B8601A', '#2d8a4e', '#A8322E', '#4A6FA5',
+  '#7B3F99', '#C79A2B', '#0E7FA8', '#8A6B2B',
+  '#6A6A72', '#1A1A1D',
+] as const
+
+export const SEED_WORKSPACES: readonly Workspace[] = [
+  {
+    id: 'triage',
+    name: 'TRIAGE 3×2',
+    cols: 3,
+    rows: 2,
+    promptOverrides: {
+      orchestrator: 'You coordinate a triage. Read the latest failing CI run, split into a repro task and a code-read task. Gate merges via MPO.',
+    },
+    cells: [
+      { persona: 'orchestrator', project: '', prompt: '' },
+      { persona: 'mpo',          project: '', prompt: '' },
+      { persona: 'worker',       project: '', prompt: 'grep stacktrace' },
+      { persona: 'worker',       project: '', prompt: 'read changelog' },
+      { persona: 'auditor',      project: '', prompt: 'review open PR' },
+      { persona: 'empty',        project: '', prompt: '' },
+    ],
+    merges: {},
+  },
+  {
+    id: 'dual',
+    name: 'DUAL SPLIT',
+    cols: 2,
+    rows: 2,
+    promptOverrides: {},
+    cells: [
+      { persona: 'orchestrator', project: '', prompt: '' },
+      { persona: 'developer',    project: '', prompt: '' },
+      { persona: 'auditor',      project: '', prompt: 'review' },
+      { persona: 'empty',        project: '', prompt: '' },
+    ],
+    merges: {},
+  },
+]

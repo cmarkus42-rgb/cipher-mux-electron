@@ -334,3 +334,13 @@ export interface TaskFilter {
   parentId?: string | null
   sessionId?: string
 }
+
+// ─── Personas & Workspaces ────────────────────────────────
+
+export type {
+  Persona,
+  WorkspaceCell,
+  Workspace,
+  PromptSource,
+  ResolvedPrompt,
+} from './persona-types'
