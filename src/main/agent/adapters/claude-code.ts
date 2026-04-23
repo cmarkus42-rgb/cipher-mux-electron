@@ -12,11 +12,26 @@ import type {
 import type { AdapterFeature, AdapterCapabilities } from '../../../shared/types'
 import { runCommand } from '../../util/exec-util'
 
+/** Minimal interface for reading the agent config section. */
+export interface AgentConfigReader {
+  getSkipPermissions(): boolean
+}
+
+/** Default reader that lazily imports configStore (avoids top-level electron dep in tests). */
+const defaultConfigReader: AgentConfigReader = {
+  getSkipPermissions(): boolean {
+    // Lazy require to avoid pulling in electron at module load time
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { configStore } = require('../../config/config-store')
+    return configStore.get('agent').skipPermissions
+  },
+}
+
 /**
  * Claude Code adapter — Tier-1, full capability support.
  *
  * Encapsulates all Claude Code CLI specifics:
- * - Launch via `claude --dangerously-skip-permissions`
+ * - Launch via `claude --dangerously-skip-permissions` (configurable via agent.skipPermissions)
  * - MCP injection via `claude mcp add-json` AND direct settings.json
  *   manipulation (dual-path fix for BUG-mcp-tools-not-loaded)
  * - StatusLine hook for context usage reporting
@@ -27,11 +42,18 @@ export class ClaudeCodeAdapter implements AgentAdapter {
   readonly displayName = 'Claude Code'
   readonly tier = 'tier-1' as const
 
+  private readonly configReader: AgentConfigReader
+
+  constructor(configReader?: AgentConfigReader) {
+    this.configReader = configReader ?? defaultConfigReader
+  }
+
   buildLaunchCommand(_opts: LaunchOpts): LaunchCommand {
-    return {
-      cmd: 'claude',
-      args: ['--dangerously-skip-permissions'],
+    const args: string[] = []
+    if (this.configReader.getSkipPermissions()) {
+      args.push('--dangerously-skip-permissions')
     }
+    return { cmd: 'claude', args }
   }
 
   /**

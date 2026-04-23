@@ -145,6 +145,10 @@ export interface AppConfig {
     theme: ThemeName
     grid: GridState
   }
+  agent: {
+    /** When true, launches Claude Code with --dangerously-skip-permissions. Default: false. */
+    skipPermissions: boolean
+  }
   windows: {
     main: { x: number; y: number; width: number; height: number }
   }

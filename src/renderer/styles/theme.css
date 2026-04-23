@@ -2,7 +2,7 @@
  * theme.css — cipher-mux-electron "Cipher Ivory" Design System
  *
  * Merged from cipher-mux v1 + cipher-desktop-electron.
- * Ivory (light) theme default. Dark theme via body.theme-dark.
+ * Ivory (light) theme default. Other themes via body[data-theme="<id>"].
  * Cut-corner geometry. Rajdhani headings, Fira Code mono. CALM aesthetic.
  */
 
@@ -10,8 +10,16 @@
    Theme Token Imports
    ================================================================ */
 
-@import './theme-ivory.css';
-@import './theme-dark.css';
+@import './theme-cipher-ivory.css';
+@import './theme-cipher-dark.css';
+@import './theme-blueprint.css';
+@import './theme-warm-paper.css';
+@import './theme-gruvbox-dark.css';
+@import './theme-nord.css';
+@import './theme-synthwave.css';
+@import './theme-matrix.css';
+@import './theme-brutalist.css';
+@import './theme-high-contrast.css';
 
 /* ================================================================
    Font Faces

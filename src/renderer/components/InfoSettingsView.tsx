@@ -1,10 +1,14 @@
 // src/renderer/components/InfoSettingsView.tsx
 import { useCallback, useEffect, useState } from 'preact/hooks'
 import { APP_VERSION } from '../../shared/constants'
+import type { ThemeName } from '../../shared/grid-types'
+import themesManifest from '../themes.json'
 
 interface InfoSettingsViewProps {
   onRescan: () => void | Promise<void>
   scanning: boolean
+  theme: ThemeName
+  onSetTheme: (t: ThemeName) => void
 }
 
 const api = (window as any).cipherMux
@@ -24,7 +28,9 @@ const SHORTCUTS = [
   { category: 'terminal', combo: 'Cmd+V', label: 'einfügen' },
 ]
 
-export function InfoSettingsView({ onRescan, scanning }: InfoSettingsViewProps) {
+const themes = themesManifest.themes
+
+export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme }: InfoSettingsViewProps) {
   const [activeTab, setActiveTab] = useState<TabId>('features')
   const [scanPaths, setScanPaths] = useState<string[]>([])
   const [scanDepth, setScanDepth] = useState(1)
@@ -131,17 +137,17 @@ export function InfoSettingsView({ onRescan, scanning }: InfoSettingsViewProps) 
           <div class="wiki-entry">
             <div class="settings-section__title">grid layout</div>
             <p class="wiki-text">
-              das hauptfenster zeigt ein grid mit bis zu 5×3 zellen. jede zelle kann eine
-              terminal-session aufnehmen. leere zellen zeigen einen „+" button zum starten
+              das hauptfenster zeigt ein grid mit bis zu 5x3 zellen. jede zelle kann eine
+              terminal-session aufnehmen. leere zellen zeigen einen "+" button zum starten
               neuer sessions.
             </p>
             <p class="wiki-text">
-              <strong>bedienung:</strong> grid-größe über die „spalten ±" / „zeilen ±" controls
+              <strong>bedienung:</strong> grid-größe über die "spalten +/-" / "zeilen +/-" controls
               unten rechts anpassen. sessions per drag & drop umordnen. klick auf den header
               einer session setzt den fokus.
             </p>
             <p class="wiki-text">
-              <strong>projekt wechseln:</strong> „⇄" im header einer session öffnet den
+              <strong>projekt wechseln:</strong> "swap" im header einer session öffnet den
               projektpicker. die alte session wird gestoppt und eine neue im selben slot gestartet.
             </p>
           </div>
@@ -159,7 +165,7 @@ export function InfoSettingsView({ onRescan, scanning }: InfoSettingsViewProps) 
               <li>aufgaben zwischen sessions verteilen</li>
             </ul>
             <p class="wiki-text">
-              der orchestrator startet automatisch mit der app. über den „orchestrator" button
+              der orchestrator startet automatisch mit der app. über den "orchestrator" button
               in der statusbar kann er manuell gestartet/gestoppt werden.
             </p>
           </div>
@@ -168,7 +174,7 @@ export function InfoSettingsView({ onRescan, scanning }: InfoSettingsViewProps) 
             <div class="settings-section__title">message bus & chatroom</div>
             <p class="wiki-text">
               alle sessions teilen sich einen SQLite-basierten nachrichtenbus. sessions können
-              nachrichten an topics senden (z.b. „broadcast", „orchestrator", „session:xyz").
+              nachrichten an topics senden (z.b. "broadcast", "orchestrator", "session:xyz").
               der chatroom zeigt den gesamten bus-feed in echtzeit.
             </p>
             <p class="wiki-text">
@@ -211,7 +217,7 @@ export function InfoSettingsView({ onRescan, scanning }: InfoSettingsViewProps) 
           <div class="wiki-entry">
             <div class="settings-section__title">bugreport</div>
             <p class="wiki-text">
-              über „bugreport" in der statusbar (oder Cmd+B) kannst du einen bug-report erstellen.
+              über "bugreport" in der statusbar (oder Cmd+B) kannst du einen bug-report erstellen.
               die beschreibung wird optional von ollama (lokales LLM) in ein strukturiertes format
               gebracht: titel, severity, tags, schritte, zusammenfassung. der report landet als
               markdown-datei in der outbox.
@@ -221,9 +227,10 @@ export function InfoSettingsView({ onRescan, scanning }: InfoSettingsViewProps) 
           <div class="wiki-entry">
             <div class="settings-section__title">themes</div>
             <p class="wiki-text">
-              zwei themes: <strong>ivory</strong> (hell, keramik-töne) und <strong>dark</strong>
-              (dunkel, muted neon). wechsel über „theme: ..." in der statusbar. die terminals
-              passen sich automatisch an. die wahl wird persistent gespeichert.
+              10 themes stehen zur wahl — von cipher ivory (hell, keramik) über gruvbox, nord und
+              blueprint bis zu synthwave und matrix. jedes theme passt die gesamte app und alle
+              terminals sofort an. wechsel über den theme-picker in den einstellungen oder per
+              klick auf den theme-namen in der statusbar. die wahl wird persistent gespeichert.
             </p>
           </div>
 
@@ -235,7 +242,7 @@ export function InfoSettingsView({ onRescan, scanning }: InfoSettingsViewProps) 
               erscheinen im projektpicker wenn du eine neue session startest.
             </p>
             <p class="wiki-text">
-              scan-pfade und -tiefe lassen sich im „einstellungen" tab konfigurieren.
+              scan-pfade und -tiefe lassen sich im "einstellungen" tab konfigurieren.
             </p>
           </div>
         </section>
@@ -243,7 +250,41 @@ export function InfoSettingsView({ onRescan, scanning }: InfoSettingsViewProps) 
 
       {activeTab === 'settings' && !loading && (
         <section class="settings-section">
-          <div class="settings-section__title">scan-pfade</div>
+          <div class="settings-section__title">theme</div>
+          <div class="settings-section__hint">
+            wähle ein farbschema. die app und alle terminals übernehmen sofort.
+          </div>
+
+          <div class="theme-picker" role="radiogroup" aria-label="theme">
+            {themes.map((t) => (
+              <div
+                key={t.id}
+                class={`theme-row ${t.id === theme ? 'theme-row--active' : ''}`}
+                role="radio"
+                aria-checked={t.id === theme}
+                tabIndex={0}
+                onClick={() => onSetTheme(t.id as ThemeName)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onSetTheme(t.id as ThemeName)
+                  }
+                }}
+              >
+                <div class="theme-radio" />
+                <div class="theme-strip" aria-hidden="true">
+                  {t.previewSwatches.map((c, i) => <span key={i} style={{ background: c }} />)}
+                </div>
+                <div class="theme-meta">
+                  <div class="theme-name">{t.name}</div>
+                  <div class="theme-tag">{t.tag}</div>
+                </div>
+                <div class="theme-mode">{t.mode}</div>
+              </div>
+            ))}
+          </div>
+
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>scan-pfade</div>
           <div class="settings-section__hint">
             verzeichnisse, die beim scan nach claude-code-projekten durchsucht werden.
           </div>
@@ -261,7 +302,7 @@ export function InfoSettingsView({ onRescan, scanning }: InfoSettingsViewProps) 
           <div class="settings-row">
             <button class="btn btn--primary btn--sm" onClick={handleAdd}>+ pfad hinzufügen</button>
             <button class="btn btn--sm" onClick={onRescan} disabled={scanning}>
-              {scanning ? 'scanne…' : 'jetzt rescannen'}
+              {scanning ? 'scanne...' : 'jetzt rescannen'}
             </button>
           </div>
           <div class="settings-row" style={{ marginTop: '12px' }}>

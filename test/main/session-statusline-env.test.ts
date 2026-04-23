@@ -40,21 +40,37 @@ describe('SessionManager statusLine integration', () => {
     // Simulate what happens at runtime:
     // 1. SessionManager sets CIPHER_MUX_SESSION_ID=test-session-123 in env
     // 2. Claude Code triggers StatusLine hook: `cat > /tmp/cipher-mux/context/$CIPHER_MUX_SESSION_ID.json`
-    // 3. Hook receives JSON on stdin and writes it
+    // 3. Hook receives JSON on stdin and writes it (real Claude Code nested format)
 
     const contextDir = path.join(tmpProjectDir, 'context-sim')
     fs.mkdirSync(contextDir, { recursive: true })
 
     const sessionId = 'test-session-123'
-    const usageJson = JSON.stringify({ usedPercentage: 42, modelId: 'claude-opus-4' })
+    // Use real Claude Code format with nested context_window
+    const usageJson = JSON.stringify({
+      model: { id: 'claude-opus-4', display_name: 'Opus 4' },
+      context_window: {
+        total_input_tokens: 5000,
+        total_output_tokens: 1200,
+        context_window_size: 200000,
+        used_percentage: 42,
+        remaining_percentage: 58,
+      },
+    })
 
     // Simulate the hook writing (what `cat > dir/$CIPHER_MUX_SESSION_ID.json` does)
     const targetFile = path.join(contextDir, `${sessionId}.json`)
     fs.writeFileSync(targetFile, usageJson)
 
-    // Verify the file is readable by StatusLineMonitor
-    const content = JSON.parse(fs.readFileSync(targetFile, 'utf-8'))
-    assert.equal(content.usedPercentage, 42)
-    assert.equal(content.modelId, 'claude-opus-4')
+    // Verify the file is readable and parseable by StatusLineMonitor
+    const { StatusLineMonitor } = require('../../src/main/monitoring/statusline-monitor')
+    const monitor = new StatusLineMonitor(contextDir)
+    monitor.start()
+    const usage = monitor.get(sessionId)
+    assert.ok(usage, 'StatusLineMonitor should parse the nested format')
+    assert.equal(usage.usedPercentage, 42)
+    assert.equal(usage.modelId, 'claude-opus-4')
+    assert.equal(usage.totalInputTokens, 5000)
+    monitor.stop()
   })
 })

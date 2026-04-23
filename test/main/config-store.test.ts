@@ -13,11 +13,11 @@ describe('config persistence', () => {
   after(() => fs.rmSync(tmpDir, { recursive: true, force: true }))
 
   it('writes and reads config correctly', () => {
-    const data = { ui: { theme: 'ivory', chatroomVisible: true } }
+    const data = { ui: { theme: 'cipher-ivory', chatroomVisible: true } }
     fs.writeFileSync(configPath, JSON.stringify(data, null, 2), 'utf-8')
     const raw = fs.readFileSync(configPath, 'utf-8')
     const parsed = JSON.parse(raw)
-    assert.deepStrictEqual(parsed.ui.theme, 'ivory')
+    assert.deepStrictEqual(parsed.ui.theme, 'cipher-ivory')
     assert.deepStrictEqual(parsed.ui.chatroomVisible, true)
   })
 
@@ -28,8 +28,8 @@ describe('config persistence', () => {
   })
 
   it('deep merges with defaults using production deepMerge', () => {
-    const defaults = { ui: { theme: 'ivory', chatroomVisible: false, grid: { cols: 5, rows: 2 } } }
-    const saved = { ui: { theme: 'dark' } }
+    const defaults = { ui: { theme: 'cipher-ivory', chatroomVisible: false, grid: { cols: 5, rows: 2 } } }
+    const saved = { ui: { theme: 'cipher-dark' } }
 
     // Shallow spread loses grid — verify this is the bug
     const shallow = { ...defaults, ...saved }
@@ -37,7 +37,7 @@ describe('config persistence', () => {
 
     // Production deepMerge preserves nested defaults
     const deep = deepMerge(defaults, saved)
-    assert.strictEqual(deep.ui.theme, 'dark')
+    assert.strictEqual(deep.ui.theme, 'cipher-dark')
     assert.strictEqual(deep.ui.grid.cols, 5) // preserved
     assert.strictEqual(deep.ui.chatroomVisible, false) // preserved
   })

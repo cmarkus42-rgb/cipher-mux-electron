@@ -20,26 +20,56 @@ const capturedSessions = new Set<string>()
 /** Threshold: sessions created more than 10s ago are considered recovered. */
 const RECOVERED_THRESHOLD_MS = 10_000
 
+/** Minimum container dimension (px) to attempt fit — avoids zero-size states during transitions. */
+const MIN_FIT_DIMENSION = 50
+
+/** Debounce interval (ms) for fit() calls — coalesces rapid ResizeObserver / window resize events. */
+const FIT_DEBOUNCE_MS = 150
+
 export interface UseTerminalResult {
   terminalRef: preact.RefObject<HTMLDivElement>
   fit: () => void
 }
 
-export function useTerminal(sessionId: string, theme: ThemeName = 'ivory', createdAt?: number): UseTerminalResult {
+export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory', createdAt?: number): UseTerminalResult {
   const terminalRef = useRef<HTMLDivElement>(null!)
   const termRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
+  const fitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Last cols/rows sent to tmux — skip IPC if unchanged. */
+  const lastSizeRef = useRef<{ cols: number; rows: number }>({ cols: 0, rows: 0 })
 
+  /**
+   * Debounced fit: coalesces all resize triggers into a single fit() call
+   * that only fires after the layout has settled (FIT_DEBOUNCE_MS).
+   * Guards against zero-size containers during CSS transitions / grid reflow.
+   */
   const fit = useCallback(() => {
-    const fitAddon = fitAddonRef.current
-    const term = termRef.current
-    if (!fitAddon || !term) return
-    try {
-      fitAddon.fit()
-      api().terminal.resize(sessionId, term.cols, term.rows)
-    } catch {
-      // container may not be visible yet
-    }
+    if (fitTimerRef.current) clearTimeout(fitTimerRef.current)
+    fitTimerRef.current = setTimeout(() => {
+      fitTimerRef.current = null
+      const fitAddon = fitAddonRef.current
+      const term = termRef.current
+      const container = terminalRef.current
+      if (!fitAddon || !term || !container) return
+
+      // Guard: skip fit when container is collapsed or mid-transition
+      const { clientWidth, clientHeight } = container
+      if (clientWidth < MIN_FIT_DIMENSION || clientHeight < MIN_FIT_DIMENSION) return
+
+      try {
+        fitAddon.fit()
+        // Only send resize IPC if dimensions actually changed
+        const { cols, rows } = term
+        const last = lastSizeRef.current
+        if (cols !== last.cols || rows !== last.rows) {
+          lastSizeRef.current = { cols, rows }
+          api().terminal.resize(sessionId, cols, rows)
+        }
+      } catch {
+        // container may not be visible yet
+      }
+    }, FIT_DEBOUNCE_MS)
   }, [sessionId])
 
   useEffect(() => {
@@ -88,6 +118,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'ivory', creat
       if (reported) return
       if (term.cols < 20 || term.rows < 5) return
       reported = true
+      lastSizeRef.current = { cols: term.cols, rows: term.rows }
       api().terminal.ready(sessionId, term.cols, term.rows)
       // After autoLaunch fires (≈ 250ms post-ready in main), the viewport can
       // be scrolled off the live region because xterm stored the shell prompt
@@ -99,37 +130,49 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'ivory', creat
       setTimeout(nudge, 1500)
     }
 
-    // Use ResizeObserver to fit terminal when container gets/changes size
-    const resizeObserver = new ResizeObserver(() => {
+    /**
+     * Immediate (non-debounced) fit — used only during initial mount sequence
+     * where we need to measure the real terminal size for TERMINAL_READY.
+     * After the initial ready signal, all subsequent resizes go through the
+     * debounced `fit()` to avoid rapid-fire IPC during grid reflows.
+     */
+    const immediateFit = () => {
+      const { clientWidth, clientHeight } = container
+      if (clientWidth < MIN_FIT_DIMENSION || clientHeight < MIN_FIT_DIMENSION) return
       try {
         fitAddon.fit()
-        api().terminal.resize(sessionId, term.cols, term.rows)
+        const { cols, rows } = term
+        const last = lastSizeRef.current
+        if (cols !== last.cols || rows !== last.rows) {
+          lastSizeRef.current = { cols, rows }
+          api().terminal.resize(sessionId, cols, rows)
+        }
         reportReady()
       } catch {
         // container may not be visible yet
+      }
+    }
+
+    // Use ResizeObserver to fit terminal when container gets/changes size.
+    // All resize events are funnelled through the debounced fit() to prevent
+    // rapid-fire fit+IPC storms during grid reflow / CSS transitions.
+    const resizeObserver = new ResizeObserver(() => {
+      if (!reported) {
+        // Before ready, try immediate fit to establish initial size quickly
+        immediateFit()
+      } else {
+        fit()
       }
     })
     resizeObserver.observe(container)
 
     // Initial fit after layout settles
     requestAnimationFrame(() => {
-      try {
-        fitAddon.fit()
-        api().terminal.resize(sessionId, term.cols, term.rows)
-        reportReady()
-      } catch {
-        // container may not be visible yet
-      }
+      immediateFit()
     })
     // Second fit after a short delay to catch late layout changes
     setTimeout(() => {
-      try {
-        fitAddon.fit()
-        api().terminal.resize(sessionId, term.cols, term.rows)
-        reportReady()
-      } catch {
-        // ignore
-      }
+      immediateFit()
     }, 200)
 
     // Aggressive auto-scroll: poll every 200ms for the first 8 seconds after
@@ -183,12 +226,14 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'ivory', creat
       clearInterval(scrollInterval)
       clearTimeout(scrollTimeout)
       if (restoreTimer) clearTimeout(restoreTimer)
+      if (fitTimerRef.current) clearTimeout(fitTimerRef.current)
       resizeObserver.disconnect()
       inputDisposable.dispose()
       unsubscribe()
       term.dispose()
       termRef.current = null
       fitAddonRef.current = null
+      lastSizeRef.current = { cols: 0, rows: 0 }
     }
   }, [sessionId, theme])
 

@@ -11,6 +11,8 @@ export interface TmuxSessionInfo {
   width: number
   height: number
   created: number
+  /** Working directory of the first pane (best-effort, empty string if unavailable) */
+  paneCwd: string
 }
 
 export interface TmuxManagerEvents {
@@ -263,23 +265,33 @@ export class TmuxManager extends EventEmitter {
    */
   async listSessions(): Promise<TmuxSessionInfo[]> {
     try {
-      // Use tab separator instead of colon — session names can contain colons
+      // Use tab separator instead of colon — session names can contain colons.
+      // list-panes -a gives us per-pane data including pane_current_path,
+      // but we only need one row per session so we deduplicate below.
       const sep = '\t'
       const output = await runCommand('tmux', [
-        'list-sessions',
+        'list-panes',
+        '-a',
         '-F',
-        `#{session_id}${sep}#{session_name}${sep}#{session_width}${sep}#{session_height}${sep}#{session_created}`,
+        `#{session_id}${sep}#{session_name}${sep}#{session_width}${sep}#{session_height}${sep}#{session_created}${sep}#{pane_current_path}${sep}#{pane_index}`,
       ])
-      const sessions = output.split('\n').filter(Boolean).map((line) => {
-        const [id, name, width, height, created] = line.split(sep)
-        return {
+      const seen = new Set<string>()
+      const sessions: TmuxSessionInfo[] = []
+      for (const line of output.split('\n')) {
+        if (!line) continue
+        const [id, name, width, height, created, paneCwd, paneIndex] = line.split(sep)
+        // Take first pane (index 0) per session for dedup
+        if (seen.has(name)) continue
+        seen.add(name)
+        sessions.push({
           id,
           name,
           width: parseInt(width, 10),
           height: parseInt(height, 10),
           created: parseInt(created, 10),
-        }
-      })
+          paneCwd: paneCwd || '',
+        })
+      }
       console.log(`[TmuxManager] listSessions found ${sessions.length} tmux sessions:`, sessions.map(s => s.name).join(', '))
       return sessions
     } catch (err) {
