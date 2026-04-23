@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'preact/hooks'
 import { APP_VERSION } from '../../shared/constants'
 import type { ThemeName } from '../../shared/grid-types'
 import themesManifest from '../themes.json'
+import '../styles/workspaces.css'
+import { PersonasTab } from './PersonasTab'
 
 interface InfoSettingsViewProps {
   onRescan: () => void | Promise<void>
@@ -18,7 +20,7 @@ interface AppSection {
   scanDepth: number
 }
 
-type TabId = 'shortcuts' | 'features' | 'settings'
+type TabId = 'shortcuts' | 'features' | 'settings' | 'personas'
 
 // Built-in shortcuts (hard-coded since most keyboard shortcuts were removed)
 const SHORTCUTS = [
@@ -81,13 +83,13 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme }: Info
   return (
     <div class="settings-view">
       <div class="info-tabs">
-        {(['shortcuts', 'features', 'settings'] as TabId[]).map((tab) => (
+        {(['shortcuts', 'features', 'settings', 'personas'] as TabId[]).map((tab) => (
           <button
             key={tab}
             class={`info-tab ${activeTab === tab ? 'info-tab--active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === 'shortcuts' ? 'shortcuts' : tab === 'features' ? 'features' : 'einstellungen'}
+            {tab === 'shortcuts' ? 'shortcuts' : tab === 'features' ? 'features' : tab === 'personas' ? 'personas' : 'einstellungen'}
           </button>
         ))}
       </div>
@@ -247,6 +249,8 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme }: Info
           </div>
         </section>
       )}
+
+      {activeTab === 'personas' && <PersonasTab />}
 
       {activeTab === 'settings' && !loading && (
         <section class="settings-section">
