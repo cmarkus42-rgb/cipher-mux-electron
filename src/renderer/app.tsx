@@ -27,6 +27,7 @@ export function App() {
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null)
   const [bugreportVisible, setBugreportVisible] = useState(false)
   const [infoVisible, setInfoVisible] = useState(false)
+  const [infoInitialTab, setInfoInitialTab] = useState<'shortcuts' | 'features' | 'settings' | 'workspaces' | 'personas' | undefined>(undefined)
   const [workspacesPopupVisible, setWorkspacesPopupVisible] = useState(false)
 
   // Project popup state
@@ -264,8 +265,9 @@ export function App() {
     setWorkspacesPopupVisible(false)
   }, [])
 
-  const handleWorkspaceOpenSettings = useCallback((_tab: 'personas' | 'workspaces') => {
+  const handleWorkspaceOpenSettings = useCallback((tab: 'personas' | 'workspaces') => {
     setWorkspacesPopupVisible(false)
+    setInfoInitialTab(tab)
     setInfoVisible(true)
   }, [])
 
@@ -357,7 +359,7 @@ export function App() {
         onToggleRequests={() => setRequestsVisible((v) => !v)}
         onToggleTheme={toggleTheme}
         onToggleWorkspaces={handleToggleWorkspaces}
-        onInfo={() => setInfoVisible(true)}
+        onInfo={() => { setInfoInitialTab(undefined); setInfoVisible(true) }}
         onGridResize={handleResize}
       />
 
@@ -398,6 +400,7 @@ export function App() {
               scanning={scanning}
               theme={theme}
               onSetTheme={setTheme}
+              initialTab={infoInitialTab}
             />
           </div>
         </div>
