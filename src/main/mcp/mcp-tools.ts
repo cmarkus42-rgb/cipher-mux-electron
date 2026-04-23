@@ -21,6 +21,35 @@ export interface ToolContext {
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']
 
+/**
+ * Escape text for safe injection via tmux send-keys.
+ * For long messages (>500 chars), uses base64 encoding to avoid quoting issues.
+ */
+export function escapeForTmux(text: string): string {
+  if (text.length > 500) {
+    const b64 = Buffer.from(text).toString('base64')
+    return `echo '${b64}' | base64 -d`
+  }
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/'/g, "\\'")
+    .replace(/;/g, '\\;')
+    .replace(/\n/g, ' ')
+}
+
+/**
+ * Find a session by its display name or tmux session name.
+ */
+export function findSessionByName(
+  sessionManager: ToolContext['sessionManager'],
+  name: string,
+): string | null {
+  const sessions = sessionManager.list()
+  const match = sessions.find(s => s.name === name || s.tmuxSession === name)
+  return match?.id ?? null
+}
+
 // Helper to work around TS2589 with zod v4 + MCP SDK deep type instantiation.
 // We cast the schema shapes to `any` for registerTool's inputSchema, but keep
 // runtime validation intact via zod.
@@ -30,18 +59,20 @@ const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'sys
  * Register all MCP tools on the given McpServer instance.
  */
 export function registerTools(server: McpServer, ctx: ToolContext): void {
-  // 1. mux_send — Send a message to the message bus
+  // 1. mux_send — Send a message to the message bus (with optional push delivery)
   ;(server.registerTool as any)(
     'mux_send',
     {
-      description: 'Send a message to the cipher-mux message bus',
+      description: 'Send a message to the cipher-mux message bus. Optionally push-deliver to a target session via tmux send-keys.',
       inputSchema: {
         topic: z.string().describe('Message topic (status, bug, review, chat, system)'),
         sender: z.string().describe('Sender identifier'),
         text: z.string().describe('Message text'),
+        sessionId: z.string().optional().describe('Target session ID for push delivery'),
+        sessionName: z.string().optional().describe('Target session name for push delivery'),
       },
     },
-    async (args: { topic: string; sender: string; text: string }) => {
+    async (args: { topic: string; sender: string; text: string; sessionId?: string; sessionName?: string }) => {
       if (!ctx.messageBus) {
         return { content: [{ type: 'text' as const, text: 'MessageBus not available' }], isError: true }
       }
@@ -53,8 +84,32 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         payload: { text: args.text },
       })
 
+      // Push delivery via tmux send-keys if target session is specified
+      let delivered = false
+      const targetId = args.sessionId
+        ?? (args.sessionName ? findSessionByName(ctx.sessionManager, args.sessionName) : null)
+
+      if (targetId) {
+        const session = ctx.sessionManager.get(targetId)
+        if (session && session.status === 'active') {
+          try {
+            // Readiness check: capture pane to see if Claude prompt is visible
+            const paneContent = await ctx.sessionManager.capture(targetId)
+            const isReady = paneContent?.includes('\u276f') || paneContent?.includes('$')
+
+            if (isReady) {
+              const escaped = escapeForTmux(args.text)
+              await ctx.sessionManager.sendKeys(targetId, escaped + '\r')
+              delivered = true
+            }
+          } catch {
+            // Capture or sendKeys failed — message is still on the bus
+          }
+        }
+      }
+
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: message.id }) }],
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: message.id, delivered }) }],
       }
     }
   )

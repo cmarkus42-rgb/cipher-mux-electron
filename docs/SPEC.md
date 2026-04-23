@@ -72,18 +72,24 @@ _Erstellt in Phase 2 auf Basis von `docs/requirements.md` (2026-04-13)._
 | MessageBus | Main | SQLite-basierte Inter-Session-Kommunikation, Topics, Unread-Tracking |
 | MCP Server | Main | Streamable HTTP Endpoint, Tool-Registrierung, API-Key-Auth |
 | IPC Hub | Main | Zentraler Router für alle Renderer-Main-Kommunikation |
-| SessionManager | Main | Session-Registry, Status-Tracking, Recovery |
+| SessionManager | Main | Session-Registry, Status-Tracking, Recovery, MPO-Lifecycle |
 | ConfigStore | Main | App-Einstellungen (JSON), Layout-Persistenz |
 | ProjectScanner | Main | Projektentdeckung via Ordner-Scan (CLAUDE.md-Marker) |
 | StatusLineMonitor | Main | Empfängt Context-Usage JSON von Claude Code Sessions |
-| KickoffManager | Main | Projekt-Scaffold, Session-Spawn, Auto-Interview-Trigger |
-| BugreportManager | Main | Diagnostik-Sammlung, Report-Export |
-| Activity Rail | Renderer | Session-Icons, Unread-Badges, View-Wechsel |
-| Terminal Panes | Renderer | xterm.js Rendering, Splitting, Resize |
+| KickoffOrchestrator | Main | Projekt-Scaffold, Session-Spawn, Launcher-Prompt-Generierung |
+| BugreportManager | Main | Diagnostik-Sammlung, Ollama-Enrichment, Report-Export |
+| VoiceManager | Main | STT (Whisper), TTS (Piper), ConversationEngine, VoiceInputRouter |
+| AgentAdapter | Main | Abstraktion für AI-Agent-Backends (ClaudeCode Tier-1, Registry) |
+| TaskManager | Main | Task-Queue (SQLite), State-Machine, TaskWatcher, TaskHooks |
+| InputRequestWatcher | Main | MPO Bubble-Requests an Sidebar (mux_input_request_create) |
+| SessionGrid | Renderer | Obsidian-Style Grid mit SessionCell/LauncherCell, Drag-Resize |
+| Terminal Panes | Renderer | xterm.js Rendering, PaneHeader mit Context-% |
 | Chatroom Panel | Renderer | Message Bus Feed, bidirektionale Kommunikation |
-| Cockpit View | Renderer | Projekt-Card-Grid, Session-Start, Context-Budget |
+| StatusBar | Renderer | Controls (Voice, Grid, MPO), Version, Session-Count |
+| VoiceControl | Renderer | Floating Pill UI, VAD (Silero ONNX), Audio Capture |
+| InputRequestsPanel | Renderer | MPO Input-Request-Sidebar |
 | Kickoff Dialog | Renderer | Dateipfad + Zielverzeichnis Input |
-| Info Page | Renderer | In-App-Hilfe und Anleitung |
+| Info/Settings | Renderer | Shortcuts, Features, Settings-Tab |
 
 ## 2. Module & Verzeichnisstruktur
 

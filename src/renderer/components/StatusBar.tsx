@@ -53,15 +53,17 @@ export function StatusBar({
         <span class="status-bar__sep">|</span>
         <button
           class={`status-bar__btn${orchestratorRunning ? ' status-bar__btn--active' : ''}`}
+          style={{ color: '#B8601A' }}
           onClick={onOrchestrator}
         >
-          orchestrator
+          <span style={{ marginRight: '4px' }}>●</span>orchestrator
         </button>
         <button
           class={`status-bar__btn${mpoRunning ? ' status-bar__btn--active' : ''}`}
+          style={{ color: '#2d8a4e' }}
           onClick={onMpo}
         >
-          mpo
+          <span style={{ marginRight: '4px' }}>●</span>mpo
         </button>
         <button class="status-bar__btn" onClick={onBugreport}>bugreport</button>
         <button

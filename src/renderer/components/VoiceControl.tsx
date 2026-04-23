@@ -41,9 +41,11 @@ export function VoiceControl({ focusedSessionId, focusedSessionName, inline }: V
         </div>
       )}
 
-      {/* Error display */}
+      {/* Error display — full message in title for tooltip on hover */}
       {error && !active && (
-        <div class="voice-toast voice-toast--error">{error}</div>
+        <div class="voice-toast voice-toast--error" title={error}>
+          {error.length > 60 ? error.slice(0, 60) + '...' : error}
+        </div>
       )}
 
       {/* Toggle switch + LED */}

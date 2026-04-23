@@ -99,6 +99,22 @@ Ziel: Info-Seite, Bugreport, Session-Recovery, Layout-Persistenz, finale Integra
 
 ---
 
+## Post-Phase: Erweiterungen (TP-Tracks)
+
+_Implementiert nach Phase 6, nicht im ursprünglichen Scope._
+
+| # | Task | Status | Dateien |
+|---|------|--------|---------|
+| TP-2 | **AgentAdapter Interface** — Abstraktion für AI-Agent-Backends (ClaudeCodeAdapter Tier-1, ReferenceStub Tier-2, AdapterRegistry) | done (2026-04-20) | src/main/agent/ |
+| TP-5 | **Voice STT Pipeline** — Silero VAD (Renderer) + Whisper STT (Main) + VoiceInputRouter + ConversationEngine + TTS (Piper für Bugreport) | done (2026-04-19) | src/main/voice/, src/renderer/voice/, VoiceControl.tsx |
+| TP-6 | **Task-System** — TaskManager (SQLite), TaskWatcher, TaskHooks, BugreportTaskSource, MCP-Tools (mux_task_*) | done (2026-04-21) | src/main/task/ |
+| TP-7 | **Grid-Layout** — SessionGrid mit SessionCell/LauncherCell, Obsidian-Style Drag-Resize, useGrid Hook | done (2026-04-21) | SessionGrid.tsx, SessionCell.tsx, LauncherCell.tsx, useGrid.ts, grid-types.ts |
+| TP-8 | **MPO (Multi-Project Orchestrator)** — MpoTemplate, InputRequestWatcher, mux_input_request_create, StatusBar-Button, Grid-Placement | done (2026-04-23) | src/main/mpo/, src/main/session/mpo-template.ts |
+| Phase-A | **Theme-System** — 10 Themes via themes.json Manifest, body[data-theme] Switching, Theme-Picker in Settings, CSS Custom Properties + ANSI-Farben pro Theme, useTheme Hook | done (2026-04-23) | src/renderer/themes.json, src/renderer/styles/theme-*.css, src/renderer/hooks/useTheme.ts |
+| Phase-B | **MCP/Terminal/StatusLine Polish** — MCP Session-Lifecycle (GC 30min, max 5, /health), StatusLine 2.x context_window Parser, Terminal Fit-Debounce (150ms) + Min-Size-Guard, agent.skipPermissions ConfigStore-Flag | done (2026-04-23) | src/main/mcp/, src/main/monitoring/, src/main/agent/ |
+
+---
+
 ## Abhängigkeits-Graph (Übersicht)
 
 ```
