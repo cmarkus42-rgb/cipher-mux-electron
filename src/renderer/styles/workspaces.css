@@ -1,0 +1,399 @@
+/*
+ * workspaces.css — Personas & Workspaces settings UI
+ *
+ * Two-panel layout: left list + right editor.
+ * Shared between PersonasTab and (future) WorkspacesTab.
+ */
+
+/* ================================================================
+   Persona Pane — Two-Column Grid
+   ================================================================ */
+
+.pp-pane {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  min-height: 520px;
+}
+
+/* ================================================================
+   LEFT: Persona List
+   ================================================================ */
+
+.pp-list {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-sunken);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.pp-list-head {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  background: var(--color-bg-elevated);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pp-list-head button {
+  background: var(--color-text);
+  color: var(--color-bg);
+  border: 1px solid var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.pp-list-head button:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.pp-list-items {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ── List Item ── */
+
+.pp-item {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  align-items: center;
+}
+
+.pp-item:hover {
+  background: var(--color-bg);
+}
+
+.pp-item--active {
+  background: var(--color-accent-soft);
+  border-left-color: var(--color-accent);
+}
+
+.pp-dot {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--color-text);
+  box-sizing: border-box;
+}
+
+.pp-item-meta {
+  min-width: 0;
+}
+
+.pp-item-name {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pp-item-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-dim);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pp-item-sub::before {
+  content: '> ';
+  color: var(--color-accent);
+}
+
+.pp-item-sub--empty::before {
+  display: none;
+}
+
+.pp-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  padding: 2px 6px;
+}
+
+/* ================================================================
+   RIGHT: Editor Panel
+   ================================================================ */
+
+.pp-edit {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pp-edit--empty {
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-dim);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* ── Header Row ── */
+
+.pp-edit-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.pp-edit-dot {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-text);
+  box-sizing: border-box;
+}
+
+.pp-edit-name {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 4px 6px;
+  width: 100%;
+}
+
+.pp-edit-name:hover,
+.pp-edit-name:focus {
+  border-color: var(--color-border);
+  background: var(--color-bg);
+  outline: none;
+}
+
+.pp-edit-name:disabled {
+  cursor: not-allowed;
+  color: var(--color-text);
+  border: 1px dashed var(--color-border);
+  background: transparent;
+}
+
+/* ── Action Buttons ── */
+
+.pp-edit-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pp-edit-actions button {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.pp-edit-actions button:hover {
+  background: var(--color-text);
+  color: var(--color-bg);
+  border-color: var(--color-text);
+}
+
+.pp-edit-actions button.pp-btn-danger {
+  color: var(--color-neon-red);
+  border-color: var(--color-neon-red);
+}
+
+.pp-edit-actions button.pp-btn-danger:hover {
+  background: var(--color-neon-red);
+  color: white;
+  border-color: var(--color-neon-red);
+}
+
+.pp-edit-actions button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  background: transparent;
+  color: var(--color-text-dim);
+  border-color: var(--color-border);
+}
+
+/* ── Color Swatches ── */
+
+.pp-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.pp-colors-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.pp-swatch {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--color-text);
+  cursor: pointer;
+  position: relative;
+}
+
+.pp-swatch--selected::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border: 1px solid var(--color-accent);
+  pointer-events: none;
+}
+
+.pp-swatch--locked {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ── Form Field ── */
+
+.pp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pp-field label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+}
+
+.pp-field .pp-hint {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--color-text-dim);
+  letter-spacing: 0.04em;
+}
+
+.pp-field .pp-hint::before {
+  content: '// ';
+  color: var(--color-accent);
+}
+
+.pp-field textarea {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 10px 12px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 180px;
+}
+
+.pp-field textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+/* ── Usage Footer ── */
+
+.pp-usage {
+  padding: 10px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-dim);
+  letter-spacing: 0.02em;
+}
+
+.pp-usage b {
+  color: var(--color-text);
+}
+
+.pp-usage .pp-usage-empty {
+  color: var(--color-text-dim);
+  font-style: italic;
+}
+
+/* ── Save / Revert Footer ── */
+
+.pp-foot-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.pp-foot-actions button {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.pp-foot-actions button:hover {
+  background: var(--color-text);
+  color: var(--color-bg);
+  border-color: var(--color-text);
+}
+
+.pp-foot-actions button.pp-btn-primary {
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border-color: var(--color-accent);
+}
+
+.pp-foot-actions button.pp-btn-primary:hover {
+  background: var(--color-text);
+  border-color: var(--color-text);
+}
+
+.pp-foot-actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
