@@ -16,6 +16,7 @@ interface SessionCellProps {
   onClose: (sessionId: string) => void
   onSwitchProject: (sessionId: string) => void
   onToggleExpand: (sessionId: string) => void
+  onShell: (sessionId: string, projectPath: string | null) => void
   onDragStart: (sessionId: string) => void
   onDragOver: (e: DragEvent) => void
   onDrop: (e: DragEvent) => void
@@ -24,7 +25,7 @@ interface SessionCellProps {
 export function SessionCell({
   session, contextUsage, focused, isOrchestrator, theme,
   rowSpan, maxRows,
-  onFocus, onClose, onSwitchProject, onToggleExpand, onDragStart, onDragOver, onDrop,
+  onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onDragStart, onDragOver, onDrop,
 }: SessionCellProps) {
   const { terminalRef } = useTerminal(session.id, theme, session.createdAt)
   const pct = contextUsage?.usedPercentage ?? 0
@@ -42,6 +43,10 @@ export function SessionCell({
     e.stopPropagation()
     onToggleExpand(session.id)
   }, [session.id, onToggleExpand])
+  const handleShell = useCallback((e: Event) => {
+    e.stopPropagation()
+    onShell(session.id, session.projectPath)
+  }, [session.id, session.projectPath, onShell])
 
   const ctxClass = pct >= 85 ? 'ctx-error' : pct >= 60 ? 'ctx-warn' : 'ctx-ok'
   const dotClass = pct >= 85 ? 'neon-dot--error' : pct >= 60 ? 'neon-dot--warn' : 'neon-dot--ok'
@@ -84,6 +89,7 @@ export function SessionCell({
           {!isOrchestrator && (
             <button class="cell-btn" onClick={handleSwitch} title="projekt wechseln">⇄</button>
           )}
+          <button class="cell-btn" onClick={handleShell} title="shell öffnen">$</button>
           <button class="cell-btn" onClick={handleClose} title="session schließen">✕</button>
         </div>
       </div>

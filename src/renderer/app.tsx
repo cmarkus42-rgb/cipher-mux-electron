@@ -259,6 +259,20 @@ export function App() {
     }
   }, [stopSession, removeSession, focusedSessionId, grid.slots])
 
+  const handleShell = useCallback(async (_sessionId: string, projectPath: string | null) => {
+    if (!projectPath) return
+    try {
+      const session = await startSession({
+        name: 'Shell',
+        projectPath,
+      })
+      addSession(session.id)
+      setFocusedSessionId(session.id)
+    } catch (err) {
+      console.error('[App] Failed to open shell:', err)
+    }
+  }, [startSession, addSession])
+
   const handleResize = useCallback((cols: number, rows: number) => {
     resize({ cols, rows })
   }, [resize])
@@ -335,6 +349,7 @@ export function App() {
           onCloseSession={handleCloseSession}
           onSwitchProject={handleSwitchProject}
           onToggleExpand={toggleExpand}
+          onShell={handleShell}
           onLaunch={handleLaunch}
           onOpenSession={handleOpenSession}
           onSwap={swap}
