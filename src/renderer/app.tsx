@@ -86,8 +86,11 @@ export function App() {
   }, [setSessionAtSlot])
 
   const placeMpo = useCallback((sessionId: string) => {
-    setMpoSessionId(sessionId)
-    addSession(sessionId)
+    setMpoSessionId((prev) => {
+      if (prev === sessionId) return prev // already placed
+      addSession(sessionId)
+      return sessionId
+    })
   }, [addSession])
 
   // Check orchestrator status on mount
@@ -270,14 +273,13 @@ export function App() {
         removeSession(mpoSessionId)
         setMpoSessionId(null)
       } else {
-        const session = await api.mpo.start()
-        const sid = session?.sessionId ?? session?.id
-        if (sid) placeMpo(sid)
+        await api.mpo.start()
+        // placement handled by onStarted listener
       }
     } catch (err) {
       console.error('[App] MPO toggle failed:', err)
     }
-  }, [mpoSessionId, removeSession, placeMpo])
+  }, [mpoSessionId, removeSession])
 
   return (
     <div class="app-shell">
