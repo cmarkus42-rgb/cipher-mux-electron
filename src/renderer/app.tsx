@@ -339,7 +339,16 @@ export function App() {
           onOpenSession={handleOpenSession}
           onSwap={swap}
         />
-        <ChatroomPanel visible={chatroomVisible} />
+        <ChatroomPanel
+          visible={chatroomVisible}
+          sessions={sessions}
+          gridSessionIds={grid.slots.map(s => s.sessionId).filter(Boolean) as string[]}
+          contextUsages={contextUsages}
+          onAddToGrid={(sessionId) => {
+            addSession(sessionId)
+            setFocusedSessionId(sessionId)
+          }}
+        />
         <InputRequestsPanel visible={requestsVisible} />
       </div>
 

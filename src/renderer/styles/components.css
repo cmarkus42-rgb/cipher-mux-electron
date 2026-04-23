@@ -1263,3 +1263,66 @@
 .status-bar__dot--mpo { background: #2d8a4e; }
 .status-bar__btn--active .status-bar__dot--orchestrator { box-shadow: 0 0 4px #B8601A; }
 .status-bar__btn--active .status-bar__dot--mpo { box-shadow: 0 0 4px #2d8a4e; }
+
+/* ── Background Sessions (Chatroom) ── */
+
+.chatroom-bg-sessions {
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-sunken);
+}
+
+.chatroom-bg-sessions__head {
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.chatroom-bg-sessions__head:hover {
+  color: var(--color-text);
+}
+
+.chatroom-bg-session {
+  padding: 6px 12px;
+  border-top: 1px solid var(--color-border);
+  cursor: pointer;
+}
+
+.chatroom-bg-session:hover {
+  background: var(--color-bg);
+}
+
+.chatroom-bg-session__name {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.chatroom-bg-session__path {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--color-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chatroom-bg-session__bar {
+  margin-top: 4px;
+  height: 3px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+}
+
+.chatroom-bg-session__fill {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 300ms ease;
+}
