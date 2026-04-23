@@ -24,19 +24,19 @@ export interface TerminalThemeColors {
 export function getTerminalTheme(theme: ThemeName): TerminalThemeColors {
   if (theme === 'dark') {
     return {
-      background: '#222228',
-      foreground: '#D8D8E0',
+      background: '#1a1e24',
+      foreground: '#8aac8e',
       cursor: '#5C9A6E',
-      selectionBackground: 'rgba(92, 154, 110, 0.40)',
-      selectionForeground: '#FFFFFF',
-      black: '#222228', brightBlack: '#888898',
-      white: '#D8D8E0', brightWhite: '#FFFFFF',
-      green: '#5C9A6E', brightGreen: '#8CC8A0',
-      red: '#D47080', brightRed: '#E08090',
-      yellow: '#C07840', brightYellow: '#D09060',
-      blue: '#60A0B8', brightBlue: '#70B0C8',
-      cyan: '#60A0B8', brightCyan: '#70B0C8',
-      magenta: '#A080C0', brightMagenta: '#A480C4',
+      selectionBackground: 'rgba(92, 154, 110, 0.35)',
+      selectionForeground: '#c8d8cc',
+      black: '#1a1e24', brightBlack: '#606870',
+      white: '#8aac8e', brightWhite: '#a8c4ac',
+      green: '#5C9A6E', brightGreen: '#72b084',
+      red: '#a85860', brightRed: '#b86870',
+      yellow: '#906030', brightYellow: '#a87040',
+      blue: '#5088a0', brightBlue: '#6098b0',
+      cyan: '#5088a0', brightCyan: '#6098b0',
+      magenta: '#7860a0', brightMagenta: '#8870a8',
     }
   }
   // Ivory theme — light terminal
