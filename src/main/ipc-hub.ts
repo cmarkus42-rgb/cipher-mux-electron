@@ -1,5 +1,6 @@
 import { app, dialog, ipcMain, screen } from 'electron'
 import * as path from 'path'
+import * as os from 'os'
 import { WindowManager } from './window-manager'
 import { SessionManager } from './session/session-manager'
 import { TmuxManager } from './tmux/tmux-manager'
@@ -479,21 +480,20 @@ export class IpcHub {
 
   // ─── Window ─────────────────────────────────────────────
   private registerWindowChannels(): void {
-    ipcMain.handle(IPC.WINDOW_FIT_GRID, (_e, { cols, rows }: { cols: number; rows: number }) => {
+    ipcMain.handle(IPC.WINDOW_FIT_GRID, (_e, { cols, rows, panelWidth: extraPanels }: { cols: number; rows: number; panelWidth?: number }) => {
       const win = this.windowManager.getMainWindow()
       if (!win) return
       const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
       const targetCellWidth = 664
-      const panelWidth = 280 // chatroom
+      const panels = extraPanels ?? 280 // default: chatroom only
       const padding = 20
-      const idealWidth = cols * targetCellWidth + panelWidth + padding
+      const idealWidth = cols * targetCellWidth + panels + padding
       // Height: fixed cell height × rows + chrome
       const cellHeight = 380 // SESSION_CELL_HEIGHT
       const chromeHeight = 38 + 28 // drag region + status bar
       const gridPadding = 12 // 6px padding top+bottom on .session-grid-area
-      const gridControls = 22 // grid controls bar height
       const gridGaps = (rows - 1) * 4 // 4px gap between rows
-      const idealHeight = rows * cellHeight + chromeHeight + gridPadding + gridControls + gridGaps
+      const idealHeight = rows * cellHeight + chromeHeight + gridPadding + gridGaps
       // Cap to screen dimensions — grid scrolls when content exceeds window
       const newWidth = Math.min(idealWidth, screenW)
       const newHeight = Math.min(idealHeight, screenH)
@@ -610,8 +610,10 @@ export class IpcHub {
         // Session mode uses renderer-side VAD (Silero ONNX via vad-loader.ts).
         // Don't block voice availability for missing sherpa-onnx-node.
       }
-      // Check whisper model
-      const modelPath = path.join(app.getPath('userData'), 'models', 'whisper', 'ggml-small.bin')
+      // Check whisper model — use ~/.config/cipher-mux/ so path is stable
+      // regardless of dev vs packaged mode (app.getPath('userData') varies)
+      const configBase = path.join(os.homedir(), '.config', 'cipher-mux')
+      const modelPath = path.join(configBase, 'models', 'whisper', 'ggml-small.bin')
       if (!fs.existsSync(modelPath)) {
         console.log('[Voice] Whisper model NOT found at:', modelPath)
         return { available: false, reason: `Whisper-Model fehlt: ${modelPath} — scripts/download-models.sh` }
@@ -623,22 +625,28 @@ export class IpcHub {
 
     ipcMain.handle(IPC.VOICE_START, async () => {
       try {
-        if (!this.voiceManager) {
-          this.voiceManager = new VoiceManager()
-          const transport: ConversationTransport = {
-            sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
-            sendStopCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'processing'),
-            sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
-            sendAudioPlayback: (b64) => this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_AUDIO, b64),
-            sendStateChange: (state) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state),
-            sendStopPlayback: () => this.windowManager.sendToMainWindow(IPC.VOICE_STOP_PLAYBACK, undefined),
-            sendGenerationDone: () => this.windowManager.sendToMainWindow(IPC.VOICE_GENERATION_DONE, undefined),
-            dispatchStatus: (text: string, level: string) => console.log(`[Voice:${level}] ${text}`),
-            cancelStream: () => { /* no LLM stream cancel for bugreport */ },
-          }
-          this.voiceManager.setTransport(transport)
-          await this.voiceManager.init()
+        // Bugreport interview needs TTS — if a session-mode VoiceManager (skipTTS)
+        // is running, shut it down and create a fresh one with TTS enabled.
+        if (this.voiceManager) {
+          console.log('[Voice] Shutting down existing VoiceManager for bugreport mode')
+          this.voiceManager.shutdown()
+          this.voiceManager = null as any
         }
+
+        this.voiceManager = new VoiceManager()
+        const transport: ConversationTransport = {
+          sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
+          sendStopCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'processing'),
+          sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
+          sendAudioPlayback: (b64) => this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_AUDIO, b64),
+          sendStateChange: (state) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state),
+          sendStopPlayback: () => this.windowManager.sendToMainWindow(IPC.VOICE_STOP_PLAYBACK, undefined),
+          sendGenerationDone: () => this.windowManager.sendToMainWindow(IPC.VOICE_GENERATION_DONE, undefined),
+          dispatchStatus: (text: string, level: string) => console.log(`[Voice:${level}] ${text}`),
+          cancelStream: () => { /* no LLM stream cancel for bugreport */ },
+        }
+        this.voiceManager.setTransport(transport)
+        await this.voiceManager.init()
 
         const interview = this.voiceManager.startInterview()
         interview.on('turn-update', (turn: { role: string; content: string }) => {
@@ -700,23 +708,29 @@ export class IpcHub {
     ipcMain.handle(IPC.VOICE_START_SESSION, async () => {
       console.log('[Voice] VOICE_START_SESSION handler invoked')
       try {
-        if (!this.voiceManager) {
-          console.log('[Voice] Creating new VoiceManager (skipTTS: true)')
-          this.voiceManager = new VoiceManager({ skipTTS: true })
-          const transport: ConversationTransport = {
-            sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
-            sendStopCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'processing'),
-            sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
-            sendAudioPlayback: () => {},
-            sendStateChange: (state) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state),
-            sendStopPlayback: () => {},
-            sendGenerationDone: () => {},
-            dispatchStatus: (text: string, level: string) => console.log(`[Voice:${level}] ${text}`),
-            cancelStream: () => {},
-          }
-          this.voiceManager.setTransport(transport)
-          await this.voiceManager.init()
+        // Session mode needs skipTTS — if a bugreport VoiceManager (with TTS)
+        // is running, shut it down and create a fresh one without TTS.
+        if (this.voiceManager) {
+          console.log('[Voice] Shutting down existing VoiceManager for session mode')
+          this.voiceManager.shutdown()
+          this.voiceManager = null as any
         }
+
+        console.log('[Voice] Creating new VoiceManager (skipTTS: true)')
+        this.voiceManager = new VoiceManager({ skipTTS: true })
+        const transport: ConversationTransport = {
+          sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
+          sendStopCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'processing'),
+          sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
+          sendAudioPlayback: () => {},
+          sendStateChange: (state) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state),
+          sendStopPlayback: () => {},
+          sendGenerationDone: () => {},
+          dispatchStatus: (text: string, level: string) => console.log(`[Voice:${level}] ${text}`),
+          cancelStream: () => {},
+        }
+        this.voiceManager.setTransport(transport)
+        await this.voiceManager.init()
 
         console.log('[Voice] Starting session mode...')
         const inputRouter = this.voiceManager.startSessionMode(this.sessionManager)
@@ -777,7 +791,12 @@ export class IpcHub {
   // ─── Input Requests (MPO) ─────────────────────────────
   private registerInputRequestChannels(): void {
     const INPUT_REQUESTS_PATH = BRAND.inputRequestsPath
-    if (!INPUT_REQUESTS_PATH) return
+
+    // Always register the handler so renderer doesn't get "No handler" errors
+    if (!INPUT_REQUESTS_PATH) {
+      ipcMain.handle(IPC.MPO_INPUT_REQUESTS, () => ({ requests: [] }))
+      return
+    }
 
     this.inputRequestWatcher = new InputRequestWatcher(INPUT_REQUESTS_PATH)
 
