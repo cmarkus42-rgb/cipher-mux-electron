@@ -106,6 +106,9 @@ export interface AppState {
 // ─── Config ────────────────────────────────────────────────
 
 export interface AppConfig {
+  personas: import('./persona-types').Persona[]
+  workspaces: import('./persona-types').Workspace[]
+  activeWorkspaceId: string | null
   app: {
     scanPaths: string[]
     /** Directory levels below each scanPath that are inspected (1 = children only). */
