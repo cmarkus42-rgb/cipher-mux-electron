@@ -12,6 +12,7 @@ interface InfoSettingsViewProps {
   scanning: boolean
   theme: ThemeName
   onSetTheme: (t: ThemeName) => void
+  initialTab?: TabId
 }
 
 const api = (window as any).cipherMux
@@ -33,8 +34,8 @@ const SHORTCUTS = [
 
 const themes = themesManifest.themes
 
-export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme }: InfoSettingsViewProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('features')
+export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initialTab }: InfoSettingsViewProps) {
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'features')
   const [scanPaths, setScanPaths] = useState<string[]>([])
   const [scanDepth, setScanDepth] = useState(1)
   const [loading, setLoading] = useState(true)
