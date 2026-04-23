@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>cipher-mux · Settings · Workspaces</title>
+<link rel="stylesheet" href="workspaces.css">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="personas.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: #1A1A1D; min-height: 100vh; font-family: var(--font-body); color: var(--color-text); }
+  .stage { padding: 32px; display: grid; place-items: start center; gap: 12px; }
+  .hint { color: #8A8A82; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.05em; max-width: 1120px; }
+  .hint b { color: var(--color-accent); }
+
+  .win { width: 1120px; background: var(--color-bg); border: 1px solid var(--color-border-strong); box-shadow: 0 12px 32px rgba(0,0,0,0.35); }
+  .win-chrome { display: flex; align-items: center; padding: 6px 10px; background: var(--color-bg-sunken); border-bottom: 1px solid var(--color-border); gap: 8px; }
+  .win-dots { display: flex; gap: 5px; }
+  .win-dots span { width: 10px; height: 10px; border-radius: 50%; background: var(--color-border); }
+  .win-dots span:nth-child(1) { background: #D4716C; }
+  .win-dots span:nth-child(2) { background: #D4B96C; }
+  .win-dots span:nth-child(3) { background: #7CB37F; }
+  .win-title { flex: 1; text-align: center; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); letter-spacing: 0.04em; }
+
+  .win-tabs { display: flex; padding: 0 12px; background: var(--color-bg-sunken); border-bottom: 1px solid var(--color-border); }
+  .win-tab { padding: 8px 14px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-dim); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .win-tab[aria-selected="true"] { color: var(--color-text); border-bottom-color: var(--color-accent); background: var(--color-bg); }
+  .win-tab a { color: inherit; text-decoration: none; display: block; }
+  .win-body { padding: 18px 20px 24px; }
+
+  .ws-pane { display: grid; grid-template-columns: 300px 1fr; gap: 20px; min-height: 640px; }
+
+  /* LEFT: list */
+  .ws-list { border: 1px solid var(--color-border); background: var(--color-bg-sunken); display: flex; flex-direction: column; }
+  .ws-list-head { padding: 10px 12px; border-bottom: 1px solid var(--color-border); font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text); background: var(--color-bg-elevated); display: flex; justify-content: space-between; align-items: center; }
+  .ws-list-head button { background: var(--color-text); color: var(--color-bg); border: 1px solid var(--color-text); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; cursor: pointer; }
+  .ws-list-head button:hover { background: var(--color-accent); border-color: var(--color-accent); }
+  .ws-item { display: grid; grid-template-columns: 56px 1fr; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--color-border); cursor: pointer; border-left: 3px solid transparent; align-items: center; }
+  .ws-item:hover { background: var(--color-bg); }
+  .ws-item[aria-current="true"] { background: var(--color-accent-soft); border-left-color: var(--color-accent); }
+  .ws-item-thumb { width: 56px; aspect-ratio: 3/2; --aspect: 1.5; }
+  .ws-item-thumb .vcell-role, .ws-item-thumb .vcell-project, .ws-item-thumb .vcell-prompt { display: none; }
+  .ws-item-thumb .vcell { padding: 0; }
+  .ws-item-name { font-family: var(--font-display); font-weight: 700; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ws-item-sub { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* RIGHT: editor */
+  .ws-editor { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .ws-ed-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center; }
+  .ws-ed-name { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text); background: transparent; border: 1px solid transparent; padding: 4px 6px; margin: 0; width: 100%; }
+  .ws-ed-name:hover, .ws-ed-name:focus { border-color: var(--color-border); background: var(--color-bg-elevated); outline: none; }
+  .ws-ed-tool { background: transparent; border: 1px solid var(--color-border); color: var(--color-text); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 10px; cursor: pointer; }
+  .ws-ed-tool:hover { background: var(--color-text); color: var(--color-bg); border-color: var(--color-text); }
+  .ws-ed-tool.danger { color: var(--color-danger); border-color: var(--color-danger); }
+  .ws-ed-tool.danger:hover { background: var(--color-danger); color: white; border-color: var(--color-danger); }
+
+  .ws-dims { display: flex; gap: 12px; align-items: center; padding: 10px 12px; background: var(--color-bg-sunken); border: 1px solid var(--color-border); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; }
+  .dim-stepper { display: flex; align-items: center; gap: 2px; }
+  .dim-label { font-family: var(--font-display); font-weight: 700; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-dim); margin-right: 6px; }
+  .dim-stepper button { width: 22px; height: 22px; border: 1px solid var(--color-border); background: var(--color-bg-elevated); color: var(--color-text); font-family: var(--font-mono); cursor: pointer; }
+  .dim-stepper button:hover { background: var(--color-text); color: var(--color-bg); }
+  .dim-stepper .dim-val { min-width: 28px; text-align: center; font-family: var(--font-mono); font-size: 13px; padding: 0 6px; color: var(--color-text); }
+  .dim-note { margin-left: auto; color: var(--color-text-dim); }
+  .dim-note kbd { font-family: var(--font-mono); font-size: 9px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); padding: 1px 4px; }
+
+  .ed-grid-wrap { padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg-sunken); position: relative; }
+  .ed-grid { display: grid; grid-template-columns: repeat(var(--cols), 1fr); grid-auto-rows: 1fr; min-height: 360px; position: relative; border: 1px solid var(--color-border-strong); gap: 0; }
+
+  .ed-cell { background: var(--color-bg-elevated); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 110px; position: relative; cursor: pointer; border-top: 1px solid var(--color-border-strong); border-left: 1px solid var(--color-border-strong); }
+  .ed-cell:hover { box-shadow: inset 0 0 0 2px var(--color-accent); }
+  .ed-cell[data-selected="true"] { box-shadow: inset 0 0 0 2px var(--color-accent); background: var(--color-bg); }
+  .ed-cell[data-col="0"] { border-left: 0; }
+  .ed-cell[data-row="0"] { border-top: 0; }
+
+  .merge-handle { position: absolute; left: 8px; right: 8px; bottom: -1px; height: 4px; z-index: 5; cursor: row-resize; }
+  .merge-handle::before { content: ''; display: block; width: 100%; height: 2px; background: var(--color-text-dim); opacity: 0; transition: opacity 120ms ease, height 120ms ease; }
+  .merge-handle:hover::before { opacity: 1; background: var(--color-accent); height: 3px; }
+  .ed-cell[data-merged="true"]::after {
+    content: ''; position: absolute; left: 8px; right: 8px;
+    bottom: calc(100% * (var(--span-below, 0) / var(--span, 1)));
+    border-top: 2px dashed var(--color-accent);
+    opacity: 0.35; pointer-events: none;
+  }
+
+  .ed-cell-row { display: flex; align-items: center; gap: 6px; }
+  .persona-chip {
+    font-family: var(--font-display); font-weight: 700; font-size: 9px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 2px 6px 2px 4px;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-bg); color: var(--color-text);
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .persona-chip .dot {
+    width: 6px; height: 6px;
+    background: var(--persona-color, var(--color-text-dim));
+  }
+  .ed-cell-coord { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); letter-spacing: 0.04em; margin-left: auto; }
+  .ed-cell-coord[data-span]:not([data-span="1"])::after { content: ' ×' attr(data-span); color: var(--color-accent); font-weight: 700; }
+  .ed-cell-project { font-family: var(--font-mono); font-size: 12px; color: var(--color-text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ed-cell-prompt { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: auto; }
+  .ed-cell-prompt::before { content: '> '; color: var(--color-accent); }
+  .ed-cell-prompt.inherited { opacity: 0.7; }
+  .ed-cell-prompt.inherited::before { content: '≡ '; color: var(--color-text-dim); }
+  .ed-cell[data-persona="empty"] { background: repeating-linear-gradient(45deg, var(--color-bg-elevated) 0 6px, var(--color-bg-sunken) 6px 12px); }
+
+  /* Inspector */
+  .inspector { border: 1px solid var(--color-border); background: var(--color-bg-elevated); padding: 14px 16px; }
+  .insp-head { font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-dim); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: baseline; }
+  .insp-head .coord { font-family: var(--font-mono); font-size: 11px; color: var(--color-accent); letter-spacing: 0.04em; }
+  .insp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .insp-field { display: flex; flex-direction: column; gap: 4px; }
+  .insp-field.wide { grid-column: 1 / -1; }
+  .insp-field label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-dim); }
+  .insp-field input, .insp-field select, .insp-field textarea { background: var(--color-bg); border: 1px solid var(--color-border); color: var(--color-text); font-family: var(--font-mono); font-size: 12px; padding: 6px 8px; letter-spacing: 0.02em; }
+  .insp-field input:focus, .insp-field select:focus, .insp-field textarea:focus { outline: none; border-color: var(--color-accent); }
+  .insp-field textarea { resize: vertical; min-height: 66px; font-size: 11px; line-height: 1.4; }
+  .insp-field .source-note { font-size: 9px; color: var(--color-text-dim); font-family: var(--font-mono); letter-spacing: 0.04em; }
+  .insp-field .source-note::before { content: '// '; color: var(--color-accent); }
+
+  /* Workspace-level persona prompt overrides */
+  .overrides-wrap {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-elevated);
+    padding: 14px 16px;
+  }
+  .overrides-head {
+    font-family: var(--font-display); font-weight: 700; font-size: 12px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--color-text);
+    margin-bottom: 6px;
+    display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  }
+  .overrides-head .sub {
+    font-family: var(--font-mono); font-size: 9px;
+    color: var(--color-text-dim); letter-spacing: 0.04em;
+    text-transform: none; font-weight: 400;
+  }
+  .overrides-head .sub::before { content: '// '; color: var(--color-accent); }
+  .overrides-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+  .ov-col { display: flex; flex-direction: column; gap: 4px; }
+  .ov-col .ov-label {
+    font-family: var(--font-display); font-weight: 700; font-size: 11px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .ov-col .ov-label .dot { width: 8px; height: 8px; background: var(--persona-color); }
+  .ov-col .ov-label .project-count { margin-left: auto; font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); letter-spacing: 0.04em; font-weight: 400; text-transform: none; }
+  .ov-col textarea { background: var(--color-bg); border: 1px solid var(--color-border); color: var(--color-text); font-family: var(--font-mono); font-size: 11px; padding: 8px 10px; line-height: 1.4; resize: vertical; min-height: 76px; }
+  .ov-col textarea:focus { outline: none; border-color: var(--color-accent); }
+  .ov-col .ov-base {
+    font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim);
+    letter-spacing: 0.02em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ov-col .ov-base::before { content: 'base: '; color: var(--color-accent); }
+  .ov-col .ov-base.using-base { color: var(--color-accent); }
+  .overrides-add { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
+  .overrides-add select { background: var(--color-bg); border: 1px solid var(--color-border); color: var(--color-text); font-family: var(--font-mono); font-size: 10px; padding: 4px 8px; }
+  .overrides-add button { background: transparent; border: 1px solid var(--color-border); color: var(--color-text); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; cursor: pointer; }
+  .overrides-add button:hover { background: var(--color-text); color: var(--color-bg); border-color: var(--color-text); }
+
+  .foot-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--color-border); }
+  .foot-actions button { background: transparent; border: 1px solid var(--color-border); color: var(--color-text); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; padding: 7px 14px; cursor: pointer; }
+  .foot-actions button:hover { background: var(--color-text); color: var(--color-bg); border-color: var(--color-text); }
+  .foot-actions button.primary { background: var(--color-accent); color: var(--color-bg); border-color: var(--color-accent); }
+  .foot-actions button.primary:hover { background: var(--color-text); border-color: var(--color-text); }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="hint">
+    <b>Settings → Workspaces.</b>
+    Jede Zelle trägt eine <b>Persona</b> (verwaltet im Personas-Tab), ein Projekt und einen optionalen Per-Cell-Prompt.
+    Prompt-Auflösung: Zelle > Workspace-Override > Persona-Default.
+    Spalten fix — merge-Handles auf unterer Kante mergen nach unten.
+  </div>
+
+  <div class="win">
+    <div class="win-chrome">
+      <div class="win-dots"><span></span><span></span><span></span></div>
+      <div class="win-title">cipher-mux · settings</div>
+    </div>
+    <div class="win-tabs">
+      <div class="win-tab">General</div>
+      <div class="win-tab">Themes</div>
+      <div class="win-tab" aria-selected="true">Workspaces</div>
+      <div class="win-tab"><a href="settings-personas.html">Personas</a></div>
+      <div class="win-tab">Keybinds</div>
+      <div class="win-tab">MCP</div>
+      <div class="win-tab">About</div>
+    </div>
+    <div class="win-body">
+
+      <div class="ws-pane">
+
+        <!-- LEFT: list -->
+        <div class="ws-list">
+          <div class="ws-list-head">
+            <span>Saved</span>
+            <button onclick="addWs()">+ NEW</button>
+          </div>
+          <div id="wsList"></div>
+        </div>
+
+        <!-- RIGHT: editor -->
+        <div class="ws-editor">
+
+          <div class="ws-ed-row" style="grid-template-columns: 1fr auto auto;">
+            <input class="ws-ed-name" id="wsName" value="TRIAGE 3×2">
+            <button class="ws-ed-tool" onclick="duplicateWs()">duplicate</button>
+            <button class="ws-ed-tool danger" onclick="deleteWs()">delete</button>
+          </div>
+
+          <div class="ws-dims">
+            <span class="dim-label">Cols</span>
+            <div class="dim-stepper">
+              <button onclick="stepCols(-1)">−</button>
+              <span class="dim-val" id="dimCols">3</span>
+              <button onclick="stepCols(1)">+</button>
+            </div>
+            <span class="dim-label" style="margin-left: 14px;">Rows</span>
+            <div class="dim-stepper">
+              <button onclick="stepRows(-1)">−</button>
+              <span class="dim-val" id="dimRows">2</span>
+              <button onclick="stepRows(1)">+</button>
+            </div>
+            <span class="dim-note">
+              <kbd>click</kbd> cell ·
+              <kbd>hover</kbd> bottom edge to merge down
+            </span>
+          </div>
+
+          <div class="ed-grid-wrap">
+            <div class="ed-grid" id="edGrid"></div>
+          </div>
+
+          <div class="inspector" id="inspector"></div>
+
+          <div class="overrides-wrap">
+            <div class="overrides-head">
+              <span>Persona Prompt Overrides</span>
+              <span class="sub">Per-workspace prompt injections for specific personas · fall back to persona default when empty</span>
+            </div>
+            <div class="overrides-list" id="overridesList"></div>
+            <div class="overrides-add">
+              <select id="overridePersonaPicker"></select>
+              <button onclick="addOverride()">+ add override</button>
+              <span style="font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); letter-spacing: 0.04em; margin-left: auto;">Personas in <u>this workspace</u> are auto-listed above · use picker to add for unused personas</span>
+            </div>
+          </div>
+
+          <div class="foot-actions">
+            <button onclick="revertWs()">revert</button>
+            <button class="primary" onclick="saveWs()">save</button>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  let WORKSPACES = CM.getWorkspaces();
+  let PERSONAS = CM.getPersonas();
+  let activeWsId = WORKSPACES[0].id;
+  let selectedCell = 0;
+
+  function getActive() { return WORKSPACES.find(w => w.id === activeWsId); }
+  function getPersona(id) { return PERSONAS.find(p => p.id === id) || CM.getPersonaById(id); }
+
+  /* ================================================================
+   * RENDER — thumbs + list
+   * ================================================================ */
+
+  function thumb(ws) {
+    const cells = ws.cells.map((c, i) => {
+      const col = i % ws.cols;
+      const row = Math.floor(i / ws.cols);
+      const span = spanOf(ws, col, row, i);
+      if (span === 0) return '';
+      const spanAttr = span > 1 ? ` style="grid-row: span ${span};"` : '';
+      const persona = getPersona(c.persona);
+      const color = c.persona === 'empty'
+        ? 'repeating-linear-gradient(45deg, var(--color-bg-elevated) 0 2px, var(--color-bg-sunken) 2px 4px)'
+        : persona.color;
+      return `<div class="vcell" data-persona="${c.persona}" data-col="${col}" data-row="${row}" style="background:${color};${spanAttr.replace(/^ style="/, '').replace(/"$/, '')}"></div>`;
+    }).join('');
+    return `<div class="grid-viz ws-item-thumb" style="--cols:${ws.cols}; --rows:${ws.rows}; --aspect:${ws.cols/ws.rows}; display: grid; grid-template-columns: repeat(${ws.cols}, 1fr); grid-auto-rows: 1fr; gap: 2px; background: var(--color-text); padding: 2px;">${cells}</div>`;
+  }
+
+  function spanOf(ws, col, row, idx) {
+    if (row > 0 && ws.merges[`${col}:${row-1}`]) return 0;
+    let span = 1, r = row;
+    while (ws.merges[`${col}:${r}`] && r + 1 < ws.rows) { span++; r++; }
+    return span;
+  }
+
+  function renderList() {
+    document.getElementById('wsList').innerHTML = WORKSPACES.map(ws => `
+      <div class="ws-item" data-id="${ws.id}" aria-current="${ws.id === activeWsId}" onclick="selectWs('${ws.id}')">
+        ${thumb(ws)}
+        <div>
+          <div class="ws-item-name">${ws.name}</div>
+          <div class="ws-item-sub">${ws.cols}×${ws.rows} · ${ws.cells.filter(c => c.persona !== 'empty').length} slots</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  /* ================================================================
+   * RENDER — editor grid
+   * ================================================================ */
+
+  function renderEditor() {
+    const ws = getActive();
+    document.getElementById('wsName').value = ws.name;
+    document.getElementById('dimCols').textContent = ws.cols;
+    document.getElementById('dimRows').textContent = ws.rows;
+
+    const grid = document.getElementById('edGrid');
+    grid.style.setProperty('--cols', ws.cols);
+
+    let html = '';
+    for (let row = 0; row < ws.rows; row++) {
+      for (let col = 0; col < ws.cols; col++) {
+        const idx = row * ws.cols + col;
+        const span = spanOf(ws, col, row, idx);
+        if (span === 0) continue;
+        const cell = ws.cells[idx] || { persona: 'empty', project: '', prompt: '' };
+        const persona = getPersona(cell.persona);
+        const resolved = CM.resolvePrompt(ws, cell);
+        const promptDisplay = resolved.text ? resolved.text.slice(0, 48).replace(/\n/g, ' ') : '(no prompt)';
+        const inherited = resolved.source !== 'cell';
+        const canMergeDown = row + span <= ws.rows - 1;
+        html += `
+          <div class="ed-cell" data-idx="${idx}" data-col="${col}" data-row="${row}" data-persona="${cell.persona}" data-selected="${idx === selectedCell}"
+               onclick="selectCell(${idx}, event)"
+               style="grid-column: ${col+1}; grid-row: ${row+1} / span ${span}; --persona-color: ${persona.color};">
+            <div class="ed-cell-row">
+              <span class="persona-chip"><span class="dot" style="background:${persona.color}"></span>${persona.name}</span>
+              <span class="ed-cell-coord" data-span="${span}">[${col},${row}]</span>
+            </div>
+            <div class="ed-cell-project">${cell.project || (cell.persona === 'empty' ? '—' : 'unassigned')}</div>
+            <div class="ed-cell-prompt ${inherited ? 'inherited' : ''}" title="${resolved.source}">${promptDisplay}</div>
+            ${canMergeDown ? `<div class="merge-handle" onclick="toggleMerge(${col}, ${row + span - 1}, event)" title="Merge with cell below"></div>` : ''}
+          </div>
+        `;
+      }
+    }
+    grid.innerHTML = html;
+
+    renderInspector();
+    renderOverrides();
+  }
+
+  /* ================================================================
+   * RENDER — inspector
+   * ================================================================ */
+
+  function renderInspector() {
+    const ws = getActive();
+    const cell = ws.cells[selectedCell] || { persona: 'empty', project: '', prompt: '' };
+    const col = selectedCell % ws.cols;
+    const row = Math.floor(selectedCell / ws.cols);
+    const span = spanOf(ws, col, row, selectedCell);
+    const persona = getPersona(cell.persona);
+    const resolved = CM.resolvePrompt(ws, cell);
+
+    const sourceNote =
+      resolved.source === 'cell' ? 'Per-cell override in effect'
+      : resolved.source === 'workspace-override' ? 'Using this workspace\'s persona override — clear this field to fall back'
+      : 'Using persona default from Personas tab — type here to override just this cell';
+
+    const insp = document.getElementById('inspector');
+    insp.innerHTML = `
+      <div class="insp-head">
+        <span>Cell Inspector</span>
+        <span class="coord">[${col}, ${row}]${span > 1 ? ` · ${span}× tall` : ''}</span>
+      </div>
+      <div class="insp-grid">
+        <div class="insp-field">
+          <label>Persona <span class="source-note" style="color: ${persona.color};">● ${persona.name}</span></label>
+          <select onchange="updateCell('persona', this.value)">
+            ${PERSONAS.map(p => `<option value="${p.id}" ${cell.persona === p.id ? 'selected' : ''}>${p.name}${p.builtin ? '' : ' (custom)'}</option>`).join('')}
+          </select>
+        </div>
+        <div class="insp-field">
+          <label>Project <span class="source-note">mock list · wire to real project picker</span></label>
+          <select onchange="updateCell('project', this.value)">
+            <option value="">— none —</option>
+            ${CM.MOCK_PROJECTS.map(p => `<option value="${p}" ${cell.project === p ? 'selected' : ''}>${p}</option>`).join('')}
+          </select>
+        </div>
+        <div class="insp-field wide">
+          <label>Cell Prompt <span class="source-note">${sourceNote}</span></label>
+          <textarea onchange="updateCell('prompt', this.value)" placeholder="${cell.persona !== 'empty' ? (resolved.text || '').slice(0, 140) : ''}">${cell.prompt || ''}</textarea>
+        </div>
+      </div>
+    `;
+  }
+
+  /* ================================================================
+   * RENDER — persona overrides section
+   * ================================================================ */
+
+  function renderOverrides() {
+    const ws = getActive();
+    const personasUsed = new Set(ws.cells.map(c => c.persona).filter(p => p !== 'empty'));
+    const personasWithOverride = new Set(Object.keys(ws.promptOverrides || {}));
+    const toShow = [...new Set([...personasUsed, ...personasWithOverride])];
+
+    const list = document.getElementById('overridesList');
+    list.innerHTML = toShow.map(pid => {
+      const p = getPersona(pid);
+      if (!p) return '';
+      const override = ws.promptOverrides[pid] || '';
+      const usingBase = !override;
+      const projectsUsingThis = ws.cells.filter(c => c.persona === pid).map(c => c.project).filter(Boolean);
+      const projCount = ws.cells.filter(c => c.persona === pid).length;
+      return `
+        <div class="ov-col" style="--persona-color: ${p.color};">
+          <div class="ov-label">
+            <span class="dot"></span>
+            <span>${p.name}</span>
+            <span class="project-count">${projCount} cell${projCount === 1 ? '' : 's'}${projectsUsingThis.length ? ' · ' + [...new Set(projectsUsingThis)].join(', ') : ''}</span>
+          </div>
+          <textarea onchange="setOverride('${pid}', this.value)" placeholder="Leave empty to use persona default">${override}</textarea>
+          <div class="ov-base ${usingBase ? 'using-base' : ''}">${(p.defaultPrompt || '(no default)').slice(0, 110)}${(p.defaultPrompt || '').length > 110 ? '…' : ''}</div>
+        </div>
+      `;
+    }).join('') || '<div style="font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); grid-column: 1 / -1; padding: 8px 0;">No personas assigned to cells yet. Pick one in the Cell Inspector above.</div>';
+
+    // Picker for adding overrides on personas not yet in the workspace
+    const picker = document.getElementById('overridePersonaPicker');
+    const missing = PERSONAS.filter(p => p.id !== 'empty' && !toShow.includes(p.id));
+    picker.innerHTML = missing.length
+      ? missing.map(p => `<option value="${p.id}">${p.name}</option>`).join('')
+      : '<option disabled>All personas shown above</option>';
+    picker.disabled = !missing.length;
+  }
+
+  /* ================================================================
+   * ACTIONS
+   * ================================================================ */
+
+  function selectWs(id) { activeWsId = id; selectedCell = 0; renderAll(); }
+  function selectCell(idx, e) {
+    if (e && e.target.classList.contains('merge-handle')) return;
+    selectedCell = idx; renderAll();
+  }
+
+  function stepCols(d) { const ws = getActive(); const n = Math.max(1, Math.min(10, ws.cols + d)); if (n === ws.cols) return; resizeCells(ws, n, ws.rows); ws.cols = n; renderAll(); }
+  function stepRows(d) { const ws = getActive(); const n = Math.max(1, Math.min(6, ws.rows + d)); if (n === ws.rows) return; resizeCells(ws, ws.cols, n); ws.rows = n; renderAll(); }
+
+  function resizeCells(ws, cols, rows) {
+    const out = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const oldIdx = r * ws.cols + c;
+        out.push((r < ws.rows && c < ws.cols && ws.cells[oldIdx]) ? ws.cells[oldIdx] : { persona: 'empty', project: '', prompt: '' });
+      }
+    }
+    ws.cells = out;
+    const newMerges = {};
+    for (const k of Object.keys(ws.merges)) {
+      const [c, r] = k.split(':').map(Number);
+      if (c < cols && r < rows - 1) newMerges[k] = true;
+    }
+    ws.merges = newMerges;
+    if (selectedCell >= out.length) selectedCell = 0;
+  }
+
+  function toggleMerge(col, row, e) {
+    e.stopPropagation();
+    const ws = getActive();
+    const key = `${col}:${row}`;
+    if (ws.merges[key]) delete ws.merges[key];
+    else ws.merges[key] = true;
+    renderAll();
+  }
+
+  function updateCell(field, value) {
+    const ws = getActive();
+    if (!ws.cells[selectedCell]) ws.cells[selectedCell] = { persona: 'empty', project: '', prompt: '' };
+    ws.cells[selectedCell][field] = value;
+    renderAll();
+  }
+
+  function setOverride(personaId, value) {
+    const ws = getActive();
+    if (!ws.promptOverrides) ws.promptOverrides = {};
+    if (value && value.trim()) ws.promptOverrides[personaId] = value;
+    else delete ws.promptOverrides[personaId];
+    renderAll();
+  }
+
+  function addOverride() {
+    const pid = document.getElementById('overridePersonaPicker').value;
+    if (!pid) return;
+    const ws = getActive();
+    if (!ws.promptOverrides) ws.promptOverrides = {};
+    ws.promptOverrides[pid] = '';
+    renderAll();
+    // focus the new textarea
+    setTimeout(() => {
+      const ts = document.querySelectorAll('#overridesList textarea');
+      if (ts.length) ts[ts.length - 1].focus();
+    }, 50);
+  }
+
+  function addWs() {
+    const id = 'ws-' + Date.now();
+    WORKSPACES.push({
+      id, name: 'NEW WORKSPACE', cols: 3, rows: 2,
+      promptOverrides: {},
+      cells: Array.from({length: 6}, () => ({ persona: 'empty', project: '', prompt: '' })),
+      merges: {}
+    });
+    activeWsId = id; selectedCell = 0; renderAll();
+  }
+  function duplicateWs() {
+    const cur = getActive();
+    const id = 'ws-' + Date.now();
+    WORKSPACES.push({ ...JSON.parse(JSON.stringify(cur)), id, name: cur.name + ' COPY' });
+    activeWsId = id; renderAll();
+  }
+  function deleteWs() {
+    if (!confirm(`Delete "${getActive().name}"?`)) return;
+    WORKSPACES = WORKSPACES.filter(w => w.id !== activeWsId);
+    if (WORKSPACES.length === 0) addWs();
+    else activeWsId = WORKSPACES[0].id;
+    renderAll();
+  }
+  function saveWs() {
+    const ws = getActive();
+    ws.name = document.getElementById('wsName').value;
+    CM.setWorkspaces(WORKSPACES);
+    flashSave();
+  }
+  function revertWs() { WORKSPACES = CM.getWorkspaces(); renderAll(); }
+  function flashSave() {
+    const btn = event?.target;
+    if (!btn) return;
+    const old = btn.textContent;
+    btn.textContent = '✓ saved';
+    setTimeout(() => btn.textContent = old, 900);
+  }
+
+  function renderAll() {
+    PERSONAS = CM.getPersonas();    // always re-read — Personas tab may have changed them
+    renderList(); renderEditor();
+  }
+  renderAll();
+</script>
+
+</body>
+</html>
