@@ -5,6 +5,7 @@ import type { AppConfig } from '../../shared/types'
 import { createEmptyGrid } from '../../shared/grid-types'
 import { deepMerge } from '../util/deep-merge'
 import { BRAND } from '../../shared/brand'
+import { BUILTIN_PERSONAS, SEED_CUSTOM_PERSONAS, SEED_WORKSPACES } from '../../shared/persona-types'
 import {
   DEFAULT_SCAN_DEPTH,
   MAX_SESSIONS,
@@ -20,6 +21,9 @@ import {
 } from '../../shared/constants'
 
 const defaults: AppConfig = {
+  personas: [...BUILTIN_PERSONAS, ...SEED_CUSTOM_PERSONAS] as AppConfig['personas'],
+  workspaces: [...SEED_WORKSPACES] as AppConfig['workspaces'],
+  activeWorkspaceId: null,
   app: {
     scanPaths: [...BRAND.scanPaths],
     scanDepth: DEFAULT_SCAN_DEPTH,
