@@ -2,6 +2,16 @@
 
 import type { Persona, Workspace, WorkspaceCell, ResolvedPrompt } from '../../shared/persona-types'
 
+export interface ApplyResult {
+  applied: boolean
+  sessionsStarted: number
+  warnings: string[]
+}
+
+export interface SessionStarter {
+  start(opts: { name: string; projectPath: string; autoLaunch?: string }): Promise<{ id: string }>
+}
+
 /**
  * resolvePrompt — 3-level priority resolution for a workspace cell's effective prompt.
  *
@@ -103,4 +113,52 @@ export function resizeCells(
   }
 
   return { cells, merges }
+}
+
+/**
+ * applyWorkspace — Applies a workspace by resizing the grid and spawning sessions
+ * for each non-empty cell that has a project assigned.
+ */
+export async function applyWorkspace(
+  workspace: Workspace,
+  personas: readonly Persona[],
+  sessionStarter: SessionStarter,
+  gridCallback: (cols: number, rows: number) => void,
+): Promise<ApplyResult> {
+  const warnings: string[] = []
+  let sessionsStarted = 0
+
+  // 1. Set grid dimensions
+  gridCallback(workspace.cols, workspace.rows)
+
+  // 2. For each non-empty cell, spawn a session
+  for (let i = 0; i < workspace.cells.length; i++) {
+    const cell = workspace.cells[i]
+    if (cell.persona === 'empty') continue
+
+    const persona = personas.find(p => p.id === cell.persona)
+    if (!persona) {
+      warnings.push(`Persona "${cell.persona}" not found — cell ${i} skipped`)
+      continue
+    }
+
+    if (!cell.project) {
+      warnings.push(`Cell ${i} (${persona.name}) has no project — skipped`)
+      continue
+    }
+
+    const resolved = resolvePrompt(workspace, cell, personas)
+    try {
+      await sessionStarter.start({
+        name: persona.name,
+        projectPath: cell.project,
+        autoLaunch: resolved.text ? `claude "${resolved.text}"` : 'claude',
+      })
+      sessionsStarted++
+    } catch (err) {
+      warnings.push(`Failed to start ${persona.name}: ${(err as Error).message}`)
+    }
+  }
+
+  return { applied: true, sessionsStarted, warnings }
 }
