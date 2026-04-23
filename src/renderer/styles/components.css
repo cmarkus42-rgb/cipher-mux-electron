@@ -1247,3 +1247,19 @@
   text-align: right; flex-shrink: 0;
 }
 .theme-row--active .theme-mode { color: var(--color-accent); }
+
+/* ================================================================
+   Session Indicator Dots (orchestrator / mpo buttons)
+   ================================================================ */
+
+.status-bar__dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.status-bar__dot--orchestrator { background: #B8601A; }
+.status-bar__dot--mpo { background: #2d8a4e; }
+.status-bar__btn--active .status-bar__dot--orchestrator { box-shadow: 0 0 4px #B8601A; }
+.status-bar__btn--active .status-bar__dot--mpo { box-shadow: 0 0 4px #2d8a4e; }
