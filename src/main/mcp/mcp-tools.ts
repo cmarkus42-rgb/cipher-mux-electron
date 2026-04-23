@@ -16,6 +16,7 @@ export interface ToolContext {
   statusLineMonitor: StatusLineMonitor | null
   kickoffOrchestrator: KickoffOrchestrator | null
   taskManager: TaskManager | null
+  inputRequestWatcher: import('../mpo/input-request-watcher').InputRequestWatcher | null
 }
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']
@@ -485,6 +486,56 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       const children = ctx.taskManager.children(args.task_id)
       return {
         content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, task, children }, null, 2) }],
+      }
+    }
+  )
+
+  // 14. mux_input_request_create — Create an input request for the MPO sidebar
+  ;(server.registerTool as any)(
+    'mux_input_request_create',
+    {
+      description: 'Create an input request bubble for the cipher-mux sidebar (used by MPO to ask the user questions)',
+      inputSchema: {
+        projectId: z.string().describe('Project identifier'),
+        question: z.string().describe('The question to ask the user'),
+        context: z.string().optional().describe('Additional context (2-3 sentences)'),
+        options: z.array(z.object({
+          key: z.string(),
+          label: z.string(),
+          description: z.string().optional().default(''),
+        })).optional().describe('Answer options (max 4)'),
+        recommendation: z.string().optional().describe('Recommended option key'),
+      },
+    },
+    async (args: {
+      projectId: string
+      question: string
+      context?: string
+      options?: Array<{ key: string; label: string; description?: string }>
+      recommendation?: string
+    }) => {
+      if (!ctx.inputRequestWatcher) {
+        return { content: [{ type: 'text' as const, text: 'InputRequestWatcher not available' }], isError: true }
+      }
+
+      const id = `ir-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const request: import('../../shared/types').InputRequestBubble = {
+        id,
+        type: 'bubble',
+        projectId: args.projectId,
+        question: args.question,
+        context: args.context ?? '',
+        options: (args.options ?? []).map(o => ({ key: o.key, label: o.label, description: o.description ?? '' })),
+        recommendation: args.recommendation,
+        status: 'open',
+        answer: null,
+        createdAt: new Date().toISOString(),
+        answeredAt: null,
+      }
+      ctx.inputRequestWatcher.createRequest(request)
+
+      return {
+        content: [{ type: 'text' as const, text: `Input request created: ${id} — "${args.question}"` }],
       }
     }
   )
