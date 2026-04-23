@@ -4,10 +4,11 @@ import * as path from 'path'
 import * as os from 'os'
 import { ulid } from 'ulidx'
 import type { SessionInfo, SessionStatus, StartSessionOpts, RecoveryResult } from '../../shared/types'
-import { MAX_SESSIONS, ORCHESTRATOR_MAX_RETRIES } from '../../shared/constants'
+import { MAX_SESSIONS, ORCHESTRATOR_MAX_RETRIES, MPO_MAX_RETRIES } from '../../shared/constants'
 import { BRAND } from '../../shared/brand'
 import { TmuxManager } from '../tmux/tmux-manager'
 import { generateOrchestratorClaudeMd } from './orchestrator-template'
+import { generateMpoClaudeMd } from './mpo-template'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
 
@@ -29,6 +30,7 @@ export class SessionManager extends EventEmitter {
   private adapterRegistry: AdapterRegistry
   private sessionAdapters: Map<string, AgentAdapter> = new Map()
   private orchestratorSessionId: string | null = null
+  private mpoSessionId: string | null = null
   private mcpConfig: OrchestratorConfig | null = null
   /**
    * Commands queued to be sent to a session once its terminal reports
@@ -239,6 +241,14 @@ export class SessionManager extends EventEmitter {
     for (const session of recovered) {
       if (session.name === 'Orchestrator') {
         this.orchestratorSessionId = session.id
+        break
+      }
+    }
+
+    // Restore MPO link if a recovered session is named "MPO"
+    for (const session of recovered) {
+      if (session.name === 'MPO') {
+        this.mpoSessionId = session.id
         break
       }
     }
@@ -515,6 +525,112 @@ export class SessionManager extends EventEmitter {
    */
   getOrchestratorSessionId(): string | null {
     return this.orchestratorSessionId
+  }
+
+  // ─── MPO (Multi-Project Orchestrator) ───────────────
+
+  /**
+   * Resolve the MPO directory path (expand ~).
+   */
+  private resolveMpoDir(): string {
+    return BRAND.mpoDir.replace(/^~/, os.homedir())
+  }
+
+  /**
+   * Start the MPO session.
+   * Creates the MPO directory and CLAUDE.md, then starts
+   * a special session pointing at that directory.
+   */
+  async startMpo(config: OrchestratorConfig): Promise<SessionInfo> {
+    if (this.mpoSessionId) {
+      const existing = this.sessions.get(this.mpoSessionId)
+      if (existing && existing.status === 'active') {
+        throw new Error('MPO is already running')
+      }
+      this.mpoSessionId = null
+    }
+
+    const mpoDir = this.resolveMpoDir()
+    fs.mkdirSync(mpoDir, { recursive: true })
+
+    // Generate CLAUDE.md with adapter-specific prompt fragment
+    const adapter = this.adapterRegistry.getDefault()
+    const claudeMd = generateMpoClaudeMd({
+      mcpHost: config.mcpHost,
+      mcpPort: config.mcpPort,
+      mcpApiKey: config.mcpApiKey,
+      maxRetries: MPO_MAX_RETRIES,
+      adapterFragment: adapter.buildMpoPromptFragment('de'),
+    })
+    fs.writeFileSync(path.join(mpoDir, 'CLAUDE.md'), claudeMd, 'utf-8')
+
+    // Write .mcp.json for Claude Code MCP auto-discovery
+    const mcpUrl = `http://${config.mcpHost}:${config.mcpPort}/mcp`
+    const mcpJsonPath = path.join(mpoDir, '.mcp.json')
+    const mcpJson = {
+      mcpServers: {
+        'cipher-mux': {
+          type: 'http',
+          url: mcpUrl,
+          headers: { Authorization: `Bearer ${config.mcpApiKey}` },
+        },
+      },
+    }
+    fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2), 'utf-8')
+
+    const session = await this.start({
+      name: 'MPO',
+      projectPath: mpoDir,
+    })
+
+    this.mpoSessionId = session.id
+    this.emit('mpo-started', session)
+    return session
+  }
+
+  /**
+   * Queue Claude Code launch in the MPO session.
+   */
+  queueMpoClaude(): void {
+    if (!this.mpoSessionId) {
+      throw new Error('MPO is not running')
+    }
+    const adapter = this.adapterRegistry.getDefault()
+    const launchCmd = adapter.buildLaunchCommand({
+      projectPath: this.resolveMpoDir(),
+      sessionName: 'MPO',
+      isMpo: true,
+    })
+    const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
+    this.setPendingLaunch(this.mpoSessionId, `clear; ${cmdStr}\n`)
+  }
+
+  /**
+   * Stop the MPO session.
+   */
+  async stopMpo(): Promise<void> {
+    if (!this.mpoSessionId) {
+      throw new Error('MPO is not running')
+    }
+    await this.stop(this.mpoSessionId)
+    this.mpoSessionId = null
+    this.emit('mpo-stopped')
+  }
+
+  /**
+   * Check if the MPO is currently running.
+   */
+  isMpoRunning(): boolean {
+    if (!this.mpoSessionId) return false
+    const session = this.sessions.get(this.mpoSessionId)
+    return (session?.status === 'active') || false
+  }
+
+  /**
+   * Get the MPO session ID (or null).
+   */
+  getMpoSessionId(): string | null {
+    return this.mpoSessionId
   }
 
   /**
