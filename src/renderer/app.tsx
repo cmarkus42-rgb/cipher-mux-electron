@@ -19,6 +19,7 @@ import { BugreportDialog } from './components/BugreportDialog'
 import { InfoSettingsView } from './components/InfoSettingsView'
 import { StatusBar } from './components/StatusBar'
 import { SessionDialog } from './components/SessionDialog'
+import { VoiceControl } from './components/VoiceControl'
 
 export function App() {
   const [chatroomVisible, setChatroomVisible] = useState(true)
@@ -61,6 +62,12 @@ export function App() {
     },
   ], [])
   useShortcuts(shortcutEntries)
+
+  const focusedSessionName = useMemo(() => {
+    if (!focusedSessionId) return null
+    const session = sessions.find(s => s.id === focusedSessionId)
+    return session?.name ?? null
+  }, [focusedSessionId, sessions])
 
   const [orchestratorSessionId, setOrchestratorSessionId] = useState<string | null>(null)
 
@@ -279,6 +286,12 @@ export function App() {
         onToggleRequests={() => setRequestsVisible((v) => !v)}
         onToggleTheme={toggleTheme}
         onInfo={() => setInfoVisible(true)}
+      />
+
+      {/* voice input pill */}
+      <VoiceControl
+        focusedSessionId={focusedSessionId}
+        focusedSessionName={focusedSessionName}
       />
 
       {/* dialogs */}
