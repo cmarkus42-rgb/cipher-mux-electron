@@ -15,7 +15,7 @@ Phasen-Übersicht:
 6. ~~Review, Test & Iteration → Feedback-Loop~~ ✅ (2026-04-17)
 7. ~~Bugreport-Orchestrator + Voice-Pipeline (VAD)~~ ✅ (2026-04-19)
 
-**Status:** v0.4.0-alpha, 164 Tests grün, Build sauber. Shortcut-Verdrahtung offen (Hook existiert, nicht eingebunden).
+**Status:** v0.8.4-beta, 371 Tests, Build sauber. Voice-Pipeline komplett (Session-Input + Bug-Assistant mit TTS). Mode-Trennung Session/Bugreport sauber.
 
 ## Build & Test
 
@@ -54,11 +54,16 @@ cipher-mux-electron/
 │   │   ├── config/        ← ConfigStore (electron-store)
 │   │   ├── monitoring/    ← StatusLineMonitor
 │   │   ├── bugreport/     ← BugreportManager
+│   │   ├── voice/         ← VoiceManager, STT (Whisper), TTS (Piper), ConversationEngine, VoiceInputRouter
+│   │   ├── agent/         ← AgentAdapter Interface, ClaudeCodeAdapter, AdapterRegistry
+│   │   ├── task/          ← TaskManager, TaskWatcher, TaskHooks, BugreportSource
+│   │   ├── mpo/           ← InputRequestWatcher (MPO Input Requests)
 │   │   └── util/          ← exec-util, dependency-check
 │   ├── renderer/
 │   │   ├── app.tsx, index.html
 │   │   ├── components/    ← ActivityRail, TerminalPane, Chatroom, Cockpit, etc.
-│   │   ├── hooks/         ← useTerminal, useMessages, useSessions, useContextUsage
+│   │   ├── hooks/         ← useTerminal, useMessages, useSessions, useContextUsage, useVoiceSession, useGrid
+│   │   ├── voice/         ← vad-loader (Silero ONNX), audio-capture-worklet
 │   │   ├── styles/        ← theme.css, layout.css, components.css
 │   │   └── fonts/         ← Rajdhani, Fira Code
 │   └── shared/
@@ -126,6 +131,31 @@ Der MCP-Server stellt Tools bereit (`mux_create_session`, `mux_send`, etc.), die
 
 `mux_send` ist fuer Inter-Session-Kommunikation gedacht (z.B. Status-Updates, Bug-Notifications). Es ist **kein Prompt-Input-Mechanismus**. Claude liest den Bus nur wenn es explizit `mux_read` aufruft — was ein idle Worker nicht tut.
 
+## Voice-Pipeline
+
+STT-basierte Spracheingabe in fokussierte Sessions. Architektur:
+
+```
+Renderer (Silero VAD) → IPC → Main (ConversationEngine → Whisper STT → VoiceInputRouter → tmux sendKeys)
+```
+
+- **STT:** Whisper.cpp via `@fugood/whisper.node`, Model unter `~/.config/cipher-mux/models/whisper/ggml-small.bin`
+- **VAD:** Silero ONNX im Renderer, erkennt Sprache lokal ohne Netzwerk
+- **Routing:** VoiceInputRouter dispatcht Transkription an fokussierte tmux-Session
+- **Voice-Commands:** "abschicken"/"absenden"/"senden" → Enter, "neue zeile" → Newline. Text wird ohne Enter diktiert, Submit per Sprachbefehl.
+- **TTS:** Piper (nur für Bugreport-Interview, nicht für Session-Modus)
+- **Status:** E2E funktional — VAD erkennt Sprache, Whisper transkribiert, Text erscheint in Session, Submit per Voice-Command
+- **tmux sendKeys:** Verwendet `\r` (0x0d, Carriage Return) für Enter, nicht `\n` (0x0a)
+
+## AgentAdapter Interface (TP-2)
+
+Abstraktion für verschiedene AI-Agent-Backends:
+
+- `AgentAdapter` Interface: `isAvailable()`, `getCapabilities()`, `executeCommand()`, `streamOutput()`
+- `ClaudeCodeAdapter` (Tier-1): Vollständig implementiert
+- `ReferenceStubAdapter` (Tier-2): Stub für Dokumentation
+- `AdapterRegistry`: Discovery + Registrierung
+
 ## Bekannte Constraints
 
 - **macOS-only:** tmux als harte Abhängigkeit, osascript-Integration
@@ -133,6 +163,7 @@ Der MCP-Server stellt Tools bereit (`mux_create_session`, `mux_send`, etc.), die
 - **Single-Writer SQLite:** Nur Main Process schreibt — kein Concurrent-Write-Problem
 - **xterm.js Streaming:** High-frequency tmux-Output erfordert Batching/Throttling der IPC-Bridge
 - **Preact statt React:** ~3KB, React-API-kompatibel, aber einige React-Ecosystem-Libs brauchen Aliasing
+- **Whisper Model-Pfad:** Muss `~/.config/cipher-mux/` sein, NICHT `app.getPath('userData')` (dev/prod Divergenz)
 
 ## Workflow-Regeln
 
