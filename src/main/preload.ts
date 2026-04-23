@@ -119,6 +119,18 @@ const api = {
     },
   },
 
+  // ─── MPO ─────────────────────────────────────────────────
+  mpo: {
+    start: () => ipcRenderer.invoke(IPC.MPO_START),
+    stop: () => ipcRenderer.invoke(IPC.MPO_STOP),
+    status: () => ipcRenderer.invoke(IPC.MPO_STATUS),
+    onStarted: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.MPO_STARTED, handler)
+      return () => ipcRenderer.removeListener(IPC.MPO_STARTED, handler)
+    },
+  },
+
   // ─── Window ──────────────────────────────────────────────
   window: {
     fitGrid: (cols: number, rows: number, panelWidth?: number) => ipcRenderer.invoke(IPC.WINDOW_FIT_GRID, { cols, rows, panelWidth }),

@@ -10,11 +10,13 @@ interface StatusBarProps {
   requestsVisible: boolean
   requestsOpenCount: number
   orchestratorRunning: boolean
+  mpoRunning: boolean
   gridCols: number
   gridRows: number
   focusedSessionId: string | null
   focusedSessionName: string | null
   onOrchestrator: () => void
+  onMpo: () => void
   onBugreport: () => void
   onToggleChatroom: () => void
   onToggleRequests: () => void
@@ -26,8 +28,8 @@ interface StatusBarProps {
 export function StatusBar({
   theme, chatroomVisible, requestsVisible, requestsOpenCount, orchestratorRunning,
   gridCols, gridRows, focusedSessionId, focusedSessionName,
-  onOrchestrator, onBugreport, onToggleChatroom, onToggleRequests, onToggleTheme, onInfo,
-  onGridResize,
+  onOrchestrator, onMpo, onBugreport, onToggleChatroom, onToggleRequests, onToggleTheme, onInfo,
+  onGridResize, mpoRunning,
 }: StatusBarProps) {
   return (
     <div class="status-bar">
@@ -45,6 +47,12 @@ export function StatusBar({
           onClick={onOrchestrator}
         >
           orchestrator
+        </button>
+        <button
+          class={`status-bar__btn${mpoRunning ? ' status-bar__btn--active' : ''}`}
+          onClick={onMpo}
+        >
+          mpo
         </button>
         <button class="status-bar__btn" onClick={onBugreport}>bugreport</button>
         <button
