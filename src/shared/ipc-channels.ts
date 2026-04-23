@@ -53,6 +53,12 @@ export const IPC = {
   ORCHESTRATOR_STATUS: 'cipher-mux:orchestrator:status',
   ORCHESTRATOR_STARTED: 'cipher-mux:orchestrator:started',
 
+  // MPO (Multi-Project Orchestrator)
+  MPO_START: 'cipher-mux:mpo:start',
+  MPO_STOP: 'cipher-mux:mpo:stop',
+  MPO_STATUS: 'cipher-mux:mpo:status',
+  MPO_STARTED: 'cipher-mux:mpo:started',
+
   // Window
   WINDOW_FIT_GRID: 'cipher-mux:window:fit-grid',
 
