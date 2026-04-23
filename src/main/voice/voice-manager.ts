@@ -18,14 +18,7 @@ import { OllamaChat } from './ollama-chat'
 import { BugreportInterview, BUGREPORT_SYSTEM_PROMPT } from './bugreport-interview'
 import { VoiceInputRouter } from './voice-input-router'
 
-// Optional import — app may not be available in all contexts (e.g. tests)
-let electronApp: { getPath(name: string): string } | undefined
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  electronApp = require('electron').app
-} catch {
-  // Not running in Electron context
-}
+
 
 export interface VoiceManagerConfig {
   whisperModelDir?: string
@@ -56,8 +49,9 @@ export class VoiceManager extends EventEmitter {
   constructor(config?: VoiceManagerConfig) {
     super()
 
-    const userDataDir = electronApp?.getPath?.('userData')
-      ?? path.join(process.env.HOME ?? '', 'Library', 'Application Support', 'cipher-mux')
+    // Use ~/.config/cipher-mux for model storage — stable across dev/prod
+    // (electron getPath('userData') returns different paths in dev vs packaged)
+    const userDataDir = path.join(process.env.HOME ?? '', '.config', 'cipher-mux')
 
     this.config = {
       whisperModelDir: config?.whisperModelDir
@@ -184,9 +178,18 @@ export class VoiceManager extends EventEmitter {
     this.inputRouter.setMode('session')
 
     // Wire: conversation transcription -> input router (session dispatch)
+    // In session mode there's no TTS/LLM, so we must transition back to READY
+    // after dispatch — otherwise the state machine stays stuck in PROCESSING.
     this.conversation.removeAllListeners('transcription')
-    this.conversation.on('transcription', (text: string) => {
-      this.inputRouter?.routeTranscription(text)
+    this.conversation.on('transcription', async (text: string) => {
+      if (!this.inputRouter || !this.conversation) return
+      console.log('[Voice] Session transcription received:', JSON.stringify(text?.slice(0, 80)))
+      await this.inputRouter.routeTranscription(text)
+      // Transition back to READY so VAD can accept the next utterance
+      if (this.conversation.state === VoiceState.PROCESSING) {
+        console.log('[Voice] Session dispatch done — transitioning PROCESSING → READY')
+        this.conversation.stateMachine.transition(VoiceState.READY)
+      }
     })
 
     // Session mode uses always-listen: VAD captures speech segments automatically.

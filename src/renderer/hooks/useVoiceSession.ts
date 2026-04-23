@@ -61,6 +61,7 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
         audioCtxRef.current = null
       }
       setActive(false)
+      ;(window as any).__cipherMuxSessionVoiceActive = false
       setRecording(false)
       setProcessing(false)
       setVoiceState('idle')
@@ -120,9 +121,12 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
       vadRef.current.start()
       console.log('[VoiceSession] VAD started')
 
-      api.voice.setRoutingMode('session')
+      // Target MUST be set before routing mode — otherwise first utterance
+      // hits "No session focused" because the router has no target yet.
       api.voice.setSessionTarget(focusedSessionId)
+      api.voice.setRoutingMode('session')
       setActive(true)
+      ;(window as any).__cipherMuxSessionVoiceActive = true
       setVoiceState('ready')
       setError(null)
       console.log('[VoiceSession] Voice session ACTIVE, focusedSession:', focusedSessionId)
