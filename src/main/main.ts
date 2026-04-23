@@ -1,16 +1,21 @@
 import { app, BrowserWindow, globalShortcut, Menu, session } from 'electron'
 import { WindowManager } from './window-manager'
+import type { WindowGridHint } from './window-manager'
 import { IpcHub } from './ipc-hub'
+import { configStore } from './config/config-store'
 import { patchEnvPath } from './util/exec-util'
 
 // macOS GUI apps inherit a minimal PATH — patch in /opt/homebrew/bin etc.
 // before any child_process spawns (tmux, claude, etc.)
 patchEnvPath()
 
-// Single instance lock
-const gotLock = app.requestSingleInstanceLock()
-if (!gotLock) {
-  app.quit()
+// Single instance lock — skip in dev mode so dev and production can run side-by-side
+const isDev = !app.isPackaged
+if (!isDev) {
+  const gotLock = app.requestSingleInstanceLock()
+  if (!gotLock) {
+    app.quit()
+  }
 }
 
 let windowManager: WindowManager
@@ -43,7 +48,12 @@ app.whenReady().then(() => {
   ipcHub = new IpcHub(windowManager)
   ipcHub.init()
 
-  windowManager.createMainWindow()
+  // Read saved grid config to compute initial window dimensions
+  const savedUi = configStore.get('ui')
+  const gridHint: WindowGridHint | undefined = savedUi?.grid?.config
+    ? { cols: savedUi.grid.config.cols, rows: savedUi.grid.config.rows }
+    : undefined
+  windowManager.createMainWindow(gridHint)
 
   // Custom menu: keep Edit shortcuts (copy/paste/undo) but strip default
   // zoom accelerators (Cmd+-, Cmd+=, Cmd+0) so they reach the renderer's

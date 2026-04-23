@@ -6,16 +6,12 @@ import { createEmptyGrid } from '../../shared/grid-types'
 import { deepMerge } from '../util/deep-merge'
 import { BRAND } from '../../shared/brand'
 import {
-  DEFAULT_SCAN_PATHS,
   DEFAULT_SCAN_DEPTH,
-  DEFAULT_PROJECT_DIR,
   MAX_SESSIONS,
   MESSAGE_RETENTION_DAYS,
-  PROJECTLAUNCHER_DIR_DEFAULT,
   KICKOFF_TIMEOUT_MIN_DEFAULT,
   MCP_DEFAULT_PORT,
   MCP_DEFAULT_HOST,
-  ORCHESTRATOR_DIR,
   ORCHESTRATOR_MAX_RETRIES,
   TASK_STALL_TIMEOUT_MS,
   TASK_WATCH_INTERVAL_MS,
@@ -25,12 +21,12 @@ import {
 
 const defaults: AppConfig = {
   app: {
-    scanPaths: DEFAULT_SCAN_PATHS,
+    scanPaths: [...BRAND.scanPaths],
     scanDepth: DEFAULT_SCAN_DEPTH,
-    defaultProjectDir: DEFAULT_PROJECT_DIR,
+    defaultProjectDir: BRAND.defaultProjectDir,
     maxSessions: MAX_SESSIONS,
     messageRetentionDays: MESSAGE_RETENTION_DAYS,
-    projectlauncherPath: PROJECTLAUNCHER_DIR_DEFAULT,
+    projectlauncherPath: BRAND.projectLauncherDir,
     kickoffTimeoutMinutes: KICKOFF_TIMEOUT_MIN_DEFAULT,
   },
   mcp: {
@@ -39,7 +35,7 @@ const defaults: AppConfig = {
     apiKey: '',
   },
   orchestrator: {
-    dir: ORCHESTRATOR_DIR,
+    dir: BRAND.orchestratorDir,
     maxRetries: ORCHESTRATOR_MAX_RETRIES,
     stallTimeout: TASK_STALL_TIMEOUT_MS,
     watchInterval: TASK_WATCH_INTERVAL_MS,

@@ -1010,6 +1010,26 @@
   padding: 4px 12px 4px 6px;
 }
 
+/* Inline mode — sits in status bar, no fixed positioning */
+.voice-pill--inline {
+  position: static;
+  z-index: auto;
+}
+
+.voice-pill--inline.voice-pill--active {
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.voice-pill__target {
+  font-family: var(--font-heading);
+  font-size: 9px;
+  color: var(--color-text-dim);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
 /* Toggle switch — hidden checkbox + square track */
 .voice-switch {
   position: relative;

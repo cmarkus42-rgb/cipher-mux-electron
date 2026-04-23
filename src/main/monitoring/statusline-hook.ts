@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { STATUSLINE_DIR } from '../../shared/constants'
+import { BRAND } from '../../shared/brand'
 
 /**
  * Inject a StatusLine hook into a project's .claude/settings.local.json.
@@ -32,7 +32,7 @@ export function injectStatusLineHook(projectPath: string): void {
   // Add statusLine — top-level setting, receives JSON on stdin
   settings.statusLine = {
     type: 'command',
-    command: `cat > ${STATUSLINE_DIR}/$CIPHER_MUX_SESSION_ID.json`,
+    command: `cat > ${BRAND.statusLineDir}/$CIPHER_MUX_SESSION_ID.json`,
     padding: 0,
   }
 

@@ -36,6 +36,8 @@ export interface LaunchOpts {
   sessionName: string
   /** Whether this is an orchestrator session */
   isOrchestrator?: boolean
+  /** Whether this is an MPO session */
+  isMpo?: boolean
 }
 
 export interface AdapterContext {
@@ -97,4 +99,6 @@ export interface AgentAdapter {
   buildOrchestratorPromptFragment(lang: 'de' | 'en'): string
   /** Agent-specific launcher suffix (e.g. '/launch' for Claude Code). */
   buildLauncherPromptFragment(lang: 'de' | 'en'): string
+  /** Agent-specific instructions injected into the MPO template. */
+  buildMpoPromptFragment(lang: 'de' | 'en'): string
 }

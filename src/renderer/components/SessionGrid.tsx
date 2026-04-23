@@ -5,7 +5,6 @@ import { computeGridStyle } from '../../shared/grid-types'
 import type { GridState, ThemeName } from '../../shared/grid-types'
 import { SessionCell } from './SessionCell'
 import { LauncherCell } from './LauncherCell'
-import { GridControls } from './GridControls'
 
 interface SessionGridProps {
   grid: GridState
@@ -20,7 +19,6 @@ interface SessionGridProps {
   onToggleExpand: (sessionId: string) => void
   onLaunch: (slotIndex: number) => void
   onOpenSession: (slotIndex: number) => void
-  onResize: (cols: number, rows: number) => void
   onSwap: (idxA: number, idxB: number) => void
 }
 
@@ -46,7 +44,7 @@ function getCoveredSlots(slots: GridState['slots'], cols: number, rows: number):
 export function SessionGrid({
   grid, sessions, contextUsages, focusedSessionId, theme,
   orchestratorSessionId, onFocusSession, onCloseSession,
-  onSwitchProject, onToggleExpand, onLaunch, onOpenSession, onResize, onSwap,
+  onSwitchProject, onToggleExpand, onLaunch, onOpenSession, onSwap,
 }: SessionGridProps) {
   const [dragSourceIdx, setDragSourceIdx] = useState<number | null>(null)
   const { cols, rows } = grid.config
@@ -114,7 +112,6 @@ export function SessionGrid({
           )
         })}
       </div>
-      <GridControls cols={cols} rows={rows} onResize={onResize} />
     </div>
   )
 }

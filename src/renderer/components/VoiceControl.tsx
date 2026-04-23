@@ -11,9 +11,10 @@ import { useVoiceSession } from '../hooks/useVoiceSession'
 interface VoiceControlProps {
   focusedSessionId: string | null
   focusedSessionName: string | null
+  inline?: boolean
 }
 
-export function VoiceControl({ focusedSessionId, focusedSessionName }: VoiceControlProps) {
+export function VoiceControl({ focusedSessionId, focusedSessionName, inline }: VoiceControlProps) {
   const {
     active,
     recording,
@@ -32,7 +33,7 @@ export function VoiceControl({ focusedSessionId, focusedSessionName }: VoiceCont
         : 'voice-led voice-led--off'
 
   return (
-    <div class={`voice-pill${active ? ' voice-pill--active' : ''}`}>
+    <div class={`voice-pill${active ? ' voice-pill--active' : ''}${inline ? ' voice-pill--inline' : ''}`}>
       {/* Toast overlay */}
       {toast && (
         <div class={`voice-toast voice-toast--${toast.type}`}>
@@ -59,16 +60,9 @@ export function VoiceControl({ focusedSessionId, focusedSessionName }: VoiceCont
       </label>
       <span class={ledClass} />
 
-      {/* Expanded info */}
-      {active && (
-        <div class="voice-pill__info">
-          <span class="voice-pill__mode">
-            {focusedSessionName
-              ? `Session: ${focusedSessionName}`
-              : 'No session focused'}
-          </span>
-          <span class="voice-pill__hint">Ctrl+Shift+Space</span>
-        </div>
+      {/* Inline: compact session target hint */}
+      {inline && active && focusedSessionName && (
+        <span class="voice-pill__target">{focusedSessionName}</span>
       )}
     </div>
   )
