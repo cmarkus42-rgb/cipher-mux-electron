@@ -1,13 +1,19 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { ClaudeCodeAdapter } from '../../src/main/agent/adapters/claude-code'
+import type { AgentConfigReader } from '../../src/main/agent/adapters/claude-code'
 import { ReferenceStubAdapter } from '../../src/main/agent/adapters/_reference-stub'
 import { AdapterRegistry } from '../../src/main/agent/registry'
+
+/** Test helper: creates a config reader with a fixed skipPermissions value. */
+function mockConfigReader(skipPermissions: boolean): AgentConfigReader {
+  return { getSkipPermissions: () => skipPermissions }
+}
 
 // ─── ClaudeCodeAdapter ──────────────────────────────────────
 
 describe('ClaudeCodeAdapter', () => {
-  const adapter = new ClaudeCodeAdapter()
+  const adapter = new ClaudeCodeAdapter(mockConfigReader(false))
 
   it('has correct id, displayName, and tier', () => {
     assert.equal(adapter.id, 'claude-code')
@@ -33,18 +39,39 @@ describe('ClaudeCodeAdapter', () => {
   })
 
   describe('buildLaunchCommand', () => {
-    it('returns structured command with cmd and args', () => {
-      const cmd = adapter.buildLaunchCommand({
+    it('default (skipPermissions=false): no --dangerously-skip-permissions flag', () => {
+      const a = new ClaudeCodeAdapter(mockConfigReader(false))
+      const cmd = a.buildLaunchCommand({
         projectPath: '/tmp/project',
         sessionName: 'Worker-1',
       })
       assert.equal(cmd.cmd, 'claude')
       assert.ok(Array.isArray(cmd.args))
+      assert.ok(!cmd.args.includes('--dangerously-skip-permissions'))
+    })
+
+    it('skipPermissions=true: includes --dangerously-skip-permissions flag', () => {
+      const a = new ClaudeCodeAdapter(mockConfigReader(true))
+      const cmd = a.buildLaunchCommand({
+        projectPath: '/tmp/project',
+        sessionName: 'Worker-1',
+      })
+      assert.equal(cmd.cmd, 'claude')
       assert.ok(cmd.args.includes('--dangerously-skip-permissions'))
     })
 
+    it('skipPermissions=false: flag is absent', () => {
+      const a = new ClaudeCodeAdapter(mockConfigReader(false))
+      const cmd = a.buildLaunchCommand({
+        projectPath: '/tmp/project',
+        sessionName: 'Worker-1',
+      })
+      assert.ok(!cmd.args.includes('--dangerously-skip-permissions'))
+    })
+
     it('does not include shell metacharacters', () => {
-      const cmd = adapter.buildLaunchCommand({
+      const a = new ClaudeCodeAdapter(mockConfigReader(true))
+      const cmd = a.buildLaunchCommand({
         projectPath: '/tmp/project',
         sessionName: 'Worker-1',
       })

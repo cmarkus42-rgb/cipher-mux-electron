@@ -179,14 +179,31 @@ export class SessionManager extends EventEmitter {
    * - Known sessions are restored → recovered[]
    */
   async recover(): Promise<RecoveryResult> {
-    const tmuxSessions = await this.tmux.listSessions()
+    // Retry up to 3 times with a short delay — tmux may still be
+    // initialising right after the control-mode attach.
+    let tmuxSessions = await this.tmux.listSessions()
+    if (tmuxSessions.length <= 1) {
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        console.log(`[SessionManager] recover: only ${tmuxSessions.length} sessions found, retry ${attempt}/2 in 500ms`)
+        await new Promise((r) => setTimeout(r, 500))
+        tmuxSessions = await this.tmux.listSessions()
+        if (tmuxSessions.length > 1) break
+      }
+    }
+
     const recovered: SessionInfo[] = []
     const orphaned: SessionInfo[] = []
     const killed: SessionInfo[] = []
 
     console.log(`[SessionManager] recover: ${tmuxSessions.length} tmux sessions found, ${this.sessions.size} in registry`)
+    console.log(`[SessionManager] recover: session names: ${tmuxSessions.map(s => s.name).join(', ')}`)
 
     for (const tmuxSession of tmuxSessions) {
+      // Skip the cipher-mux control session — it's infrastructure, not a user session
+      if (tmuxSession.name === 'cipher-mux-control') {
+        continue
+      }
+
       // Check if this is one of our sessions (prefix cmux-)
       if (!tmuxSession.name.startsWith('cmux-')) {
         console.log(`[SessionManager] recover: skipping non-cmux session "${tmuxSession.name}"`)
@@ -209,10 +226,14 @@ export class SessionManager extends EventEmitter {
         const lowerName = tmuxSession.name.toLowerCase()
         const isLauncher = lowerName.includes('launcher') || lowerName.includes('kickoff')
 
+        // Use pane cwd as projectPath when available — gives the user
+        // context about what directory the session was working in.
+        const projectPath = tmuxSession.paneCwd || null
+
         const sessionInfo: SessionInfo = {
           id: ulid(),
           name: tmuxSession.name,
-          projectPath: null,
+          projectPath,
           tmuxSession: tmuxSession.name,
           tmuxPane: null,
           status: 'orphaned',
@@ -231,7 +252,7 @@ export class SessionManager extends EventEmitter {
           killed.push(sessionInfo)
         } else {
           // Present unknown sessions to the user for adopt/kill decision
-          console.log(`[SessionManager] orphaned session queued for user decision: ${tmuxSession.name}`)
+          console.log(`[SessionManager] orphaned session queued for user decision: ${tmuxSession.name} (cwd: ${projectPath ?? 'unknown'})`)
           orphaned.push(sessionInfo)
         }
       }

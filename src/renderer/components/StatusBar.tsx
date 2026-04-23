@@ -3,6 +3,15 @@ import type { ThemeName } from '../../shared/grid-types'
 import { APP_VERSION } from '../../shared/constants'
 import { GridControls } from './GridControls'
 import { VoiceControl } from './VoiceControl'
+import themesManifest from '../themes.json'
+
+const themesList = themesManifest.themes
+
+/** Resolve ThemeName to human-readable display name. */
+function themeDisplayName(id: ThemeName): string {
+  const entry = themesList.find((t) => t.id === id)
+  return entry?.name ?? id
+}
 
 interface StatusBarProps {
   theme: ThemeName
@@ -39,9 +48,9 @@ export function StatusBar({
           focusedSessionName={focusedSessionName}
           inline
         />
-        <span class="status-bar__sep">│</span>
+        <span class="status-bar__sep">|</span>
         <GridControls cols={gridCols} rows={gridRows} onResize={onGridResize} inline />
-        <span class="status-bar__sep">│</span>
+        <span class="status-bar__sep">|</span>
         <button
           class={`status-bar__btn${orchestratorRunning ? ' status-bar__btn--active' : ''}`}
           onClick={onOrchestrator}
@@ -70,8 +79,8 @@ export function StatusBar({
             <span class="status-bar__badge">{requestsOpenCount}</span>
           )}
         </button>
-        <button class="status-bar__btn status-bar__btn--active" onClick={onToggleTheme}>
-          theme: {theme}
+        <button class="status-bar__btn status-bar__btn--active" onClick={onInfo}>
+          {themeDisplayName(theme)}
         </button>
         <button class="status-bar__btn" onClick={onInfo}>info</button>
       </div>

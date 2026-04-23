@@ -1186,3 +1186,64 @@
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ================================================================
+   Theme Picker (Settings Tab)
+   ================================================================ */
+
+.theme-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-sunken);
+}
+.theme-row {
+  display: grid;
+  grid-template-columns: 20px auto 1fr auto;
+  align-items: center; gap: 10px;
+  padding: 8px 12px;
+  border-left: 3px solid transparent;
+  background: var(--color-bg-elevated);
+  cursor: pointer; user-select: none;
+  transition: background 120ms ease, border-color 120ms ease;
+  border-top: 1px solid var(--color-border);
+}
+.theme-row:nth-child(1), .theme-row:nth-child(2) { border-top: none; }
+.theme-row:nth-child(odd) { border-right: 1px solid var(--color-border); }
+.theme-row:hover { background: var(--color-bg); }
+.theme-row--active,
+.theme-row[aria-checked="true"] {
+  border-left-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.theme-radio {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 1.5px solid var(--color-border); background: transparent;
+  display: grid; place-items: center;
+}
+.theme-row--active .theme-radio { border-color: var(--color-accent); }
+.theme-row--active .theme-radio::after {
+  content: ''; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--color-accent);
+}
+.theme-meta { display: flex; flex-direction: column; min-width: 0; }
+.theme-name {
+  font-family: 'Rajdhani', sans-serif; font-weight: 700;
+  font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--color-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.theme-tag {
+  font-family: 'Fira Code', monospace; font-size: 9px; color: var(--color-text-dim);
+  margin-top: 1px; letter-spacing: 0.02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.theme-strip { display: flex; height: 22px; border: 1px solid var(--color-border); flex-shrink: 0; }
+.theme-strip span { width: 10px; height: 100%; display: block; }
+.theme-mode {
+  font-family: 'Fira Code', monospace; font-size: 9px;
+  color: var(--color-text-dim); letter-spacing: 0.06em; text-transform: uppercase;
+  text-align: right; flex-shrink: 0;
+}
+.theme-row--active .theme-mode { color: var(--color-accent); }

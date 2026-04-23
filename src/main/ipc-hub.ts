@@ -137,18 +137,17 @@ export class IpcHub {
       }
     }
 
-    // Connect tmux control mode
-    this.tmux.connect().catch((err) => {
-      console.error('[IpcHub] tmux connect failed:', err)
-    })
-
-    // Recover orphaned sessions
-    this.sessionManager.recover().then((result) => {
-      if (result.orphaned.length > 0) {
+    // Connect tmux control mode, THEN recover sessions.
+    // Recovery must wait for connect() so the tmux server is fully
+    // available before we enumerate sessions.
+    this.tmux.connect().then(() => {
+      return this.sessionManager.recover()
+    }).then((result) => {
+      if (result.orphaned.length > 0 || result.recovered.length > 0) {
         this.windowManager.sendToMainWindow(IPC.SESSIONS_RECOVERY_RESULT, result)
       }
     }).catch((err) => {
-      console.error('[IpcHub] session recovery failed:', err)
+      console.error('[IpcHub] tmux connect or session recovery failed:', err)
     })
 
     // Initial cleanup

@@ -1,0 +1,79 @@
+/* theme-blueprint.css — Blueprint
+ * Drafting · Cyan on indigo · Engineer
+ * Mode: dark · Font preset: Inter + IBM Plex Mono
+ * Generated from cipher-mux theme-playground. Do not edit by hand.
+ */
+
+body[data-theme="blueprint"] {
+  /* surfaces */
+  --color-bg:               #0E2A44;
+  --color-bg-elevated:      #143657;
+  --color-bg-sunken:        #081C30;
+  --color-bg-terminal:      #0A2138;
+
+  /* borders */
+  --color-border:           #2E6FA0;
+  --color-border-light:     #4A8AC0;
+  --color-border-focus:     #7FD3FF;
+
+  /* text */
+  --color-text:             #DCEEFF;
+  --color-text-secondary:   #A8CCEC;
+  --color-text-dim:         #6A8FB4;
+  --color-text-accent:      #7FD3FF;
+
+  /* accents — neon */
+  --color-neon-green:       #8EE3B0;
+  --color-neon-red:         #FF8FA0;
+  --color-neon-orange:      #FFC170;
+  --color-neon-cyan:        #7FD3FF;
+
+  /* status dots */
+  --color-dot-ok:           #8EE3B0;
+  --color-dot-warn:         #FFC170;
+  --color-dot-error:        #FF8FA0;
+  --color-dot-info:         #7FD3FF;
+
+  /* semantic */
+  --color-accent:           #7FD3FF;
+  --color-accent-soft:      rgba(127, 211, 255, 0.12);
+  --color-success:          #8EE3B0;
+  --color-error:            #FF8FA0;
+  --color-warning:          #FFC170;
+  --color-info:             #7FD3FF;
+
+  /* context usage */
+  --color-ctx-ok:           #8EE3B0;
+  --color-ctx-warn:         #FFC170;
+  --color-ctx-error:        #FF8FA0;
+
+  /* overlay */
+  --color-bg-overlay:       rgba(14, 42, 68, 0.85);
+
+  /* scanline */
+  --scanline-opacity:       0.020;
+
+  /* shadows */
+  --shadow-sm:              0 1px 2px rgba(0,0,0,0.20), 0 2px 6px rgba(0,0,0,0.16);
+  --shadow-md:              0 2px 4px rgba(0,0,0,0.24), 0 4px 16px rgba(0,0,0,0.20);
+  --shadow-lg:              0 4px 8px rgba(0,0,0,0.28), 0 8px 32px rgba(0,0,0,0.24);
+  --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.16);
+
+  /* ANSI terminal palette 0-15 */
+  --ansi-0:                 #081C30;
+  --ansi-1:                 #FF8FA0;
+  --ansi-2:                 #8EE3B0;
+  --ansi-3:                 #FFC170;
+  --ansi-4:                 #7FD3FF;
+  --ansi-5:                 #C8A8F0;
+  --ansi-6:                 #9FE5FF;
+  --ansi-7:                 #A8CCEC;
+  --ansi-8:                 #4A8AC0;
+  --ansi-9:                 #FFAFC0;
+  --ansi-10:                #AEEFC8;
+  --ansi-11:                #FFD690;
+  --ansi-12:                #A8E0FF;
+  --ansi-13:                #DCC0FF;
+  --ansi-14:                #C0F0FF;
+  --ansi-15:                #DCEEFF;
+}

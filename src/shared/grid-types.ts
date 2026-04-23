@@ -21,7 +21,19 @@ export interface GridState {
   slots: GridSlot[]
 }
 
-export type ThemeName = 'ivory' | 'dark'
+export type ThemeName =
+  | 'cipher-ivory' | 'cipher-dark'
+  | 'blueprint' | 'warm-paper'
+  | 'gruvbox-dark' | 'nord'
+  | 'synthwave' | 'matrix'
+  | 'brutalist' | 'high-contrast'
+
+export const LEGACY_THEME_ALIASES: Record<string, ThemeName> = {
+  'ivory': 'cipher-ivory',
+  'dark': 'cipher-dark',
+}
+
+export const DEFAULT_THEME: ThemeName = 'cipher-ivory'
 
 export const DEFAULT_GRID_CONFIG: GridConfig = { cols: 2, rows: 2 }
 

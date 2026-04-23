@@ -108,6 +108,7 @@ export class StatusLineMonitor extends EventEmitter {
 
   private handleFileChange(filename: string): void {
     const sessionId = filename.replace('.json', '')
+    if (!sessionId) return // Skip bare `.json` (env var CIPHER_MUX_SESSION_ID was unset)
     const filePath = path.join(this.watchDir, filename)
 
     try {
@@ -138,25 +139,59 @@ export class StatusLineMonitor extends EventEmitter {
   /**
    * Parse a statusLine JSON payload into ContextUsage.
    * Defensive: returns null if data is malformed.
+   *
+   * Claude Code's statusLine JSON nests context data under `context_window`:
+   *   { context_window: { used_percentage, remaining_percentage, total_input_tokens, ... }, model: { id }, ... }
+   * We also support flat payloads for forward-compat and testing.
    */
   private parseUsage(data: unknown): ContextUsage | null {
     if (!data || typeof data !== 'object') return null
     const d = data as Record<string, unknown>
 
-    const usedPercentage = typeof d.usedPercentage === 'number' ? d.usedPercentage
+    // Extract context_window sub-object (Claude Code >= 2.x nests here)
+    const cw = (d.context_window && typeof d.context_window === 'object')
+      ? d.context_window as Record<string, unknown>
+      : null
+
+    // Try nested context_window first, then flat top-level
+    const usedPercentage = cw && typeof cw.used_percentage === 'number' ? cw.used_percentage
+      : typeof d.usedPercentage === 'number' ? d.usedPercentage
       : typeof d.used_percentage === 'number' ? d.used_percentage
       : typeof d.percent === 'number' ? d.percent
       : null
 
+    // used_percentage can be null when no API calls have been made yet
     if (usedPercentage === null) return null
+
+    const remainingPercentage = cw && typeof cw.remaining_percentage === 'number' ? cw.remaining_percentage
+      : typeof d.remainingPercentage === 'number' ? d.remainingPercentage
+      : 100 - usedPercentage
+
+    const totalInputTokens = cw && typeof cw.total_input_tokens === 'number' ? cw.total_input_tokens
+      : typeof d.totalInputTokens === 'number' ? d.totalInputTokens
+      : (d.total_input_tokens as number) ?? 0
+
+    const totalOutputTokens = cw && typeof cw.total_output_tokens === 'number' ? cw.total_output_tokens
+      : typeof d.totalOutputTokens === 'number' ? d.totalOutputTokens
+      : (d.total_output_tokens as number) ?? 0
+
+    const contextWindowSize = cw && typeof cw.context_window_size === 'number' ? cw.context_window_size
+      : typeof d.contextWindowSize === 'number' ? d.contextWindowSize
+      : (d.context_window_size as number) ?? 0
+
+    // Model ID: nested under model.id or flat
+    const modelObj = (d.model && typeof d.model === 'object') ? d.model as Record<string, unknown> : null
+    const modelId = modelObj && typeof modelObj.id === 'string' ? modelObj.id
+      : typeof d.modelId === 'string' ? d.modelId
+      : (d.model_id as string) ?? ''
 
     return {
       usedPercentage,
-      remainingPercentage: typeof d.remainingPercentage === 'number' ? d.remainingPercentage : 100 - usedPercentage,
-      totalInputTokens: typeof d.totalInputTokens === 'number' ? d.totalInputTokens : (d.total_input_tokens as number) ?? 0,
-      totalOutputTokens: typeof d.totalOutputTokens === 'number' ? d.totalOutputTokens : (d.total_output_tokens as number) ?? 0,
-      contextWindowSize: typeof d.contextWindowSize === 'number' ? d.contextWindowSize : (d.context_window_size as number) ?? 0,
-      modelId: typeof d.modelId === 'string' ? d.modelId : (d.model_id as string) ?? '',
+      remainingPercentage,
+      totalInputTokens,
+      totalOutputTokens,
+      contextWindowSize,
+      modelId,
       updatedAt: Date.now(),
     }
   }

@@ -152,4 +152,67 @@ describe('StatusLineMonitor', () => {
     monitor.stop()
     assert.equal(monitor.getAll().size, 0)
   })
+
+  it('parses real Claude Code statusLine JSON with nested context_window', () => {
+    // Real payload from Claude Code >= 2.x
+    const realPayload = {
+      session_id: '9db7aad3-5b9a-4d48-abdc-7ed7cbb6e7d7',
+      model: { id: 'claude-opus-4-6[1m]', display_name: 'Opus 4.6 (1M context)' },
+      context_window: {
+        total_input_tokens: 2806,
+        total_output_tokens: 13381,
+        context_window_size: 1000000,
+        used_percentage: 4,
+        remaining_percentage: 96,
+      },
+    }
+    fs.writeFileSync(path.join(tmpDir, 'real-session.json'), JSON.stringify(realPayload))
+
+    monitor.start()
+    const usage = monitor.get('real-session')
+    assert.ok(usage, 'should parse nested context_window format')
+    assert.equal(usage.usedPercentage, 4)
+    assert.equal(usage.remainingPercentage, 96)
+    assert.equal(usage.totalInputTokens, 2806)
+    assert.equal(usage.totalOutputTokens, 13381)
+    assert.equal(usage.contextWindowSize, 1000000)
+    assert.equal(usage.modelId, 'claude-opus-4-6[1m]')
+  })
+
+  it('returns null when context_window.used_percentage is null (no API calls yet)', () => {
+    const payload = {
+      model: { id: 'claude-opus-4-6[1m]' },
+      context_window: {
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+        context_window_size: 1000000,
+        current_usage: null,
+        used_percentage: null,
+        remaining_percentage: null,
+      },
+    }
+    fs.writeFileSync(path.join(tmpDir, 'null-pct.json'), JSON.stringify(payload))
+
+    monitor.start()
+    assert.equal(monitor.get('null-pct'), undefined, 'should return undefined when used_percentage is null')
+  })
+
+  it('extracts model.id from nested model object', () => {
+    const payload = {
+      model: { id: 'claude-sonnet-4-20250514', display_name: 'Sonnet 4' },
+      context_window: { used_percentage: 12, context_window_size: 200000 },
+    }
+    fs.writeFileSync(path.join(tmpDir, 'model-nested.json'), JSON.stringify(payload))
+
+    monitor.start()
+    const usage = monitor.get('model-nested')
+    assert.ok(usage)
+    assert.equal(usage.modelId, 'claude-sonnet-4-20250514')
+  })
+
+  it('skips bare .json file (empty session ID)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.json'), JSON.stringify({ context_window: { used_percentage: 50 } }))
+    monitor.start()
+    assert.equal(monitor.getAll().size, 0, 'bare .json should be skipped')
+  })
 })

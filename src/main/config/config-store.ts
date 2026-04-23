@@ -47,9 +47,12 @@ const defaults: AppConfig = {
       },
     },
   },
+  agent: {
+    skipPermissions: false,
+  },
   ui: {
     chatroomVisible: false,
-    theme: 'ivory' as const,
+    theme: 'cipher-ivory' as const,
     grid: createEmptyGrid(),
   },
   windows: {

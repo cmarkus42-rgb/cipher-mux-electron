@@ -6,6 +6,13 @@ import { APP_NAME, APP_VERSION, MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../..
 import { validateBearer } from './mcp-auth'
 import { registerTools, ToolContext } from './mcp-tools'
 
+/** Session timeout: sessions inactive for longer than this are garbage-collected. */
+export const SESSION_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
+/** How often the GC sweep runs. */
+export const SESSION_GC_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
+/** Maximum concurrent MCP sessions. */
+export const MAX_MCP_SESSIONS = 5
+
 /**
  * Per-client MCP session — each connecting client gets its own
  * McpServer + StreamableHTTPServerTransport pair.
@@ -14,6 +21,7 @@ interface McpSession {
   sessionId: string
   mcpServer: McpServer
   transport: StreamableHTTPServerTransport
+  lastActivity: number
 }
 
 /**
@@ -29,6 +37,8 @@ export class McpServerManager {
   private host: string = MCP_DEFAULT_HOST
   private apiKey: string = ''
   private toolCtx: ToolContext | null = null
+  private gcTimer: ReturnType<typeof setInterval> | null = null
+  private startTime: number = 0
 
   /**
    * Start the MCP server.
@@ -48,6 +58,8 @@ export class McpServerManager {
       this.handleRequest(req, res)
     })
 
+    this.startTime = Date.now()
+
     // Start listening
     await new Promise<void>((resolve, reject) => {
       this.httpServer!.once('error', reject)
@@ -57,12 +69,21 @@ export class McpServerManager {
         resolve()
       })
     })
+
+    // Start session GC sweep
+    this.gcTimer = setInterval(() => this.sweepStaleSessions(), SESSION_GC_INTERVAL_MS)
   }
 
   /**
    * Stop the MCP server and all sessions.
    */
   async stop(): Promise<void> {
+    // Stop GC timer
+    if (this.gcTimer) {
+      clearInterval(this.gcTimer)
+      this.gcTimer = null
+    }
+
     // Close all sessions
     for (const [id, session] of this.sessions) {
       try {
@@ -101,6 +122,11 @@ export class McpServerManager {
    * Create a new MCP session (McpServer + Transport) for a connecting client.
    */
   private async createSession(): Promise<McpSession> {
+    // Enforce session limit — evict oldest if at capacity
+    if (this.sessions.size >= MAX_MCP_SESSIONS) {
+      await this.evictOldestSession()
+    }
+
     const mcpServer = new McpServer(
       { name: APP_NAME, version: APP_VERSION },
       { capabilities: { tools: {} } }
@@ -121,7 +147,7 @@ export class McpServerManager {
     // Connect transport to MCP server
     await mcpServer.connect(transport)
 
-    const session: McpSession = { sessionId, mcpServer, transport }
+    const session: McpSession = { sessionId, mcpServer, transport, lastActivity: Date.now() }
     this.sessions.set(sessionId, session)
 
     console.log(`[McpServer] new session created: ${sessionId} (total: ${this.sessions.size})`)
@@ -143,6 +169,17 @@ export class McpServerManager {
     if (req.method === 'OPTIONS') {
       res.writeHead(204)
       res.end()
+      return
+    }
+
+    // Health endpoint — no auth required
+    if (req.method === 'GET' && req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({
+        status: 'ok',
+        sessions: this.sessions.size,
+        uptime: Math.floor((Date.now() - this.startTime) / 1000),
+      }))
       return
     }
 
@@ -230,6 +267,7 @@ export class McpServerManager {
       return
     }
 
+    session.lastActivity = Date.now()
     session.transport.handleRequest(req, res, body)
   }
 
@@ -260,6 +298,8 @@ export class McpServerManager {
       return
     }
 
+    session.lastActivity = Date.now()
+
     // On DELETE, clean up the session after the transport handles it
     if (req.method === 'DELETE') {
       session.transport.handleRequest(req, res)
@@ -275,6 +315,57 @@ export class McpServerManager {
     }
 
     session.transport.handleRequest(req, res)
+  }
+
+  /**
+   * Remove sessions that have been inactive for longer than SESSION_TIMEOUT_MS.
+   */
+  private async sweepStaleSessions(): Promise<void> {
+    const now = Date.now()
+    for (const [id, session] of this.sessions) {
+      if (now - session.lastActivity > SESSION_TIMEOUT_MS) {
+        console.log(`[McpServer] GC: removing stale session ${id} (idle ${Math.round((now - session.lastActivity) / 1000)}s)`)
+        try {
+          await session.transport.close()
+          await session.mcpServer.close()
+        } catch { /* ignore cleanup errors */ }
+        this.sessions.delete(id)
+      }
+    }
+  }
+
+  /**
+   * Evict the oldest session (by lastActivity) to make room for a new one.
+   */
+  private async evictOldestSession(): Promise<void> {
+    let oldest: McpSession | null = null
+    for (const session of this.sessions.values()) {
+      if (!oldest || session.lastActivity < oldest.lastActivity) {
+        oldest = session
+      }
+    }
+    if (oldest) {
+      console.warn(`[McpServer] session limit (${MAX_MCP_SESSIONS}) reached — evicting oldest session ${oldest.sessionId}`)
+      try {
+        await oldest.transport.close()
+        await oldest.mcpServer.close()
+      } catch { /* ignore cleanup errors */ }
+      this.sessions.delete(oldest.sessionId)
+    }
+  }
+
+  /**
+   * Expose session count for testing.
+   */
+  getSessionCount(): number {
+    return this.sessions.size
+  }
+
+  /**
+   * Expose the GC sweep for testing (allows manual trigger).
+   */
+  async _sweepForTest(): Promise<void> {
+    await this.sweepStaleSessions()
   }
 
   /**

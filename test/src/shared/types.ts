@@ -123,6 +123,9 @@ export interface AppConfig {
     activeView: ActiveView
     layout: LayoutState
   }
+  agent: {
+    skipPermissions: boolean
+  }
   windows: {
     main: { x: number; y: number; width: number; height: number }
   }

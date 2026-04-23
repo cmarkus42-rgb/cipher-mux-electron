@@ -1,4 +1,3 @@
-import { useEffect, useCallback } from 'preact/hooks'
 import { useTerminal } from '../hooks/useTerminal'
 import { PaneHeader } from './PaneHeader'
 
@@ -9,16 +8,9 @@ interface TerminalPaneProps {
 }
 
 export function TerminalPane({ sessionId, sessionName, contextUsage }: TerminalPaneProps) {
-  const { terminalRef, fit } = useTerminal(sessionId)
-
-  const handleResize = useCallback(() => {
-    fit()
-  }, [fit])
-
-  useEffect(() => {
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [handleResize])
+  // ResizeObserver in useTerminal handles all container size changes,
+  // including those triggered by window resize — no separate listener needed.
+  const { terminalRef } = useTerminal(sessionId)
 
   return (
     <div

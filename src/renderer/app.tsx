@@ -37,7 +37,7 @@ export function App() {
   const contextUsages = useContextUsage()
   const { projects, scanning, rescan } = useProjects()
   const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand } = useGrid()
-  const { theme, toggleTheme } = useTheme()
+  const { theme, setTheme, toggleTheme } = useTheme()
   const { openCount: requestsOpenCount } = useInputRequests()
 
   // Resize window when panels open/close so sessions don't compress
@@ -365,6 +365,8 @@ export function App() {
             <InfoSettingsView
               onRescan={rescan}
               scanning={scanning}
+              theme={theme}
+              onSetTheme={setTheme}
             />
           </div>
         </div>
