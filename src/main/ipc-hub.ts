@@ -95,6 +95,7 @@ export class IpcHub {
     this.registerWindowChannels()
     this.registerDialogChannels()
     this.registerOrchestratorChannels()
+    this.registerMpoChannels()
     this.registerBugreportChannels()
     this.registerVoiceChannels()
     this.registerTaskChannels()
@@ -232,6 +233,10 @@ export class IpcHub {
 
     this.sessionManager.on('session-stopped', (session) => {
       this.windowManager.sendToMainWindow(IPC.SESSION_STOPPED, session)
+    })
+
+    this.sessionManager.on('mpo-started', (session) => {
+      this.windowManager.sendToMainWindow(IPC.MPO_STARTED, session)
     })
 
     this.tmux.on('output', (paneId: string, data: string) => {
@@ -555,6 +560,36 @@ export class IpcHub {
       return {
         running: this.sessionManager.isOrchestratorRunning(),
         sessionId: this.sessionManager.getOrchestratorSessionId(),
+      }
+    })
+  }
+
+  // ─── MPO ─────────────────────────────────────────────
+  private registerMpoChannels(): void {
+    ipcMain.handle(IPC.MPO_START, async () => {
+      const mcpConfig = configStore.get('mcp')
+      const session = await this.sessionManager.startMpo({
+        mcpHost: mcpConfig?.host ?? MCP_DEFAULT_HOST,
+        mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
+        mcpApiKey: mcpConfig?.apiKey ?? '',
+      })
+      try {
+        this.sessionManager.queueMpoClaude()
+      } catch (err) {
+        console.error('[IpcHub] Failed to queue MPO claude:', err)
+      }
+      return session
+    })
+
+    ipcMain.handle(IPC.MPO_STOP, async () => {
+      await this.sessionManager.stopMpo()
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.MPO_STATUS, async () => {
+      return {
+        running: this.sessionManager.isMpoRunning(),
+        sessionId: this.sessionManager.getMpoSessionId(),
       }
     })
   }
