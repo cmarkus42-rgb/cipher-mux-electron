@@ -76,6 +76,7 @@ export function App() {
   }, [focusedSessionId, sessions])
 
   const [orchestratorSessionId, setOrchestratorSessionId] = useState<string | null>(null)
+  const [mpoSessionId, setMpoSessionId] = useState<string | null>(null)
 
   // Place orchestrator in grid slot 0
   const placeOrchestrator = useCallback((sessionId: string) => {
@@ -83,6 +84,11 @@ export function App() {
     // Always put orchestrator in slot 0 (top-left)
     setSessionAtSlot(0, sessionId)
   }, [setSessionAtSlot])
+
+  const placeMpo = useCallback((sessionId: string) => {
+    setMpoSessionId(sessionId)
+    addSession(sessionId)
+  }, [addSession])
 
   // Check orchestrator status on mount
   useEffect(() => {
@@ -96,6 +102,19 @@ export function App() {
     })
     return () => unsub()
   }, [placeOrchestrator])
+
+  // Check MPO status on mount
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    api.mpo.status().then((s: { running: boolean; sessionId?: string }) => {
+      if (s.running && s.sessionId) placeMpo(s.sessionId)
+    })
+    const unsub = api.mpo.onStarted((data: any) => {
+      const sid = data?.sessionId ?? data?.id
+      if (sid) placeMpo(sid)
+    })
+    return () => unsub()
+  }, [placeMpo])
 
   // Handle kickoff started — add launcher session to grid
   const handleKickoffStarted = useCallback((launcherSessionId: string) => {
@@ -243,6 +262,23 @@ export function App() {
     }
   }, [orchestratorSessionId, removeSession, placeOrchestrator])
 
+  const handleMpoToggle = useCallback(async () => {
+    const api = (window as any).cipherMux
+    try {
+      if (mpoSessionId) {
+        await api.mpo.stop()
+        removeSession(mpoSessionId)
+        setMpoSessionId(null)
+      } else {
+        const session = await api.mpo.start()
+        const sid = session?.sessionId ?? session?.id
+        if (sid) placeMpo(sid)
+      }
+    } catch (err) {
+      console.error('[App] MPO toggle failed:', err)
+    }
+  }, [mpoSessionId, removeSession, placeMpo])
+
   return (
     <div class="app-shell">
       {/* drag region */}
@@ -285,6 +321,8 @@ export function App() {
         requestsVisible={requestsVisible}
         requestsOpenCount={requestsOpenCount}
         orchestratorRunning={!!orchestratorSessionId}
+        mpoRunning={!!mpoSessionId}
+        onMpo={handleMpoToggle}
         gridCols={grid.config.cols}
         gridRows={grid.config.rows}
         focusedSessionId={focusedSessionId}
