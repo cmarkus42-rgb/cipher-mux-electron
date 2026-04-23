@@ -85,10 +85,42 @@ export class InputRequestWatcher extends EventEmitter {
       lastUpdated: new Date().toISOString(),
     }
 
-    // Atomic write: tmp file + rename
+    this.writeFileAtomic(data)
+  }
+
+  /**
+   * Create a new input request and append it to the file.
+   */
+  createRequest(request: InputRequest): void {
+    const data = this.readFile()
+    data.requests.push(request)
+    data.lastUpdated = new Date().toISOString()
+    this.writeFileAtomic(data)
+  }
+
+  /**
+   * Atomic write: write to .tmp file then rename.
+   */
+  private writeFileAtomic(data: InputRequestsFile): void {
     const tmpPath = this.filePath + '.tmp'
-    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8')
+    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8')
     fs.renameSync(tmpPath, this.filePath)
+  }
+
+  /**
+   * Read the current file state (fresh from disk).
+   */
+  private readFile(): InputRequestsFile {
+    try {
+      if (!fs.existsSync(this.filePath)) {
+        return { requests: [], lastUpdated: new Date().toISOString() }
+      }
+      const raw = fs.readFileSync(this.filePath, 'utf8')
+      const data: InputRequestsFile = JSON.parse(raw)
+      return { requests: Array.isArray(data.requests) ? data.requests : [], lastUpdated: data.lastUpdated ?? new Date().toISOString() }
+    } catch {
+      return { requests: [], lastUpdated: new Date().toISOString() }
+    }
   }
 
   private debouncedReload(): void {
