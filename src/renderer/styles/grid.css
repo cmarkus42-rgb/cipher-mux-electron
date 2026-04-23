@@ -5,7 +5,6 @@
   display: flex;
   flex-direction: column;
   padding: 6px;
-  gap: 4px;
   min-width: 0;
   min-height: 0;
   overflow-x: auto;
@@ -13,7 +12,7 @@
 }
 
 .session-grid {
-  flex: 0 0 auto;
+  flex: 1;
   display: grid;
   gap: 4px;
 }
@@ -196,6 +195,11 @@
   align-items: center;
   padding: 2px 4px;
   gap: 6px;
+}
+
+.grid-controls--inline {
+  display: inline-flex;
+  padding: 0;
 }
 
 .grid-controls__label {
@@ -484,14 +488,21 @@
   user-select: none;
 }
 
-.status-bar__version {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-dim);
-}
-
 .status-bar__actions {
   display: flex;
+  align-items: center;
   gap: 12px;
+}
+
+.status-bar__sep {
+  color: var(--color-border);
+  font-size: var(--font-size-xs);
+}
+
+.status-bar__version {
+  margin-left: auto;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
 }
 
 .status-bar__btn {

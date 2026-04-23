@@ -1,0 +1,64 @@
+cipher-mux
+Copyright (c) 2026 cipher-mux contributors
+
+This software is distributed under the MIT License. See LICENSE for details.
+
+---
+
+Third-Party Dependencies and Their Licenses
+
+This project includes the following third-party software:
+
+## Apache-2.0
+
+- detect-libc (https://github.com/lovell/detect-libc)
+- sherpa-onnx-node (https://github.com/k2-fsa/sherpa-onnx) — optional, VAD engine
+- sherpa-onnx-darwin-arm64 — optional, platform binary
+
+## BSD-3-Clause
+
+- fast-uri
+- ieee754
+- qs
+
+## BSD-2-Clause
+
+- json-schema-typed
+
+## ISC
+
+- chownr, inherits, ini, isexe, once, semver, setprototypeof, which, wrappy
+- zod-to-json-schema
+
+## MIT
+
+Key dependencies (full list in package-lock.json):
+
+- @modelcontextprotocol/sdk — MCP protocol implementation
+- better-sqlite3 — SQLite bindings (native module)
+- express — HTTP server for MCP endpoint
+- hono — HTTP framework
+- ulidx — ULID generation
+- zod — Schema validation
+- @fugood/whisper.node — optional, Whisper STT bindings
+- preact — UI framework (devDependency)
+- @xterm/xterm — Terminal emulator (devDependency)
+- electron — Application framework (devDependency)
+- vite — Build tool (devDependency)
+- typescript — Type system (devDependency)
+
+## Bundled Fonts
+
+- **Rajdhani** — SIL Open Font License 1.1
+  Copyright (c) Indian Type Foundry
+  Used for heading typography.
+
+- **Fira Code** — SIL Open Font License 1.1
+  Copyright (c) The Fira Code Project Authors
+  Used for monospace/terminal typography.
+
+---
+
+For the complete list of dependencies and their licenses, run:
+
+  npx license-checker --production --summary

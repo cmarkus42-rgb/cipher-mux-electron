@@ -58,8 +58,8 @@ describe('BugreportTaskSource', () => {
     const filePath = path.join(tmpDir, 'new-bug.md')
     fs.writeFileSync(filePath, 'A new bug report')
 
-    // Wait for fs.watch event + 100ms delay + some buffer
-    await waitFor(400)
+    // Wait for fs.watch event + 100ms delay + generous buffer (macOS fs.watch can be slow)
+    await waitFor(1500)
     source.stop()
 
     assert.equal(emitted.length, 1)
@@ -78,7 +78,7 @@ describe('BugreportTaskSource', () => {
     fs.writeFileSync(path.join(tmpDir, 'readme.txt'), 'not a bug report')
     fs.writeFileSync(path.join(tmpDir, 'data.json'), '{}')
 
-    await waitFor(400)
+    await waitFor(1500)
     source.stop()
 
     assert.equal(emitted.length, 0)
@@ -96,7 +96,7 @@ describe('BugreportTaskSource', () => {
     // Overwrite the same file — fs.watch may fire again
     fs.writeFileSync(filePath, 'Second write')
 
-    await waitFor(400)
+    await waitFor(1500)
     source.stop()
 
     // Should only have been emitted once (deduplication by filename)

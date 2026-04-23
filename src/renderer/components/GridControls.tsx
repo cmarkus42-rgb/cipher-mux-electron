@@ -7,9 +7,9 @@ interface GridControlsProps {
   onResize: (cols: number, rows: number) => void
 }
 
-export function GridControls({ cols, rows, onResize }: GridControlsProps) {
+export function GridControls({ cols, rows, onResize, inline }: GridControlsProps & { inline?: boolean }) {
   return (
-    <div class="grid-controls">
+    <div class={`grid-controls${inline ? ' grid-controls--inline' : ''}`}>
       <span class="grid-controls__label">spalten</span>
       <button
         class="grid-controls__btn"

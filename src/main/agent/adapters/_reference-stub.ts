@@ -128,4 +128,15 @@ export class ReferenceStubAdapter implements AgentAdapter {
   buildLauncherPromptFragment(_lang: 'de' | 'en'): string {
     return ''
   }
+
+  /**
+   * TODO (optional): Return agent-specific instructions for the MPO template.
+   *
+   * This fragment is injected into the MPO (Multi-Project Orchestrator) session's CLAUDE.md.
+   * Use it to provide worker-startup instructions and delegation semantics.
+   * Return empty string if your agent needs no special MPO guidance.
+   */
+  buildMpoPromptFragment(_lang: 'de' | 'en'): string {
+    return ''
+  }
 }

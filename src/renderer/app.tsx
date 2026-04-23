@@ -19,7 +19,6 @@ import { BugreportDialog } from './components/BugreportDialog'
 import { InfoSettingsView } from './components/InfoSettingsView'
 import { StatusBar } from './components/StatusBar'
 import { SessionDialog } from './components/SessionDialog'
-import { VoiceControl } from './components/VoiceControl'
 
 export function App() {
   const [chatroomVisible, setChatroomVisible] = useState(true)
@@ -40,6 +39,13 @@ export function App() {
   const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand } = useGrid()
   const { theme, toggleTheme } = useTheme()
   const { openCount: requestsOpenCount } = useInputRequests()
+
+  // Resize window when panels open/close so sessions don't compress
+  useEffect(() => {
+    const panelWidth = (chatroomVisible ? 280 : 0) + (requestsVisible ? 320 : 0)
+    const api = (window as any).cipherMux
+    api.window.fitGrid(grid.config.cols, grid.config.rows, panelWidth)
+  }, [chatroomVisible, requestsVisible, grid.config.cols, grid.config.rows])
 
   // Global keyboard shortcuts
   const shortcutEntries = useMemo(() => [
@@ -259,7 +265,6 @@ export function App() {
           onToggleExpand={toggleExpand}
           onLaunch={handleLaunch}
           onOpenSession={handleOpenSession}
-          onResize={handleResize}
           onSwap={swap}
         />
         <ChatroomPanel visible={chatroomVisible} />
@@ -280,18 +285,17 @@ export function App() {
         requestsVisible={requestsVisible}
         requestsOpenCount={requestsOpenCount}
         orchestratorRunning={!!orchestratorSessionId}
+        gridCols={grid.config.cols}
+        gridRows={grid.config.rows}
+        focusedSessionId={focusedSessionId}
+        focusedSessionName={focusedSessionName}
         onOrchestrator={handleOrchestratorToggle}
         onBugreport={() => setBugreportVisible(true)}
         onToggleChatroom={() => setChatroomVisible((v) => !v)}
         onToggleRequests={() => setRequestsVisible((v) => !v)}
         onToggleTheme={toggleTheme}
         onInfo={() => setInfoVisible(true)}
-      />
-
-      {/* voice input pill */}
-      <VoiceControl
-        focusedSessionId={focusedSessionId}
-        focusedSessionName={focusedSessionName}
+        onGridResize={handleResize}
       />
 
       {/* dialogs */}

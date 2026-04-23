@@ -152,4 +152,23 @@ Send instructions DIRECTLY via tmux send-keys into the pane — not via mux_send
   buildLauncherPromptFragment(_lang: 'de' | 'en'): string {
     return '/launch'
   }
+
+  buildMpoPromptFragment(lang: 'de' | 'en'): string {
+    if (lang === 'de') {
+      return `### Worker-Session-Startup (Claude Code)
+
+Starte Worker mit: \`claude --dangerously-skip-permissions\`
+MCP-Tools stehen automatisch zur Verfügung wenn die Session via mux_create_session erstellt wurde.
+Instruktionen DIREKT via tmux send-keys in den Pane schicken — nicht via mux_send.
+Session-Prefix fuer MPO-Worker: \`cmux-mpo-\`
+`
+    }
+    return `### Worker Session Startup (Claude Code)
+
+Start workers with: \`claude --dangerously-skip-permissions\`
+MCP tools are automatically available when sessions are created via mux_create_session.
+Send instructions DIRECTLY via tmux send-keys into the pane — not via mux_send.
+Session prefix for MPO workers: \`cmux-mpo-\`
+`
+  }
 }

@@ -1,7 +1,8 @@
 import { EventEmitter } from 'events'
 import * as fs from 'fs'
 import * as path from 'path'
-import { STATUSLINE_DIR, CONTEXT_WARNING_THRESHOLD } from '../../shared/constants'
+import { CONTEXT_WARNING_THRESHOLD } from '../../shared/constants'
+import { BRAND } from '../../shared/brand'
 import type { ContextUsage } from '../../shared/types'
 
 /**
@@ -17,7 +18,7 @@ export class StatusLineMonitor extends EventEmitter {
   private cache: Map<string, ContextUsage> = new Map()
   private warningEmitted: Set<string> = new Set()
 
-  constructor(watchDir: string = STATUSLINE_DIR) {
+  constructor(watchDir: string = BRAND.statusLineDir) {
     super()
     this.watchDir = watchDir
   }
