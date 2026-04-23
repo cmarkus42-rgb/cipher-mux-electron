@@ -13,9 +13,11 @@ Phasen-Übersicht:
 4. ~~Task-Dekomposition (Autonom) → `docs/todo.md`~~ ✅ (2026-04-13)
 5. ~~Autonome Implementierung (Autonom) → Code~~ ✅ (2026-04-14)
 6. ~~Review, Test & Iteration → Feedback-Loop~~ ✅ (2026-04-17)
-7. ~~Bugreport-Orchestrator + Voice-Pipeline (VAD)~~ ✅ (2026-04-19)
+7. ~~Voice-Pipeline (VAD + STT + TTS) + Bugreport-Interview~~ ✅ (2026-04-19)
+8. ~~AgentAdapter (TP-2) + Task-System + MPO~~ ✅ (2026-04-23)
+9. ~~Phase A (Theme-System) + Phase B (MCP/Terminal/StatusLine Polish)~~ ✅ (2026-04-23)
 
-**Status:** v0.8.4-beta, 371 Tests, Build sauber. Voice-Pipeline komplett (Session-Input + Bug-Assistant mit TTS). Mode-Trennung Session/Bugreport sauber.
+**Status:** v0.8.9-beta, ~448 Tests (43 Test-Dateien), Build sauber. Voice-Pipeline, Task-System, AgentAdapter, MPO, Theme-System und MCP-Lifecycle komplett.
 
 ## Build & Test
 
@@ -47,31 +49,41 @@ cipher-mux-electron/
 │   ├── main/
 │   │   ├── main.ts, window-manager.ts, ipc-hub.ts, preload.ts
 │   │   ├── tmux/          ← TmuxManager (Control Mode), Parser, Batcher
-│   │   ├── message-bus/   ← SQLite CRUD, Schema, Types
+│   │   ├── message-bus/   ← SQLite CRUD, Schema
 │   │   ├── mcp/           ← Streamable HTTP Server, Tools, Auth
-│   │   ├── session/       ← SessionManager, Recovery
-│   │   ├── project/       ← ProjectScanner, KickoffManager
-│   │   ├── config/        ← ConfigStore (electron-store)
-│   │   ├── monitoring/    ← StatusLineMonitor
-│   │   ├── bugreport/     ← BugreportManager
-│   │   ├── voice/         ← VoiceManager, STT (Whisper), TTS (Piper), ConversationEngine, VoiceInputRouter
+│   │   ├── session/       ← SessionManager, OrchestratorTemplate, MpoTemplate
+│   │   ├── project/       ← ProjectScanner, KickoffOrchestrator, LauncherPrompt, KickoffWatcher
+│   │   ├── config/        ← ConfigStore (JSON-File Store)
+│   │   ├── monitoring/    ← StatusLineMonitor, StatusLineHook
+│   │   ├── bugreport/     ← BugreportManager, BugreportResolve, OllamaClient
+│   │   ├── voice/         ← VoiceManager, ConversationEngine, STT (Whisper), TTS (Piper), VoiceInputRouter
 │   │   ├── agent/         ← AgentAdapter Interface, ClaudeCodeAdapter, AdapterRegistry
 │   │   ├── task/          ← TaskManager, TaskWatcher, TaskHooks, BugreportSource
 │   │   ├── mpo/           ← InputRequestWatcher (MPO Input Requests)
-│   │   └── util/          ← exec-util, dependency-check
+│   │   └── util/          ← exec-util, dependency-check, deep-merge
 │   ├── renderer/
 │   │   ├── app.tsx, index.html
-│   │   ├── components/    ← ActivityRail, TerminalPane, Chatroom, Cockpit, etc.
-│   │   ├── hooks/         ← useTerminal, useMessages, useSessions, useContextUsage, useVoiceSession, useGrid
+│   │   ├── components/    ← SessionGrid, SessionCell, LauncherCell, TerminalPane, PaneHeader,
+│   │   │                     ChatroomPanel, ChatToggleButton, StatusBar, GridControls,
+│   │   │                     KickoffDialog, SessionDialog, ProjectCard, ProjectPopup,
+│   │   │                     InputRequestsPanel, BugreportDialog, InfoSettingsView,
+│   │   │                     RecoveryDialog, VoiceControl
+│   │   ├── hooks/         ← useTerminal, useMessages, useSessions, useContextUsage,
+│   │   │                     useVoiceSession, useGrid, useInputRequests, useProjects,
+│   │   │                     useShortcuts, useTheme
 │   │   ├── voice/         ← vad-loader (Silero ONNX), audio-capture-worklet
 │   │   ├── styles/        ← theme.css, layout.css, components.css
 │   │   └── fonts/         ← Rajdhani, Fira Code
 │   └── shared/
 │       ├── ipc-channels.ts ← Typed Channel Constants
 │       ├── types.ts        ← Shared Interfaces
-│       └── constants.ts
+│       ├── constants.ts    ← App-weite Konstanten
+│       ├── brand.ts        ← Branding-Config (Pfade, Namen)
+│       ├── grid-types.ts   ← Grid-Layout Types
+│       ├── terminal-theme.ts ← xterm.js Farbthema
+│       └── version.ts      ← Auto-generierte Versionsnummer
 └── test/
-    └── main/              ← Unit-Tests für Business-Logik
+    └── main/              ← Unit-Tests für Business-Logik (43 Dateien)
 ```
 
 ## Referenz-Projekte
@@ -83,7 +95,7 @@ cipher-mux-electron/
 
 - **Session-Backend:** tmux (macOS, Homebrew)
 - **Message Bus:** SQLite via better-sqlite3 (WAL-Modus, Single-Writer aus Main Process)
-- **MCP-Server:** localhost HTTP im Main Process
+- **MCP-Server:** localhost HTTP im Main Process (Session-GC nach 30min Inaktivitaet, max 5 MCP-Sessions, `/health` Endpoint)
 - **Persistenz:** ConfigStore (JSON), SQLite (Messages/Sessions)
 - **Keine externe API** — nutzt Claude Code CLI für LLM-Interaktion
 
@@ -94,7 +106,7 @@ cipher-mux-electron/
 - ESLint + Prettier
 - Electron: contextIsolation=true, nodeIntegration=false
 - IPC: typed channels via shared types
-- CSS: cipher ivory Design System (Rajdhani Headings, Fira Code Mono, dunkles Theme)
+- CSS: 10 Themes via `body[data-theme="<id>"]`, Theme-Picker in Settings, `themes.json` Manifest. Tokens via CSS Custom Properties, ANSI-Farben pro Theme. Default: cipher-ivory (light) / cipher-dark (dark)
 - Naming: camelCase für Variablen/Funktionen, PascalCase für Komponenten/Klassen
 
 ## Architekturentscheidungen
@@ -152,7 +164,7 @@ Renderer (Silero VAD) → IPC → Main (ConversationEngine → Whisper STT → V
 Abstraktion für verschiedene AI-Agent-Backends:
 
 - `AgentAdapter` Interface: `isAvailable()`, `getCapabilities()`, `executeCommand()`, `streamOutput()`
-- `ClaudeCodeAdapter` (Tier-1): Vollständig implementiert
+- `ClaudeCodeAdapter` (Tier-1): Vollständig implementiert, `--dangerously-skip-permissions` konfigurierbar via ConfigStore `agent.skipPermissions`
 - `ReferenceStubAdapter` (Tier-2): Stub für Dokumentation
 - `AdapterRegistry`: Discovery + Registrierung
 
@@ -173,9 +185,11 @@ Eingebaute Funktion von cipher-mux. Empfaengt Anforderungspakete, zerlegt sie in
 - **macOS-only:** tmux als harte Abhängigkeit, osascript-Integration
 - **tmux als einziges Session-Backend:** Kein Dual-Stack mit node-pty. Sessions überleben Electron-Crashes
 - **Single-Writer SQLite:** Nur Main Process schreibt — kein Concurrent-Write-Problem
-- **xterm.js Streaming:** High-frequency tmux-Output erfordert Batching/Throttling der IPC-Bridge
+- **xterm.js Streaming:** High-frequency tmux-Output erfordert Batching/Throttling der IPC-Bridge. Terminal-Fit mit 150ms Debounce und Min-Size-Guard
+- **StatusLine 2.x:** Parser unterstuetzt Claude Code 2.x `context_window` nested Format zusaetzlich zum 1.x Flat-Format
 - **Preact statt React:** ~3KB, React-API-kompatibel, aber einige React-Ecosystem-Libs brauchen Aliasing
 - **Whisper Model-Pfad:** Muss `~/.config/cipher-mux/` sein, NICHT `app.getPath('userData')` (dev/prod Divergenz)
+- **better-sqlite3 ABI-Mismatch:** `npm run test` rebuilt für Node.js, `npm start` rebuilt für Electron. App immer mit `npm start` starten (prestart-Hook garantiert Electron-ABI). Direktes `electron .` nach Tests → MessageBus/TaskManager nicht verfügbar.
 
 ## Workflow-Regeln
 

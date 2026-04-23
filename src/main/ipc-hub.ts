@@ -628,14 +628,45 @@ export class IpcHub {
     ipcMain.handle(IPC.VOICE_AVAILABLE, () => {
       console.log('[Voice] VOICE_AVAILABLE check starting...')
       const fs = require('fs')
-      // Check native modules exist (don't import — ABI mismatch crashes)
+
+      // ── Step 1: Check whisper.node native module ──
+      // require.resolve only checks file resolution, NOT ABI compatibility.
+      // We try a full require() to catch ABI mismatch errors (e.g. module
+      // compiled for Node.js but loaded in Electron, or vice versa).
+      // Fix: npm run rebuild:voice  (rebuilds native modules for Electron ABI)
       try {
         require.resolve('@fugood/whisper.node')
-        console.log('[Voice] whisper.node: found')
+        console.log('[Voice] whisper.node: resolved')
       } catch {
-        console.log('[Voice] whisper.node: NOT found')
-        return { available: false, reason: 'whisper.node nicht installiert' }
+        console.log('[Voice] whisper.node: NOT installed')
+        return {
+          available: false,
+          reason: 'whisper.node nicht installiert — npm install @fugood/whisper.node && npm run rebuild:voice',
+        }
       }
+
+      // Try actual native load to detect ABI mismatch
+      try {
+        require('@fugood/whisper.node')
+        console.log('[Voice] whisper.node: loaded OK')
+      } catch (err) {
+        const msg = (err as Error).message || String(err)
+        const isAbiMismatch = msg.includes('was compiled against') || msg.includes('NODE_MODULE_VERSION') || msg.includes('ABI')
+        if (isAbiMismatch) {
+          console.log('[Voice] whisper.node: ABI mismatch —', msg)
+          return {
+            available: false,
+            reason: 'whisper.node ABI-Mismatch — npm run rebuild:voice',
+          }
+        }
+        console.log('[Voice] whisper.node: load failed —', msg)
+        return {
+          available: false,
+          reason: `whisper.node Ladefehler — npm run rebuild:voice (${msg.slice(0, 80)})`,
+        }
+      }
+
+      // ── Step 2: sherpa-onnx-node (optional — only for main-process VAD) ──
       try {
         require.resolve('sherpa-onnx-node')
         console.log('[Voice] sherpa-onnx-node: found')
@@ -645,13 +676,18 @@ export class IpcHub {
         // Session mode uses renderer-side VAD (Silero ONNX via vad-loader.ts).
         // Don't block voice availability for missing sherpa-onnx-node.
       }
-      // Check whisper model — use ~/.config/cipher-mux/ so path is stable
-      // regardless of dev vs packaged mode (app.getPath('userData') varies)
+
+      // ── Step 3: Check whisper model file ──
+      // Use ~/.config/cipher-mux/ so path is stable regardless of dev vs packaged
+      // mode (app.getPath('userData') varies between environments).
       const configBase = path.join(os.homedir(), '.config', 'cipher-mux')
       const modelPath = path.join(configBase, 'models', 'whisper', 'ggml-small.bin')
       if (!fs.existsSync(modelPath)) {
         console.log('[Voice] Whisper model NOT found at:', modelPath)
-        return { available: false, reason: `Whisper-Model fehlt: ${modelPath} — scripts/download-models.sh` }
+        return {
+          available: false,
+          reason: `Whisper-Model fehlt — scripts/download-models.sh ausfuehren`,
+        }
       }
       console.log('[Voice] Whisper model found at:', modelPath)
       console.log('[Voice] VOICE_AVAILABLE => true')
@@ -826,9 +862,11 @@ export class IpcHub {
   // ─── Input Requests (MPO) ─────────────────────────────
   private registerInputRequestChannels(): void {
     const INPUT_REQUESTS_PATH = BRAND.inputRequestsPath
+      || path.join(BRAND.mpoDir.replace(/^~/, os.homedir()), 'input-requests.json')
 
     // Always register the handler so renderer doesn't get "No handler" errors
     if (!INPUT_REQUESTS_PATH) {
+      console.warn('[IpcHub] inputRequestsPath is empty — InputRequestWatcher disabled. Check BUILD_PROFILE env var.')
       ipcMain.handle(IPC.MPO_INPUT_REQUESTS, () => ({ requests: [] }))
       return
     }

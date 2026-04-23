@@ -74,8 +74,9 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
       const availResult = await api.voice.available()
       console.log('[VoiceSession] voice.available() =>', availResult)
       if (!availResult.available) {
-        const msg = `Voice not available: ${availResult.reason ?? 'native modules missing'}`
-        console.log('[VoiceSession] BLOCKED:', msg)
+        const reason = availResult.reason ?? 'native modules missing'
+        const msg = `Voice not available — ${reason}`
+        console.log('[VoiceSession] BLOCKED:', msg, '(full reason:', reason, ')')
         setError(msg)
         return
       }
