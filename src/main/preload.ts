@@ -29,6 +29,11 @@ const api = {
     },
     recoveryAction: (action: string, tmuxSession: string, displayName?: string) =>
       ipcRenderer.invoke(IPC.SESSIONS_RECOVERY_ACTION, { action, tmuxSession, displayName }),
+    onVisibleAdd: (cb: (data: { sessionId: string }) => void) => {
+      const handler = (_e: unknown, data: { sessionId: string }) => cb(data)
+      ipcRenderer.on(IPC.SESSION_VISIBLE_ADD, handler)
+      return () => ipcRenderer.removeListener(IPC.SESSION_VISIBLE_ADD, handler)
+    },
   },
 
   // ─── Terminal ──────────────────────────────────────────

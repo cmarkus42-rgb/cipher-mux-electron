@@ -6,6 +6,7 @@ import type { StatusLineMonitor } from '../monitoring/statusline-monitor'
 import type { KickoffOrchestrator } from '../project/kickoff-orchestrator'
 import type { TaskManager } from '../task/task-manager'
 import type { Topic } from '../../shared/types'
+import { IPC } from '../../shared/ipc-channels'
 
 /**
  * Context passed to tool handlers — references to core services.
@@ -17,6 +18,7 @@ export interface ToolContext {
   kickoffOrchestrator: KickoffOrchestrator | null
   taskManager: TaskManager | null
   inputRequestWatcher: import('../mpo/input-request-watcher').InputRequestWatcher | null
+  windowManager: { sendToMainWindow(channel: string, data: unknown): void } | null
 }
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']
@@ -190,15 +192,20 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         name: z.string().describe('Session name'),
         projectPath: z.string().describe('Project directory path'),
         command: z.string().optional().describe('Initial command to run'),
+        visible: z.boolean().optional().describe('If true, session appears in the grid with focus'),
       },
     },
-    async (args: { name: string; projectPath: string; command?: string }) => {
+    async (args: { name: string; projectPath: string; command?: string; visible?: boolean }) => {
       try {
         const session = await ctx.sessionManager.start({
           name: args.name,
           projectPath: args.projectPath,
           command: args.command,
         })
+
+        if (args.visible && ctx.windowManager) {
+          ctx.windowManager.sendToMainWindow(IPC.SESSION_VISIBLE_ADD, { sessionId: session.id })
+        }
 
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, session }) }],
