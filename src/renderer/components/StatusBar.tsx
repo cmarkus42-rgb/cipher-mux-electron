@@ -15,9 +15,9 @@ function themeDisplayName(id: ThemeName): string {
 
 interface StatusBarProps {
   theme: ThemeName
-  chatroomVisible: boolean
-  requestsVisible: boolean
-  requestsOpenCount: number
+  sidebarVisible: boolean
+  sidebarHasContent: boolean
+  onToggleSidebar: () => void
   orchestratorRunning: boolean
   mpoRunning: boolean
   workspacesPopupVisible: boolean
@@ -28,8 +28,6 @@ interface StatusBarProps {
   onOrchestrator: () => void
   onMpo: () => void
   onBugreport: () => void
-  onToggleChatroom: () => void
-  onToggleRequests: () => void
   onToggleTheme: () => void
   onToggleWorkspaces: () => void
   onInfo: () => void
@@ -38,9 +36,9 @@ interface StatusBarProps {
 }
 
 export function StatusBar({
-  theme, chatroomVisible, requestsVisible, requestsOpenCount, orchestratorRunning,
+  theme, sidebarVisible, sidebarHasContent, onToggleSidebar, orchestratorRunning,
   gridCols, gridRows, focusedSessionId, focusedSessionName,
-  onOrchestrator, onMpo, onBugreport, onToggleChatroom, onToggleRequests, onToggleTheme, onInfo, onThemeSettings,
+  onOrchestrator, onMpo, onBugreport, onToggleTheme, onInfo, onThemeSettings,
   onGridResize, mpoRunning, workspacesPopupVisible, onToggleWorkspaces,
 }: StatusBarProps) {
   return (
@@ -74,19 +72,12 @@ export function StatusBar({
         </button>
         <button class="status-bar__btn" onClick={onBugreport}>bugreport</button>
         <button
-          class={`status-bar__btn${chatroomVisible ? ' status-bar__btn--active' : ''}`}
-          onClick={onToggleChatroom}
+          class={`status-bar__btn${sidebarVisible ? ' status-bar__btn--active' : ''}`}
+          onClick={onToggleSidebar}
+          title="Toggle sidebar"
         >
-          chatroom
-        </button>
-        <button
-          class={`status-bar__btn${requestsVisible ? ' status-bar__btn--active' : ''}`}
-          onClick={onToggleRequests}
-        >
-          requests
-          {requestsOpenCount > 0 && (
-            <span class="status-bar__badge">{requestsOpenCount}</span>
-          )}
+          {sidebarHasContent && <span class="status-bar__led" />}
+          sidebar
         </button>
         <button class="status-bar__btn status-bar__btn--active" onClick={onThemeSettings}>
           {themeDisplayName(theme)}
