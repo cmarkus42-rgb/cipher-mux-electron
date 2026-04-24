@@ -150,9 +150,20 @@ export function App() {
   useEffect(() => {
     const api = (window as any).cipherMux
     if (!api.sessions?.onVisibleAdd) return
-    const unsub = api.sessions.onVisibleAdd((data: { sessionId: string }) => {
-      addSession(data.sessionId)
-      setFocusedSessionId(data.sessionId)
+    const unsub = api.sessions.onVisibleAdd(async (data: { sessionId: string }) => {
+      // Wait for session to appear in sessions list (race condition with IPC)
+      let retries = 0
+      while (retries < 10) {
+        const sessions = await api.sessions.list()
+        if (sessions.some((s: any) => s.id === data.sessionId)) {
+          addSession(data.sessionId)
+          setFocusedSessionId(data.sessionId)
+          return
+        }
+        await new Promise(r => setTimeout(r, 200))
+        retries++
+      }
+      console.warn('[app] visible-add: session not found after retries:', data.sessionId)
     })
     return () => unsub()
   }, [addSession])
