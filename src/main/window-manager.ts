@@ -7,6 +7,7 @@ import {
   SESSION_CELL_HEIGHT,
 } from '../shared/constants'
 import { IPC } from '../shared/ipc-channels'
+import { configStore } from './config/config-store'
 
 /** Optional grid dimensions passed to createMainWindow for initial sizing. */
 export interface WindowGridHint {
@@ -170,6 +171,8 @@ export class WindowManager {
 
     this.sidebarWindow.on('closed', () => {
       this.sidebarWindow = null
+      // Clear persisted detach state so next restart opens sidebar inline
+      configStore.set('sidebarDetached' as any, false)
       // Notify main window that sidebar reattached
       this.sendToMainWindow(IPC.SIDEBAR_REATTACHED, {})
     })

@@ -1,5 +1,5 @@
 import { h } from 'preact'
-import { useCallback } from 'preact/hooks'
+import { useCallback, useEffect } from 'preact/hooks'
 import { useSessions } from '../hooks/useSessions'
 import { useContextUsage } from '../hooks/useContextUsage'
 import { SidebarPanel } from './SidebarPanel'
@@ -14,6 +14,19 @@ export function SidebarWindow() {
 
   const orchestratorActive = sessions.some(s => s.name === 'Orchestrator' && s.status === 'active')
   const mpoActive = sessions.some(s => s.name === 'MPO' && s.status === 'active')
+
+  // Auto-close the detached window when there are no active sessions to display.
+  // 3-second delay prevents flicker during brief session transitions.
+  useEffect(() => {
+    const hasContent = sessions.some(s => s.status === 'active')
+    if (!hasContent) {
+      const timer = setTimeout(() => {
+        const api = (window as any).cipherMux
+        api.sidebar?.reattach?.()
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [sessions])
 
   const handleAddToGrid = useCallback((sessionId: string) => {
     // In detached mode, adding to grid is not directly supported
