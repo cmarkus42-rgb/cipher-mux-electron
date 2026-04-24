@@ -242,6 +242,11 @@ export function PersonasTab() {
               }}
               placeholder="What does this persona do? How does it behave? One paragraph."
             />
+            {active?.builtin && active.id !== 'empty' && (
+              <div class="persona-hint">
+                {active.name} uses its own system template. This prompt influences communication style only.
+              </div>
+            )}
           </div>
 
           {/* Usage footer */}
