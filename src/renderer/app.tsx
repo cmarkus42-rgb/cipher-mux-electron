@@ -316,6 +316,17 @@ export function App() {
     setSidebarDetached(true)
   }, [])
 
+  // Restore persisted sidebar detach state on mount
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    api.sidebar?.isDetached?.().then((detached: boolean) => {
+      if (detached) {
+        setSidebarDetached(true)
+        api.sidebar.detach()
+      }
+    })
+  }, [])
+
   // Listen for sidebar reattach (sidebar window closed)
   useEffect(() => {
     const api = (window as any).cipherMux
