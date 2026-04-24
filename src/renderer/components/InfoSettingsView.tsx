@@ -4,8 +4,6 @@ import { APP_VERSION } from '../../shared/constants'
 import type { ThemeName } from '../../shared/grid-types'
 import themesManifest from '../themes.json'
 import '../styles/workspaces.css'
-import { PersonasTab } from './PersonasTab'
-import { WorkspacesTab } from './WorkspacesTab'
 
 interface InfoSettingsViewProps {
   onRescan: () => void | Promise<void>
@@ -22,7 +20,7 @@ interface AppSection {
   scanDepth: number
 }
 
-type TabId = 'shortcuts' | 'features' | 'settings' | 'workspaces' | 'personas'
+type TabId = 'shortcuts' | 'features' | 'settings'
 
 // Built-in shortcuts (hard-coded since most keyboard shortcuts were removed)
 const SHORTCUTS = [
@@ -85,13 +83,13 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
   return (
     <div class="settings-view">
       <div class="info-tabs">
-        {(['shortcuts', 'features', 'settings', 'workspaces', 'personas'] as TabId[]).map((tab) => (
+        {(['shortcuts', 'features', 'settings'] as TabId[]).map((tab) => (
           <button
             key={tab}
             class={`info-tab ${activeTab === tab ? 'info-tab--active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === 'shortcuts' ? 'shortcuts' : tab === 'features' ? 'features' : tab === 'personas' ? 'personas' : tab === 'workspaces' ? 'workspaces' : 'einstellungen'}
+            {tab === 'shortcuts' ? 'shortcuts' : tab === 'features' ? 'features' : 'einstellungen'}
           </button>
         ))}
       </div>
@@ -251,10 +249,6 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
           </div>
         </section>
       )}
-
-      {activeTab === 'workspaces' && <WorkspacesTab />}
-
-      {activeTab === 'personas' && <PersonasTab />}
 
       {activeTab === 'settings' && !loading && (
         <section class="settings-section">

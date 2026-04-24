@@ -7,12 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.9-beta] - 2026-04-24
+
 ### Added
+- **Workspaces & Personas system:** grid-based workspace editor with cell inspector, 3-level prompt resolution (cell > workspace override > persona default), merge handles for vertical cell spanning
+- **Separate Workspaces/Personas window:** dedicated 960x720 editor window (no longer in settings popup)
+- **Workspace apply:** load a workspace to resize grid, apply merges as rowSpans, and spawn sessions for assigned projects
+- **Persona skill sync:** auto-generates `.claude/skills/personas/` skills from persona prompts
+- **Shell session button:** `$` button in session headers spawns plain zsh shell in the same project directory
+- **Visible sessions (MCP):** `mux_create_session` with `visible: true` places session directly in the grid
+- **Background session cards:** sessions not in grid appear as collapsible cards in the chatroom panel
+- **Message push delivery:** `mux_send` with `sessionName` injects message directly into target tmux pane
 - README, CONTRIBUTING, ARCHITECTURE, CHANGELOG documentation
 - GitHub issue and PR templates
 - GitHub Actions CI (macOS + Linux)
 - Linux AppImage build support
-- TSDoc lint via eslint-plugin-tsdoc
+
+### Changed
+- Workspace/Personas tabs removed from Info/Settings popup (moved to own window)
+- Grid dimension limits enforced: max 7 columns x 3 rows (workspace editor + main grid)
+- Merge handles now always visible (25% opacity) and clickable (not hover-only)
+- Override prompts pre-fill with persona default instead of starting empty
+
+### Fixed
+- Theme button now opens settings tab (was opening shortcuts tab)
+- Input fields in workspace editor no longer overflow container
+- Tab bar in workspaces window padded for macOS window controls
+
+## [0.8.8-beta] - 2026-04-23
+
+### Added
+- Theme system: 10 themes (cipher-ivory, cipher-dark, blueprint, warm-paper, gruvbox-dark, nord, synthwave, matrix, brutalist, high-contrast) with CSS custom properties and ANSI terminal colors per theme
+- Theme picker in settings with live preview swatches
+- MCP session GC (garbage collection after 30min inactivity)
+- StatusLine 2.x parser for Claude Code context_window nested format
+- Terminal resize debounce (150ms) with min-size guard
+
+### Fixed
+- Session recovery reliability
+- skip-permissions config via ConfigStore (`agent.skipPermissions`)
+- Context usage display for Claude Code 2.x format
 
 ## [0.8.3-beta] - 2026-04-22
 

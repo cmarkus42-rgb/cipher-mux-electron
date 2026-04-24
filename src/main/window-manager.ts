@@ -15,6 +15,7 @@ export interface WindowGridHint {
 
 export class WindowManager {
   private mainWindow: BrowserWindow | null = null
+  private workspacesWindow: BrowserWindow | null = null
 
   createMainWindow(gridHint?: WindowGridHint): BrowserWindow {
     const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize
@@ -92,5 +93,44 @@ export class WindowManager {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       this.mainWindow.webContents.send(channel, data)
     }
+  }
+
+  openWorkspacesWindow(initialTab?: 'workspaces' | 'personas'): void {
+    // Focus existing window if already open
+    if (this.workspacesWindow && !this.workspacesWindow.isDestroyed()) {
+      this.workspacesWindow.focus()
+      return
+    }
+
+    this.workspacesWindow = new BrowserWindow({
+      width: 960,
+      height: 720,
+      minWidth: 800,
+      minHeight: 500,
+      title: 'cipher-mux · Workspaces',
+      titleBarStyle: 'hiddenInset',
+      backgroundColor: '#1A1A1D',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false,
+      },
+    })
+
+    const hash = initialTab ? `#${initialTab}` : ''
+
+    if (process.env.VITE_DEV_SERVER_URL) {
+      this.workspacesWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}?view=workspaces${hash}`)
+    } else {
+      this.workspacesWindow.loadFile(
+        path.join(__dirname, '../../renderer/index.html'),
+        { search: 'view=workspaces', hash: initialTab ?? '' },
+      )
+    }
+
+    this.workspacesWindow.on('closed', () => {
+      this.workspacesWindow = null
+    })
   }
 }

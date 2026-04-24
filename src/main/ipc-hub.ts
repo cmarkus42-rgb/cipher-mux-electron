@@ -511,6 +511,10 @@ export class IpcHub {
       win.setMinimumSize(Math.min(newWidth, screenW), Math.min(newHeight, screenH))
       win.setSize(newWidth, newHeight)
     })
+
+    ipcMain.handle(IPC.WINDOW_OPEN_WORKSPACES, (_e, initialTab?: string) => {
+      this.windowManager.openWorkspacesWindow(initialTab as 'workspaces' | 'personas' | undefined)
+    })
   }
 
   // ─── Dialogs ────────────────────────────────────────────

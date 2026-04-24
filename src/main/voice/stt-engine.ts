@@ -4,6 +4,20 @@
  * Uses @fugood/whisper.node for local speech-to-text.
  * The native module is lazy-imported and only required at runtime.
  * Pure filtering functions are exported separately for testing.
+ *
+ * ## Voice Setup (native modules)
+ *
+ * Voice requires native modules compiled for Electron's ABI:
+ *
+ *   1. Install:  npm install @fugood/whisper.node sherpa-onnx-node
+ *   2. Rebuild:  npm run rebuild:voice
+ *   3. Model:    scripts/download-models.sh  (downloads ggml-small.bin to ~/.config/cipher-mux/models/whisper/)
+ *
+ * After `npm run test` the native modules get rebuilt for Node.js ABI.
+ * Before running the app again, either `npm start` (prestart hook rebuilds
+ * better-sqlite3 for Electron) or run `npm run rebuild:voice` explicitly.
+ *
+ * ABI mismatch symptoms: "Voice not available — whisper.node ABI-Mismatch"
  */
 
 import { EventEmitter } from 'node:events'

@@ -27,7 +27,7 @@ export function App() {
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null)
   const [bugreportVisible, setBugreportVisible] = useState(false)
   const [infoVisible, setInfoVisible] = useState(false)
-  const [infoInitialTab, setInfoInitialTab] = useState<'shortcuts' | 'features' | 'settings' | 'workspaces' | 'personas' | undefined>(undefined)
+  const [infoInitialTab, setInfoInitialTab] = useState<'shortcuts' | 'features' | 'settings' | undefined>(undefined)
   const [workspacesPopupVisible, setWorkspacesPopupVisible] = useState(false)
 
   // Project popup state
@@ -39,7 +39,7 @@ export function App() {
   const { unreadCount } = useMessages()
   const contextUsages = useContextUsage()
   const { projects, scanning, rescan } = useProjects()
-  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand } = useGrid()
+  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges } = useGrid()
   const { theme, setTheme, toggleTheme } = useTheme()
   const { openCount: requestsOpenCount } = useInputRequests()
 
@@ -283,17 +283,32 @@ export function App() {
 
   const handleWorkspaceApply = useCallback(async (workspaceId: string) => {
     try {
-      await (window as any).cipherMux.workspaces.apply(workspaceId)
+      const api = (window as any).cipherMux
+      // Load workspace to get grid dimensions + merges
+      const workspaces = await api.workspaces.list()
+      const ws = workspaces.find((w: any) => w.id === workspaceId)
+      if (ws) {
+        // Resize grid first (renderer-side)
+        resize({ cols: ws.cols, rows: ws.rows })
+        // Apply workspace merges as rowSpans
+        if (ws.merges && Object.keys(ws.merges).length > 0) {
+          applyMerges(ws.cols, ws.rows, ws.merges)
+        }
+      }
+      // Then apply (spawns sessions)
+      const result = await api.workspaces.apply(workspaceId)
+      if (result?.warnings?.length) {
+        console.warn('[App] Workspace apply warnings:', result.warnings)
+      }
     } catch (err) {
       console.error('[App] Failed to apply workspace:', err)
     }
     setWorkspacesPopupVisible(false)
-  }, [])
+  }, [resize, applyMerges])
 
   const handleWorkspaceOpenSettings = useCallback((tab: 'personas' | 'workspaces') => {
     setWorkspacesPopupVisible(false)
-    setInfoInitialTab(tab)
-    setInfoVisible(true)
+    ;(window as any).cipherMux.window.openWorkspaces(tab)
   }, [])
 
   const handleOrchestratorToggle = useCallback(async () => {
@@ -395,6 +410,7 @@ export function App() {
         onToggleTheme={toggleTheme}
         onToggleWorkspaces={handleToggleWorkspaces}
         onInfo={() => { setInfoInitialTab(undefined); setInfoVisible(true) }}
+        onThemeSettings={() => { setInfoInitialTab('settings'); setInfoVisible(true) }}
         onGridResize={handleResize}
       />
 

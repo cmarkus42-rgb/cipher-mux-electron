@@ -33,13 +33,14 @@ interface StatusBarProps {
   onToggleTheme: () => void
   onToggleWorkspaces: () => void
   onInfo: () => void
+  onThemeSettings: () => void
   onGridResize: (cols: number, rows: number) => void
 }
 
 export function StatusBar({
   theme, chatroomVisible, requestsVisible, requestsOpenCount, orchestratorRunning,
   gridCols, gridRows, focusedSessionId, focusedSessionName,
-  onOrchestrator, onMpo, onBugreport, onToggleChatroom, onToggleRequests, onToggleTheme, onInfo,
+  onOrchestrator, onMpo, onBugreport, onToggleChatroom, onToggleRequests, onToggleTheme, onInfo, onThemeSettings,
   onGridResize, mpoRunning, workspacesPopupVisible, onToggleWorkspaces,
 }: StatusBarProps) {
   return (
@@ -87,7 +88,7 @@ export function StatusBar({
             <span class="status-bar__badge">{requestsOpenCount}</span>
           )}
         </button>
-        <button class="status-bar__btn status-bar__btn--active" onClick={onInfo}>
+        <button class="status-bar__btn status-bar__btn--active" onClick={onThemeSettings}>
           {themeDisplayName(theme)}
         </button>
         <button class="status-bar__btn" onClick={onInfo}>info</button>

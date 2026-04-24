@@ -139,6 +139,7 @@ const api = {
   // ─── Window ──────────────────────────────────────────────
   window: {
     fitGrid: (cols: number, rows: number, panelWidth?: number) => ipcRenderer.invoke(IPC.WINDOW_FIT_GRID, { cols, rows, panelWidth }),
+    openWorkspaces: (initialTab?: string) => ipcRenderer.invoke('cipher-mux:window:open-workspaces', initialTab),
   },
 
   // ─── Bugreport ─────────────────────────────────────────

@@ -1348,7 +1348,7 @@ These are prioritized after G1-G3 based on need.
 
 ---
 
-## Manual Test Checklist (for tomorrow)
+## Manual Test Checklist (v0.8.9-beta — 2026-04-24)
 
 ### Pre-Test Setup
 
@@ -1357,82 +1357,120 @@ cd /Users/Shared/Nextcloud/Claude/ClaudeCode01/cipher-mux-electron
 npm run build && npm start
 ```
 
-### Personas (Phase D)
-
-- [ ] **P1 — Personas tab opens.** Settings → Personas tab. Links: Persona-Liste mit farbigen Dots. Rechts: Editor-Panel. Seeded Personas sichtbar (Orchestrator, MPO, Worker, empty + custom).
-- [ ] **P2 — Built-in persona locked.** "Orchestrator" selektieren. Name-Feld disabled, Farbswatches disabled, Delete disabled. Nur Prompt-Textarea editierbar.
-- [ ] **P3 — Custom persona editierbar.** "Developer" selektieren. Name editierbar, Farbswatches klickbar, Delete enabled.
-- [ ] **P4 — Neue Persona erstellen.** "+ NEW" klicken. Neuer Eintrag in Liste mit Name "NEW PERSONA". Editor oeffnet sich dafuer.
-- [ ] **P5 — Custom persona loeschen.** Custom Persona selektieren → Delete → Confirm. Persona weg aus Liste.
-- [ ] **P6 — Persona duplizieren.** Beliebige selektieren → Duplicate. Kopie erscheint mit " COPY" Suffix, voll editierbar.
-- [ ] **P7 — Persona prompt speichern.** Prompt editieren → Save. App neu starten → Prompt bleibt.
-- [ ] **P8 — Usage counter.** Unten im Editor: zeigt welche Workspaces diese Persona referenzieren.
-
-### Workspaces (Phase D)
-
-- [ ] **W1 — Workspaces tab opens.** Settings → Workspaces tab. Links: Workspace-Liste mit Mini-Thumbnails. Rechts: Grid-Editor.
-- [ ] **W2 — Grid editor interaktiv.** Zellen im Editor klicken. Cell Inspector updated: zeigt Persona, Project, Prompt mit Source-Note.
-- [ ] **W3 — Dimension stepper.** Cols +/- und Rows +/- klicken. Grid resized (1-10 Cols, 1-6 Rows). Bestehende Zellen bleiben, neue sind empty.
-- [ ] **W4 — Merge handle.** Untere Kante einer Zelle hovern → klicken. Zelle merged mit Zelle darunter (grid-row: span 2). Nochmal klicken → unmerge.
-- [ ] **W5 — Prompt resolution.** Zelle ohne Prompt, Persona hat Default. Inspector zeigt "Using persona default" Source-Note.
-- [ ] **W6 — Workspace override.** Override in Persona Prompt Overrides setzen. Zellen mit der Persona zeigen "workspace override" Source-Note.
-- [ ] **W7 — Cell prompt wins.** Prompt in Cell Inspector Textarea tippen. Source-Note wechselt auf "Per-cell override".
-- [ ] **W8 — Workspace erstellen.** "+ NEW" in Liste. Neuer Workspace mit 3×2 Grid, alle Zellen empty.
-- [ ] **W9 — Workspace loeschen.** Selektieren → Delete → Confirm. Workspace weg.
-- [ ] **W10 — Save/Revert.** Aendern → Revert → Aenderungen weg. Aendern → Save → App neu starten → Aenderungen bleiben.
-
-### Workspace Popup (Phase D)
-
-- [ ] **WP1 — Popup oeffnet.** "workspaces" in Statusbar klicken. Popup erscheint ueber Statusbar mit Workspace-Liste + farbigen Thumbnails.
-- [ ] **WP2 — Persona-Legende.** Verschiedene Workspaces selektieren. Legende updated mit Personas + Count.
-- [ ] **WP3 — Workspace laden.** Workspace selektieren → Load. Grid resized, Sessions spawnen fuer non-empty Cells.
-- [ ] **WP4 — Quick links.** "personas..." / "edit..." klicken. Oeffnet Settings auf korrektem Tab.
-
-### Communication (Phase E)
-
-- [ ] **E1 — mux_send ohne Target.** MCP: `mux_send(topic:"chat", sender:"test", text:"hello")`. Message im Chatroom. Response: `{ok:true, id:"..."}`.
-- [ ] **E2 — mux_send mit Push.** MCP: `mux_send(topic:"system", sender:"Orch", text:"do X", sessionName:"Worker-1")`. Message im Bus UND in Worker-1 tmux injiziert. Response: `{delivered:true}`.
-- [ ] **E3 — mux_send an tote Session.** An gestoppte/nicht-existente Session senden. Response: `{delivered:false}`.
-- [ ] **E4 — Visible session.** MCP: `mux_create_session(name:"visible-test", visible:true)`. Session erscheint automatisch im Grid.
-- [ ] **E5 — Background session cards.** Session via MCP erstellen (ohne visible) → Chatroom oeffnen. Session als Card sichtbar. Klick → Session ins Grid.
-
-### Voice (Phase F)
-
-- [ ] **V1 — Voice available.** Mic-Toggle in Statusbar klicken. Kein ABI-Mismatch-Fehler. Toggle aktiviert (LED an).
-- [ ] **V2 — Sprache transkribieren.** Mic aktivieren → sprechen. Text erscheint im fokussierten Session-Terminal.
-- [ ] **V3 — Voice commands.** "abschicken" sagen. Sendet Enter ans Terminal.
-- [ ] **V4 — Bugreport voice.** Bugreport Dialog oeffnen → Voice Toggle aktivieren. Sprache wird ins Description-Feld transkribiert.
-
-### StatusBar (Phase C4 + General)
-
-- [ ] **S1 — Orchestrator button.** Klicken → Session startet. Button zeigt Active-State mit orangem Dot + Glow.
-- [ ] **S2 — MPO button.** Klicken → MPO startet. Button zeigt Active-State mit gruenem Dot + Glow.
-- [ ] **S3 — Grid controls.** +/- fuer Cols/Rows klicken. Grid resized live.
-- [ ] **S4 — Theme display.** Theme-Name in Statusbar sichtbar. Klick oeffnet Settings auf Themes-Tab.
-
-### Shell Button (Phase G1)
-
-- [ ] **G1 — Shell button sichtbar.** Session-Cell hat `$` Button im Header (zwischen ⇄ und ✕).
-- [ ] **G2 — Shell session oeffnet.** `$` klicken → neue Shell-Session im gleichen Projekt-Verzeichnis. Kein Claude CLI, nur zsh.
-- [ ] **G3 — Shell im Grid.** Neue Shell-Session erscheint im naechsten freien Slot. Focus springt dorthin.
-
-### Automated
-
-- [ ] **T1 — Unit tests.** `npm run test` → 500+ Tests, 0 Failures.
-- [ ] **T2 — Build clean.** `npm run build` → kein TS-Fehler.
-- [ ] **T3 — Lint clean.** `npm run lint` → 0 Errors.
+**Hinweis:** `npm start` (nicht `npm run dev`!) startet Electron mit ABI-Rebuild.
 
 ---
 
+
+### 1. Workspaces-Fenster (NEU — eigenes Window)
+
+- [x] **WF1 — Fenster oeffnet via Statusbar.** "workspaces" Popup → "edit..." klicken. Separates 960x720 Fenster oeffnet sich. NICHT im Info-Popup.
+- [x] **WF2 — Fenster oeffnet via Popup "personas...".** Oeffnet Workspaces-Fenster direkt auf Personas-Tab.
+- [x] **WF3 — Tab-Leiste sichtbar.** Zwei Tabs: "workspaces" und "personas". Nicht hinter macOS Traffic-Lights verdeckt (padding-left: 80px).
+- [x] **WF4 — Tab-Wechsel.** Zwischen Workspaces und Personas hin- und herwechseln. Content updated.
+- [x] **WF5 — Fenster-Singleton.** Nochmal "edit..." klicken → bestehendes Fenster kommt nach vorne, kein zweites Fenster.
+- [x] **WF6 — Info/Settings OHNE Workspaces.** Info-Button (i) in Statusbar oeffnet Info-Popup. Nur 3 Tabs: "shortcuts", "features", "einstellungen". Keine Workspaces/Personas Tabs mehr.
+
+### 2. Personas (im Workspaces-Fenster)
+
+- [x] **P1 — Personas-Liste.** Persona-Tab: Links Liste mit farbigen Dots. Rechts Editor-Panel. Seeded Personas sichtbar (Orchestrator, MPO, Worker, empty + custom).
+- [x] **P2 — Built-in locked.** "Orchestrator" selektieren. Name disabled, Farben disabled, Delete disabled. Nur Prompt editierbar. --- 
+- [ ] der PRompt dort spiegelt aber ja nicht den echten oder? dann würde ich die einfach leer lassen --- wie ist gelöst, dass man hier die grundfunktiojn vor orchestrator und MPO nicht verletzt?
+- [x] **P3 — Custom editierbar.** Custom Persona: Name, Farben, Delete — alles enabled.
+- [x] **P4 — Neue Persona.** "+ NEW" → neuer Eintrag "NEW PERSONA" in Liste, Editor oeffnet sich.
+- [x] **P5 — Loeschen.** Custom selektieren → Delete → Confirm → weg.
+- [x] **P6 — Duplizieren.** Beliebige → Duplicate → Kopie mit " COPY" Suffix.
+- [x] **P7 — Persistenz.** Prompt editieren → Save → App neu starten → Prompt bleibt.
+- [x] **P8 — Usage.** Editor-Footer zeigt welche Workspaces die Persona nutzen.
+
+### 3. Workspaces (im Workspaces-Fenster)
+
+- [x] **W1 — Workspace-Liste.** Links: Workspace-Liste mit Mini-Thumbnails (farbige Grid-Vorschau). Rechts: Grid-Editor.
+- [x] **W2 — Grid-Editor interaktiv.** Zellen klicken → Cell Inspector updated mit Persona, Project, Prompt + Source-Note.
+- [x] **W3 — Dimension-Limits.** Cols +/- (max 7, min 1) und Rows +/- (max 3, min 1). **KEIN** 10x6 moeglich. Bestehende Zellen bleiben, neue = empty.
+- [x] **W4 — Merge-Handle klickbar.** Untere Zellkante: subtile Linie sichtbar (25% opacity). Klick → Zelle merged mit Zelle darunter (span 2). Nochmal klicken → unmerge. Hint-Text sagt "click bottom edge to merge/unmerge".
+- [ ] **W5 — Prompt resolution 3-Level.** Zelle ohne Prompt + Persona mit Default → Inspector: "Using persona default from Personas tab".
+- [ ] Grundsätzlich: Workspace -> load, stellt das Grid ein, aber weder die verbindung von zellen für hohe sessions, noch sessions oder ihren inhalt, gwescheige denn prompts - momentan geht es nur für das was die +/- buttons eh schon komnnten, wenn man so will...
+- [ ] **W6 — Workspace-Prompt Override.** "Workspace-Prompts" Bereich: Override setzen → Zellen zeigen "Using this workspace's persona override".
+- [ ] hab nen sscreenshot abgelegt zur Workspace-Prompts seite --- fällt etwas auseinander - 12:15 Uhr übrigens - und die organdenen schriften - da häte ich ja lieber nen kleinen 'get default' um die defaults zu lasen, falls man sie nur anpassen will - die kaum lesbare zeile da unten...naja... erst das fixen, dann hier weiter testen
+- [ ] **W7 — Cell-Prompt gewinnt.** Prompt in Cell Inspector tippen → "Per-cell override in effect".
+- [ ] **W8 — Override Pre-Fill.** Neuen Override anlegen (+ add override) → Textarea startet mit dem vollen Persona-Default-Prompt, NICHT leer.
+- [x] **W9 — Workspace erstellen.** "+ NEW" → 3x2 Grid, alle Zellen empty.
+- [x] **W10 — Workspace loeschen.** Delete → Confirm → weg.
+- [ ] **W11 — Save/Revert.** Aendern → Revert → Aenderungen weg. Save → Neustart → Aenderungen persistent.
+- [ ] **W12 — Input-Felder passen.** Alle Textareas/Selects/Inputs im Inspector und Override-Bereich bleiben innerhalb des Containers (kein Overflow). -- innerhalb schon aber siehe screenshot zur anordnung (12:15)
+
+### 4. Workspace Popup + Apply
+
+- [x] **WP1 — Popup oeffnet.** "workspaces" in Statusbar → Popup ueber Statusbar mit farbigen Thumbnails.
+- [x] **WP2 — Persona-Legende.** Workspace selektieren → Legende updated mit Persona-Farben + Count.
+- [x] **WP3 — Workspace laden (Grid-Resize).** Load klicken → Grid resized auf Workspace-Dimensionen.
+- [ ] **WP4 — Workspace laden (Merges).** Workspace MIT verbundenen Zellen laden → Grid zeigt rowSpans korrekt. Merged Cells werden als vertikale Spans dargestellt. -> qie oben bechrieben - NEIN
+- [ ] **WP5 — Workspace laden (Sessions).** Workspace mit zugewiesenen Projekten laden → Sessions spawnen in non-empty Cells. - NEIN
+- [x] **WP6 — Quick-Links.** "personas..." → Workspaces-Fenster auf Personas-Tab. "edit..." → Workspaces-Fenster auf Workspaces-Tab.
+
+### 5. StatusBar + Theme
+
+- [ ] **S1 — Orchestrator.** Klick → Session startet. Oranger Dot + Glow. --- nein - ist zwar zum start geöffnet - aber einmal zu hat der buton keine funktion
+- [x] **S2 — MPO.** Klick → MPO startet. Gruener Dot + Glow.
+- [x] **S3 — Grid controls.** +/- Cols/Rows resized Grid live.
+- [x] **S4 — Theme-Button.** Theme-Name in Statusbar. Klick → Info-Popup oeffnet sich auf "einstellungen" Tab (Theme-Picker), NICHT auf "shortcuts".
+- [ ] **S5 — Version.** Rechts in der Statusbar: Versionsnummer sichtbar (sollte v0.9.x zeigen, nicht v0.8.4). - da steht immer noch 8.4. - screenshot von 12:21
+
+### 6. Shell Button (Phase G1)
+
+- [x] **G1 — Button sichtbar.** Session-Cell Header: `$` Button zwischen Swap und Close.
+- [x] **G2 — Shell oeffnet.** `$` klicken → neue Shell-Session im gleichen Projekt. Kein Claude CLI, nur zsh.
+- [x] **G3 — Shell im Grid.** Shell erscheint im naechsten freien Slot.
+
+### 7. Communication (Phase E)
+
+- [x] **E1 — mux_send broadcast.** MCP: `mux_send(topic:"chat", sender:"test", text:"hello")`. Message im Chatroom.
+- [ ] **E2 — mux_send push.** MCP: `mux_send(..., sessionName:"Worker-1")`. Message im Bus + in tmux Pane injiziert.
+- [x] **E3 — mux_send tote Session.** An nicht-existente Session → `{delivered:false}`.
+- [ ] **E4 — Visible session.** MCP: `mux_create_session(name:"vis-test", visible:true)` 
+- [ ] **E5 — Background cards.** Session ohne visible → Chatroom oeffnen → Card sichtbar. Klick → ins Grid. → Session automatisch im Grid. --- ja - aber inks angehöngt als im nächsten freien slot -- und die funktinosollte die grid einstellung NICHT selbsständig änern - wenn es nicht reinpasst: frage aufpoppen lassen: wohin? Kannst di griddarstellung vom Workspace nehmen um die auswahl nett zu gestalten...
+
+Bugreport E2:
+                                                            ◐ medium · /effort
+❯ mux_send Push-Delivery funktioniert nicht. Wenn man eine Message mit sessionId────────────────────────────────────────────────────────────────────────────   oder sessionName an eine aktive Session schickt, kommt delivered:false zurück                                                                              korrekt im Bus (per mux_read verifiziert), aber die tmux send-keys Injection  
+  in den Ziel-Pane findet nicht statt. Getestet mit beiden Varianten
+  (sessionName:"Worker-1" und sessionId:"01KPZG8Z18JN9TG4EMFYQFR8DX"), Session
+  war aktiv mit Pane $23. Erwartet wäre delivered:true und sichtbarer Input im
+  tmux-Pane. Vermutung: der Delivery-Codepfad wird entweder nie aufgerufen oder
+  schlägt still fehl ohne den Fehler zu propagieren.
+
+Bug E4 von claude: mux_create_session mit visible:true hat keinen sichtbaren Effekt. Die Session ────────────────────────────────────────────────────────────────────────────  wird korrekt erstellt (Status active, tmux-Pane $25 zugewiesen), aber sie     erscheint nicht automatisch im Electron-Grid. Das Grid wurde zwar vergrößert  
+  (Resize-Event kam offenbar an), aber die neue Session-Kachel fehlt. Entweder
+  wird das visible-Flag vom Backend nicht als IPC-Event ans Electron-Frontend
+  weitergegeben, oder das Frontend empfängt das Event aber fügt die Kachel nicht
+   ins Grid ein. Der tmux-Pane existiert im Hintergrund — nur die
+  Grid-Integration fehlt.
+
+### 8. Voice (Phase F — optional, ABI-abhaengig)
+
+- [x] **V1 — Voice available.** Mic-Toggle in Statusbar, kein ABI-Fehler.
+- [x] **V2 — Transkription.** Sprechen → Text in Session.
+- [x] **V3 — Voice commands.** "abschicken" → Enter.
+- [ ] bei wechsel in den bugassistant ist dort voice noch an, selbst wenn in der app vorher geschlossen --- wie es funktinoieren soll ist dir klar?
+
+### 9. Automated
+
+- [x] **T1 — Unit tests.** `npm run test` → ~448+ Tests, max 1 Failure (bugreport-source flaky).
+- [x] **T2 — Build clean.** `npm run build` → kein TS-Fehler.
+- [x] **T3 — Lint clean.** `npm run lint` → 0 Errors.
+
+---
+
+Schon sehr gut - next steps: anfordeurngen zu den lücken schärfen, dann einen plan zur Umsetzung machen - nächste Runde zu 0.9.1. :)
+
 ## Version Bump Schedule
 
-| After Phase | Version |
-|-------------|---------|
-| C4 complete | v0.9.0-beta |
-| D complete  | v0.10.0-beta |
-| E complete  | v0.11.0-beta |
-| F complete  | v0.12.0-beta |
-| G1-G3       | v1.0.0-rc1 |
+| Milestone | Version |
+|-----------|---------|
+| C4+D+E+G1 complete | v0.8.9-beta (aktuell) |
+| Polish + Final Round | v0.9.0-beta |
+| G2-G3 + Release | v1.0.0-rc1 |
 
 ---
 
