@@ -2,17 +2,13 @@
 import { useState, useCallback, useEffect, useMemo } from 'preact/hooks'
 import type { ProjectInfo } from '../shared/types'
 import { useSessions } from './hooks/useSessions'
-import { useMessages } from './hooks/useMessages'
 import { useContextUsage } from './hooks/useContextUsage'
 import { useProjects } from './hooks/useProjects'
 import { useGrid } from './hooks/useGrid'
 import { useTheme } from './hooks/useTheme'
 import { useShortcuts } from './hooks/useShortcuts'
 import { SessionGrid } from './components/SessionGrid'
-import { ChatroomPanel } from './components/ChatroomPanel'
-import { InputRequestsPanel } from './components/InputRequestsPanel'
-import { useInputRequests } from './hooks/useInputRequests'
-import { ChatToggleButton } from './components/ChatToggleButton'
+import { SidebarPanel } from './components/SidebarPanel'
 import { ProjectPopup } from './components/ProjectPopup'
 import { RecoveryDialog } from './components/RecoveryDialog'
 import { BugreportDialog } from './components/BugreportDialog'
@@ -22,8 +18,7 @@ import { SessionDialog } from './components/SessionDialog'
 import { WorkspacePopup } from './components/WorkspacePopup'
 
 export function App() {
-  const [chatroomVisible, setChatroomVisible] = useState(true)
-  const [requestsVisible, setRequestsVisible] = useState(false)
+  const [sidebarVisible, setSidebarVisible] = useState(true)
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null)
   const [bugreportVisible, setBugreportVisible] = useState(false)
   const [infoVisible, setInfoVisible] = useState(false)
@@ -36,19 +31,10 @@ export function App() {
   const [popupTargetSlotIndex, setPopupTargetSlotIndex] = useState<number | null>(null)
 
   const { sessions, startSession, stopSession } = useSessions()
-  const { unreadCount } = useMessages()
   const contextUsages = useContextUsage()
   const { projects, scanning, rescan } = useProjects()
   const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges } = useGrid()
   const { theme, setTheme, toggleTheme } = useTheme()
-  const { openCount: requestsOpenCount } = useInputRequests()
-
-  // Resize window when panels open/close so sessions don't compress
-  useEffect(() => {
-    const panelWidth = (chatroomVisible ? 280 : 0) + (requestsVisible ? 320 : 0)
-    const api = (window as any).cipherMux
-    api.window.fitGrid(grid.config.cols, grid.config.rows, panelWidth)
-  }, [chatroomVisible, requestsVisible, grid.config.cols, grid.config.rows])
 
   // Global keyboard shortcuts
   const shortcutEntries = useMemo(() => [
@@ -81,6 +67,20 @@ export function App() {
 
   const [orchestratorSessionId, setOrchestratorSessionId] = useState<string | null>(null)
   const [mpoSessionId, setMpoSessionId] = useState<string | null>(null)
+
+  // Compute grid session IDs for sidebar
+  const gridSessionIds = grid.slots.filter(s => s.sessionId).map(s => s.sessionId!)
+
+  // Check if sidebar has content (for LED indicator)
+  const sidebarHasContent = !!orchestratorSessionId || !!mpoSessionId ||
+    sessions.some(s => s.status === 'active' && !gridSessionIds.includes(s.id))
+
+  // Resize window when panels open/close so sessions don't compress
+  useEffect(() => {
+    const panelWidth = sidebarVisible && sidebarHasContent ? 280 : 0
+    const api = (window as any).cipherMux
+    api.window.fitGrid(grid.config.cols, grid.config.rows, panelWidth)
+  }, [sidebarVisible, sidebarHasContent, grid.config.cols, grid.config.rows])
 
   // Place orchestrator in grid slot 0
   const placeOrchestrator = useCallback((sessionId: string) => {
@@ -284,6 +284,17 @@ export function App() {
     }
   }, [startSession, addSession])
 
+  const handleAddToGrid = useCallback((sessionId: string) => {
+    const freeIdx = grid.slots.findIndex(s => !s.sessionId)
+    if (freeIdx >= 0) {
+      addSession(sessionId)
+      setFocusedSessionId(sessionId)
+    } else {
+      // Grid full — for now just log. GridPlacementPopup added in Task 14
+      console.warn('[app] grid full, cannot place session', sessionId)
+    }
+  }, [grid.slots, addSession])
+
   const handleResize = useCallback((cols: number, rows: number) => {
     resize({ cols, rows })
   }, [resize])
@@ -404,32 +415,23 @@ export function App() {
           onOpenSession={handleOpenSession}
           onSwap={swap}
         />
-        <ChatroomPanel
-          visible={chatroomVisible}
+        <SidebarPanel
+          visible={sidebarVisible && sidebarHasContent}
+          orchestratorActive={!!orchestratorSessionId}
+          mpoActive={!!mpoSessionId}
           sessions={sessions}
-          gridSessionIds={grid.slots.map(s => s.sessionId).filter(Boolean) as string[]}
+          gridSessionIds={gridSessionIds}
           contextUsages={contextUsages}
-          onAddToGrid={(sessionId) => {
-            addSession(sessionId)
-            setFocusedSessionId(sessionId)
-          }}
+          onAddToGrid={handleAddToGrid}
         />
-        <InputRequestsPanel visible={requestsVisible} />
       </div>
-
-      {/* floating chat toggle */}
-      <ChatToggleButton
-        visible={chatroomVisible}
-        unreadCount={unreadCount}
-        onToggle={() => setChatroomVisible((v) => !v)}
-      />
 
       {/* statusbar */}
       <StatusBar
         theme={theme}
-        chatroomVisible={chatroomVisible}
-        requestsVisible={requestsVisible}
-        requestsOpenCount={requestsOpenCount}
+        sidebarVisible={sidebarVisible}
+        sidebarHasContent={sidebarHasContent}
+        onToggleSidebar={() => setSidebarVisible(v => !v)}
         orchestratorRunning={!!orchestratorSessionId}
         mpoRunning={!!mpoSessionId}
         workspacesPopupVisible={workspacesPopupVisible}
@@ -440,8 +442,6 @@ export function App() {
         focusedSessionName={focusedSessionName}
         onOrchestrator={handleOrchestratorToggle}
         onBugreport={() => setBugreportVisible(true)}
-        onToggleChatroom={() => setChatroomVisible((v) => !v)}
-        onToggleRequests={() => setRequestsVisible((v) => !v)}
         onToggleTheme={toggleTheme}
         onToggleWorkspaces={handleToggleWorkspaces}
         onInfo={() => { setInfoInitialTab(undefined); setInfoVisible(true) }}
