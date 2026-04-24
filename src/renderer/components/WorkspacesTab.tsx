@@ -471,13 +471,33 @@ export function WorkspacesTab() {
                     ]
                     return (
                       <div key={pid} class="ov-col" style={{ '--persona-color': p.color } as any}>
-                        <div class="ov-label">
-                          <span class="dot" />
-                          <span>{p.name}</span>
-                          <span class="project-count">
-                            {projCount} cell{projCount === 1 ? '' : 's'}
-                            {projectsUsing.length > 0 ? ` \u00B7 ${projectsUsing.join(', ')}` : ''}
+                        <div class="ov-header">
+                          <span class="ov-label">
+                            <span class="dot" />
+                            <span>{p.name}</span>
+                            <span class="project-count">
+                              {projCount} cell{projCount === 1 ? '' : 's'}
+                              {projectsUsing.length > 0 ? ` \u00B7 ${projectsUsing.join(', ')}` : ''}
+                            </span>
                           </span>
+                          <div class="ov-actions">
+                            <button
+                              onClick={() => {
+                                const persona = personas.find((pp) => pp.id === pid)
+                                if (persona?.defaultPrompt) handleOverrideChange(pid, persona.defaultPrompt)
+                              }}
+                              title="Load persona default prompt into textarea"
+                            >
+                              load default
+                            </button>
+                            <button
+                              class="ov-remove"
+                              onClick={() => handleOverrideChange(pid, '')}
+                              title="Remove override for this persona"
+                            >
+                              &times;
+                            </button>
+                          </div>
                         </div>
                         <textarea
                           value={override}
