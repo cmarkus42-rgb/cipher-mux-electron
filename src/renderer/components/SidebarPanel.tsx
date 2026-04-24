@@ -1,5 +1,5 @@
 import { h } from 'preact'
-import { useState } from 'preact/hooks'
+import { useState, useEffect } from 'preact/hooks'
 import { useMessages } from '../hooks/useMessages'
 
 interface SidebarPanelProps {
@@ -70,24 +70,12 @@ export function SidebarPanel({
             <span>{bgExpanded ? '▾' : '▸'} BACKGROUND SESSIONS ({backgroundSessions.length})</span>
           </div>
           {bgExpanded && backgroundSessions.map(s => (
-            <div key={s.id} class="bg-card" onClick={() => onAddToGrid(s.id)} title="Click to place in grid">
-              <div class="bg-card__head">
-                <span class="bg-card__name">{s.name}</span>
-                <span class="bg-card__path">{s.projectPath ?? ''}</span>
-              </div>
-              {contextUsages[s.id] && (
-                <div class="bg-card__context">
-                  <span class="bg-card__tokens">
-                    {contextUsages[s.id].used != null ? `${Math.round(contextUsages[s.id].used! / 1000)}k` : '?'}
-                    /{contextUsages[s.id].total != null ? `${Math.round(contextUsages[s.id].total! / 1000)}k` : '?'}
-                  </span>
-                  <div class="bg-card__bar">
-                    <div class="bg-card__fill" style={{ width: `${contextUsages[s.id].usedPercentage}%` }} />
-                  </div>
-                </div>
-              )}
-              <div class="bg-card__preview" />
-            </div>
+            <BackgroundSessionCard
+              key={s.id}
+              session={s}
+              contextUsage={contextUsages[s.id]}
+              onClick={() => onAddToGrid(s.id)}
+            />
           ))}
         </section>
       )}
@@ -96,5 +84,52 @@ export function SidebarPanel({
         <div class="sidebar-panel__empty">No active background content.</div>
       )}
     </aside>
+  )
+}
+
+interface BackgroundSessionCardProps {
+  session: { id: string; name: string; projectPath?: string }
+  contextUsage?: { usedPercentage: number; used?: number; total?: number }
+  onClick: () => void
+}
+
+function BackgroundSessionCard({ session, contextUsage, onClick }: BackgroundSessionCardProps) {
+  const [lastOutput, setLastOutput] = useState<string>('')
+
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.sessions?.capture) return
+
+    const fetchPreview = async () => {
+      const content = await api.sessions.capture(session.id)
+      if (content) setLastOutput(content)
+    }
+
+    fetchPreview()
+    const interval = setInterval(fetchPreview, 5000)
+    return () => clearInterval(interval)
+  }, [session.id])
+
+  return (
+    <div class="bg-card" onClick={onClick} title="Click to place in grid">
+      <div class="bg-card__head">
+        <span class="bg-card__name">{session.name}</span>
+        <span class="bg-card__path">{session.projectPath ?? ''}</span>
+      </div>
+      {contextUsage && (
+        <div class="bg-card__context">
+          <span class="bg-card__tokens">
+            {contextUsage.used != null ? `${Math.round(contextUsage.used / 1000)}k` : '?'}
+            /{contextUsage.total != null ? `${Math.round(contextUsage.total / 1000)}k` : '?'}
+          </span>
+          <div class="bg-card__bar">
+            <div class="bg-card__fill" style={{ width: `${contextUsage.usedPercentage}%` }} />
+          </div>
+        </div>
+      )}
+      {lastOutput && (
+        <div class="bg-card__preview">{lastOutput}</div>
+      )}
+    </div>
   )
 }

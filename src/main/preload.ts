@@ -34,6 +34,7 @@ const api = {
       ipcRenderer.on(IPC.SESSION_VISIBLE_ADD, handler)
       return () => ipcRenderer.removeListener(IPC.SESSION_VISIBLE_ADD, handler)
     },
+    capture: (sessionId: string): Promise<string | null> => ipcRenderer.invoke('cipher-mux:sessions:capture', sessionId),
   },
 
   // ─── Terminal ──────────────────────────────────────────
