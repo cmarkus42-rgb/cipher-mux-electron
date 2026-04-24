@@ -31,7 +31,7 @@ export interface ResolvedPrompt {
   source: PromptSource
 }
 
-export const BUILTIN_PERSONA_IDS = ['orchestrator', 'mpo', 'worker', 'empty'] as const
+export const BUILTIN_PERSONA_IDS = ['orchestrator', 'mpo', 'empty'] as const
 
 export const BUILTIN_PERSONAS: readonly Persona[] = [
   {
@@ -49,14 +49,6 @@ export const BUILTIN_PERSONAS: readonly Persona[] = [
     builtin: true,
     defaultPrompt:
       'You are the Meta-Prompt Officer. Verify every claim the orchestrator or workers make by reading source. Block merges with concrete evidence. Keep a compact log: file:line → claim → verdict.',
-  },
-  {
-    id: 'worker',
-    name: 'Worker',
-    color: '#6A6A72',
-    builtin: true,
-    defaultPrompt:
-      'You execute one focused task at a time. Read what you need, do the thing, report back concisely. No speculation, no extra work. Surface blockers immediately.',
   },
   {
     id: 'empty',
@@ -128,8 +120,8 @@ export const SEED_WORKSPACES: readonly Workspace[] = [
     cells: [
       { persona: 'orchestrator', project: '', prompt: '' },
       { persona: 'mpo',          project: '', prompt: '' },
-      { persona: 'worker',       project: '', prompt: 'grep stacktrace' },
-      { persona: 'worker',       project: '', prompt: 'read changelog' },
+      { persona: 'empty',        project: '', prompt: 'grep stacktrace' },
+      { persona: 'empty',        project: '', prompt: 'read changelog' },
       { persona: 'auditor',      project: '', prompt: 'review open PR' },
       { persona: 'empty',        project: '', prompt: '' },
     ],
