@@ -172,7 +172,7 @@ export class WindowManager {
     this.sidebarWindow.on('closed', () => {
       this.sidebarWindow = null
       // Clear persisted detach state so next restart opens sidebar inline
-      configStore.set('sidebarDetached' as any, false)
+      configStore.set('sidebarDetached', false)
       // Notify main window that sidebar reattached
       this.sendToMainWindow(IPC.SIDEBAR_REATTACHED, {})
     })

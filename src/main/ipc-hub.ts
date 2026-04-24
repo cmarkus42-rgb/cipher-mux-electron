@@ -540,18 +540,18 @@ export class IpcHub {
 
     ipcMain.handle(IPC.SIDEBAR_DETACH, () => {
       this.windowManager.openSidebarWindow()
-      configStore.set('sidebarDetached' as any, true)
+      configStore.set('sidebarDetached', true)
       return { ok: true }
     })
 
     ipcMain.handle(IPC.SIDEBAR_REATTACH, () => {
       this.windowManager.closeSidebarWindow()
-      configStore.set('sidebarDetached' as any, false)
+      configStore.set('sidebarDetached', false)
       return { ok: true }
     })
 
     ipcMain.handle('cipher-mux:sidebar:is-detached', () => {
-      return configStore.get('sidebarDetached' as any) ?? false
+      return configStore.get('sidebarDetached') ?? false
     })
   }
 

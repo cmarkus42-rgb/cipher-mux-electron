@@ -155,6 +155,8 @@ export interface AppConfig {
   windows: {
     main: { x: number; y: number; width: number; height: number }
   }
+  /** Whether the sidebar is detached into its own window. Persisted across restarts. */
+  sidebarDetached?: boolean
 }
 
 // ─── Kickoff ───────────────────────────────────────────────
