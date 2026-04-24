@@ -226,65 +226,71 @@ npm run build && npm start
 
 ### 1. Unified Sidebar Panel
 
-- [ ] **SP1 — Auto-show Messages.** Start orchestrator -> Messages section appears in sidebar. No orchestrator -> section hidden.
-- [ ] **SP2 — Auto-show Background Sessions.** Create session via MCP that isn't in grid -> Background Sessions section appears. All sessions in grid -> section hidden.
-- [ ] **SP3 — Auto-show Requests.** Start MPO -> Requests section appears (if requests exist). No MPO -> section hidden.
-- [ ] **SP4 — No toolbar buttons.** Chat toggle button and Input Requests button removed from toolbar/statusbar.
-- [ ] **SP5 — No input field.** Sidebar has no message input/textarea. Pure display.
-- [ ] **SP6 — Panel hidden when empty.** No orchestrator, no background sessions, no MPO -> sidebar not rendered, grid gets full width.
+- [x] **SP1 — Auto-show Messages.** Start orchestrator -> Messages section appears in sidebar. No orchestrator -> section hidden.
+- [x] **SP2 — Auto-show Background Sessions.** Create session via MCP that isn't in grid -> Background Sessions section appears. All sessions in grid -> section hidden. ---
+- [ ] 
+- [ ] deutlicher grafische trennung wzischen den rbereich - jetzt ist alles nur schrazuauf weiß...
+ [ja ] **SP3 — Auto-show Requests.** Start MPO -> Requests section appears (if requests exist). No MPO -> section hidden. --- mpo geht nur ihintegrund auf - backgroun d sessions fuktioniert
+- [x] **SP4 — No toolbar buttons.** Chat toggle button and Input Requests button removed from toolbar/statusbar.
+- [x] **SP5 — No input field.** Sidebar has no message input/textarea. Pure display.
+- [x] **SP6 — Panel hidden when empty.** No orchestrator, no background sessions, no MPO -> sidebar not rendered, grid gets full width.
 
 ### 2. Background Session Cards
 
-- [ ] **BG1 — Card content.** Background session card shows: name (bold), project path, context bar (used/total), last 3 lines of output + "...".
-- [ ] **BG2 — Click free slot.** Grid has empty slot -> click card -> session placed in free slot.
-- [ ] **BG3 — Click grid full.** Grid full -> click card -> popup with visual grid, user picks target slot.
-- [ ] **BG4 — Card updates.** Session produces output -> card's "last response" updates live (or on reasonable interval).
-- [ ] **BG5 — Card disappears.** Background session placed in grid -> card removed from list.
+- [x] **BG1 — Card content.** Background session card shows: name (bold), project path, context bar (used/total), last 3 lines of output + "...".
+- [ ] ok, aber darstellung nicht so doll screenshot 21:39/40
+- [x] **BG2 — Click free slot.** Grid has empty slot -> click card -> session placed in free slot.
+- [x] **BG3 — Click grid full.** Grid full -> click card -> popup with visual grid, user picks target slot.
+- [ ] bakground too transparent - ein klassisches popop up wäre mir hier n lieben als immer gekilech ein overlay...
+- [x] **BG4 — Card updates.** Session produces output -> card's "last response" updates live (or on reasonable interval).
+- [x] **BG5 — Card disappears.** Background session placed in grid -> card removed from list.
 
 ### 3. Sidebar Detach
 
-- [ ] **DT1 — Detach button.** Panel header has detach icon. Click -> sidebar becomes standalone window.
-- [ ] **DT2 — Main window reclaims space.** After detach, grid expands to full width.
-- [ ] **DT3 — Auto-close.** Detached window: all sections lose content -> window closes automatically.
+erbst theme nicht wen ausgeklinkgt -- -wenn, dassnn gestralte es doch ausgeklappt als holo-fenster- ähnlich dem info-fenster beim desktop....
+
+- [x] **DT1 — Detach button.** Panel header has detach icon. Click -> sidebar becomes standalone window.
+- [x] **DT2 — Main window reclaims space.** After detach, grid expands to full width.
+- [x] **DT3 — Auto-close.** Detached window: all sections lose content -> window closes automatically.
 - [ ] **DT4 — Persistence.** Detach -> restart app -> sidebar opens as detached window again.
-- [ ] **DT5 — Reattach.** Close detached window manually -> sidebar reattaches in main window.
+- [x] **DT5 — Reattach.** Close detached window manually -> sidebar reattaches in main window.
 
 ### 4. Workspace Apply (End-to-End)
 
-- [ ] **WA1 — Grid resize.** Load workspace with 4x2 -> grid resizes to 4 cols, 2 rows.
-- [ ] **WA2 — Merges applied.** Workspace has merged cells -> grid shows rowSpans.
-- [ ] **WA3 — Sessions spawn.** Non-empty cells with projects -> sessions start in correct slots.
-- [ ] **WA4 — Prompts injected.** Session started by workspace apply has the resolved prompt (check via tmux capture-pane).
-- [ ] **WA5 — Empty cells stay empty.** Cells with persona=empty -> no session spawned.
+- [x] **WA1 — Grid resize.** Load workspace with 4x2 -> grid resizes to 4 cols, 2 rows.
+- [x] **WA2 — Merges applied.** Workspace has merged cells -> grid shows rowSpans.
+- [x] **WA3 — Sessions spawn.** Non-empty cells with projects -> sessions start in correct slots.
+- [x] **WA4 — Prompts injected.** Session started by workspace apply has the resolved prompt (check via tmux capture-pane).
+- [x] **WA5 — Empty cells stay empty.** Cells with persona=empty -> no session spawned.
 - [ ] **WA6 — Missing project warning.** Cell with persona but no project -> warning shown, cell skipped.
 
 ### 5. Bugfixes
 
-- [ ] **E2-fix — Push delivery.** `mux_send(sessionName:"Worker-1", text:"hello")` -> `delivered:true`, text visible in tmux pane.
-- [ ] **E4-fix — Visible session.** `mux_create_session(name:"test", visible:true)` -> session appears in grid.
-- [ ] **S1-fix — Orchestrator toggle.** Start orchestrator -> close session (X button) -> button resets to inactive -> click again -> new orchestrator starts.
-- [ ] **S5-fix — Version.** StatusBar shows `v0.9.1-beta` (or current package.json version).
+- [x] **E2-fix — Push delivery.** `mux_send(sessionName:"Worker-1", text:"hello")` -> `delivered:true`, text visible in tmux pane.
+- [x] **E4-fix — Visible session.** `mux_create_session(name:"test", visible:true)` -> session appears in grid.
+- [x] **S1-fix — Orchestrator toggle.** Start orchestrator -> close session (X button) -> button resets to inactive -> click again -> new orchestrator starts.
+- [x] **S5-fix — Version.** StatusBar shows `v0.9.1-beta` (or current package.json version).
 
 ### 6. Personas
 
-- [ ] **P-fix1 — No Worker built-in.** Personas tab: only Orchestrator, MPO, empty as built-ins. No Worker.
-- [ ] **P-fix2 — Built-in hint.** Orchestrator/MPO editor shows note: "uses own system template, prompt affects style only".
-- [ ] **P-fix3 — Legacy workspaces.** Workspace referencing deleted Worker persona -> handled gracefully (empty cell or warning).
+- [ ] **P-fix1 — No Worker built-in.** Personas tab: only Orchestrator, MPO, empty as built-ins. No Worker. - noch da
+- [x] **P-fix2 — Built-in hint.** Orchestrator/MPO editor shows note: "uses own system template, prompt affects style only".
+- [x] **P-fix3 — Legacy workspaces.** Workspace referencing deleted Worker persona -> handled gracefully (empty cell or warning).
 
 ### 7. Settings
 
-- [ ] **SET1 — Skip-permissions toggle.** Settings tab has "Skip Permission Prompts" toggle with warning text.
-- [ ] **SET2 — Toggle persists.** Enable -> restart -> still enabled.
-- [ ] **SET3 — Visual warning.** Toggle active -> orange/red visual indicator.
+- [x] **SET1 — Skip-permissions toggle.** Settings tab has "Skip Permission Prompts" toggle with warning text.
+- [x] **SET2 — Toggle persists.** Enable -> restart -> still enabled.
+- [x] **SET3 — Visual warning.** Toggle active -> orange/red visual indicator.
 
 ### 8. Workspace-Prompts UI
 
-- [ ] **WP-fix1 — Layout intact.** Workspace prompt override area: all elements within container bounds.
-- [ ] **WP-fix2 — Readable text.** No orange-on-light-background issues. Theme-appropriate colors.
-- [ ] **WP-fix3 — Load Default button.** Override textarea has "load default" that fills with persona's defaultPrompt.
-- [ ] **WP-fix4 — Pre-fill new override.** "+ add override" -> textarea starts with persona default, not empty.
-
-### 9. Automated
+- [x] **WP-fix1 — Layout intact.** Workspace prompt override area: all elements within container bounds.
+- [x] **WP-fix2 — Readable text.** No orange-on-light-background issues. Theme-appropriate colors.
+- [x] **WP-fix3 — Load Default button.** Override textarea has "load default" that fills with persona's defaultPrompt.
+- [x] **WP-fix4 — Pre-fill new override.** "+ add override" -> textarea starts with persona default, not empty.
+the edito rmisses the capability to split cells again ;)
+### 9. Automated --- na das kannst dselbst
 
 - [ ] **T1 — Unit tests.** `npm run test` -> all pass.
 - [ ] **T2 — Build clean.** `npm run build` -> no TS errors.
