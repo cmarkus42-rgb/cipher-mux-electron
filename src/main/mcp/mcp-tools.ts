@@ -95,17 +95,16 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         const session = ctx.sessionManager.get(targetId)
         if (session && session.status === 'active') {
           try {
-            // Readiness check: capture pane to see if Claude prompt is visible
-            const paneContent = await ctx.sessionManager.capture(targetId)
-            const isReady = paneContent?.includes('\u276f') || paneContent?.includes('$')
-
-            if (isReady) {
-              const escaped = escapeForTmux(args.text)
-              await ctx.sessionManager.sendKeys(targetId, escaped + '\r')
-              delivered = true
-            }
+            // Push-deliver directly — no readiness check needed for active
+            // sessions. The old code captured the pane and looked for ❯/$
+            // prompts, but that fails when Claude's TUI is running (which is
+            // the normal case). The message is on the bus regardless; this
+            // injection is best-effort convenience.
+            const escaped = escapeForTmux(args.text)
+            await ctx.sessionManager.sendKeys(targetId, escaped + '\r')
+            delivered = true
           } catch {
-            // Capture or sendKeys failed — message is still on the bus
+            // sendKeys failed — message is still on the bus
           }
         }
       }
