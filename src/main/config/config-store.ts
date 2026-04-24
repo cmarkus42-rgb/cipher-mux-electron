@@ -62,17 +62,30 @@ const defaults: AppConfig = {
   windows: {
     main: { x: 0, y: 0, width: DEFAULT_WINDOW_WIDTH, height: DEFAULT_WINDOW_HEIGHT },
   },
+  sidebarDetached: false,
 }
 
 function getConfigPath(): string {
   return path.join(app.getPath('userData'), 'cipher-mux-config.json')
 }
 
+function migrateConfig(config: AppConfig): AppConfig {
+  // Remove Worker built-in persona (removed in v0.9.1)
+  if (config.personas) {
+    const before = config.personas.length
+    config.personas = config.personas.filter((p: any) => p.id !== 'worker') as AppConfig['personas']
+    if (config.personas.length !== before) {
+      saveConfig(config)
+    }
+  }
+  return config
+}
+
 function loadConfig(): AppConfig {
   try {
     const raw = fs.readFileSync(getConfigPath(), 'utf-8')
     if (!raw.trim()) return { ...defaults }
-    return deepMerge(defaults, JSON.parse(raw))
+    return migrateConfig(deepMerge(defaults, JSON.parse(raw)))
   } catch {
     return { ...defaults }
   }

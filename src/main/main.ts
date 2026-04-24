@@ -55,6 +55,11 @@ app.whenReady().then(() => {
     : undefined
   windowManager.createMainWindow(gridHint)
 
+  // Auto-restore detached sidebar window if it was detached before last quit
+  if (configStore.get('sidebarDetached')) {
+    windowManager.openSidebarWindow()
+  }
+
   // Custom menu: keep Edit shortcuts (copy/paste/undo) but strip default
   // zoom accelerators (Cmd+-, Cmd+=, Cmd+0) so they reach the renderer's
   // capture-phase keydown handler for our shortcut registry.
