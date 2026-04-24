@@ -1404,13 +1404,14 @@
   padding: var(--space-sm);
   margin: var(--space-xs) var(--space-sm);
   border: 1px solid var(--color-border);
+  background: var(--color-surface);
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 .bg-card:hover {
   border-color: var(--color-neon);
-  background: var(--color-surface);
+  background: var(--color-surface-sunken);
 }
 
 .bg-card__head {
@@ -1418,6 +1419,7 @@
   justify-content: space-between;
   align-items: baseline;
   gap: var(--space-sm);
+  margin-bottom: var(--space-xxs);
 }
 
 .bg-card__name {
@@ -1426,6 +1428,7 @@
   font-weight: 600;
   text-transform: uppercase;
   color: var(--color-text);
+  letter-spacing: 0.05em;
 }
 
 .bg-card__path {
@@ -1435,7 +1438,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 120px;
+  max-width: 140px;
+  direction: rtl;
+  text-align: left;
 }
 
 .bg-card__context {
@@ -1465,16 +1470,19 @@
 }
 
 .bg-card__preview {
-  margin-top: var(--space-xxs);
+  margin-top: var(--space-xs);
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary, var(--color-text-muted));
   line-height: 1.4;
-  max-height: 3.6em;
+  max-height: 4.2em;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
+  background: var(--color-surface-sunken);
+  padding: var(--space-xxs) var(--space-xs);
+  border-left: 2px solid var(--color-border);
 }
 
 /* --- Grid Placement Popup --- */
