@@ -537,6 +537,16 @@ export class IpcHub {
     ipcMain.handle(IPC.WINDOW_OPEN_WORKSPACES, (_e, initialTab?: string) => {
       this.windowManager.openWorkspacesWindow(initialTab as 'workspaces' | 'personas' | undefined)
     })
+
+    ipcMain.handle(IPC.SIDEBAR_DETACH, () => {
+      this.windowManager.openSidebarWindow()
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.SIDEBAR_REATTACH, () => {
+      this.windowManager.closeSidebarWindow()
+      return { ok: true }
+    })
   }
 
   // ─── Dialogs ────────────────────────────────────────────

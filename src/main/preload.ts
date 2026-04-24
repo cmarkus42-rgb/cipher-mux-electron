@@ -145,6 +145,17 @@ const api = {
     openWorkspaces: (initialTab?: string) => ipcRenderer.invoke('cipher-mux:window:open-workspaces', initialTab),
   },
 
+  // ─── Sidebar ──────────────────────────────────────────────
+  sidebar: {
+    detach: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.SIDEBAR_DETACH),
+    reattach: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.SIDEBAR_REATTACH),
+    onReattached: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on(IPC.SIDEBAR_REATTACHED, handler)
+      return () => ipcRenderer.removeListener(IPC.SIDEBAR_REATTACHED, handler)
+    },
+  },
+
   // ─── Bugreport ─────────────────────────────────────────
   bugreport: {
     collect: () => ipcRenderer.invoke(IPC.BUGREPORT_COLLECT),
