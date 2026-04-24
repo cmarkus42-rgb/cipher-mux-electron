@@ -306,16 +306,24 @@ export function App() {
           applyMerges(ws.cols, ws.rows, ws.merges)
         }
       }
-      // Then apply (spawns sessions)
+      // Apply workspace (spawns sessions in main process)
       const result = await api.workspaces.apply(workspaceId)
       if (result?.warnings?.length) {
         console.warn('[App] Workspace apply warnings:', result.warnings)
+      }
+      // Place spawned sessions into their grid slots
+      if (result?.sessions?.length) {
+        for (const { cellIndex, sessionId } of result.sessions) {
+          setSessionAtSlot(cellIndex, sessionId)
+        }
+        // Focus the first spawned session
+        setFocusedSessionId(result.sessions[0].sessionId)
       }
     } catch (err) {
       console.error('[App] Failed to apply workspace:', err)
     }
     setWorkspacesPopupVisible(false)
-  }, [resize, applyMerges])
+  }, [resize, applyMerges, setSessionAtSlot])
 
   const handleWorkspaceOpenSettings = useCallback((tab: 'personas' | 'workspaces') => {
     setWorkspacesPopupVisible(false)

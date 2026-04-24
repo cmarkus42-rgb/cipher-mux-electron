@@ -93,6 +93,43 @@ describe('applyWorkspace', () => {
     const starter = makeMockStarter()
     await applyWorkspace(ws, PERSONAS, starter, () => {})
     assert.ok(starter.started[0].autoLaunch?.includes('run tests'))
+    assert.ok(starter.started[0].autoLaunch?.includes('--dangerously-skip-permissions'))
+    assert.ok(starter.started[0].autoLaunch?.startsWith('clear;'))
+  })
+
+  it('returns session IDs mapped to cell indices', async () => {
+    const ws: Workspace = {
+      id: 'test', name: 'Test', cols: 2, rows: 1,
+      cells: [
+        { persona: 'orchestrator', project: '/proj/a', prompt: '' },
+        { persona: 'worker', project: '/proj/b', prompt: '' },
+      ],
+      merges: {}, promptOverrides: {},
+    }
+    const starter = makeMockStarter()
+    const result = await applyWorkspace(ws, PERSONAS, starter, () => {})
+    assert.equal(result.sessions.length, 2)
+    assert.equal(result.sessions[0].cellIndex, 0)
+    assert.equal(result.sessions[0].sessionId, 'session-1')
+    assert.equal(result.sessions[1].cellIndex, 1)
+    assert.equal(result.sessions[1].sessionId, 'session-2')
+  })
+
+  it('skips hidden cells in merged areas', async () => {
+    const ws: Workspace = {
+      id: 'test', name: 'Test', cols: 1, rows: 2,
+      cells: [
+        { persona: 'orchestrator', project: '/proj/a', prompt: '' },
+        { persona: 'worker', project: '/proj/b', prompt: '' },
+      ],
+      merges: { '0:0': true }, // col 0, row 0 merges down — cell at row 1 is hidden
+      promptOverrides: {},
+    }
+    const starter = makeMockStarter()
+    const result = await applyWorkspace(ws, PERSONAS, starter, () => {})
+    assert.equal(result.sessionsStarted, 1)
+    assert.equal(starter.started.length, 1)
+    assert.equal(starter.started[0].name, 'Orchestrator')
   })
 
   it('catches start failures and adds warning', async () => {
