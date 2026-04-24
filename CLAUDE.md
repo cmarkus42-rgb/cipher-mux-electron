@@ -17,8 +17,9 @@ Phasen-Übersicht:
 8. ~~AgentAdapter (TP-2) + Task-System + MPO~~ ✅ (2026-04-23)
 9. ~~Phase A (Theme-System) + Phase B (MCP/Terminal/StatusLine Polish)~~ ✅ (2026-04-23)
 10. ~~Phase C4 (Session Coloring) + Phase D (Workspaces + Personas) + Phase E (Communication) + Phase G1 (Shell Button)~~ ✅ (2026-04-24)
+11. ~~v0.9.1–0.9.5: Unified Sidebar, Workspace Apply E2E, Bugfixes, Cell Split, Terminal Width~~ ✅ (2026-04-24)
 
-**Status:** v0.8.9-beta, ~448 Tests (43 Test-Dateien), Build sauber. Workspaces, Personas, Push-Delivery, Shell Sessions und separates Workspace-Editor-Fenster komplett. v0.9.0 nach Polish + Final Round.
+**Status:** v0.9.5-beta, ~448 Tests (43 Test-Dateien), Build sauber. Unified Sidebar (Messages/Background Sessions/Requests), Detachable Sidebar, Cell Split, Terminal Width Fix, Workspace Apply E2E, Config Migration. Alle manuellen Testcases bestanden.
 
 ## Build & Test
 
@@ -66,9 +67,9 @@ cipher-mux-electron/
 │   ├── renderer/
 │   │   ├── app.tsx, index.html
 │   │   ├── components/    ← SessionGrid, SessionCell, LauncherCell, TerminalPane, PaneHeader,
-│   │   │                     ChatroomPanel, ChatToggleButton, StatusBar, GridControls,
-│   │   │                     KickoffDialog, SessionDialog, ProjectCard, ProjectPopup,
-│   │   │                     InputRequestsPanel, BugreportDialog, InfoSettingsView,
+│   │   │                     SidebarPanel, SidebarWindow, GridPlacementPopup,
+│   │   │                     StatusBar, GridControls, KickoffDialog, SessionDialog,
+│   │   │                     ProjectCard, ProjectPopup, BugreportDialog, InfoSettingsView,
 │   │   │                     RecoveryDialog, VoiceControl, WorkspacesWindow,
 │   │   │                     WorkspacesTab, PersonasTab, WorkspacePopup
 │   │   ├── hooks/         ← useTerminal, useMessages, useSessions, useContextUsage,

@@ -321,6 +321,7 @@ export function WorkspacesTab() {
                         : '(no prompt)'
                       const inherited = resolved.source !== 'cell'
                       const canMergeDown = row + span - 1 < ws.rows - 1
+                      const isMerged = span > 1
 
                       gridCells.push(
                         <div
@@ -331,7 +332,7 @@ export function WorkspacesTab() {
                           data-row={row}
                           data-persona={cell.persona}
                           data-selected={idx === selectedCell ? 'true' : 'false'}
-                          data-merged={span > 1 ? 'true' : 'false'}
+                          data-merged={isMerged ? 'true' : 'false'}
                           style={{
                             gridColumn: `${col + 1}`,
                             gridRow: `${row + 1} / span ${span}`,
@@ -339,6 +340,7 @@ export function WorkspacesTab() {
                           } as any}
                           onClick={(e) => {
                             if ((e.target as HTMLElement).classList.contains('merge-handle')) return
+                            if ((e.target as HTMLElement).classList.contains('split-handle')) return
                             setSelectedCell(idx)
                           }}
                         >
@@ -367,6 +369,17 @@ export function WorkspacesTab() {
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleToggleMerge(col, row + span - 1)
+                              }}
+                            />
+                          )}
+                          {isMerged && !canMergeDown && (
+                            <div
+                              class="merge-handle split-handle"
+                              title="Split merged cell"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                // Remove the last merge to split off the bottom row
+                                handleToggleMerge(col, row + span - 2)
                               }}
                             />
                           )}

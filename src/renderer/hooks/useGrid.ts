@@ -14,9 +14,11 @@ import { GRID_SAVE_DEBOUNCE_MS } from '../../shared/constants'
 
 const api = () => (window as any).cipherMux
 
-export function useGrid() {
+export function useGrid(panelWidth = 0) {
   const [grid, setGrid] = useState<GridState>(createEmptyGrid())
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const panelWidthRef = useRef(panelWidth)
+  panelWidthRef.current = panelWidth
 
   const persist = useCallback((next: GridState) => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
@@ -32,10 +34,10 @@ export function useGrid() {
     api().config.get('ui').then((ui: any) => {
       if (ui?.grid?.config && ui.grid.slots) {
         setGrid(ui.grid)
-        api().window.fitGrid(ui.grid.config.cols, ui.grid.config.rows).catch(() => {})
+        api().window.fitGrid(ui.grid.config.cols, ui.grid.config.rows, panelWidthRef.current).catch(() => {})
       } else {
         // Fit window to default grid
-        api().window.fitGrid(grid.config.cols, grid.config.rows).catch(() => {})
+        api().window.fitGrid(grid.config.cols, grid.config.rows, panelWidthRef.current).catch(() => {})
       }
     }).catch(() => {})
     return () => {
@@ -54,7 +56,7 @@ export function useGrid() {
       }
       const { state } = assignSessionToGrid(prev, sessionId)
       persist(state)
-      api().window.fitGrid(state.config.cols, state.config.rows).catch(() => {})
+      api().window.fitGrid(state.config.cols, state.config.rows, panelWidthRef.current).catch(() => {})
       return state
     })
   }, [persist])
@@ -64,7 +66,7 @@ export function useGrid() {
       const next = removeSessionFromGrid(prev, sessionId)
       persist(next)
       // Re-fit window in case grid can shrink
-      api().window.fitGrid(next.config.cols, next.config.rows).catch(() => {})
+      api().window.fitGrid(next.config.cols, next.config.rows, panelWidthRef.current).catch(() => {})
       return next
     })
   }, [persist])
@@ -82,7 +84,7 @@ export function useGrid() {
       const next = resizeGrid(prev, newConfig)
       persist(next)
       // Resize window to fit new grid
-      api().window.fitGrid(newConfig.cols, newConfig.rows).catch(() => {})
+      api().window.fitGrid(newConfig.cols, newConfig.rows, panelWidthRef.current).catch(() => {})
       return next
     })
   }, [persist])

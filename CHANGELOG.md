@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5-beta] - 2026-04-24
+
+### Added
+- **Unified Sidebar Panel:** replaces Chatroom + Input Requests with a single auto-visible panel containing Messages, Background Sessions, and Requests sections
+- **SIDEBAR button with activity LED** in StatusBar — sections auto-show/hide based on state (orchestrator, background sessions, MPO)
+- **Background Session Cards:** rich cards with session name, project path, context/token bar, last 3 lines of output — click to place in grid
+- **Grid Placement Popup:** when grid is full, visual grid popup lets user pick which slot to replace
+- **Detachable Sidebar:** sidebar can be detached as standalone resizable window, grid reclaims full width, state persisted across restarts
+- **Cell split (unmerge) handle:** orange handle on fully-merged cells to split them back apart
+- **Skip-permissions toggle:** Settings tab has `--dangerously-skip-permissions` toggle with warning indicator
+- **Persona hints:** Orchestrator/MPO editor shows note that persona prompt affects communication style only
+
+### Changed
+- Sidebar is purely passive (no chat input field) — Message Bus is an audit log, not a communication channel
+- Chat toggle and Input Requests toolbar buttons removed (replaced by single SIDEBAR button)
+- Worker built-in persona removed (orchestrator manages subagent prompts directly)
+- Config migration auto-removes Worker persona from persisted config on load
+
+### Fixed
+- **E2 push delivery:** `mux_send` with `sessionName` now correctly injects via tmux send-keys (removed broken readiness check)
+- **E4 visible session:** `mux_create_session` with `visible:true` reliably places session in grid (retry mechanism for IPC race)
+- **S1 orchestrator button:** toggle now queries live status before acting (no stale local state)
+- **Terminal width with sidebar:** `useGrid` fitGrid calls now account for sidebar panel width via ref
+- **Detach persistence:** `sidebarDetached` properly typed in AppConfig, auto-restores on app start
+- **Workspace apply end-to-end:** grid resize + merges + session spawning + prompt injection all wired correctly
+- **Workspace prompt overrides:** layout fixed, readable colors, "load default" button, pre-fill on new override
+
 ## [0.8.9-beta] - 2026-04-24
 
 ### Added

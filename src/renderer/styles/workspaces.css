@@ -825,6 +825,15 @@
   height: 3px;
 }
 
+.split-handle::before {
+  background: var(--color-warning, #e8a040);
+  opacity: 0.5;
+}
+
+.split-handle:hover::before {
+  background: var(--color-warning, #e8a040);
+}
+
 /* ── Cell Inspector ── */
 
 .inspector {
