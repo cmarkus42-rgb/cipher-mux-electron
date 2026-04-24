@@ -373,6 +373,17 @@ export class IpcHub {
         return { ok: true }
       }
     })
+
+    ipcMain.handle('cipher-mux:sessions:capture', async (_e: any, sessionId: string) => {
+      try {
+        const content = await this.sessionManager.capture(sessionId)
+        if (!content) return null
+        const lines = content.split('\n').filter((l: string) => l.trim())
+        return lines.slice(-5).join('\n')
+      } catch {
+        return null
+      }
+    })
   }
 
   // ─── Terminal ──────────────────────────────────────────
