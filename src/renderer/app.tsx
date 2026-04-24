@@ -1,5 +1,5 @@
 // src/renderer/app.tsx
-import { useState, useCallback, useEffect, useMemo } from 'preact/hooks'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'preact/hooks'
 import type { ProjectInfo } from '../shared/types'
 import { useSessions } from './hooks/useSessions'
 import { useContextUsage } from './hooks/useContextUsage'
@@ -36,7 +36,10 @@ export function App() {
   const { sessions, startSession, stopSession } = useSessions()
   const contextUsages = useContextUsage()
   const { projects, scanning, rescan } = useProjects()
-  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges } = useGrid()
+  // panelWidth needs a ref so useGrid callbacks can access the latest value
+  // without circular dependency (sidebarHasContent depends on grid which depends on useGrid)
+  const panelWidthRef = useRef(0)
+  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges } = useGrid(panelWidthRef.current)
   const { theme, setTheme, toggleTheme } = useTheme()
 
   // Global keyboard shortcuts
@@ -79,12 +82,16 @@ export function App() {
   const sidebarHasContent = !!orchestratorSessionId || !!mpoSessionId ||
     sessions.some(s => s.status === 'active' && !gridSessionIds.includes(s.id))
 
+  // Keep panelWidth ref in sync for useGrid callbacks
+  const computedPanelWidth = sidebarVisible && sidebarHasContent && !sidebarDetached ? 280 : 0
+  panelWidthRef.current = computedPanelWidth
+
   // Resize window when panels open/close so sessions don't compress
   useEffect(() => {
-    const panelWidth = sidebarVisible && sidebarHasContent ? 280 : 0
+    const pw = sidebarVisible && sidebarHasContent && !sidebarDetached ? 280 : 0
     const api = (window as any).cipherMux
-    api.window.fitGrid(grid.config.cols, grid.config.rows, panelWidth)
-  }, [sidebarVisible, sidebarHasContent, grid.config.cols, grid.config.rows])
+    api.window.fitGrid(grid.config.cols, grid.config.rows, pw)
+  }, [sidebarVisible, sidebarHasContent, sidebarDetached, grid.config.cols, grid.config.rows])
 
   // Place orchestrator in grid slot 0
   const placeOrchestrator = useCallback((sessionId: string) => {

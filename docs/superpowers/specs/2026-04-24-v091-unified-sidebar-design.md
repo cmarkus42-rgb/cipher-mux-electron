@@ -289,8 +289,26 @@ erbst theme nicht wen ausgeklinkgt -- -wenn, dassnn gestralte es doch ausgeklapp
 - [x] **WP-fix2 — Readable text.** No orange-on-light-background issues. Theme-appropriate colors.
 - [x] **WP-fix3 — Load Default button.** Override textarea has "load default" that fills with persona's defaultPrompt.
 - [x] **WP-fix4 — Pre-fill new override.** "+ add override" -> textarea starts with persona default, not empty.
-the edito rmisses the capability to split cells again ;)
-### 9. Automated --- na das kannst dselbst
+### 9. Workspace Editor — Cell Split
+
+- [x] **CS1 — Split handle visible.** Merged cell spanning full height -> orange split handle visible at bottom edge.
+- [x] **CS2 — Split action.** Click split handle -> cell loses one row of span, bottom cell reappears.
+- [x] **CS3 — Merge+split cycle.** Merge down -> split -> merge again -> split again. No stuck state.
+
+### 10. Terminal Width with Sidebar
+
+- [x] **TW1 — Full width when sidebar closed.** Sidebar hidden -> terminal fills entire window width.
+- [x] **TW2 — Correct width with sidebar.** Sidebar open -> terminal content not clipped, window auto-sizes to fit both grid + sidebar.
+- [x] **TW3 — Width after detach.** Detach sidebar -> grid reclaims full width, terminal columns match window.
+- [x] **TW4 — Width on session add/remove.** With sidebar open: add session -> window resizes correctly including sidebar width. Remove session -> same.
+- [x] **TW5 — Width on grid resize.** With sidebar open: change cols/rows -> window accounts for sidebar width.
+
+### 11. Fix-Round Retests
+
+- [x] **P-fix1r — No Worker.** Personas tab: Worker built-in no longer visible (config migration removes it).
+- [x] **DT4r — Detach persistence.** Detach sidebar -> restart app -> sidebar auto-opens as detached window.
+
+### 12. Automated machste selbe rne
 
 - [ ] **T1 — Unit tests.** `npm run test` -> all pass.
 - [ ] **T2 — Build clean.** `npm run build` -> no TS errors.
