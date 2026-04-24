@@ -6,6 +6,7 @@ import {
   CHATROOM_PANEL_WIDTH,
   SESSION_CELL_HEIGHT,
 } from '../shared/constants'
+import { IPC } from '../shared/ipc-channels'
 
 /** Optional grid dimensions passed to createMainWindow for initial sizing. */
 export interface WindowGridHint {
@@ -16,6 +17,7 @@ export interface WindowGridHint {
 export class WindowManager {
   private mainWindow: BrowserWindow | null = null
   private workspacesWindow: BrowserWindow | null = null
+  private sidebarWindow: BrowserWindow | null = null
 
   createMainWindow(gridHint?: WindowGridHint): BrowserWindow {
     const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize
@@ -132,5 +134,50 @@ export class WindowManager {
     this.workspacesWindow.on('closed', () => {
       this.workspacesWindow = null
     })
+  }
+
+  openSidebarWindow(): void {
+    // Focus existing window if already open
+    if (this.sidebarWindow && !this.sidebarWindow.isDestroyed()) {
+      this.sidebarWindow.focus()
+      return
+    }
+
+    this.sidebarWindow = new BrowserWindow({
+      width: 320,
+      height: 600,
+      minWidth: 250,
+      minHeight: 300,
+      title: 'cipher-mux · Sidebar',
+      titleBarStyle: 'hiddenInset',
+      backgroundColor: '#1A1A1D',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false,
+      },
+    })
+
+    if (process.env.VITE_DEV_SERVER_URL) {
+      this.sidebarWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}?view=sidebar`)
+    } else {
+      this.sidebarWindow.loadFile(
+        path.join(__dirname, '../../renderer/index.html'),
+        { search: 'view=sidebar' },
+      )
+    }
+
+    this.sidebarWindow.on('closed', () => {
+      this.sidebarWindow = null
+      // Notify main window that sidebar reattached
+      this.sendToMainWindow(IPC.SIDEBAR_REATTACHED, {})
+    })
+  }
+
+  closeSidebarWindow(): void {
+    if (this.sidebarWindow && !this.sidebarWindow.isDestroyed()) {
+      this.sidebarWindow.close()
+    }
   }
 }

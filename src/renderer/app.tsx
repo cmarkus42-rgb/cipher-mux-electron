@@ -20,6 +20,7 @@ import { GridPlacementPopup } from './components/GridPlacementPopup'
 
 export function App() {
   const [sidebarVisible, setSidebarVisible] = useState(true)
+  const [sidebarDetached, setSidebarDetached] = useState(false)
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null)
   const [bugreportVisible, setBugreportVisible] = useState(false)
   const [infoVisible, setInfoVisible] = useState(false)
@@ -309,6 +310,22 @@ export function App() {
     resize({ cols, rows })
   }, [resize])
 
+  const handleSidebarDetach = useCallback(async () => {
+    const api = (window as any).cipherMux
+    await api.sidebar.detach()
+    setSidebarDetached(true)
+  }, [])
+
+  // Listen for sidebar reattach (sidebar window closed)
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api.sidebar?.onReattached) return
+    const unsub = api.sidebar.onReattached(() => {
+      setSidebarDetached(false)
+    })
+    return () => unsub()
+  }, [])
+
   const handleToggleWorkspaces = useCallback(() => {
     setWorkspacesPopupVisible((v) => !v)
   }, [])
@@ -425,15 +442,18 @@ export function App() {
           onOpenSession={handleOpenSession}
           onSwap={swap}
         />
-        <SidebarPanel
-          visible={sidebarVisible && sidebarHasContent}
-          orchestratorActive={!!orchestratorSessionId}
-          mpoActive={!!mpoSessionId}
-          sessions={sessions}
-          gridSessionIds={gridSessionIds}
-          contextUsages={contextUsages}
-          onAddToGrid={handleAddToGrid}
-        />
+        {!sidebarDetached && (
+          <SidebarPanel
+            visible={sidebarVisible && sidebarHasContent}
+            orchestratorActive={!!orchestratorSessionId}
+            mpoActive={!!mpoSessionId}
+            sessions={sessions}
+            gridSessionIds={gridSessionIds}
+            contextUsages={contextUsages}
+            onAddToGrid={handleAddToGrid}
+            onDetach={handleSidebarDetach}
+          />
+        )}
       </div>
 
       {/* statusbar */}
