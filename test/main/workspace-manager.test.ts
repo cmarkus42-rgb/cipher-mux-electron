@@ -44,10 +44,10 @@ describe('resolvePrompt', () => {
 
   it('persona default used when no cell prompt or workspace override (source: persona-default)', () => {
     const ws = makeWorkspace()
-    const cell = makeCell({ persona: 'worker', prompt: '' })
+    const cell = makeCell({ persona: 'orchestrator', prompt: '' })
     const result = resolvePrompt(ws, cell, [...BUILTIN_PERSONAS])
-    const workerPersona = BUILTIN_PERSONAS.find((p) => p.id === 'worker')!
-    assert.strictEqual(result.text, workerPersona.defaultPrompt)
+    const orchestratorPersona = BUILTIN_PERSONAS.find((p) => p.id === 'orchestrator')!
+    assert.strictEqual(result.text, orchestratorPersona.defaultPrompt)
     assert.strictEqual(result.source, 'persona-default')
   })
 
@@ -104,11 +104,11 @@ describe('resolvePrompt', () => {
   })
 
   it('workspace override that is whitespace-only falls through to persona default', () => {
-    const ws = makeWorkspace({ promptOverrides: { worker: '   ' } })
-    const cell = makeCell({ persona: 'worker', prompt: '' })
-    const workerPersona = BUILTIN_PERSONAS.find((p) => p.id === 'worker')!
+    const ws = makeWorkspace({ promptOverrides: { orchestrator: '   ' } })
+    const cell = makeCell({ persona: 'orchestrator', prompt: '' })
+    const orchestratorPersona = BUILTIN_PERSONAS.find((p) => p.id === 'orchestrator')!
     const result = resolvePrompt(ws, cell, [...BUILTIN_PERSONAS])
-    assert.strictEqual(result.text, workerPersona.defaultPrompt)
+    assert.strictEqual(result.text, orchestratorPersona.defaultPrompt)
     assert.strictEqual(result.source, 'persona-default')
   })
 })
