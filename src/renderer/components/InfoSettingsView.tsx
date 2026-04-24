@@ -37,11 +37,14 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
   const [scanPaths, setScanPaths] = useState<string[]>([])
   const [scanDepth, setScanDepth] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [skipPerms, setSkipPerms] = useState(false)
 
   const load = useCallback(async () => {
     const app: AppSection | null = await api.config.get('app')
     setScanPaths(app?.scanPaths ?? [])
     setScanDepth(app?.scanDepth ?? 1)
+    const sp: boolean = await api.config.getSkipPermissions()
+    setSkipPerms(sp)
     setLoading(false)
   }, [])
 
@@ -322,6 +325,28 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
             </label>
             <span class="text-xs text-dim">1 = nur direkte kinder · max. 5</span>
           </div>
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>agent</div>
+          <div class="settings-row" style={{ marginTop: '8px' }}>
+            <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={skipPerms}
+                onChange={async (e) => {
+                  const v = (e.target as HTMLInputElement).checked
+                  setSkipPerms(v)
+                  await api.config.setSkipPermissions(v)
+                }}
+                style={{ marginRight: '8px' }}
+              />
+              <span>Skip Permission Prompts</span>
+            </label>
+          </div>
+          {skipPerms && (
+            <div class="settings-section__hint" style={{ color: 'var(--color-warning)', marginTop: '6px' }}>
+              Sessions starten mit --dangerously-skip-permissions. Alle Tool-Aufrufe werden automatisch genehmigt.
+            </div>
+          )}
+
           <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>über</div>
           <div class="settings-section__hint">
             cipher-mux {APP_VERSION} — electron-basierte kommandozentrale für claude code projekte.

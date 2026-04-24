@@ -486,6 +486,17 @@ export class IpcHub {
       const ui = configStore.get('ui')
       configStore.set('ui', { ...ui, grid })
     })
+
+    ipcMain.handle('cipher-mux:config:get-skip-permissions', () => {
+      const agent = configStore.get('agent') as any
+      return agent?.skipPermissions ?? false
+    })
+
+    ipcMain.handle('cipher-mux:config:set-skip-permissions', (_e: any, value: boolean) => {
+      const agent = (configStore.get('agent') as any) ?? {}
+      configStore.set('agent' as any, { ...agent, skipPermissions: value })
+      return { ok: true }
+    })
   }
 
   // ─── Window ─────────────────────────────────────────────
