@@ -16,6 +16,7 @@ import { InfoSettingsView } from './components/InfoSettingsView'
 import { StatusBar } from './components/StatusBar'
 import { SessionDialog } from './components/SessionDialog'
 import { WorkspacePopup } from './components/WorkspacePopup'
+import { GridPlacementPopup } from './components/GridPlacementPopup'
 
 export function App() {
   const [sidebarVisible, setSidebarVisible] = useState(true)
@@ -24,6 +25,7 @@ export function App() {
   const [infoVisible, setInfoVisible] = useState(false)
   const [infoInitialTab, setInfoInitialTab] = useState<'shortcuts' | 'features' | 'settings' | undefined>(undefined)
   const [workspacesPopupVisible, setWorkspacesPopupVisible] = useState(false)
+  const [placementPopup, setPlacementPopup] = useState<{ sessionId: string } | null>(null)
 
   // Project popup state
   const [popupVisible, setPopupVisible] = useState(false)
@@ -54,6 +56,7 @@ export function App() {
         setPopupVisible(false)
         setSessionDialogVisible(false)
         setWorkspacesPopupVisible(false)
+        setPlacementPopup(null)
       },
     },
   ], [])
@@ -290,10 +293,17 @@ export function App() {
       addSession(sessionId)
       setFocusedSessionId(sessionId)
     } else {
-      // Grid full — for now just log. GridPlacementPopup added in Task 14
-      console.warn('[app] grid full, cannot place session', sessionId)
+      // Grid full — open placement popup so user can pick a slot to replace
+      setPlacementPopup({ sessionId })
     }
   }, [grid.slots, addSession])
+
+  const handlePlacementSelect = useCallback((slotIndex: number) => {
+    if (!placementPopup) return
+    setSessionAtSlot(slotIndex, placementPopup.sessionId)
+    setFocusedSessionId(placementPopup.sessionId)
+    setPlacementPopup(null)
+  }, [placementPopup, setSessionAtSlot])
 
   const handleResize = useCallback((cols: number, rows: number) => {
     resize({ cols, rows })
@@ -467,6 +477,15 @@ export function App() {
         onKickoffStarted={handleKickoffStarted}
         onRescan={rescan}
         onClose={() => setPopupVisible(false)}
+      />
+      <GridPlacementPopup
+        visible={!!placementPopup}
+        gridSlots={grid.slots}
+        cols={grid.config.cols}
+        rows={grid.config.rows}
+        sessions={sessions}
+        onSelect={handlePlacementSelect}
+        onCancel={() => setPlacementPopup(null)}
       />
       <RecoveryDialog onDone={() => {}} onAdopt={addSession} />
       <SessionDialog
