@@ -1417,6 +1417,18 @@
   color: var(--color-bg);
 }
 
+.request-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  padding: var(--space-xxs);
+  resize: vertical;
+}
+
 .sidebar-msg {
   padding: var(--space-xs);
   border-bottom: 1px solid var(--color-border-subtle, var(--color-border));
