@@ -978,25 +978,30 @@
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .ov-col .ov-label .dot {
   width: 8px;
   height: 8px;
+  flex-shrink: 0;
   background: var(--persona-color);
 }
 
 .ov-col .ov-label .project-count {
-  margin-left: auto;
   font-family: var(--font-mono);
   font-size: 9px;
   color: var(--color-text-dim);
   letter-spacing: 0.04em;
   font-weight: 400;
   text-transform: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ov-col textarea {
@@ -1031,11 +1036,61 @@
 
 .ov-col .ov-base::before {
   content: 'base: ';
-  color: var(--color-accent);
+  color: var(--color-text-dim);
 }
 
 .ov-col .ov-base.using-base {
-  color: var(--color-accent);
+  color: var(--color-text-muted, var(--color-text-dim));
+}
+
+/* ── Override entry header row (label + actions) ── */
+
+.ov-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ov-header .ov-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.ov-header .ov-actions button {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-dim);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.ov-header .ov-actions button:hover {
+  background: var(--color-bg-sunken);
+  color: var(--color-text);
+  border-color: var(--color-text-dim);
+}
+
+.ov-header .ov-actions button.ov-remove:hover {
+  color: var(--color-neon-red);
+  border-color: var(--color-neon-red);
+  background: transparent;
+}
+
+/* ── Prompt source note (replaces inline orange style) ── */
+
+.prompt-source-note {
+  font-size: var(--font-size-xs, 9px);
+  color: var(--color-text-muted, var(--color-text-dim));
+  font-family: var(--font-mono);
+  padding: var(--space-xxs, 2px) 0;
+  letter-spacing: 0.04em;
 }
 
 .overrides-add {
