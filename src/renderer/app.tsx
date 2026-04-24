@@ -314,33 +314,49 @@ export function App() {
   const handleOrchestratorToggle = useCallback(async () => {
     const api = (window as any).cipherMux
     try {
-      if (orchestratorSessionId) {
+      const status = await api.orchestrator.status()
+      if (status.running && status.sessionId) {
+        // Running — stop it
         await api.orchestrator.stop()
-        removeSession(orchestratorSessionId)
+        removeSession(status.sessionId)
         setOrchestratorSessionId(null)
       } else {
+        // Not running — clear stale state and start fresh
+        if (orchestratorSessionId) {
+          removeSession(orchestratorSessionId)
+          setOrchestratorSessionId(null)
+        }
         const session = await api.orchestrator.start()
         const sid = session?.sessionId ?? session?.id
         if (sid) placeOrchestrator(sid)
       }
     } catch (err) {
       console.error('[App] orchestrator toggle failed:', err)
+      setOrchestratorSessionId(null)
     }
   }, [orchestratorSessionId, removeSession, placeOrchestrator])
 
   const handleMpoToggle = useCallback(async () => {
     const api = (window as any).cipherMux
     try {
-      if (mpoSessionId) {
+      const status = await api.mpo.status()
+      if (status.running && status.sessionId) {
+        // Running — stop it
         await api.mpo.stop()
-        removeSession(mpoSessionId)
+        removeSession(status.sessionId)
         setMpoSessionId(null)
       } else {
+        // Not running — clear stale state and start fresh
+        if (mpoSessionId) {
+          removeSession(mpoSessionId)
+          setMpoSessionId(null)
+        }
         await api.mpo.start()
         // placement handled by onStarted listener
       }
     } catch (err) {
       console.error('[App] MPO toggle failed:', err)
+      setMpoSessionId(null)
     }
   }, [mpoSessionId, removeSession])
 
