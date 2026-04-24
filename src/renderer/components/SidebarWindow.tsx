@@ -2,6 +2,7 @@ import { h } from 'preact'
 import { useCallback, useEffect } from 'preact/hooks'
 import { useSessions } from '../hooks/useSessions'
 import { useContextUsage } from '../hooks/useContextUsage'
+import { useTheme } from '../hooks/useTheme'
 import { SidebarPanel } from './SidebarPanel'
 
 /**
@@ -9,6 +10,7 @@ import { SidebarPanel } from './SidebarPanel'
  * Loaded via ?view=sidebar URL parameter.
  */
 export function SidebarWindow() {
+  useTheme() // sets body[data-theme] so CSS custom properties resolve correctly
   const { sessions } = useSessions()
   const contextUsages = useContextUsage()
 
