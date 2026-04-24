@@ -47,14 +47,13 @@ export function useGrid() {
     setGrid((prev) => {
       // Skip if session is already in the grid (idempotent)
       if (prev.slots.some((s) => s.sessionId === sessionId)) return prev
-      let target = prev
-      // Auto-expand grid columns when all slots are occupied
-      if (findFirstEmptySlot(prev) === -1 && prev.config.cols < MAX_GRID_COLS) {
-        target = resizeGrid(prev, { cols: prev.config.cols + 1, rows: prev.config.rows })
+      // No free slot — don't auto-expand; session stays as background session
+      if (findFirstEmptySlot(prev) === -1) {
+        console.log('[useGrid] addSession: no free slot, skipping grid placement for', sessionId)
+        return prev
       }
-      const { state } = assignSessionToGrid(target, sessionId)
+      const { state } = assignSessionToGrid(prev, sessionId)
       persist(state)
-      // Resize window to fit (possibly expanded) grid
       api().window.fitGrid(state.config.cols, state.config.rows).catch(() => {})
       return state
     })
