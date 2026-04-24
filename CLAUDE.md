@@ -16,8 +16,9 @@ Phasen-Übersicht:
 7. ~~Voice-Pipeline (VAD + STT + TTS) + Bugreport-Interview~~ ✅ (2026-04-19)
 8. ~~AgentAdapter (TP-2) + Task-System + MPO~~ ✅ (2026-04-23)
 9. ~~Phase A (Theme-System) + Phase B (MCP/Terminal/StatusLine Polish)~~ ✅ (2026-04-23)
+10. ~~Phase C4 (Session Coloring) + Phase D (Workspaces + Personas) + Phase E (Communication) + Phase G1 (Shell Button)~~ ✅ (2026-04-24)
 
-**Status:** v0.8.9-beta, ~448 Tests (43 Test-Dateien), Build sauber. Voice-Pipeline, Task-System, AgentAdapter, MPO, Theme-System und MCP-Lifecycle komplett.
+**Status:** v0.8.9-beta, ~448 Tests (43 Test-Dateien), Build sauber. Workspaces, Personas, Push-Delivery, Shell Sessions und separates Workspace-Editor-Fenster komplett. v0.9.0 nach Polish + Final Round.
 
 ## Build & Test
 
@@ -60,6 +61,7 @@ cipher-mux-electron/
 │   │   ├── agent/         ← AgentAdapter Interface, ClaudeCodeAdapter, AdapterRegistry
 │   │   ├── task/          ← TaskManager, TaskWatcher, TaskHooks, BugreportSource
 │   │   ├── mpo/           ← InputRequestWatcher (MPO Input Requests)
+│   │   ├── workspace/     ← WorkspaceManager (Apply, Prompt Resolution, Persona Skill Sync)
 │   │   └── util/          ← exec-util, dependency-check, deep-merge
 │   ├── renderer/
 │   │   ├── app.tsx, index.html
@@ -67,7 +69,8 @@ cipher-mux-electron/
 │   │   │                     ChatroomPanel, ChatToggleButton, StatusBar, GridControls,
 │   │   │                     KickoffDialog, SessionDialog, ProjectCard, ProjectPopup,
 │   │   │                     InputRequestsPanel, BugreportDialog, InfoSettingsView,
-│   │   │                     RecoveryDialog, VoiceControl
+│   │   │                     RecoveryDialog, VoiceControl, WorkspacesWindow,
+│   │   │                     WorkspacesTab, PersonasTab, WorkspacePopup
 │   │   ├── hooks/         ← useTerminal, useMessages, useSessions, useContextUsage,
 │   │   │                     useVoiceSession, useGrid, useInputRequests, useProjects,
 │   │   │                     useShortcuts, useTheme
@@ -119,6 +122,19 @@ cipher-mux-electron/
 - **ADR-006:** ulidx für ULID-Generierung — `docs/decisions/ADR-006-ulid-library.md`
 - **ADR-007:** 7 Tage zeitbasierte Message-Retention — `docs/decisions/ADR-007-message-retention.md`
 - **ADR-008:** Strukturiertes Orchestrator CLAUDE.md Template — `docs/decisions/ADR-008-orchestrator-template.md`
+
+## Workspaces + Personas
+
+Personas definieren Rollen (Name, Farbe, Default-Prompt). Workspaces kombinieren Personas in einem Grid-Layout mit Projekt-Zuweisungen.
+
+- **Personas:** ConfigStore `personas` Key. Builtin-Personas (Orchestrator, MPO, Worker, empty) sind locked (nur Prompt editierbar). Custom Personas voll editierbar.
+- **Workspaces:** ConfigStore `workspaces` Key. Grid-Editor mit Merge-Handles (vertikale Zell-Verschmelzung), Cell Inspector, Prompt Resolution.
+- **Prompt Resolution (3-Level):** cell.prompt > workspace.promptOverrides[persona] > persona.defaultPrompt
+- **Separates Fenster:** Workspaces + Personas haben ein eigenes BrowserWindow (960x720), erreichbar via Workspace-Popup oder StatusBar. NICHT mehr im Info/Settings-Popup.
+- **URL-Routing:** `index.html?view=workspaces#tab` — main.tsx routet zu WorkspacesWindow oder App basierend auf URL-Parameter.
+- **Workspace Apply:** Grid wird auf Workspace-Dimensionen resized, Merges werden als rowSpans uebertragen, Sessions spawnen fuer non-empty Cells mit zugewiesenen Projekten.
+- **Grid-Limits:** Max 7 Cols x 3 Rows (konsistent mit MAX_GRID_COLS/MAX_GRID_ROWS in constants.ts)
+- **Persona Skill Sync:** Generiert .claude/skills/personas/ Skills aus Persona-Prompts.
 
 ## MCP-Server: Worker-Session-Handling
 

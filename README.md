@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="https://github.com/cmarkus42/cipher-mux-electron/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cmarkus42/cipher-mux-electron/ci.yml?branch=main&label=CI&style=flat-square&labelColor=000000&color=F5F5EC"></a>
-  <a href="https://github.com/cmarkus42/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.8.3--beta-0088A0?style=flat-square&labelColor=000000"></a>
+  <a href="https://github.com/cmarkus42/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.8.9--beta-0088A0?style=flat-square&labelColor=000000"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="#"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="CONTRIBUTING.md#maintenance-status"><img alt="Maintenance" src="https://img.shields.io/badge/maintenance-active-00FF88?style=flat-square&labelColor=000000"></a>
@@ -115,6 +115,10 @@ Toggle voice input (bottom-left) to dictate prompts into the focused session. Us
 
 Capture tasks via voice interview, chatroom, or hotkey. Tasks are stored in SQLite and can be triaged by the orchestrator on your command ("check for bug reports"). The orchestrator reads the outbox, assigns tasks to sessions, and tracks completion.
 
+### Workspaces & Personas
+
+Define **personas** (named roles with colors and default prompts) and arrange them in **workspaces** (grid layouts with project assignments). Load a workspace to resize the grid, apply vertical cell merges, and spawn sessions in one click. Prompt resolution follows a 3-level priority: per-cell prompt > workspace override > persona default. Manage everything in a dedicated editor window.
+
 ### Message Bus
 
 Sessions communicate through a SQLite message bus. The chatroom panel shows inter-session messages. The MCP server exposes this as `mux_send` / `mux_read` tools, enabling the orchestrator to coordinate workers without terminal scraping.
@@ -173,6 +177,7 @@ src/main/          — Electron main process
   message-bus/     — SQLite CRUD, schema, typed messages
   mcp/             — Streamable HTTP MCP server, tools, auth
   session/         — SessionManager, recovery, orchestrator template
+  workspace/       — Personas, workspaces, prompt resolution, skill sync
   voice/           — Whisper STT, Piper TTS, Silero VAD, interview engine
   task/            — Task state machine, watcher, hooks, MCP tools
 src/renderer/      — Preact UI

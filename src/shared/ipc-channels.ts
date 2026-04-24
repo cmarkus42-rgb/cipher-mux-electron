@@ -62,6 +62,7 @@ export const IPC = {
 
   // Window
   WINDOW_FIT_GRID: 'cipher-mux:window:fit-grid',
+  WINDOW_OPEN_WORKSPACES: 'cipher-mux:window:open-workspaces',
 
   // Bugreport
   BUGREPORT_COLLECT: 'cipher-mux:bugreport:collect',

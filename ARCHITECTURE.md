@@ -88,7 +88,8 @@ Communication between main and renderer flows through typed IPC channels defined
 | **StatusLineMonitor** | `monitoring/` | Reads real-time context/token usage from Claude Code sessions via the statusLine hook. See [ADR-003](docs/decisions/ADR-003-statusline-integration.md). |
 | **TaskManager** | `task/` | SQLite-backed task outbox. State machine (inbox -> in-progress -> done/parked/dropped). Watcher, hooks, MCP tool integration. |
 | **BugreportManager** | `bugreport/` | Session diagnostics collection, structured bug report creation, resolution workflow. |
-| **VoiceManager** | `voice/` | Local voice pipeline: Whisper STT, Piper TTS, Silero VAD. Powers voice bug reports and (planned) voice-to-session prompt input. |
+| **VoiceManager** | `voice/` | Local voice pipeline: Whisper STT, Piper TTS, Silero VAD. Powers voice bug reports and voice-to-session prompt input via VoiceInputRouter. |
+| **WorkspaceManager** | `workspace/` | Personas (named roles with colors/prompts), workspaces (grid layouts with project assignments), 3-level prompt resolution, persona skill sync. |
 | **Utilities** | `util/` | `exec-util.ts` (safe child_process wrapper with PATH patching), `dependency-check.ts` (tmux/claude availability). |
 
 ### Renderer Process (`src/renderer/`)
@@ -99,9 +100,11 @@ Communication between main and renderer flows through typed IPC channels defined
 | **ActivityRail** | `components/` | Left sidebar with session icons, status dots, unread badges, view switcher |
 | **TerminalPane** | `components/` | xterm.js terminal instance, fit addon, WebGL/Canvas renderer ([ADR-005](docs/decisions/ADR-005-xterm-renderer.md)) |
 | **SessionGrid** | `components/` | Dynamic grid layout for terminal panes. Configurable columns/rows. |
-| **Chatroom** | `components/` | Message bus feed, send messages between sessions |
+| **Chatroom** | `components/` | Message bus feed, send messages between sessions, background session cards |
 | **Cockpit** | `components/` | Project card grid, context usage overview, session management |
-| **Hooks** | `hooks/` | `useTerminal`, `useSessions`, `useMessages`, `useGrid`, `useContextUsage`, `useTheme`, `useShortcuts` - all wrap IPC calls |
+| **WorkspacesWindow** | `components/` | Standalone editor window for personas and workspaces (960x720, separate BrowserWindow) |
+| **WorkspacePopup** | `components/` | Quick-access popup above statusbar for loading workspaces |
+| **Hooks** | `hooks/` | `useTerminal`, `useSessions`, `useMessages`, `useGrid`, `useContextUsage`, `useTheme`, `useShortcuts`, `useInputRequests`, `useProjects`, `useVoiceSession` - all wrap IPC calls |
 
 ### Shared (`src/shared/`)
 

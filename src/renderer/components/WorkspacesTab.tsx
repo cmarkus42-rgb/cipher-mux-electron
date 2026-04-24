@@ -112,7 +112,7 @@ export function WorkspacesTab() {
 
   const handleStepCols = (d: number) => {
     if (!ws) return
-    const n = Math.max(1, Math.min(10, ws.cols + d))
+    const n = Math.max(1, Math.min(7, ws.cols + d))
     if (n === ws.cols) return
     const result = resizeCells(ws.cells, ws.merges, ws.cols, ws.rows, n, ws.rows)
     updateWs({ cols: n, cells: result.cells, merges: result.merges })
@@ -121,7 +121,7 @@ export function WorkspacesTab() {
 
   const handleStepRows = (d: number) => {
     if (!ws) return
-    const n = Math.max(1, Math.min(6, ws.rows + d))
+    const n = Math.max(1, Math.min(3, ws.rows + d))
     if (n === ws.rows) return
     const result = resizeCells(ws.cells, ws.merges, ws.cols, ws.rows, ws.cols, n)
     updateWs({ rows: n, cells: result.cells, merges: result.merges })
@@ -154,7 +154,10 @@ export function WorkspacesTab() {
 
   const handleAddOverride = (personaId: string) => {
     if (!ws || !personaId) return
-    const next = { ...ws.promptOverrides, [personaId]: '' }
+    // Pre-fill with persona's default prompt so user can modify, not start from scratch
+    const persona = personas.find((p) => p.id === personaId)
+    const defaultText = persona?.defaultPrompt ?? ''
+    const next = { ...ws.promptOverrides, [personaId]: defaultText }
     updateWs({ promptOverrides: next })
   }
 
@@ -296,7 +299,7 @@ export function WorkspacesTab() {
                 <button onClick={() => handleStepRows(1)}>+</button>
               </div>
               <span class="dim-note">
-                <kbd>click</kbd> cell &middot; <kbd>hover</kbd> bottom edge to merge down
+                <kbd>click</kbd> cell &middot; <kbd>click</kbd> bottom edge to merge/unmerge
               </span>
             </div>
 
@@ -447,10 +450,9 @@ export function WorkspacesTab() {
             {/* Persona Prompt Overrides */}
             <div class="overrides-wrap">
               <div class="overrides-head">
-                <span>Persona Prompt Overrides</span>
+                <span>Workspace-Prompts</span>
                 <span class="sub">
-                  Per-workspace prompt injections for specific personas &middot; fall back to
-                  persona default when empty
+                  Nur in diesem Workspace aktiv — leer lassen = Persona-Default bleibt
                 </span>
               </div>
               <div class="overrides-list">

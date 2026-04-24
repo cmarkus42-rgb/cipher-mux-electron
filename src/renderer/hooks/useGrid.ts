@@ -112,5 +112,31 @@ export function useGrid() {
     })
   }, [persist])
 
-  return { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand }
+  /** Apply workspace merges as rowSpans. merges is Record<"col:row", true>. */
+  const applyMerges = useCallback((cols: number, rows: number, merges: Record<string, true>) => {
+    setGrid((prev) => {
+      const newSlots = prev.slots.map((s) => ({ ...s, rowSpan: 1 }))
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const idx = row * cols + col
+          if (idx >= newSlots.length) continue
+          // Count consecutive merges downward
+          let span = 1
+          let r = row
+          while (merges[`${col}:${r}`]) {
+            span++
+            r++
+          }
+          newSlots[idx] = { ...newSlots[idx], rowSpan: span }
+          // Mark merged-into slots as hidden (rowSpan 0 is not used, they just keep rowSpan 1
+          // but won't render because the parent cell spans over them via CSS grid)
+        }
+      }
+      const next = { ...prev, slots: newSlots }
+      persist(next)
+      return next
+    })
+  }, [persist])
+
+  return { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges }
 }
