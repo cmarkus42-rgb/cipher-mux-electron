@@ -102,6 +102,8 @@ const api = {
     get: (key: string) => ipcRenderer.invoke(IPC.CONFIG_GET, { key }),
     set: (key: string, value: unknown) => ipcRenderer.invoke(IPC.CONFIG_SET, { key, value }),
     saveGrid: (grid: unknown) => ipcRenderer.invoke(IPC.CONFIG_SAVE_GRID, grid),
+    getSkipPermissions: (): Promise<boolean> => ipcRenderer.invoke('cipher-mux:config:get-skip-permissions'),
+    setSkipPermissions: (v: boolean): Promise<{ ok: boolean }> => ipcRenderer.invoke('cipher-mux:config:set-skip-permissions', v),
   },
 
   // ─── Dialogs ──────────────────────────────────────────────
