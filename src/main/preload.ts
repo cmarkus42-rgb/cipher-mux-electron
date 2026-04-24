@@ -204,7 +204,7 @@ const api = {
     list: (): Promise<unknown[]> => ipcRenderer.invoke('cipher-mux:workspaces:list'),
     save: (ws: unknown): Promise<{ ok: boolean }> => ipcRenderer.invoke('cipher-mux:workspaces:save', ws),
     delete: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('cipher-mux:workspaces:delete', id),
-    apply: (id: string): Promise<{ applied: boolean; sessionsStarted?: number; warnings?: string[] }> => ipcRenderer.invoke('cipher-mux:workspaces:apply', id),
+    apply: (id: string): Promise<{ applied: boolean; sessionsStarted?: number; warnings?: string[]; sessions?: Array<{ cellIndex: number; sessionId: string }> }> => ipcRenderer.invoke('cipher-mux:workspaces:apply', id),
     active: (id?: string): Promise<string | null> => ipcRenderer.invoke('cipher-mux:workspaces:active', id),
   },
 

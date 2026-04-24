@@ -119,14 +119,20 @@ export function resizeCells(
  * applyWorkspace — Applies a workspace by resizing the grid and spawning sessions
  * for each non-empty cell that has a project assigned.
  */
+export interface ApplyResultSession {
+  cellIndex: number
+  sessionId: string
+}
+
 export async function applyWorkspace(
   workspace: Workspace,
   personas: readonly Persona[],
   sessionStarter: SessionStarter,
   gridCallback: (cols: number, rows: number) => void,
-): Promise<ApplyResult> {
+): Promise<ApplyResult & { sessions: ApplyResultSession[] }> {
   const warnings: string[] = []
   let sessionsStarted = 0
+  const startedSessions: ApplyResultSession[] = []
 
   // 1. Set grid dimensions
   gridCallback(workspace.cols, workspace.rows)
@@ -135,6 +141,11 @@ export async function applyWorkspace(
   for (let i = 0; i < workspace.cells.length; i++) {
     const cell = workspace.cells[i]
     if (cell.persona === 'empty') continue
+
+    // Skip cells that are hidden by merges (spanOf returns 0)
+    const col = i % workspace.cols
+    const row = Math.floor(i / workspace.cols)
+    if (spanOf(workspace, col, row) === 0) continue
 
     const persona = personas.find(p => p.id === cell.persona)
     if (!persona) {
@@ -147,18 +158,22 @@ export async function applyWorkspace(
       continue
     }
 
+    // Build launch command: clear + claude with skip-permissions + optional prompt
     const resolved = resolvePrompt(workspace, cell, personas)
+    const promptArg = resolved.text ? ` "${resolved.text.replace(/"/g, '\\"')}"` : ''
+    const launchCmd = `clear; claude --dangerously-skip-permissions${promptArg}\n`
     try {
-      await sessionStarter.start({
+      const session = await sessionStarter.start({
         name: persona.name,
         projectPath: cell.project,
-        autoLaunch: resolved.text ? `claude "${resolved.text}"` : 'claude',
+        autoLaunch: launchCmd,
       })
+      startedSessions.push({ cellIndex: i, sessionId: session.id })
       sessionsStarted++
     } catch (err) {
       warnings.push(`Failed to start ${persona.name}: ${(err as Error).message}`)
     }
   }
 
-  return { applied: true, sessionsStarted, warnings }
+  return { applied: true, sessionsStarted, warnings, sessions: startedSessions }
 }
