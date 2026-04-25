@@ -87,11 +87,14 @@ export class TaskWatcher {
   }
 
   private handleStall(task: Task): void {
-    // Move task to stalled state
-    this.taskManager.markStalled(task.id)
+    try {
+      this.taskManager.markStalled(task.id)
+    } catch (err) {
+      console.warn(`[TaskWatcher] could not stall task ${task.id}: ${err}`)
+      return
+    }
 
     if (task.retryCount < task.maxRetries) {
-      // Stop the associated session (fire-and-forget), then re-queue for retry
       const stopSession = task.sessionId !== null
         ? this.sessionManager.stop(task.sessionId)
         : Promise.resolve()
@@ -99,13 +102,20 @@ export class TaskWatcher {
       stopSession
         .catch(() => { /* ignore stop errors — session may already be dead */ })
         .finally(() => {
-          this.taskManager.retry(task.id)
+          try {
+            this.taskManager.retry(task.id)
+          } catch (err) {
+            console.warn(`[TaskWatcher] could not retry task ${task.id}: ${err}`)
+          }
         })
     } else {
-      // No retries left — mark as permanently failed
-      this.taskManager.markFailed(task.id, {
-        error: `Task stalled after ${task.maxRetries} retries`,
-      })
+      try {
+        this.taskManager.markFailed(task.id, {
+          error: `Task stalled after ${task.maxRetries} retries`,
+        })
+      } catch (err) {
+        console.warn(`[TaskWatcher] could not fail task ${task.id}: ${err}`)
+      }
     }
   }
 }
