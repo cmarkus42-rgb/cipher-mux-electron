@@ -15,7 +15,7 @@ import type {
 
 const VALID_TRANSITIONS: Partial<Record<TaskState, TaskState[]>> = {
   queued:      ['dispatched'],
-  dispatched:  ['running'],
+  dispatched:  ['running', 'stalled'],
   running:     ['validating', 'completed', 'stalled', 'failed'],
   validating:  ['completed', 'failed'],
   stalled:     ['queued', 'failed'],
@@ -316,7 +316,7 @@ export class TaskManager extends EventEmitter {
     return updated
   }
 
-  /** running → stalled */
+  /** running|dispatched → stalled */
   markStalled(id: string): Task {
     return this.doTransition(id, 'stalled')
   }

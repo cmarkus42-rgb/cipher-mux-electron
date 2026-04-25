@@ -443,6 +443,13 @@ describe('TaskManager', () => {
       assert.equal(stalled.state, 'stalled')
     })
 
+    it('should transition dispatched → stalled', () => {
+      const task = mgr.create({ title: 'T', source: 'test' })
+      mgr.dispatch(task.id)
+      const stalled = mgr.markStalled(task.id)
+      assert.equal(stalled.state, 'stalled')
+    })
+
     it('should emit task:stalled event', () => {
       const task = mgr.create({ title: 'T', source: 'test' })
       mgr.dispatch(task.id)
