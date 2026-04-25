@@ -18,8 +18,9 @@ Phasen-Übersicht:
 9. ~~Phase A (Theme-System) + Phase B (MCP/Terminal/StatusLine Polish)~~ ✅ (2026-04-23)
 10. ~~Phase C4 (Session Coloring) + Phase D (Workspaces + Personas) + Phase E (Communication) + Phase G1 (Shell Button)~~ ✅ (2026-04-24)
 11. ~~v0.9.1–0.9.5: Unified Sidebar, Workspace Apply E2E, Bugfixes, Cell Split, Terminal Width~~ ✅ (2026-04-24)
+12. ~~v0.9.6: Notes Editor — dritte Grid-Cell-Option, CodeMirror 6, Ollama Auto-Tagging~~ ✅ (2026-04-25)
 
-**Status:** v0.9.5-beta, ~448 Tests (43 Test-Dateien), Build sauber. Unified Sidebar (Messages/Background Sessions/Requests), Detachable Sidebar, Cell Split, Terminal Width Fix, Workspace Apply E2E, Config Migration. Alle manuellen Testcases bestanden.
+**Status:** v0.9.6-beta, ~448 Tests (43 Test-Dateien), Build sauber. Notes Editor (CodeMirror 6 Markdown, Frontmatter, Ollama Auto-Tagging, Sidebar Notes-Tab mit Search/Tag-Filter, Delete UI). Unified Sidebar, Detachable Sidebar, Cell Split, Terminal Width Fix, Workspace Apply E2E, Config Migration.
 
 ## Build & Test
 
@@ -62,19 +63,20 @@ cipher-mux-electron/
 │   │   ├── agent/         ← AgentAdapter Interface, ClaudeCodeAdapter, AdapterRegistry
 │   │   ├── task/          ← TaskManager, TaskWatcher, TaskHooks, BugreportSource
 │   │   ├── mpo/           ← InputRequestWatcher (MPO Input Requests)
+│   │   ├── notes/         ← NoteManager (Filesystem CRUD), NoteTagging (Ollama Auto-Tagging)
 │   │   ├── workspace/     ← WorkspaceManager (Apply, Prompt Resolution, Persona Skill Sync)
 │   │   └── util/          ← exec-util, dependency-check, deep-merge
 │   ├── renderer/
 │   │   ├── app.tsx, index.html
-│   │   ├── components/    ← SessionGrid, SessionCell, LauncherCell, TerminalPane, PaneHeader,
-│   │   │                     SidebarPanel, SidebarWindow, GridPlacementPopup,
-│   │   │                     StatusBar, GridControls, KickoffDialog, SessionDialog,
-│   │   │                     ProjectCard, ProjectPopup, BugreportDialog, InfoSettingsView,
-│   │   │                     RecoveryDialog, VoiceControl, WorkspacesWindow,
-│   │   │                     WorkspacesTab, PersonasTab, WorkspacePopup
+│   │   ├── components/    ← SessionGrid, SessionCell, LauncherCell, NotesCell, NoteEditor,
+│   │   │                     TerminalPane, PaneHeader, SidebarPanel, SidebarWindow,
+│   │   │                     GridPlacementPopup, StatusBar, GridControls, KickoffDialog,
+│   │   │                     SessionDialog, ProjectCard, ProjectPopup, BugreportDialog,
+│   │   │                     InfoSettingsView, RecoveryDialog, VoiceControl,
+│   │   │                     WorkspacesWindow, WorkspacesTab, PersonasTab, WorkspacePopup
 │   │   ├── hooks/         ← useTerminal, useMessages, useSessions, useContextUsage,
 │   │   │                     useVoiceSession, useGrid, useInputRequests, useProjects,
-│   │   │                     useShortcuts, useTheme
+│   │   │                     useShortcuts, useTheme, useNotes
 │   │   ├── voice/         ← vad-loader (Silero ONNX), audio-capture-worklet
 │   │   ├── styles/        ← theme.css, layout.css, components.css
 │   │   └── fonts/         ← Rajdhani, Fira Code
@@ -196,6 +198,20 @@ Eingebaute Funktion von cipher-mux. Empfaengt Anforderungspakete, zerlegt sie in
 - **StatusBar:** `mpo`-Button mit Active-State
 - **Kein Auto-Start** — manuell per Button
 - **Grid-Placement:** Naechster freier Slot (oben-links, links-nach-rechts)
+
+## Notes Editor
+
+Minimalistischer Markdown-Editor als dritte Grid-Cell-Option (neben Session und Launcher).
+
+- **Storage:** `~/.config/cipher-mux/notes/` (global) bzw. `~/.config/cipher-mux/notes/workspace-<id>/` (workspace-scoped)
+- **Format:** Markdown mit YAML-Frontmatter (gray-matter), Tags + Title im Frontmatter
+- **Editor:** CodeMirror 6 mit CM6 HighlightStyle (Obsidian-aehnlich), Live-Markdown-Rendering
+- **Auto-Tagging:** Ollama (gemma4:26b) schlaegt bis zu 5 Tags vor bei manuellem Cmd+S. Auto-Save (2s Debounce) schreibt nur die Datei, kein Tagging.
+- **Tag-Repository:** Seed-Tags (27 vordefiniert) + dynamisch wachsend, persistiert in `.tags.json`
+- **Sidebar:** Notes-Tab mit Suchfeld, Tag-Filter-Chips, Doppelklick oeffnet in NotesCell, Delete-Button (hover)
+- **Grid-Integration:** LauncherCell hat dritten "notes"-Button, GridSlot hat `type: 'session' | 'notes'`
+- **IPC:** 7 Channels (NOTES_LIST, NOTES_READ, NOTES_SAVE, NOTES_CREATE, NOTES_DELETE, NOTES_TAGS, NOTES_CHANGED)
+- **Delete:** Sidebar (hover-reveal Button) + aktiver Tab (Trash-Icon), jeweils mit Confirm-Dialog
 
 ## Bekannte Constraints
 

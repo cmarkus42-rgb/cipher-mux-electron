@@ -15,10 +15,11 @@ Audience: a developer who uses Claude Code daily, is comfortable with tmux, and 
 5. [Start the orchestrator](#start-the-orchestrator)
 6. [Your first delegation](#your-first-delegation)
 7. [Voice input](#voice-input)
-8. [The task outbox](#the-task-outbox)
-9. [Keyboard shortcuts](#keyboard-shortcuts)
-10. [Troubleshooting](#troubleshooting)
-11. [Next steps](#next-steps)
+8. [Notes editor](#notes-editor)
+9. [The task outbox](#the-task-outbox)
+10. [Keyboard shortcuts](#keyboard-shortcuts)
+11. [Troubleshooting](#troubleshooting)
+12. [Next steps](#next-steps)
 
 ---
 
@@ -183,6 +184,69 @@ The voice pipeline also powers a structured bug-report interview:
 5. The final report lands in `~/.config/cipher-mux/bugreports/outbox/` as a markdown file with front-matter.
 
 The orchestrator can pick up these reports — `mux_task_list` surfaces them as tasks ready for triage.
+
+---
+
+## Notes editor
+
+cipher-mux includes a lightweight Markdown editor that lives alongside terminal sessions in the grid. Think of it as scratch space for design notes, meeting logs, or architecture decisions — right next to the sessions that produce them.
+
+### Opening a notes cell
+
+From any empty grid slot (the launcher cell with the three buttons), click **Notes**. The cell switches to the notes editor view with a tab bar at the top.
+
+Alternatively, if the sidebar is open, the **NOTES** section lists all notes for the current scope. Double-click a note to open it in the notes cell.
+
+### Creating and editing
+
+- Click **+** in the tab bar to create a new note.
+- Notes are Markdown with live syntax highlighting (headings, bold, italic, code, links, lists).
+- **Cmd+S** (macOS) / **Ctrl+S** (Linux) saves and triggers auto-tagging (see below).
+- Auto-save fires 2 seconds after you stop typing — this writes the file but does **not** trigger tagging.
+
+### Where notes are stored
+
+Notes live under `~/.config/cipher-mux/notes/`. Each note is a `.md` file with YAML frontmatter:
+
+```yaml
+---
+title: My design note
+tags:
+  - architecture
+  - cipher-mux
+---
+# My design note
+
+Content here...
+```
+
+If a workspace is active, notes are scoped to `~/.config/cipher-mux/notes/workspace-<id>/`. Global notes are always visible.
+
+### Auto-tagging
+
+When you save with Cmd+S and Ollama is running locally (`127.0.0.1:11433`), cipher-mux sends the note content to the configured model (default: `gemma4:26b`) and receives up to 5 tag suggestions. Tags are written into the frontmatter automatically.
+
+A seed repository of ~27 tags covers common categories (trading, infra, coding, project, etc.). New tags discovered by the model are added to the repository. Tag counts track how often each tag is used.
+
+Without Ollama, tagging is skipped silently — notes work fine without it.
+
+### Sidebar integration
+
+The sidebar's **NOTES** section shows:
+
+- A **search field** that filters by title and tag name.
+- **Tag filter chips** — click a tag to filter, click again to remove the filter. Multiple tags are AND-combined.
+- **Note cards** with title, tags, and last-modified date. Double-click to open.
+- A **delete button** (✕) appears on hover. Confirmation required.
+
+### Deleting notes
+
+Two ways to delete:
+
+1. **From the sidebar:** hover over a note card, click the ✕ button.
+2. **From the tab bar:** when a note is active, a trash icon appears on its tab. Click to delete.
+
+Both require confirmation. Deletion removes the `.md` file from disk permanently.
 
 ---
 

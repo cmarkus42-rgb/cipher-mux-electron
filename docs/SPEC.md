@@ -82,7 +82,9 @@ _Erstellt in Phase 2 auf Basis von `docs/requirements.md` (2026-04-13)._
 | AgentAdapter | Main | Abstraktion für AI-Agent-Backends (ClaudeCode Tier-1, Registry) |
 | TaskManager | Main | Task-Queue (SQLite), State-Machine, TaskWatcher, TaskHooks |
 | InputRequestWatcher | Main | MPO Bubble-Requests an Sidebar (mux_input_request_create) |
-| SessionGrid | Renderer | Obsidian-Style Grid mit SessionCell/LauncherCell, Drag-Resize |
+| NoteManager | Main | Filesystem-CRUD fuer Markdown-Notizen (~/.config/cipher-mux/notes/), Frontmatter (gray-matter) |
+| NoteTagging | Main | Ollama Auto-Tagging (gemma4:26b), Seed-Tag-Repository, Tag-Count-Tracking |
+| SessionGrid | Renderer | Obsidian-Style Grid mit SessionCell/LauncherCell/NotesCell, Drag-Resize |
 | Terminal Panes | Renderer | xterm.js Rendering, PaneHeader mit Context-% |
 | Chatroom Panel | Renderer | Message Bus Feed, bidirektionale Kommunikation |
 | StatusBar | Renderer | Controls (Voice, Grid, MPO), Version, Session-Count |
@@ -146,6 +148,10 @@ cipher-mux-electron/
 │   │   │
 │   │   ├── bugreport/
 │   │   │   └── bugreport-manager.ts  <- Diagnostik-Sammlung, Export
+│   │   │
+│   │   ├── notes/
+│   │   │   ├── note-manager.ts       <- Filesystem CRUD, Frontmatter (gray-matter)
+│   │   │   └── note-tagging.ts       <- Ollama Auto-Tagging, Seed-Tag-Repository
 │   │   │
 │   │   └── util/
 │   │       ├── exec-util.ts          <- Safe Shell Execution
