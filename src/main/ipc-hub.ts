@@ -1051,15 +1051,16 @@ export class IpcHub {
       return this.noteManager.read(id, scope)
     })
 
-    ipcMain.handle(IPC.NOTES_SAVE, async (_e, { id, scope, body, tags }: {
-      id: string; scope: string; body: string; tags?: string[]
+    ipcMain.handle(IPC.NOTES_SAVE, async (_e, { id, scope, body, tags, skipTagging }: {
+      id: string; scope: string; body: string; tags?: string[]; skipTagging?: boolean
     }) => {
       const note = await this.noteManager.save(id, scope, body, tags)
       this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', note })
-      // Async auto-tagging (fire-and-forget, only on manual save)
-      if (!tags) {
+      // Async auto-tagging (fire-and-forget, only on manual Cmd+S save)
+      if (!tags && !skipTagging) {
         this.noteTagging.autoTag(body).then(async (autoTags) => {
           if (autoTags && autoTags.length > 0) {
+            await this.noteTagging.updateRepository(autoTags)
             const updated = await this.noteManager.save(id, scope, body, autoTags)
             this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tagged', note: updated })
           }
