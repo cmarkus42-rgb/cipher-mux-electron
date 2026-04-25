@@ -494,6 +494,8 @@ export function App() {
             contextUsages={contextUsages}
             onAddToGrid={handleAddToGrid}
             onDetach={handleSidebarDetach}
+            activeWorkspaceId={activeWorkspaceId}
+            hasNotesCell={grid.slots.some(s => s.type === 'notes')}
           />
         )}
       </div>

@@ -2,6 +2,7 @@ import { h } from 'preact'
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import { useMessages } from '../hooks/useMessages'
 import { useInputRequests } from '../hooks/useInputRequests'
+import { useNotes } from '../hooks/useNotes'
 
 interface SidebarPanelProps {
   visible: boolean
@@ -12,6 +13,8 @@ interface SidebarPanelProps {
   contextUsages: Record<string, { usedPercentage: number; used?: number; total?: number }>
   onAddToGrid: (sessionId: string) => void
   onDetach?: () => void
+  activeWorkspaceId: string | null
+  hasNotesCell: boolean
 }
 
 function formatTime(ts: string | number): string {
@@ -20,13 +23,42 @@ function formatTime(ts: string | number): string {
 
 export function SidebarPanel({
   visible, orchestratorActive, mpoActive, sessions, gridSessionIds,
-  contextUsages, onAddToGrid, onDetach,
+  contextUsages, onAddToGrid, onDetach, activeWorkspaceId, hasNotesCell,
 }: SidebarPanelProps) {
   const { messages } = useMessages()
   const { requests, openCount, answerRequest, openReview } = useInputRequests()
   const [messagesExpanded, setMessagesExpanded] = useState(true)
   const [bgExpanded, setBgExpanded] = useState(true)
   const [requestsExpanded, setRequestsExpanded] = useState(true)
+  const [notesExpanded, setNotesExpanded] = useState(true)
+  const [tagFilter, setTagFilter] = useState<string[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
+
+  const scope = activeWorkspaceId ? `workspace-${activeWorkspaceId}` : 'global'
+  const { notes, tagRepo } = useNotes(scope)
+
+  const showNotes = true
+
+  // Filter notes
+  const filteredNotes = notes.filter(n => {
+    if (tagFilter.length > 0 && !tagFilter.every(t => n.tags.includes(t))) return false
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase()
+      return n.title.toLowerCase().includes(q) || n.tags.some(t => t.includes(q))
+    }
+    return true
+  })
+
+  const availableTags = [...new Set(notes.flatMap(n => n.tags))].sort()
+
+  const handleNoteDoubleClick = useCallback((note: any) => {
+    const openFn = (window as any).__notesCell_openNote
+    if (openFn) openFn(note)
+  }, [])
+
+  const toggleTag = useCallback((tag: string) => {
+    setTagFilter(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
+  }, [])
 
   const backgroundSessions = sessions.filter(
     (s) => s.status === 'active' && !gridSessionIds.includes(s.id)
@@ -102,7 +134,65 @@ export function SidebarPanel({
         </section>
       )}
 
-      {!showMessages && !showBackground && !showRequests && (
+      {showNotes && (
+        <section class="sidebar-section">
+          <div class="sidebar-section__head" onClick={() => setNotesExpanded(v => !v)}>
+            <span>{notesExpanded ? '▾' : '▸'} NOTES ({filteredNotes.length})</span>
+          </div>
+          {notesExpanded && (
+            <div class="sidebar-section__feed">
+              {/* Search */}
+              <input
+                type="text"
+                class="sidebar-notes__search"
+                placeholder="suche..."
+                value={searchTerm}
+                onInput={(e) => setSearchTerm((e.target as HTMLInputElement).value)}
+              />
+              {/* Tag chips */}
+              {availableTags.length > 0 && (
+                <div class="sidebar-notes__tags">
+                  {availableTags.map(tag => (
+                    <span
+                      key={tag}
+                      class={`sidebar-notes__tag ${tagFilter.includes(tag) ? 'sidebar-notes__tag--active' : ''}`}
+                      onClick={() => toggleTag(tag)}
+                    >#{tag}</span>
+                  ))}
+                </div>
+              )}
+              {/* Note list */}
+              {filteredNotes.map(note => (
+                <div
+                  key={note.id}
+                  class="bg-card"
+                  onDblClick={() => handleNoteDoubleClick(note)}
+                  title="Doppelklick zum Öffnen"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer?.setData('text/plain', JSON.stringify(note))
+                  }}
+                >
+                  <div class="bg-card__head">
+                    <span class="bg-card__name">{note.title || note.id}</span>
+                  </div>
+                  <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)' }}>
+                    {note.tags.map(t => `#${t}`).join(' ')}
+                  </div>
+                  <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)', opacity: 0.5 }}>
+                    {note.modifiedAt ? new Date(note.modifiedAt).toLocaleDateString() : ''}
+                  </div>
+                </div>
+              ))}
+              {filteredNotes.length === 0 && (
+                <div class="sidebar-panel__empty" style={{ padding: 'var(--space-sm)' }}>Keine Notes gefunden.</div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
+      {!showMessages && !showBackground && !showRequests && !showNotes && (
         <div class="sidebar-panel__empty">No active background content.</div>
       )}
     </aside>
