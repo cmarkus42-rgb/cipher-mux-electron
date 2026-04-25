@@ -121,6 +121,12 @@ export class StatusLineMonitor extends EventEmitter {
       this.cache.set(sessionId, usage)
       this.emit('usage-updated', sessionId, usage)
 
+      // Extract Claude session ID if present
+      const claudeSessionId = this.extractClaudeSessionId(data)
+      if (claudeSessionId) {
+        this.emit('claude-session-id', sessionId, claudeSessionId)
+      }
+
       // Warning threshold
       if (usage.usedPercentage >= CONTEXT_WARNING_THRESHOLD && !this.warningEmitted.has(sessionId)) {
         this.warningEmitted.add(sessionId)
@@ -194,5 +200,17 @@ export class StatusLineMonitor extends EventEmitter {
       modelId,
       updatedAt: Date.now(),
     }
+  }
+
+  /**
+   * Extract Claude Code session ID from statusline JSON if present.
+   * Claude Code >= 2.x may include session_id at the top level.
+   */
+  private extractClaudeSessionId(data: unknown): string | null {
+    if (!data || typeof data !== 'object') return null
+    const d = data as Record<string, unknown>
+    if (typeof d.session_id === 'string' && d.session_id) return d.session_id
+    if (typeof d.sessionId === 'string' && d.sessionId) return d.sessionId
+    return null
   }
 }

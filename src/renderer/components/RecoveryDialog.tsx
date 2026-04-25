@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'preact/hooks'
+import { useTranslation } from 'react-i18next'
 import type { RecoveryResult, SessionInfo } from '../../shared/types'
 
 const api = () => (window as any).cipherMux
@@ -9,6 +10,7 @@ interface RecoveryDialogProps {
 }
 
 export function RecoveryDialog({ onDone, onAdopt }: RecoveryDialogProps) {
+  const { t } = useTranslation()
   const [orphans, setOrphans] = useState<SessionInfo[]>([])
   const [visible, setVisible] = useState(false)
 
@@ -56,9 +58,9 @@ export function RecoveryDialog({ onDone, onAdopt }: RecoveryDialogProps) {
   return (
     <div class="modal-overlay">
       <div class="dialog recovery-dialog">
-        <h3 class="dialog__title">Session-Recovery</h3>
+        <h3 class="dialog__title">{t('recovery.title')}</h3>
         <p class="dialog__text">
-          {orphans.length} verwaiste Session{orphans.length > 1 ? 's' : ''} gefunden:
+          {t('recovery.orphansFound', { count: orphans.length })}
         </p>
         <ul class="recovery-list">
           {orphans.map((o) => (
@@ -69,10 +71,10 @@ export function RecoveryDialog({ onDone, onAdopt }: RecoveryDialogProps) {
               </span>
               <div class="recovery-list__actions">
                 <button class="btn btn--sm btn--primary" onClick={() => handleAdopt(o)}>
-                  Übernehmen
+                  {t('recovery.adopt')}
                 </button>
                 <button class="btn btn--sm" onClick={() => handleKill(o)}>
-                  Beenden
+                  {t('recovery.kill')}
                 </button>
               </div>
             </li>
@@ -80,7 +82,7 @@ export function RecoveryDialog({ onDone, onAdopt }: RecoveryDialogProps) {
         </ul>
         <div class="dialog__footer">
           <button class="btn btn--sm" onClick={handleKillAll}>
-            Alle beenden
+            {t('recovery.killAll')}
           </button>
         </div>
       </div>

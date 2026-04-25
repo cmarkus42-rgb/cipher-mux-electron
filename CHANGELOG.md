@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **i18n foundation:** i18next + react-i18next integration with EN (primary) and DE locale files. All 24 renderer components use `useTranslation()` hook. Language switcher in Settings with immediate UI update. Persisted in ConfigStore (SP-1)
+- **Notes MCP full CRUD:** 6 new MCP tools — `mux_notes_read`, `mux_notes_update`, `mux_notes_search`, `mux_notes_delete`, `mux_notes_handoff_create`, `mux_notes_handoff_search` (SP-2)
+- **NoteManager.search():** Full-text search over notes with tag filter, title-priority sorting, max 50 results
+- **NoteManager.createHandoff():** Creates handoff notes with extended frontmatter (`from_session`, `to_entity`, `handoff_status`)
+- **Handoff frontmatter:** `NoteInfo` type extended with optional `fromSession`, `toEntity`, `handoffStatus` fields
+- **13 new tests** covering all SP-2 quality gate testcases (T1–T13)
+- **Session Resume (SP-5 Phase 4a):** `--resume` flag support — entity sessions (Orchestrator, MPO) auto-resume. Manual sessions get a "Resume previous session" checkbox in SessionDialog. `StartSessionOpts.resume` field.
+- **Session Fork (SP-5 Phase 4b):** Fork button (⑂) in SessionCell header for Claude Code sessions. Creates new session with `--fork-session --resume <claude-session-id>`. Claude session ID tracked from statusline JSON.
+- **Orphan Detection (SP-5 Phase 4c):** Periodic (5min) scan for orphaned `cmux-*` tmux sessions not in registry. Sidebar shows "Orphaned Sessions" section with Adopt/Terminate buttons per orphan. Non-cmux sessions ignored (FR-9 scope).
+- **17 new tests** covering all SP-5 quality gate testcases (T1–T9)
+
 ## [0.9.5-beta] - 2026-04-24
 
 ### Added

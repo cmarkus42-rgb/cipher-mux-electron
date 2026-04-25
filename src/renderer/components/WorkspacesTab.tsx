@@ -1,5 +1,6 @@
 // src/renderer/components/WorkspacesTab.tsx — Workspaces grid editor settings tab
 import { useCallback, useEffect, useState } from 'preact/hooks'
+import { useTranslation } from 'react-i18next'
 import type { Persona, Workspace, WorkspaceCell, ResolvedPrompt } from '../../shared/persona-types'
 import type { ProjectInfo } from '../../shared/types'
 import { resolvePrompt, spanOf, resizeCells } from '../../main/workspace/workspace-manager'
@@ -7,6 +8,7 @@ import { resolvePrompt, spanOf, resizeCells } from '../../main/workspace/workspa
 const api = (window as any).cipherMux
 
 export function WorkspacesTab() {
+  const { t } = useTranslation()
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [personas, setPersonas] = useState<Persona[]>([])
   const [projects, setProjects] = useState<ProjectInfo[]>([])
@@ -81,7 +83,7 @@ export function WorkspacesTab() {
 
   const handleDelete = async () => {
     if (!ws) return
-    const ok = confirm(`Delete "${ws.name}"?`)
+    const ok = confirm(t('workspacesTab.confirmDelete', { name: ws.name }))
     if (!ok) return
     await api.workspaces.delete(ws.id)
     const next = workspaces.filter((w) => w.id !== ws.id)
@@ -208,7 +210,7 @@ export function WorkspacesTab() {
   // ── Loading state ──
 
   if (workspaces.length === 0 && personas.length === 0) {
-    return <div class="ws-pane"><div class="ws-editor" style={{ alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-dim)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>loading...</div></div>
+    return <div class="ws-pane"><div class="ws-editor" style={{ alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-dim)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{t('workspacesTab.loading')}</div></div>
   }
 
   // ── Cell inspector data ──
@@ -223,10 +225,10 @@ export function WorkspacesTab() {
 
   const sourceNote =
     cellResolved?.source === 'cell'
-      ? 'Per-cell override in effect'
+      ? t('workspacesTab.sourceCell')
       : cellResolved?.source === 'workspace-override'
-        ? "Using this workspace's persona override"
-        : 'Using persona default from Personas tab'
+        ? t('workspacesTab.sourceWorkspace')
+        : t('workspacesTab.sourceDefault')
 
   // ── Overrides data ──
 
@@ -244,8 +246,8 @@ export function WorkspacesTab() {
       {/* LEFT: workspace list */}
       <div class="ws-list">
         <div class="ws-list-head">
-          <span>Saved</span>
-          <button onClick={handleAddWs}>+ NEW</button>
+          <span>{t('workspacesTab.saved')}</span>
+          <button onClick={handleAddWs}>{t('workspacesTab.addNew')}</button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {workspaces.map((w) => {
@@ -280,26 +282,26 @@ export function WorkspacesTab() {
                 value={ws.name}
                 onInput={(e) => updateWs({ name: (e.target as HTMLInputElement).value })}
               />
-              <button class="ws-ed-tool" onClick={handleDuplicate}>duplicate</button>
-              <button class="ws-ed-tool danger" onClick={handleDelete}>delete</button>
+              <button class="ws-ed-tool" onClick={handleDuplicate}>{t('workspacesTab.duplicate')}</button>
+              <button class="ws-ed-tool danger" onClick={handleDelete}>{t('workspacesTab.delete')}</button>
             </div>
 
             {/* Dimension steppers */}
             <div class="ws-dims">
-              <span class="dim-label">Cols</span>
+              <span class="dim-label">{t('workspacesTab.cols')}</span>
               <div class="dim-stepper">
                 <button onClick={() => handleStepCols(-1)}>-</button>
                 <span class="dim-val">{ws.cols}</span>
                 <button onClick={() => handleStepCols(1)}>+</button>
               </div>
-              <span class="dim-label" style={{ marginLeft: '14px' }}>Rows</span>
+              <span class="dim-label" style={{ marginLeft: '14px' }}>{t('workspacesTab.rows')}</span>
               <div class="dim-stepper">
                 <button onClick={() => handleStepRows(-1)}>-</button>
                 <span class="dim-val">{ws.rows}</span>
                 <button onClick={() => handleStepRows(1)}>+</button>
               </div>
               <span class="dim-note">
-                <kbd>click</kbd> cell &middot; <kbd>click</kbd> bottom edge to merge/unmerge
+                {t('workspacesTab.gridHint')}
               </span>
             </div>
 
@@ -318,7 +320,7 @@ export function WorkspacesTab() {
                       const resolved = resolvePrompt(ws, cell, personas)
                       const promptDisplay = resolved.text
                         ? resolved.text.slice(0, 48).replace(/\n/g, ' ')
-                        : '(no prompt)'
+                        : t('workspacesTab.noPrompt')
                       const inherited = resolved.source !== 'cell'
                       const canMergeDown = row + span - 1 < ws.rows - 1
                       const isMerged = span > 1
@@ -354,7 +356,7 @@ export function WorkspacesTab() {
                             </span>
                           </div>
                           <div class="ed-cell-project">
-                            {cell.project || (cell.persona === 'empty' ? '\u2014' : 'unassigned')}
+                            {cell.project || (cell.persona === 'empty' ? '\u2014' : t('workspacesTab.unassigned'))}
                           </div>
                           <div
                             class={`ed-cell-prompt ${inherited ? 'inherited' : ''}`}
@@ -365,7 +367,7 @@ export function WorkspacesTab() {
                           {canMergeDown && (
                             <div
                               class="merge-handle"
-                              title="Merge with cell below"
+                              title={t('workspacesTab.mergeHint')}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleToggleMerge(col, row + span - 1)
@@ -375,7 +377,7 @@ export function WorkspacesTab() {
                           {isMerged && !canMergeDown && (
                             <div
                               class="merge-handle split-handle"
-                              title="Split merged cell"
+                              title={t('workspacesTab.splitHint')}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 // Remove the last merge to split off the bottom row
@@ -396,7 +398,7 @@ export function WorkspacesTab() {
             {cellData && cellPersona && cellResolved && (
               <div class="inspector">
                 <div class="insp-head">
-                  <span>Cell Inspector</span>
+                  <span>{t('workspacesTab.cellInspector')}</span>
                   <span class="coord">
                     [{cellCol}, {cellRow}]
                     {cellSpan > 1 ? ` \u00B7 ${cellSpan}\u00D7 tall` : ''}
@@ -405,7 +407,7 @@ export function WorkspacesTab() {
                 <div class="insp-grid">
                   <div class="insp-field">
                     <label>
-                      Persona{' '}
+                      {t('workspacesTab.persona')}{' '}
                       <span class="source-note" style={{ color: cellPersona.color }}>
                         {'\u25CF'} {cellPersona.name}
                       </span>
@@ -419,20 +421,20 @@ export function WorkspacesTab() {
                       {personas.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name}
-                          {p.builtin ? '' : ' (custom)'}
+                          {p.builtin ? '' : t('workspacesTab.custom')}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div class="insp-field">
-                    <label>Project</label>
+                    <label>{t('workspacesTab.project')}</label>
                     <select
                       value={cellData.project}
                       onChange={(e) =>
                         handleCellUpdate('project', (e.target as HTMLSelectElement).value)
                       }
                     >
-                      <option value="">{'\u2014'} none {'\u2014'}</option>
+                      <option value="">{t('workspacesTab.projectNone')}</option>
                       {projects.map((p) => (
                         <option key={p.path} value={p.path}>
                           {p.name}
@@ -442,7 +444,7 @@ export function WorkspacesTab() {
                   </div>
                   <div class="insp-field wide">
                     <label>
-                      Cell Prompt <span class="source-note">{sourceNote}</span>
+                      {t('workspacesTab.cellPrompt')} <span class="source-note">{sourceNote}</span>
                     </label>
                     <textarea
                       value={cellData.prompt}
@@ -463,9 +465,9 @@ export function WorkspacesTab() {
             {/* Persona Prompt Overrides */}
             <div class="overrides-wrap">
               <div class="overrides-head">
-                <span>Workspace-Prompts</span>
+                <span>{t('workspacesTab.workspacePrompts')}</span>
                 <span class="sub">
-                  Nur in diesem Workspace aktiv — leer lassen = Persona-Default bleibt
+                  {t('workspacesTab.workspacePromptsHint')}
                 </span>
               </div>
               <div class="overrides-list">
@@ -499,14 +501,14 @@ export function WorkspacesTab() {
                                 const persona = personas.find((pp) => pp.id === pid)
                                 if (persona?.defaultPrompt) handleOverrideChange(pid, persona.defaultPrompt)
                               }}
-                              title="Load persona default prompt into textarea"
+                              title={t('workspacesTab.loadDefaultHint')}
                             >
-                              load default
+                              {t('workspacesTab.loadDefault')}
                             </button>
                             <button
                               class="ov-remove"
                               onClick={() => handleOverrideChange(pid, '')}
-                              title="Remove override for this persona"
+                              title={t('workspacesTab.removeOverride')}
                             >
                               &times;
                             </button>
@@ -514,13 +516,13 @@ export function WorkspacesTab() {
                         </div>
                         <textarea
                           value={override}
-                          placeholder="Leave empty to use persona default"
+                          placeholder={t('workspacesTab.leavePlaceholder')}
                           onInput={(e) =>
                             handleOverrideChange(pid, (e.target as HTMLTextAreaElement).value)
                           }
                         />
                         <div class={`ov-base ${usingBase ? 'using-base' : ''}`}>
-                          {(p.defaultPrompt || '(no default)').slice(0, 110)}
+                          {(p.defaultPrompt || t('workspacesTab.noDefault')).slice(0, 110)}
                           {(p.defaultPrompt || '').length > 110 ? '\u2026' : ''}
                         </div>
                       </div>
@@ -536,7 +538,7 @@ export function WorkspacesTab() {
                       padding: '8px 0',
                     }}
                   >
-                    No personas assigned to cells yet. Pick one in the Cell Inspector above.
+                    {t('workspacesTab.noPersonasAssigned')}
                   </div>
                 )}
               </div>
@@ -555,7 +557,7 @@ export function WorkspacesTab() {
                       if (el?.value) handleAddOverride(el.value)
                     }}
                   >
-                    + add override
+                    {t('workspacesTab.addOverride')}
                   </button>
                 </div>
               )}
@@ -564,16 +566,16 @@ export function WorkspacesTab() {
             {/* Save / Revert footer */}
             <div class="foot-actions">
               <button onClick={handleRevert} disabled={!dirty}>
-                revert
+                {t('workspacesTab.revert')}
               </button>
               <button class="primary" onClick={handleSave} disabled={!dirty}>
-                save
+                {t('workspacesTab.save')}
               </button>
             </div>
           </>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--color-text-dim)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
-            {workspaces.length === 0 ? 'No workspaces yet — click + NEW' : 'Select a workspace'}
+            {workspaces.length === 0 ? t('workspacesTab.noWorkspaces') : t('workspacesTab.selectWorkspace')}
           </div>
         )}
       </div>

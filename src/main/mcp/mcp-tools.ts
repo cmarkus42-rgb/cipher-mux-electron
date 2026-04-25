@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { readFileSync, writeFileSync } from 'fs'
+import path from 'path'
+import matter from 'gray-matter'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { SessionManager } from '../session/session-manager'
 import type { MessageBus } from '../message-bus/message-bus'
@@ -6,6 +9,8 @@ import type { StatusLineMonitor } from '../monitoring/statusline-monitor'
 import type { KickoffOrchestrator } from '../project/kickoff-orchestrator'
 import type { TaskManager } from '../task/task-manager'
 import type { Topic } from '../../shared/types'
+import type { NoteManager } from '../notes/note-manager'
+import type { MemoryStore } from '../companion/memory-store'
 import { IPC } from '../../shared/ipc-channels'
 
 /**
@@ -19,6 +24,8 @@ export interface ToolContext {
   taskManager: TaskManager | null
   inputRequestWatcher: import('../mpo/input-request-watcher').InputRequestWatcher | null
   windowManager: { sendToMainWindow(channel: string, data: unknown): void } | null
+  noteManager: NoteManager | null
+  memoryStore: MemoryStore | null
 }
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']
@@ -597,6 +604,468 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
       return {
         content: [{ type: 'text' as const, text: `Input request created: ${id} — "${args.question}"` }],
+      }
+    }
+  )
+
+  // 15. mux_notes_create — Create a note in cipher-mux
+  ;(server.registerTool as any)(
+    'mux_notes_create',
+    {
+      description:
+        'Create a note in the cipher-mux Notes system. Notes appear in the sidebar and can be opened in the Notes editor. '
+        + 'Use this to persist deliverables, summaries, research findings, or any text output that should survive the session.',
+      inputSchema: {
+        title: z.string().describe('Note title (also used as # heading)'),
+        body: z.string().describe('Markdown body (without the title heading — it will be prepended)'),
+        scope: z.string().optional().describe('Scope: "global" (default) or "workspace-<id>" for workspace-scoped notes'),
+        tags: z.array(z.string()).optional().describe('Tags for categorization (max 5, lowercase)'),
+      },
+    },
+    async (args: { title: string; body: string; scope?: string; tags?: string[] }) => {
+      if (!ctx.noteManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'NoteManager not available' }) }], isError: true }
+      }
+      try {
+        const scope = args.scope || 'global'
+        const fullBody = `# ${args.title}\n\n${args.body}`
+        const note = await ctx.noteManager.create(scope, args.title, fullBody)
+
+        // If tags provided, save again with tags
+        if (args.tags && args.tags.length > 0) {
+          await ctx.noteManager.save(note.id, scope, fullBody, args.tags.slice(0, 5))
+        }
+
+        // Notify UI
+        if (ctx.windowManager) {
+          ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created', note })
+        }
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: note.id, title: note.title, scope }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: errMsg }) }],
+          isError: true,
+        }
+      }
+    }
+  )
+
+  // 16. mux_notes_list — List notes
+  ;(server.registerTool as any)(
+    'mux_notes_list',
+    {
+      description: 'List notes in the cipher-mux Notes system. Returns title, tags, scope, and timestamps.',
+      inputSchema: {
+        scope: z.string().optional().describe('Scope to list: "global", "workspace-<id>", or omit for all notes'),
+      },
+    },
+    async (args: { scope?: string }) => {
+      if (!ctx.noteManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'NoteManager not available' }) }], isError: true }
+      }
+      try {
+        const notes = args.scope
+          ? await ctx.noteManager.list(args.scope)
+          : await ctx.noteManager.listAll()
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(notes, null, 2) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: errMsg }) }],
+          isError: true,
+        }
+      }
+    }
+  )
+
+  // 17. mux_notes_read — Read a note by ID
+  ;(server.registerTool as any)(
+    'mux_notes_read',
+    {
+      description: 'Read a note by ID from the cipher-mux Notes system. Returns full content including body and frontmatter.',
+      inputSchema: {
+        id: z.string().describe('Note ID (ULID)'),
+        scope: z.string().optional().describe('Scope: "global" (default) or "workspace-<id>"'),
+      },
+    },
+    async (args: { id: string; scope?: string }) => {
+      if (!ctx.noteManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
+      }
+      try {
+        const scope = args.scope || 'global'
+        const result = await ctx.noteManager.read(args.id, scope)
+        if (!result) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Note not found: ${args.id}` }) }], isError: true }
+        }
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ info: result.info, body: result.body }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // 18. mux_notes_update — Partial update of a note
+  ;(server.registerTool as any)(
+    'mux_notes_update',
+    {
+      description:
+        'Update a note in the cipher-mux Notes system. Supports partial updates: only the provided fields are changed. '
+        + 'Can also update handoff_status for handoff notes.',
+      inputSchema: {
+        id: z.string().describe('Note ID (ULID)'),
+        scope: z.string().optional().describe('Scope: "global" (default) or "workspace-<id>"'),
+        title: z.string().optional().describe('New title — updates the first # heading in the body'),
+        body: z.string().optional().describe('New markdown body (replaces entire body)'),
+        tags: z.array(z.string()).optional().describe('New tags (max 5, replaces all existing tags)'),
+        handoff_status: z.enum(['pending', 'consumed']).optional().describe('Update handoff status for handoff notes'),
+      },
+    },
+    async (args: { id: string; scope?: string; title?: string; body?: string; tags?: string[]; handoff_status?: 'pending' | 'consumed' }) => {
+      if (!ctx.noteManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
+      }
+      try {
+        const scope = args.scope || 'global'
+        const existing = await ctx.noteManager.read(args.id, scope)
+        if (!existing) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Note not found: ${args.id}` }) }], isError: true }
+        }
+
+        let body = args.body ?? existing.body
+        const tags = args.tags ? args.tags.slice(0, 5) : existing.info.tags
+
+        // Update title heading if title provided
+        if (args.title && !args.body) {
+          body = body.replace(/^#\s+.+$/m, `# ${args.title}`)
+          // If no heading existed, prepend one
+          if (!body.match(/^#\s+/m)) {
+            body = `# ${args.title}\n\n${body}`
+          }
+        }
+
+        const note = await ctx.noteManager.save(args.id, scope, body, tags)
+
+        // Update handoff_status in frontmatter if provided (requires re-reading and re-writing the raw file)
+        if (args.handoff_status) {
+          const filePath = path.join(
+            (ctx.noteManager as any).notesDir,
+            scope,
+            `${args.id}.md`
+          )
+          const raw = readFileSync(filePath, 'utf-8')
+          const parsed = matter(raw)
+          parsed.data.handoff_status = args.handoff_status
+          parsed.data.modified = new Date().toISOString()
+          const updated = matter.stringify(parsed.content, parsed.data)
+          writeFileSync(filePath, updated, 'utf-8')
+        }
+
+        // Notify UI
+        if (ctx.windowManager) {
+          ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', note })
+        }
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: note.id, title: note.title }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // 19. mux_notes_search — Full-text search over notes
+  ;(server.registerTool as any)(
+    'mux_notes_search',
+    {
+      description:
+        'Search notes by text query and/or tags. Returns matching notes sorted by relevance (title matches first, then by date). '
+        + 'Max 50 results.',
+      inputSchema: {
+        query: z.string().describe('Search query — matched case-insensitive against title and body'),
+        scope: z.string().optional().describe('Scope filter: "global", "workspace-<id>", or omit to search all'),
+        tags: z.array(z.string()).optional().describe('Tag filter — only notes with at least one matching tag'),
+      },
+    },
+    async (args: { query: string; scope?: string; tags?: string[] }) => {
+      if (!ctx.noteManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
+      }
+      try {
+        const results = await ctx.noteManager.search(args.query, {
+          scope: args.scope,
+          tags: args.tags,
+        })
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(results.map(r => r.info), null, 2) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // 20. mux_notes_delete — Delete a note by ID
+  ;(server.registerTool as any)(
+    'mux_notes_delete',
+    {
+      description: 'Delete a note from the cipher-mux Notes system.',
+      inputSchema: {
+        id: z.string().describe('Note ID (ULID)'),
+        scope: z.string().optional().describe('Scope: "global" (default) or "workspace-<id>"'),
+      },
+    },
+    async (args: { id: string; scope?: string }) => {
+      if (!ctx.noteManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
+      }
+      try {
+        const scope = args.scope || 'global'
+        const deleted = await ctx.noteManager.delete(args.id, scope)
+        if (!deleted) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Note not found: ${args.id}` }) }], isError: true }
+        }
+
+        // Notify UI
+        if (ctx.windowManager) {
+          ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'deleted', id: args.id })
+        }
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: args.id }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // 21. mux_notes_handoff_create — Create a handoff note
+  ;(server.registerTool as any)(
+    'mux_notes_handoff_create',
+    {
+      description:
+        'Create a handoff note for session-to-session knowledge transfer. Handoff notes have extended frontmatter '
+        + '(from_session, to_entity, handoff_status) and are always global scope. Tag: "handoff".',
+      inputSchema: {
+        title: z.string().describe('Handoff title, e.g. "Handoff: Auth refactor context"'),
+        body: z.string().describe('Markdown body with context, findings, next steps'),
+        from_session: z.string().describe('Name of the session creating this handoff'),
+        to_entity: z.string().optional().describe('Target entity ID or "any" (default)'),
+      },
+    },
+    async (args: { title: string; body: string; from_session: string; to_entity?: string }) => {
+      if (!ctx.noteManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
+      }
+      try {
+        const note = await ctx.noteManager.createHandoff(
+          args.title,
+          `# ${args.title}\n\n${args.body}`,
+          args.from_session,
+          args.to_entity || 'any',
+        )
+
+        // Notify UI
+        if (ctx.windowManager) {
+          ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created', note })
+        }
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: note.id }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // 22. mux_notes_handoff_search — Search handoff notes
+  ;(server.registerTool as any)(
+    'mux_notes_handoff_search',
+    {
+      description:
+        'Search for handoff notes. Filters by to_entity and/or handoff_status. Returns newest first.',
+      inputSchema: {
+        to_entity: z.string().optional().describe('Filter by target entity ID'),
+        status: z.enum(['pending', 'consumed']).optional().describe('Filter by handoff status (default: "pending")'),
+      },
+    },
+    async (args: { to_entity?: string; status?: 'pending' | 'consumed' }) => {
+      if (!ctx.noteManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
+      }
+      try {
+        // Search for all notes with 'handoff' tag
+        const allNotes = await ctx.noteManager.list('global')
+        const handoffNotes = allNotes.filter(n => n.tags.includes('handoff'))
+
+        const statusFilter = args.status || 'pending'
+        let results = handoffNotes.filter(n => {
+          // Read handoff_status — need to check the actual file for extended frontmatter
+          return (n.handoffStatus || 'pending') === statusFilter
+        })
+
+        if (args.to_entity) {
+          results = results.filter(n =>
+            n.toEntity === args.to_entity || n.toEntity === 'any'
+          )
+        }
+
+        // Sort by createdAt desc (newest first)
+        results.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // ─── Companion Memory Tools ─────────────────────────────
+
+  // 23. companion_memory_write — Write a memory
+  ;(server.registerTool as any)(
+    'companion_memory_write',
+    {
+      description:
+        'Write a memory to the companion memory store. Memories are transparent and deletable by the user. '
+        + 'Use for decisions, preferences, project state, personal facts. NOT for smalltalk or trivial details.',
+      inputSchema: {
+        text: z.string().describe('Memory text content'),
+        kind: z.enum(['fact', 'preference', 'interaction', 'event']).describe('Memory category'),
+        session_id: z.string().optional().describe('Session that created this memory (auto-filled if omitted)'),
+        context_tags: z.array(z.string()).optional().describe('Optional context tags'),
+        salience: z.number().min(0).max(1).optional().describe('Importance 0..1 (default 0.5)'),
+      },
+    },
+    async (args: { text: string; kind: 'fact' | 'preference' | 'interaction' | 'event'; session_id?: string; context_tags?: string[]; salience?: number }) => {
+      if (!ctx.memoryStore) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'MemoryStore not available' }) }], isError: true }
+      }
+      try {
+        const memory = ctx.memoryStore.write({
+          text: args.text,
+          kind: args.kind,
+          sessionId: args.session_id,
+          salience: args.salience,
+          sourceExcerpt: args.context_tags ? args.context_tags.join(', ') : undefined,
+        })
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: memory.id }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // 24. companion_memory_recall — Recall recent memories
+  ;(server.registerTool as any)(
+    'companion_memory_recall',
+    {
+      description:
+        'Recall recent memories from the companion store. Returns newest first. '
+        + 'Use when the user references past events, decisions, or context.',
+      inputSchema: {
+        limit: z.number().optional().describe('Max results (default 20)'),
+        entity_filter: z.string().optional().describe('Filter by memory kind'),
+        since_hours: z.number().optional().describe('Only memories from the last N hours'),
+      },
+    },
+    async (args: { limit?: number; entity_filter?: string; since_hours?: number }) => {
+      if (!ctx.memoryStore) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'MemoryStore not available' }) }], isError: true }
+      }
+      try {
+        const since = args.since_hours ? Date.now() - (args.since_hours * 3600_000) : undefined
+        const kindFilter = args.entity_filter as import('../../shared/types').MemoryKind | undefined
+        const memories = ctx.memoryStore.recall({
+          limit: args.limit,
+          kindFilter,
+          since,
+        })
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(memories, null, 2) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // 25. companion_memory_search — FTS5 search
+  ;(server.registerTool as any)(
+    'companion_memory_search',
+    {
+      description:
+        'Full-text search over companion memories. Returns results ranked by relevance. '
+        + 'Use when the user asks about specific topics or keywords.',
+      inputSchema: {
+        query: z.string().describe('Search query (FTS5 syntax supported)'),
+        limit: z.number().optional().describe('Max results (default 20)'),
+      },
+    },
+    async (args: { query: string; limit?: number }) => {
+      if (!ctx.memoryStore) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'MemoryStore not available' }) }], isError: true }
+      }
+      try {
+        const memories = ctx.memoryStore.search(args.query, { limit: args.limit })
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(memories, null, 2) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // 26. companion_memory_forget — Delete a memory
+  ;(server.registerTool as any)(
+    'companion_memory_forget',
+    {
+      description: 'Delete a memory from the companion store by ID.',
+      inputSchema: {
+        id: z.string().describe('Memory ID (ULID)'),
+      },
+    },
+    async (args: { id: string }) => {
+      if (!ctx.memoryStore) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'MemoryStore not available' }) }], isError: true }
+      }
+      try {
+        const deleted = ctx.memoryStore.forget(args.id)
+        if (!deleted) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Memory not found: ${args.id}` }) }], isError: true }
+        }
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
       }
     }
   )

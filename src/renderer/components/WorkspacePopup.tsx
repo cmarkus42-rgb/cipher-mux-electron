@@ -1,12 +1,16 @@
 // src/renderer/components/WorkspacePopup.tsx
 import { useState, useEffect, useCallback, useMemo } from 'preact/hooks'
-import type { Workspace, Persona } from '../../shared/persona-types'
+import { useTranslation } from 'react-i18next'
+import type { Workspace, Persona, WorkspaceCell } from '../../shared/persona-types'
+import type { GridState } from '../../shared/grid-types'
 
 interface WorkspacePopupProps {
   visible: boolean
   onClose: () => void
   onApply: (workspaceId: string) => void
   onOpenSettings: (tab: 'personas' | 'workspaces') => void
+  currentGrid?: GridState
+  sessions?: Array<{ id: string; name: string; projectPath?: string }>
 }
 
 /** Inline span calculation (mirrors main/workspace/workspace-manager spanOf, renderer-safe) */
@@ -90,11 +94,15 @@ function buildSubtitle(ws: Workspace, personas: Persona[]): string {
   return `${ws.cols}×${ws.rows} · ${slotCount} slots · ${uniquePersonas.join(', ')}`
 }
 
-export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings }: WorkspacePopupProps) {
+export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, currentGrid, sessions: currentSessions }: WorkspacePopupProps) {
+  const { t } = useTranslation()
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [personas, setPersonas] = useState<Persona[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saveName, setSaveName] = useState('')
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
 
   // Load data on mount
   useEffect(() => {
@@ -141,6 +149,56 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings }: Wo
     if (selectedId) onApply(selectedId)
   }, [selectedId, onApply])
 
+  const handleSaveCurrentOpen = useCallback(() => {
+    const now = new Date()
+    const defaultName = `Workspace ${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    setSaveName(defaultName)
+    setShowSaveDialog(true)
+  }, [])
+
+  const handleSaveCurrentConfirm = useCallback(async () => {
+    if (!currentGrid || !saveName.trim()) return
+    setSaving(true)
+    try {
+      const api = (window as any).cipherMux
+      const sessionMap: Record<string, { name: string; projectPath?: string }> = {}
+      for (const s of currentSessions ?? []) {
+        sessionMap[s.id] = s
+      }
+
+      const cells: WorkspaceCell[] = currentGrid.slots.map(slot => {
+        const session = slot.sessionId ? sessionMap[slot.sessionId] : undefined
+        return {
+          persona: 'empty',
+          project: session?.projectPath ?? '',
+          prompt: '',
+          type: slot.type,
+        }
+      })
+
+      const ws: Workspace = {
+        id: `ws-${Date.now()}`,
+        name: saveName.trim(),
+        cols: currentGrid.config.cols,
+        rows: currentGrid.config.rows,
+        cells,
+        merges: {},
+        promptOverrides: {},
+      }
+
+      await api.workspaces.save(ws)
+      // Reload list
+      const wsList = await api.workspaces.list() as Workspace[]
+      setWorkspaces(wsList ?? [])
+      setSelectedId(ws.id)
+      setShowSaveDialog(false)
+    } catch (err) {
+      console.error('[WorkspacePopup] save failed:', err)
+    } finally {
+      setSaving(false)
+    }
+  }, [currentGrid, currentSessions, saveName])
+
   const selectedWorkspace = workspaces.find((w) => w.id === selectedId) ?? null
   const legend = selectedWorkspace ? buildLegend(selectedWorkspace, personas) : []
 
@@ -151,7 +209,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings }: Wo
       <div class="workspaces-popup" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div class="wp-head">
-          <span class="wp-title">Workspaces</span>
+          <span class="wp-title">{t('workspacePopup.title')}</span>
           <div class="wp-head-actions">
             <button onClick={onClose}>✕</button>
           </div>
@@ -161,7 +219,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings }: Wo
         <div class="wp-list">
           {workspaces.length === 0 && (
             <div style={{ padding: '16px 12px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--color-text-dim)' }}>
-              No workspaces defined.
+              {t('workspacePopup.noWorkspaces')}
             </div>
           )}
           {workspaces.map((ws) => (
@@ -178,7 +236,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings }: Wo
                 <div class="wp-sub">{buildSubtitle(ws, personas)}</div>
               </div>
               {activeId === ws.id && (
-                <span class="wp-badge">active</span>
+                <span class="wp-badge">{t('workspacePopup.active')}</span>
               )}
             </div>
           ))}
@@ -187,7 +245,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings }: Wo
         {/* Legend */}
         {legend.length > 0 && (
           <div class="wp-legend">
-            <span class="wp-legend-label">personas</span>
+            <span class="wp-legend-label">{t('workspacePopup.personas')}</span>
             {legend.map(({ persona, count }) => (
               <span key={persona.id} class="wp-legend-item">
                 <span class="dot" style={{ background: persona.color }} />
@@ -198,11 +256,40 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings }: Wo
           </div>
         )}
 
+        {/* Save Dialog */}
+        {showSaveDialog && (
+          <div class="wp-save-overlay">
+            <div class="wp-save-dialog">
+              <div class="wp-save-dialog__title">{t('workspacePopup.saveTitle')}</div>
+              <input
+                class="input input--sm"
+                type="text"
+                value={saveName}
+                onInput={(e) => setSaveName((e.target as HTMLInputElement).value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveCurrentConfirm() }}
+                placeholder={t('workspacePopup.saveNamePlaceholder')}
+                autoFocus
+                style={{ width: '100%', marginBottom: '8px' }}
+              />
+              <div class="wp-save-dialog__info">
+                {currentGrid ? `${currentGrid.config.cols}×${currentGrid.config.rows} · ${currentGrid.slots.filter(s => s.sessionId).length} ${t('workspacePopup.activeSessions')}` : ''}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', marginTop: '8px' }}>
+                <button class="ghost" onClick={() => setShowSaveDialog(false)}>{t('bugreport.cancel')}</button>
+                <button onClick={handleSaveCurrentConfirm} disabled={saving || !saveName.trim()}>
+                  {saving ? t('workspacesTab.saved') : t('workspacePopup.save')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div class="wp-foot">
-          <button class="ghost" onClick={() => onOpenSettings('personas')}>personas...</button>
-          <button class="ghost" onClick={() => onOpenSettings('workspaces')}>edit...</button>
-          <button onClick={handleLoad} disabled={!selectedId}>load</button>
+          <button class="ghost" onClick={handleSaveCurrentOpen} disabled={!currentGrid}>{t('workspacePopup.saveCurrent')}</button>
+          <button class="ghost" onClick={() => onOpenSettings('personas')}>{t('workspacePopup.personasBtn')}</button>
+          <button class="ghost" onClick={() => onOpenSettings('workspaces')}>{t('workspacePopup.editBtn')}</button>
+          <button onClick={handleLoad} disabled={!selectedId}>{t('workspacePopup.load')}</button>
         </div>
       </div>
     </div>

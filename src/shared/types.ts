@@ -11,8 +11,41 @@ export type AdapterFeature =
   | 'sub-agents'
   | 'project-instructions'
   | 'message-bus-participant'
+  | 'companion-mcp'
 
 export type AdapterCapabilities = Record<AdapterFeature, boolean>
+
+// ─── Entity Framework ─────────────────────────────────────
+
+/** Well-known entity identifiers. */
+export type EntityId = 'orchestrator' | 'mpo' | 'launcher' | 'companion' | 'refinement'
+
+/**
+ * Configuration for a functional entity (Orchestrator, MPO, Companion, etc.).
+ * Entities are special sessions with predefined behavior, assets, and UI styling.
+ */
+export interface EntityConfig {
+  /** Unique entity identifier. */
+  id: EntityId
+  /** Human-readable display name for UI. */
+  displayName: string
+  /** Emoji or icon key for StatusBar/Sidebar. */
+  icon?: string
+  /** CSS color for PaneHeader highlighting + badge. */
+  color: string
+  /** Working directory for this entity. */
+  projectPath: string
+  /** Path to CLAUDE.md + asset directory (source for deployment). */
+  templatePath?: string
+  /** Pre-filled greeting message sent after session start. */
+  startupGreeting?: string
+  /** Enabled feature flags: 'mcp', 'resume', 'memory', etc. */
+  features: string[]
+  /** Whether this entity is visible in the grid (default true, false = background). */
+  visible?: boolean
+  /** Whether to use --resume on start (default true for entities). */
+  autoResume?: boolean
+}
 
 // ─── Session ───────────────────────────────────────────────
 
@@ -31,6 +64,10 @@ export interface SessionInfo {
   adapterId?: string
   /** Capability flags from the agent adapter */
   capabilities?: AdapterCapabilities
+  /** Claude Code session ID (tracked from statusline), used for fork. */
+  claudeSessionId?: string
+  /** Entity ID if this session belongs to a registered entity. */
+  entityId?: EntityId
 }
 
 export interface StartSessionOpts {
@@ -44,6 +81,10 @@ export interface StartSessionOpts {
    * don't reflow after a late SIGWINCH.
    */
   autoLaunch?: string
+  /** When true, --resume is passed to the Claude CLI to continue the last session. */
+  resume?: boolean
+  /** Fork from an existing Claude Code session ID (--fork-session --resume <id>). */
+  forkFromClaudeSessionId?: string
 }
 
 export interface RecoveryResult {
@@ -147,6 +188,8 @@ export interface AppConfig {
     chatroomVisible: boolean
     theme: ThemeName
     grid: GridState
+    /** UI language — 'en' (default) or 'de'. */
+    language: 'en' | 'de'
   }
   agent: {
     /** When true, launches Claude Code with --dangerously-skip-permissions. Default: false. */
@@ -342,6 +385,8 @@ export interface TaskFilter {
 
 // ─── Notes ──────────────────────────────────────────────────
 
+export type HandoffStatus = 'pending' | 'consumed'
+
 export interface NoteInfo {
   id: string
   title: string
@@ -350,6 +395,12 @@ export interface NoteInfo {
   relativePath: string
   createdAt: string
   modifiedAt: string
+  /** Session name that created this handoff note */
+  fromSession?: string
+  /** Target entity ID or "any" */
+  toEntity?: string
+  /** Handoff lifecycle status */
+  handoffStatus?: HandoffStatus
 }
 
 export interface NoteContent {
@@ -364,6 +415,51 @@ export interface TagEntry {
 
 export interface TagRepository {
   tags: Record<string, TagEntry>
+}
+
+// ─── Companion Memory ─────────────────────────────────────
+
+export type MemoryKind = 'fact' | 'preference' | 'interaction' | 'event'
+
+export interface Memory {
+  id: string
+  ts: number
+  sessionId: string | null
+  persona: string | null
+  kind: MemoryKind
+  text: string
+  salience: number
+  ttlDays: number | null
+  sourceExcerpt: string | null
+  /** FTS5 rank score — only present in search results */
+  score?: number
+}
+
+export interface ProfileField {
+  field: string
+  value: string
+  updatedAt: number
+  evidence: string | null
+}
+
+export interface PersonaStateEntry {
+  key: string
+  value: string
+  updatedAt: number
+  isFrozen: boolean
+}
+
+export type PendingUpdateStatus = 'pending' | 'accepted' | 'rejected'
+
+export interface PendingUpdate {
+  id: string
+  ts: number
+  target: string
+  proposedValue: string
+  currentValue: string | null
+  reasoning: string | null
+  evidenceMemoryIds: string[] | null
+  status: PendingUpdateStatus
 }
 
 // ─── Personas & Workspaces ────────────────────────────────

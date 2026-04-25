@@ -1,5 +1,6 @@
 // src/renderer/app.tsx
 import { useState, useCallback, useEffect, useMemo, useRef } from 'preact/hooks'
+import { useTranslation } from 'react-i18next'
 import type { ProjectInfo } from '../shared/types'
 import { useSessions } from './hooks/useSessions'
 import { useContextUsage } from './hooks/useContextUsage'
@@ -19,6 +20,7 @@ import { WorkspacePopup } from './components/WorkspacePopup'
 import { GridPlacementPopup } from './components/GridPlacementPopup'
 
 export function App() {
+  const { t } = useTranslation()
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [sidebarDetached, setSidebarDetached] = useState(false)
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null)
@@ -33,7 +35,7 @@ export function App() {
   const [popupTargetSessionId, setPopupTargetSessionId] = useState<string | null>(null)
   const [popupTargetSlotIndex, setPopupTargetSlotIndex] = useState<number | null>(null)
 
-  const { sessions, startSession, stopSession } = useSessions()
+  const { sessions, startSession, stopSession, refresh: refreshSessions } = useSessions()
   const contextUsages = useContextUsage()
   const { projects, scanning, rescan } = useProjects()
   // panelWidth needs a ref so useGrid callbacks can access the latest value
@@ -47,13 +49,13 @@ export function App() {
   const shortcutEntries = useMemo(() => [
     {
       combo: 'Cmd+B',
-      label: 'bugreport dialog öffnen',
+      label: t('app.shortcut.bugreport'),
       category: 'Aktionen' as const,
       action: () => setBugreportVisible(true),
     },
     {
       combo: 'Escape',
-      label: 'dialog / overlay schließen',
+      label: t('app.shortcut.closeOverlay'),
       category: 'Navigation' as const,
       action: () => {
         setBugreportVisible(false)
@@ -64,7 +66,7 @@ export function App() {
         setPlacementPopup(null)
       },
     },
-  ], [])
+  ], [t])
   useShortcuts(shortcutEntries)
 
   const focusedSessionName = useMemo(() => {
@@ -75,6 +77,8 @@ export function App() {
 
   const [orchestratorSessionId, setOrchestratorSessionId] = useState<string | null>(null)
   const [mpoSessionId, setMpoSessionId] = useState<string | null>(null)
+  const [companionSessionId, setCompanionSessionId] = useState<string | null>(null)
+  const [refinementSessionId, setRefinementSessionId] = useState<string | null>(null)
 
   // Compute grid session IDs for sidebar
   const gridSessionIds = grid.slots.filter(s => s.sessionId).map(s => s.sessionId!)
@@ -105,10 +109,16 @@ export function App() {
   const placeMpo = useCallback((sessionId: string) => {
     setMpoSessionId((prev) => {
       if (prev === sessionId) return prev // already placed
-      addSession(sessionId)
+      const freeIdx = grid.slots.findIndex(s => !s.sessionId && s.type !== 'notes')
+      if (freeIdx >= 0) {
+        addSession(sessionId)
+      } else {
+        // Grid full — open placement popup so user can pick a slot
+        setPlacementPopup({ sessionId })
+      }
       return sessionId
     })
-  }, [addSession])
+  }, [addSession, grid.slots])
 
   // Check orchestrator status on mount
   useEffect(() => {
@@ -171,6 +181,9 @@ export function App() {
         if (sessions.some((s: any) => s.id === data.sessionId)) {
           addSession(data.sessionId)
           setFocusedSessionId(data.sessionId)
+          // Ensure useSessions state is current so sidebar shows background sessions
+          // even if SESSION_CHANGED refresh hasn't completed yet
+          refreshSessions()
           return
         }
         await new Promise(r => setTimeout(r, 200))
@@ -179,7 +192,7 @@ export function App() {
       console.warn('[app] visible-add: session not found after retries:', data.sessionId)
     })
     return () => unsub()
-  }, [addSession])
+  }, [addSession, refreshSessions])
 
   // Open project popup from launcher cell
   const handleLaunch = useCallback((slotIndex: number) => {
@@ -206,13 +219,14 @@ export function App() {
     clearSlotType(slotIndex)
   }, [clearSlotType])
 
-  const handleSessionStart = useCallback(async (dirPath: string) => {
+  const handleSessionStart = useCallback(async (dirPath: string, opts?: { resume?: boolean }) => {
     setSessionDialogVisible(false)
     try {
       const name = dirPath ? dirPath.split('/').filter(Boolean).pop() ?? 'session' : 'session'
       const session = await startSession({
         name,
         projectPath: dirPath,
+        resume: opts?.resume,
       })
       if (sessionDialogSlotIndex !== null) {
         setSessionAtSlot(sessionDialogSlotIndex, session.id)
@@ -305,6 +319,22 @@ export function App() {
       console.error('[App] Failed to open shell:', err)
     }
   }, [startSession, addSession])
+
+  const handleFork = useCallback(async (sessionId: string) => {
+    const api = (window as any).cipherMux
+    try {
+      const newSession = await api.sessions.fork(sessionId)
+      const freeIdx = grid.slots.findIndex(s => !s.sessionId)
+      if (freeIdx >= 0) {
+        addSession(newSession.id)
+      } else {
+        setPlacementPopup({ sessionId: newSession.id })
+      }
+      setFocusedSessionId(newSession.id)
+    } catch (err: any) {
+      console.error('[App] Fork failed:', err?.message || err)
+    }
+  }, [grid.slots, addSession])
 
   const handleAddToGrid = useCallback((sessionId: string) => {
     const freeIdx = grid.slots.findIndex(s => !s.sessionId)
@@ -455,6 +485,104 @@ export function App() {
     }
   }, [mpoSessionId, removeSession])
 
+  // Generic entity placement — finds a free slot or opens placement popup
+  const placeEntity = useCallback((sessionId: string) => {
+    const freeIdx = grid.slots.findIndex(s => !s.sessionId && s.type !== 'notes')
+    if (freeIdx >= 0) {
+      addSession(sessionId)
+    } else {
+      setPlacementPopup({ sessionId })
+    }
+  }, [addSession, grid.slots])
+
+  const handleCompanionToggle = useCallback(async () => {
+    const api = (window as any).cipherMux
+    try {
+      const status = await api.entity.status('companion')
+      if (status.running && status.sessionId) {
+        await api.entity.stop('companion')
+        removeSession(status.sessionId)
+        setCompanionSessionId(null)
+      } else {
+        if (companionSessionId) {
+          removeSession(companionSessionId)
+          setCompanionSessionId(null)
+        }
+        const session = await api.entity.start('companion')
+        const sid = session?.id
+        if (sid) {
+          setCompanionSessionId(sid)
+          placeEntity(sid)
+        }
+      }
+    } catch (err) {
+      console.error('[App] Companion toggle failed:', err)
+      setCompanionSessionId(null)
+    }
+  }, [companionSessionId, removeSession, placeEntity])
+
+  const handleRefinementToggle = useCallback(async () => {
+    const api = (window as any).cipherMux
+    try {
+      const status = await api.entity.status('refinement')
+      if (status.running && status.sessionId) {
+        await api.entity.stop('refinement')
+        removeSession(status.sessionId)
+        setRefinementSessionId(null)
+      } else {
+        if (refinementSessionId) {
+          removeSession(refinementSessionId)
+          setRefinementSessionId(null)
+        }
+        const session = await api.entity.start('refinement')
+        const sid = session?.id
+        if (sid) {
+          setRefinementSessionId(sid)
+          placeEntity(sid)
+        }
+      }
+    } catch (err) {
+      console.error('[App] Refinement toggle failed:', err)
+      setRefinementSessionId(null)
+    }
+  }, [refinementSessionId, removeSession, placeEntity])
+
+  // Listen for entity-started events (e.g. from other sources)
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api.entity?.onStarted) return
+    const unsub = api.entity.onStarted((data: { entityId: string; session: any }) => {
+      const sid = data.session?.id
+      if (!sid) return
+      if (data.entityId === 'companion' && !companionSessionId) {
+        setCompanionSessionId(sid)
+        placeEntity(sid)
+      } else if (data.entityId === 'refinement' && !refinementSessionId) {
+        setRefinementSessionId(sid)
+        placeEntity(sid)
+      }
+    })
+    return () => unsub()
+  }, [companionSessionId, refinementSessionId, placeEntity])
+
+  // Check companion/refinement status on mount
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api.entity?.status) return
+    api.entity.status('companion').then((s: { running: boolean; sessionId?: string }) => {
+      if (s.running && s.sessionId) {
+        setCompanionSessionId(s.sessionId)
+        placeEntity(s.sessionId)
+      }
+    })
+    api.entity.status('refinement').then((s: { running: boolean; sessionId?: string }) => {
+      if (s.running && s.sessionId) {
+        setRefinementSessionId(s.sessionId)
+        placeEntity(s.sessionId)
+      }
+    })
+  }, [placeEntity])
+
   return (
     <div class="app-shell">
       {/* drag region */}
@@ -477,12 +605,15 @@ export function App() {
           onSwitchProject={handleSwitchProject}
           onToggleExpand={toggleExpand}
           onShell={handleShell}
+          onFork={handleFork}
           onLaunch={handleLaunch}
           onOpenSession={handleOpenSession}
           onOpenNotes={handleOpenNotes}
           onCloseNotes={handleCloseNotes}
           onToggleExpandSlot={toggleExpandSlot}
           onSwap={swap}
+          onCompanion={handleCompanionToggle}
+          onRefinement={handleRefinementToggle}
         />
         {!sidebarDetached && (
           <SidebarPanel
@@ -493,6 +624,7 @@ export function App() {
             gridSessionIds={gridSessionIds}
             contextUsages={contextUsages}
             onAddToGrid={handleAddToGrid}
+            onKillSession={stopSession}
             onDetach={handleSidebarDetach}
             activeWorkspaceId={activeWorkspaceId}
             hasNotesCell={grid.slots.some(s => s.type === 'notes')}
@@ -508,8 +640,12 @@ export function App() {
         onToggleSidebar={() => setSidebarVisible(v => !v)}
         orchestratorRunning={!!orchestratorSessionId}
         mpoRunning={!!mpoSessionId}
+        companionRunning={!!companionSessionId}
+        refinementRunning={!!refinementSessionId}
         workspacesPopupVisible={workspacesPopupVisible}
         onMpo={handleMpoToggle}
+        onCompanion={handleCompanionToggle}
+        onRefinement={handleRefinementToggle}
         gridCols={grid.config.cols}
         gridRows={grid.config.rows}
         focusedSessionId={focusedSessionId}
@@ -529,6 +665,8 @@ export function App() {
         onClose={() => setWorkspacesPopupVisible(false)}
         onApply={handleWorkspaceApply}
         onOpenSettings={handleWorkspaceOpenSettings}
+        currentGrid={grid}
+        sessions={sessions}
       />
 
       {/* dialogs */}

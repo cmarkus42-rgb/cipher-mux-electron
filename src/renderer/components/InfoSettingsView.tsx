@@ -1,5 +1,7 @@
 // src/renderer/components/InfoSettingsView.tsx
 import { useCallback, useEffect, useState } from 'preact/hooks'
+import { useTranslation } from 'react-i18next'
+import i18n from '../i18n'
 import { APP_VERSION } from '../../shared/constants'
 import type { ThemeName } from '../../shared/grid-types'
 import themesManifest from '../themes.json'
@@ -22,22 +24,50 @@ interface AppSection {
 
 type TabId = 'shortcuts' | 'features' | 'settings'
 
-// Built-in shortcuts (hard-coded since most keyboard shortcuts were removed)
-const SHORTCUTS = [
-  { category: 'global', combo: 'Cmd+B', label: 'bugreport dialog öffnen' },
-  { category: 'global', combo: 'Escape', label: 'dialog / overlay schließen' },
-  { category: 'terminal', combo: 'Cmd+C', label: 'text kopieren / prozess abbrechen' },
-  { category: 'terminal', combo: 'Cmd+V', label: 'einfügen' },
+const SHORTCUT_KEYS = [
+  { category: 'global', combo: 'Cmd+B', labelKey: 'info.shortcut.openBugreport' },
+  { category: 'global', combo: 'Escape', labelKey: 'info.shortcut.closeDialog' },
+  { category: 'terminal', combo: 'Cmd+C', labelKey: 'info.shortcut.copy' },
+  { category: 'terminal', combo: 'Cmd+V', labelKey: 'info.shortcut.paste' },
 ]
 
 const themes = themesManifest.themes
 
+/** Token groups for the theme editor color pickers. */
+const THEME_TOKEN_GROUPS: Array<{ labelKey: string; tokens: string[] }> = [
+  {
+    labelKey: 'themeEditor.groupBg',
+    tokens: ['--color-bg', '--color-bg-elevated', '--color-bg-sunken', '--color-bg-terminal'],
+  },
+  {
+    labelKey: 'themeEditor.groupText',
+    tokens: ['--color-text', '--color-text-secondary', '--color-text-dim', '--color-text-accent'],
+  },
+  {
+    labelKey: 'themeEditor.groupBorder',
+    tokens: ['--color-border', '--color-border-light', '--color-border-focus'],
+  },
+  {
+    labelKey: 'themeEditor.groupAccent',
+    tokens: ['--color-accent', '--color-neon-green', '--color-neon-red', '--color-neon-orange', '--color-neon-cyan'],
+  },
+  {
+    labelKey: 'themeEditor.groupCtx',
+    tokens: ['--color-ctx-ok', '--color-ctx-warn', '--color-ctx-error'],
+  },
+]
+
 export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initialTab }: InfoSettingsViewProps) {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'features')
   const [scanPaths, setScanPaths] = useState<string[]>([])
   const [scanDepth, setScanDepth] = useState(1)
   const [loading, setLoading] = useState(true)
   const [skipPerms, setSkipPerms] = useState(false)
+  const [language, setLanguage] = useState<'en' | 'de'>(i18n.language as 'en' | 'de')
+  const [themeEditorOpen, setThemeEditorOpen] = useState(false)
+  const [customTokens, setCustomTokens] = useState<Record<string, string>>({})
+  const [savedNotice, setSavedNotice] = useState(false)
 
   const load = useCallback(async () => {
     const app: AppSection | null = await api.config.get('app')
@@ -45,6 +75,15 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
     setScanDepth(app?.scanDepth ?? 1)
     const sp: boolean = await api.config.getSkipPermissions()
     setSkipPerms(sp)
+    const ui = await api.config.get('ui')
+    if (ui?.language) setLanguage(ui.language)
+    if (ui?.customThemeTokens) {
+      setCustomTokens(ui.customThemeTokens)
+      // Apply custom tokens to document
+      for (const [prop, val] of Object.entries(ui.customThemeTokens as Record<string, string>)) {
+        document.documentElement.style.setProperty(prop, val)
+      }
+    }
     setLoading(false)
   }, [])
 
@@ -56,14 +95,14 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
   }, [])
 
   const handleAdd = useCallback(async () => {
-    const dir = await api.dialog.openDir({ title: 'Scan-Pfad hinzufügen' })
+    const dir = await api.dialog.openDir({ title: t('settings.addScanPath') })
     if (!dir) return
     if (scanPaths.includes(dir)) return
     const next = [...scanPaths, dir]
     setScanPaths(next)
     await persist({ scanPaths: next })
     await onRescan()
-  }, [scanPaths, persist, onRescan])
+  }, [scanPaths, persist, onRescan, t])
 
   const handleRemove = useCallback(async (p: string) => {
     const next = scanPaths.filter((x) => x !== p)
@@ -78,7 +117,55 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
     await persist({ scanDepth: clamped })
   }, [persist])
 
-  const grouped = SHORTCUTS.reduce<Record<string, typeof SHORTCUTS>>((acc, s) => {
+  const handleLanguageChange = useCallback(async (lng: 'en' | 'de') => {
+    setLanguage(lng)
+    i18n.changeLanguage(lng)
+    const ui = await api.config.get('ui') ?? {}
+    await api.config.set('ui', { ...ui, language: lng })
+  }, [])
+
+  /** Get the current base token value from the active theme manifest. */
+  const getBaseToken = useCallback((prop: string): string => {
+    const activeTheme = themes.find(th => th.id === theme)
+    return (activeTheme?.tokens as Record<string, string>)?.[prop] ?? '#888888'
+  }, [theme])
+
+  /** Change a single token — live-apply + track in state. */
+  const handleTokenChange = useCallback((prop: string, value: string) => {
+    document.documentElement.style.setProperty(prop, value)
+    setCustomTokens(prev => ({ ...prev, [prop]: value }))
+  }, [])
+
+  /** Save custom tokens to ConfigStore. */
+  const handleThemeSave = useCallback(async () => {
+    const ui = await api.config.get('ui') ?? {}
+    await api.config.set('ui', { ...ui, customThemeTokens: customTokens })
+    setSavedNotice(true)
+    setTimeout(() => setSavedNotice(false), 2000)
+  }, [customTokens])
+
+  /** Reset all custom overrides back to theme defaults. */
+  const handleThemeReset = useCallback(() => {
+    for (const prop of Object.keys(customTokens)) {
+      document.documentElement.style.removeProperty(prop)
+    }
+    setCustomTokens({})
+  }, [customTokens])
+
+  /** Export custom tokens as JSON to clipboard. */
+  const handleThemeExport = useCallback(async () => {
+    const exportData = {
+      baseTheme: theme,
+      tokens: customTokens,
+      exportedAt: new Date().toISOString(),
+    }
+    await navigator.clipboard.writeText(JSON.stringify(exportData, null, 2))
+    setSavedNotice(true)
+    setTimeout(() => setSavedNotice(false), 2000)
+  }, [theme, customTokens])
+
+  const shortcuts = SHORTCUT_KEYS.map(s => ({ ...s, label: t(s.labelKey) }))
+  const grouped = shortcuts.reduce<Record<string, typeof shortcuts>>((acc, s) => {
     (acc[s.category] ??= []).push(s)
     return acc
   }, {})
@@ -92,7 +179,7 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
             class={`info-tab ${activeTab === tab ? 'info-tab--active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === 'shortcuts' ? 'shortcuts' : tab === 'features' ? 'features' : 'einstellungen'}
+            {tab === 'shortcuts' ? t('info.tabShortcuts') : tab === 'features' ? t('info.tabFeatures') : t('info.tabSettings')}
           </button>
         ))}
       </div>
@@ -115,8 +202,7 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
             </div>
           ))}
           <div class="settings-section__hint" style={{ marginTop: '12px' }}>
-            die meisten aktionen werden per klick in der statusbar oder im grid ausgelöst.
-            keyboard shortcuts sind auf ein minimum reduziert.
+            {t('info.shortcutHint')}
           </div>
         </section>
       )}
@@ -124,195 +210,192 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
       {activeTab === 'features' && (
         <section class="settings-section wiki-section">
           <div class="wiki-entry">
-            <div class="settings-section__title">was ist cipher-mux?</div>
+            <div class="settings-section__title">{t('info.feature.whatIs.title')}</div>
+            <p class="wiki-text">{t('info.feature.whatIs.p1')}</p>
             <p class="wiki-text">
-              cipher-mux ist eine electron-app, die mehrere claude code sessions gleichzeitig
-              in einem fenster verwaltet. jede session läuft in einem eigenen tmux-terminal.
-              die sessions können über einen message bus kommunizieren und werden von einem
-              orchestrator koordiniert.
-            </p>
-            <p class="wiki-text">
-              <strong>wann braucht man das?</strong> sobald man an mehreren projekten gleichzeitig
-              arbeitet oder ein projekt so groß ist, dass ein einzelner claude agent an seine
-              context-grenzen stößt. der orchestrator kann aufgaben verteilen und ergebnisse
-              zusammenführen.
+              <strong>{t('info.feature.whatIs.p2strong')}</strong>{t('info.feature.whatIs.p2')}
             </p>
           </div>
 
           <div class="wiki-entry">
-            <div class="settings-section__title">grid layout</div>
+            <div class="settings-section__title">{t('info.feature.grid.title')}</div>
+            <p class="wiki-text">{t('info.feature.grid.p1')}</p>
             <p class="wiki-text">
-              das hauptfenster zeigt ein grid mit bis zu 5x3 zellen. jede zelle kann eine
-              terminal-session aufnehmen. leere zellen zeigen einen "+" button zum starten
-              neuer sessions.
+              <strong>{t('info.feature.grid.p2strong')}</strong>{t('info.feature.grid.p2')}
             </p>
             <p class="wiki-text">
-              <strong>bedienung:</strong> grid-größe über die "spalten +/-" / "zeilen +/-" controls
-              unten rechts anpassen. sessions per drag & drop umordnen. klick auf den header
-              einer session setzt den fokus.
-            </p>
-            <p class="wiki-text">
-              <strong>projekt wechseln:</strong> "swap" im header einer session öffnet den
-              projektpicker. die alte session wird gestoppt und eine neue im selben slot gestartet.
+              <strong>{t('info.feature.grid.p3strong')}</strong>{t('info.feature.grid.p3')}
             </p>
           </div>
 
           <div class="wiki-entry">
-            <div class="settings-section__title">orchestrator</div>
-            <p class="wiki-text">
-              der orchestrator ist eine spezielle claude session, die immer in slot 0 (oben links)
-              läuft. er hat zugriff auf alle anderen sessions über den MCP-server und kann:
-            </p>
+            <div class="settings-section__title">{t('info.feature.orchestrator.title')}</div>
+            <p class="wiki-text">{t('info.feature.orchestrator.p1')}</p>
             <ul class="wiki-list">
-              <li>sessions starten, stoppen und überwachen</li>
-              <li>nachrichten an sessions senden</li>
-              <li>context-usage aller sessions abfragen</li>
-              <li>aufgaben zwischen sessions verteilen</li>
+              <li>{t('info.feature.orchestrator.li1')}</li>
+              <li>{t('info.feature.orchestrator.li2')}</li>
+              <li>{t('info.feature.orchestrator.li3')}</li>
+              <li>{t('info.feature.orchestrator.li4')}</li>
             </ul>
+            <p class="wiki-text">{t('info.feature.orchestrator.p2')}</p>
+          </div>
+
+          <div class="wiki-entry">
+            <div class="settings-section__title">{t('info.feature.messageBus.title')}</div>
+            <p class="wiki-text">{t('info.feature.messageBus.p1')}</p>
             <p class="wiki-text">
-              der orchestrator startet automatisch mit der app. über den "orchestrator" button
-              in der statusbar kann er manuell gestartet/gestoppt werden.
+              <strong>{t('info.feature.messageBus.p2strong')}</strong>{t('info.feature.messageBus.p2')}
             </p>
           </div>
 
           <div class="wiki-entry">
-            <div class="settings-section__title">message bus & chatroom</div>
+            <div class="settings-section__title">{t('info.feature.mcp.title')}</div>
+            <p class="wiki-text">{t('info.feature.mcp.p1')}</p>
             <p class="wiki-text">
-              alle sessions teilen sich einen SQLite-basierten nachrichtenbus. sessions können
-              nachrichten an topics senden (z.b. "broadcast", "orchestrator", "session:xyz").
-              der chatroom zeigt den gesamten bus-feed in echtzeit.
-            </p>
-            <p class="wiki-text">
-              <strong>wozu?</strong> der orchestrator nutzt den bus um anweisungen zu verteilen.
-              sessions können ergebnisse zurückmelden. du siehst im chatroom was zwischen den
-              agents passiert.
+              <strong>{t('info.feature.mcp.p2strong')}</strong>{t('info.feature.mcp.p2')}
             </p>
           </div>
 
           <div class="wiki-entry">
-            <div class="settings-section__title">MCP-server</div>
-            <p class="wiki-text">
-              ein lokaler HTTP-server (default port 3100) stellt tools bereit, die claude sessions
-              programmatisch nutzen können. der MCP-server wird automatisch in jede neue session
-              injiziert (via CLAUDE.md).
-            </p>
-            <p class="wiki-text">
-              <strong>verfügbare tools:</strong> session management, message bus, context usage
-              abfrage, kickoff/projektstart. der orchestrator nutzt diese tools um andere
-              sessions zu steuern.
-            </p>
-          </div>
-
-          <div class="wiki-entry">
-            <div class="settings-section__title">context usage monitoring</div>
-            <p class="wiki-text">
-              jede session zeigt ihren aktuellen context-verbrauch im header (0-100%). die farbe
-              wechselt automatisch:
-            </p>
+            <div class="settings-section__title">{t('info.feature.context.title')}</div>
+            <p class="wiki-text">{t('info.feature.context.p1')}</p>
             <ul class="wiki-list">
-              <li><span style={{ color: 'var(--color-neon-green)' }}>grün</span> — 0-60%: alles gut</li>
-              <li><span style={{ color: 'var(--color-neon-orange)' }}>orange</span> — 60-85%: wird eng</li>
-              <li><span style={{ color: 'var(--color-neon-red)' }}>rot</span> — 85-100%: session bald am limit</li>
+              <li><span style={{ color: 'var(--color-neon-green)' }}>{t('info.feature.context.green')}</span>{t('info.feature.context.greenDesc')}</li>
+              <li><span style={{ color: 'var(--color-neon-orange)' }}>{t('info.feature.context.orange')}</span>{t('info.feature.context.orangeDesc')}</li>
+              <li><span style={{ color: 'var(--color-neon-red)' }}>{t('info.feature.context.red')}</span>{t('info.feature.context.redDesc')}</li>
             </ul>
-            <p class="wiki-text">
-              die daten kommen aus claudes statusLine-hook und werden in echtzeit aktualisiert.
-            </p>
+            <p class="wiki-text">{t('info.feature.context.p2')}</p>
           </div>
 
           <div class="wiki-entry">
-            <div class="settings-section__title">bugreport</div>
-            <p class="wiki-text">
-              über "bugreport" in der statusbar (oder Cmd+B) kannst du einen bug-report erstellen.
-              die beschreibung wird optional von ollama (lokales LLM) in ein strukturiertes format
-              gebracht: titel, severity, tags, schritte, zusammenfassung. der report landet als
-              markdown-datei in der outbox.
-            </p>
+            <div class="settings-section__title">{t('info.feature.bugreport.title')}</div>
+            <p class="wiki-text">{t('info.feature.bugreport.p1')}</p>
           </div>
 
           <div class="wiki-entry">
-            <div class="settings-section__title">themes</div>
-            <p class="wiki-text">
-              10 themes stehen zur wahl — von cipher ivory (hell, keramik) über gruvbox, nord und
-              blueprint bis zu synthwave und matrix. jedes theme passt die gesamte app und alle
-              terminals sofort an. wechsel über den theme-picker in den einstellungen oder per
-              klick auf den theme-namen in der statusbar. die wahl wird persistent gespeichert.
-            </p>
+            <div class="settings-section__title">{t('info.feature.themes.title')}</div>
+            <p class="wiki-text">{t('info.feature.themes.p1')}</p>
           </div>
 
           <div class="wiki-entry">
-            <div class="settings-section__title">projekt scanner</div>
-            <p class="wiki-text">
-              cipher-mux scannt konfigurierte verzeichnisse nach claude-code-projekten
-              (erkennbar an CLAUDE.md, .claude/, package.json etc). die gefundenen projekte
-              erscheinen im projektpicker wenn du eine neue session startest.
-            </p>
-            <p class="wiki-text">
-              scan-pfade und -tiefe lassen sich im "einstellungen" tab konfigurieren.
-            </p>
+            <div class="settings-section__title">{t('info.feature.scanner.title')}</div>
+            <p class="wiki-text">{t('info.feature.scanner.p1')}</p>
+            <p class="wiki-text">{t('info.feature.scanner.p2')}</p>
           </div>
         </section>
       )}
 
       {activeTab === 'settings' && !loading && (
         <section class="settings-section">
-          <div class="settings-section__title">theme</div>
-          <div class="settings-section__hint">
-            wähle ein farbschema. die app und alle terminals übernehmen sofort.
-          </div>
+          <div class="settings-section__title">{t('settings.theme')}</div>
+          <div class="settings-section__hint">{t('settings.themeHint')}</div>
 
           <div class="theme-picker" role="radiogroup" aria-label="theme">
-            {themes.map((t) => (
+            {themes.map((thm) => (
               <div
-                key={t.id}
-                class={`theme-row ${t.id === theme ? 'theme-row--active' : ''}`}
+                key={thm.id}
+                class={`theme-row ${thm.id === theme ? 'theme-row--active' : ''}`}
                 role="radio"
-                aria-checked={t.id === theme}
+                aria-checked={thm.id === theme}
                 tabIndex={0}
-                onClick={() => onSetTheme(t.id as ThemeName)}
+                onClick={() => onSetTheme(thm.id as ThemeName)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
-                    onSetTheme(t.id as ThemeName)
+                    onSetTheme(thm.id as ThemeName)
                   }
                 }}
               >
                 <div class="theme-radio" />
                 <div class="theme-strip" aria-hidden="true">
-                  {t.previewSwatches.map((c, i) => <span key={i} style={{ background: c }} />)}
+                  {thm.previewSwatches.map((c, i) => <span key={i} style={{ background: c }} />)}
                 </div>
                 <div class="theme-meta">
-                  <div class="theme-name">{t.name}</div>
-                  <div class="theme-tag">{t.tag}</div>
+                  <div class="theme-name">{thm.name}</div>
+                  <div class="theme-tag">{thm.tag}</div>
                 </div>
-                <div class="theme-mode">{t.mode}</div>
+                <div class="theme-mode">{thm.mode}</div>
               </div>
             ))}
           </div>
 
-          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>scan-pfade</div>
-          <div class="settings-section__hint">
-            verzeichnisse, die beim scan nach claude-code-projekten durchsucht werden.
+          {/* Theme Editor */}
+          <div
+            class="settings-section__title"
+            style={{ marginTop: 'var(--space-lg)', cursor: 'pointer', userSelect: 'none' }}
+            onClick={() => setThemeEditorOpen(v => !v)}
+          >
+            {themeEditorOpen ? '▾' : '▸'} {t('themeEditor.title')}
           </div>
+          <div class="settings-section__hint">{t('themeEditor.hint')}</div>
+          {themeEditorOpen && (
+            <div class="theme-editor">
+              {THEME_TOKEN_GROUPS.map(group => (
+                <div key={group.labelKey} class="theme-editor__group">
+                  <div class="theme-editor__group-label">{t(group.labelKey)}</div>
+                  <div class="theme-editor__grid">
+                    {group.tokens.map(prop => {
+                      const current = customTokens[prop] ?? getBaseToken(prop)
+                      return (
+                        <label key={prop} class="theme-editor__token">
+                          <input
+                            type="color"
+                            value={current}
+                            onInput={(e) => handleTokenChange(prop, (e.target as HTMLInputElement).value)}
+                            class="theme-editor__picker"
+                          />
+                          <span class="theme-editor__label">{prop.replace('--color-', '')}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+              <div class="theme-editor__actions">
+                <button class="btn btn--sm btn--primary" onClick={handleThemeSave}>{t('themeEditor.save')}</button>
+                <button class="btn btn--sm" onClick={handleThemeReset}>{t('themeEditor.reset')}</button>
+                <button class="btn btn--sm" onClick={handleThemeExport}>{t('themeEditor.export')}</button>
+                {savedNotice && <span class="theme-editor__notice">{t('themeEditor.saved')}</span>}
+              </div>
+            </div>
+          )}
+
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.language')}</div>
+          <div class="settings-section__hint">{t('settings.languageHint')}</div>
+          <div class="settings-row" style={{ marginTop: '8px' }}>
+            <select
+              class="input input--sm"
+              value={language}
+              onChange={(e) => handleLanguageChange((e.target as HTMLSelectElement).value as 'en' | 'de')}
+              style={{ width: '160px' }}
+            >
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+            </select>
+          </div>
+
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.scanPaths')}</div>
+          <div class="settings-section__hint">{t('settings.scanPathsHint')}</div>
           <ul class="settings-list">
             {scanPaths.length === 0 && (
-              <li class="settings-list__empty">keine pfade hinterlegt.</li>
+              <li class="settings-list__empty">{t('settings.noScanPaths')}</li>
             )}
             {scanPaths.map((p) => (
               <li key={p} class="settings-list__item">
                 <span class="font-mono text-sm truncate" title={p}>{p}</span>
-                <button class="btn btn--sm" onClick={() => handleRemove(p)} title="Entfernen">✕</button>
+                <button class="btn btn--sm" onClick={() => handleRemove(p)} title={t('settings.removePath')}>✕</button>
               </li>
             ))}
           </ul>
           <div class="settings-row">
-            <button class="btn btn--primary btn--sm" onClick={handleAdd}>+ pfad hinzufügen</button>
+            <button class="btn btn--primary btn--sm" onClick={handleAdd}>{t('settings.addPath')}</button>
             <button class="btn btn--sm" onClick={onRescan} disabled={scanning}>
-              {scanning ? 'scanne...' : 'jetzt rescannen'}
+              {scanning ? t('settings.scanning') : t('settings.scanNow')}
             </button>
           </div>
           <div class="settings-row" style={{ marginTop: '12px' }}>
             <label class="settings-label">
-              <span>scan-tiefe</span>
+              <span>{t('settings.scanDepth')}</span>
               <input
                 class="input input--sm"
                 type="number"
@@ -323,9 +406,9 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
                 style={{ width: '64px' }}
               />
             </label>
-            <span class="text-xs text-dim">1 = nur direkte kinder · max. 5</span>
+            <span class="text-xs text-dim">{t('settings.scanDepthHint')}</span>
           </div>
-          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>agent</div>
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.agent')}</div>
           <div class="settings-row" style={{ marginTop: '8px' }}>
             <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
               <input
@@ -338,18 +421,18 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
                 }}
                 style={{ marginRight: '8px' }}
               />
-              <span>Skip Permission Prompts</span>
+              <span>{t('settings.skipPermissions')}</span>
             </label>
           </div>
           {skipPerms && (
             <div class="settings-section__hint" style={{ color: 'var(--color-warning)', marginTop: '6px' }}>
-              Sessions starten mit --dangerously-skip-permissions. Alle Tool-Aufrufe werden automatisch genehmigt.
+              {t('settings.skipPermissionsWarning')}
             </div>
           )}
 
-          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>über</div>
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.about')}</div>
           <div class="settings-section__hint">
-            cipher-mux {APP_VERSION} — electron-basierte kommandozentrale für claude code projekte.
+            {t('settings.aboutText', { version: APP_VERSION })}
           </div>
         </section>
       )}

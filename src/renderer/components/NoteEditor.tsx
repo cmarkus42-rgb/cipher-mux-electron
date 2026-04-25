@@ -142,21 +142,57 @@ export function NoteEditor({ content, onSave, onAutoSave }: NoteEditorProps) {
     }
   }, [content])
 
-  // DOM-level Cmd+S handler — Electron may intercept before CodeMirror sees it
+  // DOM-level keyboard + clipboard handlers
+  // Electron menu roles (copy/paste) use webContents.copy() which reads the
+  // DOM Selection API, but CM6 doesn't always sync its internal selection to
+  // the DOM. We intercept Cmd+C/V/X in capture phase and bridge CM6 ↔ clipboard.
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey
+      if (!mod) return
+
+      if (e.key === 's') {
         e.preventDefault()
         e.stopPropagation()
         if (viewRef.current) {
           onSaveRef.current(viewRef.current.state.doc.toString())
         }
+        return
+      }
+
+      const view = viewRef.current
+      if (!view) return
+      const { from, to } = view.state.selection.main
+
+      if (e.key === 'c' || e.key === 'x') {
+        if (from === to) return // no selection
+        const text = view.state.sliceDoc(from, to)
+        navigator.clipboard.writeText(text).catch(() => {})
+        if (e.key === 'x') {
+          view.dispatch({ changes: { from, to, insert: '' } })
+        }
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
+
+      if (e.key === 'v') {
+        e.preventDefault()
+        e.stopPropagation()
+        navigator.clipboard.readText().then(text => {
+          if (text && view) {
+            view.dispatch(view.state.replaceSelection(text))
+          }
+        }).catch(() => {})
+        return
       }
     }
-    el.addEventListener('keydown', handler, true) // capture phase
-    return () => el.removeEventListener('keydown', handler, true)
+
+    el.addEventListener('keydown', onKeyDown, true)
+    return () => el.removeEventListener('keydown', onKeyDown, true)
   }, [])
 
   return <div ref={containerRef} class="note-editor" style={{ height: '100%', overflow: 'hidden' }} />

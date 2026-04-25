@@ -1,5 +1,6 @@
 // src/renderer/components/ProjectPopup.tsx
 import { useState, useCallback, useMemo } from 'preact/hooks'
+import { useTranslation } from 'react-i18next'
 import type { ProjectInfo } from '../../shared/types'
 
 const api = () => (window as any).cipherMux
@@ -32,6 +33,7 @@ export function ProjectPopup({
   visible, projects, scanning, targetSessionId,
   onSelect, onKickoffStarted, onRescan, onClose,
 }: ProjectPopupProps) {
+  const { t } = useTranslation()
   const [filter, setFilter] = useState('')
   const [customPath, setCustomPath] = useState('')
 
@@ -71,7 +73,7 @@ export function ProjectPopup({
   }, [handleCustomPathOpen])
 
   const handleBrowse = useCallback(async () => {
-    const dir = await api().dialog.openDir({ title: 'Projektordner auswählen' })
+    const dir = await api().dialog.openDir({ title: t('projectPopup.selectDir') })
     if (dir) {
       handleSelect(projectFromPath(dir))
     }
@@ -79,19 +81,19 @@ export function ProjectPopup({
 
   // Kickoff handlers
   const handleKickoffPickDir = useCallback(async () => {
-    const selected = await api().dialog.openDir({ title: 'Projekt-Verzeichnis wählen' })
+    const selected = await api().dialog.openDir({ title: t('projectPopup.projectDir') })
     if (selected) setKickoffDir(selected)
   }, [])
 
   const handleKickoffPickReqFile = useCallback(async () => {
-    const selected = await api().dialog.openFile({ title: 'Anforderungsdatei wählen' })
+    const selected = await api().dialog.openFile({ title: t('projectPopup.reqFile') })
     if (selected) setKickoffReqFile(selected)
   }, [])
 
   const handleKickoffSubmit = useCallback(async () => {
     setKickoffError(null)
     if (!kickoffDir.trim()) {
-      setKickoffError('Projekt-Verzeichnis fehlt')
+      setKickoffError(t('projectPopup.errorMissing'))
       return
     }
     setKickoffLoading(true)
@@ -123,7 +125,7 @@ export function ProjectPopup({
       <div class="modal-panel project-popup" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <span class="modal-title">
-            {targetSessionId ? 'projekt wechseln' : 'projekt auswählen'}
+            {targetSessionId ? t('projectPopup.switchTitle') : t('projectPopup.selectTitle')}
           </span>
           <button class="cell-btn" onClick={onClose}>{'\u2715'}</button>
         </div>
@@ -133,20 +135,20 @@ export function ProjectPopup({
           <input
             type="text"
             class="project-popup__input"
-            placeholder="pfad einfügen..."
+            placeholder={t('projectPopup.pathPlaceholder')}
             value={customPath}
             onInput={(e) => setCustomPath((e.target as HTMLInputElement).value)}
             onKeyDown={handleCustomPathKey}
           />
-          <button class="cell-btn" onClick={handleCustomPathOpen} title="pfad öffnen">{'\u2192'}</button>
-          <button class="cell-btn" onClick={handleBrowse} title="im finder auswählen">{'\u22EF'}</button>
+          <button class="cell-btn" onClick={handleCustomPathOpen} title={t('projectPopup.openPath')}>{'\u2192'}</button>
+          <button class="cell-btn" onClick={handleBrowse} title={t('projectPopup.browseInFinder')}>{'\u22EF'}</button>
         </div>
 
         <div class="project-popup__search">
           <input
             type="text"
             class="project-popup__input"
-            placeholder="projekte filtern..."
+            placeholder={t('projectPopup.filterPlaceholder')}
             value={filter}
             onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
             autofocus
@@ -177,7 +179,7 @@ export function ProjectPopup({
           ))}
           {filtered.length === 0 && (
             <div class="project-popup__empty">
-              {scanning ? 'scanning...' : 'keine projekte gefunden'}
+              {scanning ? t('projectPopup.scanning') : t('projectPopup.noProjects')}
             </div>
           )}
         </div>
@@ -190,45 +192,45 @@ export function ProjectPopup({
               onClick={() => setKickoffOpen((v) => !v)}
             >
               <span class={`project-popup__kickoff-arrow ${kickoffOpen ? 'project-popup__kickoff-arrow--open' : ''}`}>{'\u25B6'}</span>
-              neues projekt launchen
+              {t('projectPopup.launchNew')}
             </button>
 
             {kickoffOpen && (
               <div class="project-popup__kickoff-body">
                 <label class="project-popup__kickoff-label">
-                  <span>Projekt-Verzeichnis</span>
+                  <span>{t('projectPopup.projectDir')}</span>
                   <div class="project-popup__kickoff-row">
                     <input
                       class="project-popup__input"
                       type="text"
-                      placeholder="/pfad/zum/neuen/projekt..."
+                      placeholder={t('projectPopup.projectDirPlaceholder')}
                       value={kickoffDir}
                       onInput={(e) => setKickoffDir((e.target as HTMLInputElement).value)}
                     />
-                    <button class="cell-btn" onClick={handleKickoffPickDir} title="verzeichnis auswählen">{'\u22EF'}</button>
+                    <button class="cell-btn" onClick={handleKickoffPickDir} title={t('projectPopup.selectDir')}>{'\u22EF'}</button>
                   </div>
                 </label>
 
                 <label class="project-popup__kickoff-label">
-                  <span>Anforderungsdatei (optional)</span>
+                  <span>{t('projectPopup.reqFile')}</span>
                   <div class="project-popup__kickoff-row">
                     <input
                       class="project-popup__input"
                       type="text"
-                      placeholder="leer lassen, wenn schon im projekt"
+                      placeholder={t('projectPopup.reqFilePlaceholder')}
                       value={kickoffReqFile}
                       onInput={(e) => setKickoffReqFile((e.target as HTMLInputElement).value)}
                     />
-                    <button class="cell-btn" onClick={handleKickoffPickReqFile} title="datei auswählen">{'\u22EF'}</button>
+                    <button class="cell-btn" onClick={handleKickoffPickReqFile} title={t('projectPopup.selectFile')}>{'\u22EF'}</button>
                   </div>
                 </label>
 
                 <label class="project-popup__kickoff-label">
-                  <span>Zusätzlicher Kontext (optional)</span>
+                  <span>{t('projectPopup.extraContext')}</span>
                   <textarea
                     class="project-popup__input project-popup__kickoff-textarea"
                     rows={4}
-                    placeholder="stack-präferenzen, referenz-projekte, URLs..."
+                    placeholder={t('projectPopup.extraContextPlaceholder')}
                     value={kickoffContext}
                     onInput={(e) => setKickoffContext((e.target as HTMLTextAreaElement).value)}
                   />
@@ -237,9 +239,9 @@ export function ProjectPopup({
                 {kickoffError && <div class="project-popup__kickoff-error">{kickoffError}</div>}
 
                 <div class="project-popup__kickoff-footer">
-                  <button class="btn btn--sm" onClick={() => setKickoffOpen(false)}>abbrechen</button>
+                  <button class="btn btn--sm" onClick={() => setKickoffOpen(false)}>{t('projectPopup.cancel')}</button>
                   <button class="btn btn--sm btn--primary" onClick={handleKickoffSubmit} disabled={kickoffLoading}>
-                    {kickoffLoading ? 'starte...' : 'projekt aufsetzen'}
+                    {kickoffLoading ? t('projectPopup.starting') : t('projectPopup.setupProject')}
                   </button>
                 </div>
               </div>

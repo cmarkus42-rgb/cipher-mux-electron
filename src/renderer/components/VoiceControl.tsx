@@ -6,6 +6,7 @@
  * Toast overlays for transcription preview and dispatch feedback.
  */
 
+import { useTranslation } from 'react-i18next'
 import { useVoiceSession } from '../hooks/useVoiceSession'
 
 interface VoiceControlProps {
@@ -15,6 +16,7 @@ interface VoiceControlProps {
 }
 
 export function VoiceControl({ focusedSessionId, focusedSessionName, inline }: VoiceControlProps) {
+  const { t } = useTranslation()
   const {
     active,
     recording,
@@ -51,7 +53,7 @@ export function VoiceControl({ focusedSessionId, focusedSessionName, inline }: V
       {/* Toggle switch + LED */}
       <label
         class="voice-switch"
-        title={active ? 'Disable voice input (Ctrl+Shift+Space to talk)' : 'Enable voice input'}
+        title={active ? t('voiceControl.disable') : t('voiceControl.enable')}
       >
         <input
           type="checkbox"

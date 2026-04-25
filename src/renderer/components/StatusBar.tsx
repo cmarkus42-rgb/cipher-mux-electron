@@ -3,6 +3,7 @@ import type { ThemeName } from '../../shared/grid-types'
 import { APP_VERSION } from '../../shared/constants'
 import { GridControls } from './GridControls'
 import { VoiceControl } from './VoiceControl'
+import { useTranslation } from 'react-i18next'
 import themesManifest from '../themes.json'
 
 const themesList = themesManifest.themes
@@ -20,6 +21,8 @@ interface StatusBarProps {
   onToggleSidebar: () => void
   orchestratorRunning: boolean
   mpoRunning: boolean
+  companionRunning: boolean
+  refinementRunning: boolean
   workspacesPopupVisible: boolean
   gridCols: number
   gridRows: number
@@ -27,6 +30,8 @@ interface StatusBarProps {
   focusedSessionName: string | null
   onOrchestrator: () => void
   onMpo: () => void
+  onCompanion: () => void
+  onRefinement: () => void
   onBugreport: () => void
   onToggleTheme: () => void
   onToggleWorkspaces: () => void
@@ -38,9 +43,10 @@ interface StatusBarProps {
 export function StatusBar({
   theme, sidebarVisible, sidebarHasContent, onToggleSidebar, orchestratorRunning,
   gridCols, gridRows, focusedSessionId, focusedSessionName,
-  onOrchestrator, onMpo, onBugreport, onToggleTheme, onInfo, onThemeSettings,
-  onGridResize, mpoRunning, workspacesPopupVisible, onToggleWorkspaces,
+  onOrchestrator, onMpo, onCompanion, onRefinement, onBugreport, onToggleTheme, onInfo, onThemeSettings,
+  onGridResize, mpoRunning, companionRunning, refinementRunning, workspacesPopupVisible, onToggleWorkspaces,
 }: StatusBarProps) {
+  const { t } = useTranslation()
   return (
     <div class="status-bar">
       <div class="status-bar__actions">
@@ -56,33 +62,45 @@ export function StatusBar({
           class={`status-bar__btn${workspacesPopupVisible ? ' status-bar__btn--active' : ''}`}
           onClick={onToggleWorkspaces}
         >
-          workspaces
+          {t('statusBar.workspaces')}
         </button>
         <button
           class={`status-bar__btn status-bar__btn--session${orchestratorRunning ? ' status-bar__btn--active' : ''}`}
           onClick={onOrchestrator}
         >
-          <span class="status-bar__dot status-bar__dot--orchestrator" />orchestrator
+          <span class="status-bar__dot status-bar__dot--orchestrator" />{t('statusBar.orchestrator')}
         </button>
         <button
           class={`status-bar__btn status-bar__btn--session${mpoRunning ? ' status-bar__btn--active' : ''}`}
           onClick={onMpo}
         >
-          <span class="status-bar__dot status-bar__dot--mpo" />mpo
+          <span class="status-bar__dot status-bar__dot--mpo" />{t('statusBar.mpo')}
         </button>
-        <button class="status-bar__btn" onClick={onBugreport}>bugreport</button>
+        <button
+          class={`status-bar__btn status-bar__btn--session${companionRunning ? ' status-bar__btn--active' : ''}`}
+          onClick={onCompanion}
+        >
+          <span class="status-bar__dot status-bar__dot--companion" />{t('statusBar.companion')}
+        </button>
+        <button
+          class={`status-bar__btn status-bar__btn--session${refinementRunning ? ' status-bar__btn--active' : ''}`}
+          onClick={onRefinement}
+        >
+          <span class="status-bar__dot status-bar__dot--refinement" />{t('statusBar.refinement')}
+        </button>
+        <button class="status-bar__btn" onClick={onBugreport}>{t('statusBar.bugreport')}</button>
         <button
           class={`status-bar__btn${sidebarVisible ? ' status-bar__btn--active' : ''}`}
           onClick={onToggleSidebar}
-          title="Toggle sidebar"
+          title={t('statusBar.sidebarToggle')}
         >
           {sidebarHasContent && <span class="status-bar__led" />}
-          sidebar
+          {t('statusBar.sidebar')}
         </button>
         <button class="status-bar__btn status-bar__btn--active" onClick={onThemeSettings}>
           {themeDisplayName(theme)}
         </button>
-        <button class="status-bar__btn" onClick={onInfo}>info</button>
+        <button class="status-bar__btn" onClick={onInfo}>{t('statusBar.info')}</button>
       </div>
       <span class="status-bar__version">{APP_VERSION}</span>
     </div>

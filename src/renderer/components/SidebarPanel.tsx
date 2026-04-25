@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import { useMessages } from '../hooks/useMessages'
 import { useInputRequests } from '../hooks/useInputRequests'
 import { useNotes } from '../hooks/useNotes'
+import { CompanionMemoryView } from './CompanionMemoryView'
+import { useTranslation } from 'react-i18next'
 
 interface SidebarPanelProps {
   visible: boolean
@@ -12,6 +14,7 @@ interface SidebarPanelProps {
   gridSessionIds: string[]
   contextUsages: Record<string, { usedPercentage: number; used?: number; total?: number }>
   onAddToGrid: (sessionId: string) => void
+  onKillSession: (sessionId: string) => void
   onDetach?: () => void
   activeWorkspaceId: string | null
   hasNotesCell: boolean
@@ -23,19 +26,52 @@ function formatTime(ts: string | number): string {
 
 export function SidebarPanel({
   visible, orchestratorActive, mpoActive, sessions, gridSessionIds,
-  contextUsages, onAddToGrid, onDetach, activeWorkspaceId, hasNotesCell,
+  contextUsages, onAddToGrid, onKillSession, onDetach, activeWorkspaceId, hasNotesCell,
 }: SidebarPanelProps) {
+  const { t } = useTranslation()
   const { messages } = useMessages()
   const { requests, openCount, answerRequest, openReview } = useInputRequests()
   const [messagesExpanded, setMessagesExpanded] = useState(true)
   const [bgExpanded, setBgExpanded] = useState(true)
   const [requestsExpanded, setRequestsExpanded] = useState(true)
   const [notesExpanded, setNotesExpanded] = useState(true)
+  const [memoryExpanded, setMemoryExpanded] = useState(false)
+  const [orphansExpanded, setOrphansExpanded] = useState(true)
+  const [orphans, setOrphans] = useState<Array<{ id: string; name: string; tmuxSession: string; projectPath?: string | null }>>([])
   const [tagFilter, setTagFilter] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
 
   const scope = activeWorkspaceId ? `workspace-${activeWorkspaceId}` : 'global'
   const { notes, tagRepo, deleteNote } = useNotes(scope)
+
+  // Orphan detection: listen for periodic events + initial scan
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.sessions?.detectOrphans || !api?.sessions?.onOrphansDetected) return
+
+    // Initial scan
+    api.sessions.detectOrphans().then((result: any[]) => {
+      if (result?.length) setOrphans(result)
+    }).catch(() => {})
+
+    // Listen for periodic updates
+    const unsub = api.sessions.onOrphansDetected((detected: any[]) => {
+      setOrphans(detected)
+    })
+    return () => unsub()
+  }, [])
+
+  const handleOrphanAdopt = useCallback(async (tmuxSession: string) => {
+    const api = (window as any).cipherMux
+    await api.sessions.recoveryAction('adopt', tmuxSession)
+    setOrphans(prev => prev.filter(o => o.tmuxSession !== tmuxSession))
+  }, [])
+
+  const handleOrphanKill = useCallback(async (tmuxSession: string) => {
+    const api = (window as any).cipherMux
+    await api.sessions.recoveryAction('kill', tmuxSession)
+    setOrphans(prev => prev.filter(o => o.tmuxSession !== tmuxSession))
+  }, [])
 
   const showNotes = true
 
@@ -58,7 +94,7 @@ export function SidebarPanel({
 
   const handleNoteDelete = useCallback(async (note: any, e: Event) => {
     e.stopPropagation()
-    if (!confirm(`Note "${note.title || note.id}" wirklich löschen?`)) return
+    if (!confirm(t('sidebar.confirmDelete', { title: note.title || note.id }))) return
     await deleteNote(note.id, note.scope)
   }, [deleteNote])
 
@@ -79,16 +115,16 @@ export function SidebarPanel({
   return (
     <aside class="sidebar-panel">
       <div class="sidebar-panel__header">
-        <span class="sidebar-panel__title">SIDEBAR</span>
+        <span class="sidebar-panel__title">{t('sidebar.title')}</span>
         {onDetach && (
-          <button class="sidebar-panel__detach" onClick={onDetach} title="Detach as window">⧉</button>
+          <button class="sidebar-panel__detach" onClick={onDetach} title={t('sidebar.detach')}>⧉</button>
         )}
       </div>
 
       {showMessages && (
         <section class="sidebar-section">
           <div class="sidebar-section__head" onClick={() => setMessagesExpanded(v => !v)}>
-            <span>{messagesExpanded ? '▾' : '▸'} MESSAGES ({messages.length})</span>
+            <span>{messagesExpanded ? '▾' : '▸'} {t('sidebar.messages')} ({messages.length})</span>
           </div>
           {messagesExpanded && (
             <div class="sidebar-section__feed">
@@ -109,7 +145,7 @@ export function SidebarPanel({
       {showBackground && (
         <section class="sidebar-section">
           <div class="sidebar-section__head" onClick={() => setBgExpanded(v => !v)}>
-            <span>{bgExpanded ? '▾' : '▸'} BACKGROUND SESSIONS ({backgroundSessions.length})</span>
+            <span>{bgExpanded ? '▾' : '▸'} {t('sidebar.backgroundSessions')} ({backgroundSessions.length})</span>
           </div>
           {bgExpanded && backgroundSessions.map(s => (
             <BackgroundSessionCard
@@ -117,8 +153,44 @@ export function SidebarPanel({
               session={s}
               contextUsage={contextUsages[s.id]}
               onClick={() => onAddToGrid(s.id)}
+              onKill={() => onKillSession(s.id)}
             />
           ))}
+        </section>
+      )}
+
+      {orphans.length > 0 && (
+        <section class="sidebar-section">
+          <div class="sidebar-section__head" onClick={() => setOrphansExpanded(v => !v)}>
+            <span>
+              {orphansExpanded ? '▾' : '▸'} {t('sidebar.orphanedSessions')}
+              <span class="sidebar-section__badge">{orphans.length}</span>
+            </span>
+          </div>
+          {orphansExpanded && (
+            <div class="sidebar-section__feed">
+              {orphans.map(o => (
+                <div key={o.tmuxSession} class="bg-card">
+                  <div class="bg-card__head">
+                    <span class="bg-card__name">{o.tmuxSession}</span>
+                  </div>
+                  {o.projectPath && (
+                    <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)', opacity: 0.6 }}>
+                      {o.projectPath}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 'var(--space-xs)', marginTop: 'var(--space-xs)' }}>
+                    <button class="btn btn--sm btn--primary" onClick={() => handleOrphanAdopt(o.tmuxSession)}>
+                      {t('sidebar.orphanAdopt')}
+                    </button>
+                    <button class="btn btn--sm" onClick={() => handleOrphanKill(o.tmuxSession)}>
+                      {t('sidebar.orphanKill')}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -126,7 +198,7 @@ export function SidebarPanel({
         <section class="sidebar-section">
           <div class="sidebar-section__head" onClick={() => setRequestsExpanded(v => !v)}>
             <span>
-              {requestsExpanded ? '▾' : '▸'} REQUESTS
+              {requestsExpanded ? '▾' : '▸'} {t('sidebar.requests')}
               {openCount > 0 && <span class="sidebar-section__badge">{openCount}</span>}
             </span>
           </div>
@@ -143,7 +215,7 @@ export function SidebarPanel({
       {showNotes && (
         <section class="sidebar-section">
           <div class="sidebar-section__head" onClick={() => setNotesExpanded(v => !v)}>
-            <span>{notesExpanded ? '▾' : '▸'} NOTES ({filteredNotes.length})</span>
+            <span>{notesExpanded ? '▾' : '▸'} {t('sidebar.notes')} ({filteredNotes.length})</span>
           </div>
           {notesExpanded && (
             <div class="sidebar-section__feed">
@@ -151,7 +223,7 @@ export function SidebarPanel({
               <input
                 type="text"
                 class="sidebar-notes__search"
-                placeholder="suche..."
+                placeholder={t('sidebar.notesSearch')}
                 value={searchTerm}
                 onInput={(e) => setSearchTerm((e.target as HTMLInputElement).value)}
               />
@@ -173,7 +245,7 @@ export function SidebarPanel({
                   key={note.id}
                   class="bg-card"
                   onDblClick={() => handleNoteDoubleClick(note)}
-                  title="Doppelklick zum Öffnen"
+                  title={t('sidebar.noteDoubleClick')}
                   draggable
                   onDragStart={(e) => {
                     e.dataTransfer?.setData('text/plain', JSON.stringify(note))
@@ -184,7 +256,7 @@ export function SidebarPanel({
                     <button
                       class="bg-card__delete"
                       onClick={(e) => handleNoteDelete(note, e)}
-                      title="Note löschen"
+                      title={t('sidebar.noteDelete')}
                     >✕</button>
                   </div>
                   <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)' }}>
@@ -196,15 +268,20 @@ export function SidebarPanel({
                 </div>
               ))}
               {filteredNotes.length === 0 && (
-                <div class="sidebar-panel__empty" style={{ padding: 'var(--space-sm)' }}>Keine Notes gefunden.</div>
+                <div class="sidebar-panel__empty" style={{ padding: 'var(--space-sm)' }}>{t('sidebar.noNotes')}</div>
               )}
             </div>
           )}
         </section>
       )}
 
-      {!showMessages && !showBackground && !showRequests && !showNotes && (
-        <div class="sidebar-panel__empty">No active background content.</div>
+      <CompanionMemoryView
+        expanded={memoryExpanded}
+        onToggle={() => setMemoryExpanded(v => !v)}
+      />
+
+      {!showMessages && !showBackground && !showRequests && !showNotes && orphans.length === 0 && !memoryExpanded && (
+        <div class="sidebar-panel__empty">{t('sidebar.noContent')}</div>
       )}
     </aside>
   )
@@ -214,9 +291,11 @@ interface BackgroundSessionCardProps {
   session: { id: string; name: string; projectPath?: string }
   contextUsage?: { usedPercentage: number; used?: number; total?: number }
   onClick: () => void
+  onKill: () => void
 }
 
-function BackgroundSessionCard({ session, contextUsage, onClick }: BackgroundSessionCardProps) {
+function BackgroundSessionCard({ session, contextUsage, onClick, onKill }: BackgroundSessionCardProps) {
+  const { t } = useTranslation()
   const [lastOutput, setLastOutput] = useState<string>('')
 
   useEffect(() => {
@@ -233,10 +312,21 @@ function BackgroundSessionCard({ session, contextUsage, onClick }: BackgroundSes
     return () => clearInterval(interval)
   }, [session.id])
 
+  const handleKill = useCallback((e: Event) => {
+    e.stopPropagation()
+    if (!confirm(t('sidebar.confirmKillSession', { name: session.name }))) return
+    onKill()
+  }, [onKill, session.name, t])
+
   return (
-    <div class="bg-card" onClick={onClick} title="Click to place in grid">
+    <div class="bg-card" onClick={onClick} title={t('sidebar.clickToPlace')}>
       <div class="bg-card__head">
         <span class="bg-card__name">{session.name}</span>
+        <button
+          class="bg-card__kill"
+          onClick={handleKill}
+          title={t('sidebar.killSession')}
+        >✕</button>
         <span class="bg-card__path">{session.projectPath ?? ''}</span>
       </div>
       {contextUsage && (
@@ -314,7 +404,7 @@ function RequestCard({ request, onAnswer, onOpenReview }: RequestCardProps) {
               }}
             >
               • <strong>{o.key}</strong> {o.label}
-              {o.key === request.recommendation && <span style={{ color: 'var(--color-neon)', marginLeft: '4px' }}>(empfohlen)</span>}
+              {o.key === request.recommendation && <span style={{ color: 'var(--color-neon)', marginLeft: '4px' }}>{t('sidebar.recommended')}</span>}
             </div>
           ))}
         </div>
@@ -339,12 +429,12 @@ function RequestCard({ request, onAnswer, onOpenReview }: RequestCardProps) {
             rows={2}
           />
           <button class="btn btn--primary btn--sm" onClick={handleSave}>
-            send
+            {t('sidebar.send')}
           </button>
         </div>
       ) : (
         <button class="btn btn--sm" style={{ marginTop: 'var(--space-xs)' }} onClick={() => setEditing(true)}>
-          answer
+          {t('sidebar.answer')}
         </button>
       )}
     </div>

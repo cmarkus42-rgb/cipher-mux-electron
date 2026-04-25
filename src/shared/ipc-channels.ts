@@ -11,6 +11,9 @@ export const IPC = {
   SESSION_CHANGED: 'cipher-mux:session-changed',
   SESSION_STOPPED: 'cipher-mux:session-stopped',
   SESSION_VISIBLE_ADD: 'cipher-mux:session:visible-add',
+  SESSION_FORK: 'cipher-mux:session:fork',
+  SESSION_ORPHANS: 'cipher-mux:session:orphans',
+  SESSION_ORPHANS_DETECTED: 'cipher-mux:session:orphans-detected',
 
   // Terminals
   TERMINAL_DATA: 'cipher-mux:terminal:data',
@@ -133,6 +136,19 @@ export const IPC = {
   NOTES_DELETE: 'cipher-mux:notes:delete',
   NOTES_TAGS: 'cipher-mux:notes:tags',
   NOTES_CHANGED: 'cipher-mux:notes:changed',
+
+  // Companion Memory
+  COMPANION_RECALL: 'cipher-mux:companion:recall',
+  COMPANION_LIST_MEMORIES: 'cipher-mux:companion:list-memories',
+  COMPANION_DELETE_MEMORY: 'cipher-mux:companion:delete-memory',
+  COMPANION_SEARCH: 'cipher-mux:companion:search',
+
+  // Entity Framework
+  ENTITY_START: 'cipher-mux:entity:start',
+  ENTITY_STOP: 'cipher-mux:entity:stop',
+  ENTITY_STATUS: 'cipher-mux:entity:status',
+  ENTITY_LIST: 'cipher-mux:entity:list',
+  ENTITY_STARTED: 'cipher-mux:entity:started',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

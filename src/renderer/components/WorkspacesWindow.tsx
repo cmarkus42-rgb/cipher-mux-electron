@@ -1,6 +1,7 @@
 // src/renderer/components/WorkspacesWindow.tsx
 // Standalone window for Workspaces + Personas management
 import { useState, useEffect } from 'preact/hooks'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '../hooks/useTheme'
 import { PersonasTab } from './PersonasTab'
 import { WorkspacesTab } from './WorkspacesTab'
@@ -9,6 +10,7 @@ import '../styles/workspaces.css'
 type TabId = 'workspaces' | 'personas'
 
 export function WorkspacesWindow() {
+  const { t } = useTranslation()
   const { theme } = useTheme()
   const [activeTab, setActiveTab] = useState<TabId>('workspaces')
 
@@ -30,7 +32,7 @@ export function WorkspacesWindow() {
               class={`ws-window__tab ${activeTab === tab ? 'ws-window__tab--active' : ''}`}
               onClick={() => setActiveTab(tab)}
             >
-              {tab}
+              {tab === 'workspaces' ? t('workspacesWindow.workspaces') : t('workspacesWindow.personas')}
             </button>
           ))}
         </div>

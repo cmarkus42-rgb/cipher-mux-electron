@@ -3,12 +3,14 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import { ulid } from 'ulidx'
-import type { SessionInfo, SessionStatus, StartSessionOpts, RecoveryResult } from '../../shared/types'
+import type { SessionInfo, StartSessionOpts, RecoveryResult, EntityId } from '../../shared/types'
 import { MAX_SESSIONS, ORCHESTRATOR_MAX_RETRIES, MPO_MAX_RETRIES } from '../../shared/constants'
 import { BRAND } from '../../shared/brand'
 import { TmuxManager } from '../tmux/tmux-manager'
 import { generateOrchestratorClaudeMd } from './orchestrator-template'
 import { generateMpoClaudeMd } from './mpo-template'
+import { EntityRegistry } from './entity-registry'
+import { deployEntityAssets } from './entity-assets'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
 
@@ -32,6 +34,12 @@ export class SessionManager extends EventEmitter {
   private orchestratorSessionId: string | null = null
   private mpoSessionId: string | null = null
   private mcpConfig: OrchestratorConfig | null = null
+  /** Entity registry for functional entities. */
+  private entityRegistry: EntityRegistry
+  /** Maps entity IDs to their active session IDs. */
+  private entitySessionIds: Map<EntityId, string> = new Map()
+  /** App root for resolving template paths during asset deployment. */
+  private appRoot: string
   /**
    * Commands queued to be sent to a session once its terminal reports
    * the real (post-mount) size via markReady(). Prevents launching TUIs
@@ -39,10 +47,17 @@ export class SessionManager extends EventEmitter {
    */
   private pendingLaunch: Map<string, { command: string; timer: NodeJS.Timeout }> = new Map()
 
-  constructor(tmux: TmuxManager, adapterRegistry: AdapterRegistry) {
+  constructor(tmux: TmuxManager, adapterRegistry: AdapterRegistry, entityRegistry?: EntityRegistry, appRoot?: string) {
     super()
     this.tmux = tmux
     this.adapterRegistry = adapterRegistry
+    this.entityRegistry = entityRegistry ?? new EntityRegistry()
+    this.appRoot = appRoot ?? process.cwd()
+  }
+
+  /** Get the entity registry. */
+  getEntityRegistry(): EntityRegistry {
+    return this.entityRegistry
   }
 
   /**
@@ -141,6 +156,16 @@ export class SessionManager extends EventEmitter {
     // reports the real terminal size, so TUIs start at the correct dims.
     if (opts.autoLaunch) {
       this.setPendingLaunch(id, opts.autoLaunch)
+    } else if (opts.resume || opts.forkFromClaudeSessionId) {
+      // Build auto-launch with resume/fork flags via adapter
+      const launchCmd = adapter.buildLaunchCommand({
+        projectPath: opts.projectPath || os.homedir(),
+        sessionName: opts.name,
+        resume: opts.resume,
+        forkFromClaudeSessionId: opts.forkFromClaudeSessionId,
+      })
+      const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
+      this.setPendingLaunch(id, `clear; ${cmdStr}\n`)
     }
 
     this.emit('session-changed', session)
@@ -258,19 +283,21 @@ export class SessionManager extends EventEmitter {
       }
     }
 
-    // Restore orchestrator link if a recovered session is named "Orchestrator"
-    for (const session of recovered) {
-      if (session.name === 'Orchestrator') {
-        this.orchestratorSessionId = session.id
-        break
-      }
+    // Restore entity links from recovered sessions
+    const entityNameMap: Record<string, EntityId> = {
+      'Orchestrator': 'orchestrator',
+      'MPO': 'mpo',
+      'Coding Companion': 'companion',
+      'Refinement': 'refinement',
     }
-
-    // Restore MPO link if a recovered session is named "MPO"
     for (const session of recovered) {
-      if (session.name === 'MPO') {
-        this.mpoSessionId = session.id
-        break
+      const entityId = entityNameMap[session.name]
+      if (entityId) {
+        session.entityId = entityId
+        this.entitySessionIds.set(entityId, session.id)
+        this.entityRegistry.linkSession(session.id, entityId)
+        if (entityId === 'orchestrator') this.orchestratorSessionId = session.id
+        if (entityId === 'mpo') this.mpoSessionId = session.id
       }
     }
 
@@ -424,6 +451,134 @@ export class SessionManager extends EventEmitter {
     return this.sessionAdapters.get(sessionId)
   }
 
+  // ─── Entity Framework ───────────────────────────────────
+
+  /**
+   * Start an entity session by ID. Deploys assets if needed, creates
+   * the session, and tags it with the entity ID.
+   */
+  async startEntity(entityId: EntityId, opts?: Partial<StartSessionOpts>): Promise<SessionInfo> {
+    const config = this.entityRegistry.get(entityId)
+    if (!config) {
+      throw new Error(`Unknown entity: ${entityId}`)
+    }
+
+    // Check if already running
+    const existingId = this.entitySessionIds.get(entityId)
+    if (existingId) {
+      const existing = this.sessions.get(existingId)
+      if (existing && existing.status === 'active') {
+        throw new Error(`${config.displayName} is already running`)
+      }
+      this.entitySessionIds.delete(entityId)
+      this.entityRegistry.unlinkSession(existingId)
+    }
+
+    // Deploy assets if this entity has a template
+    if (config.templatePath) {
+      deployEntityAssets(config, this.appRoot)
+    }
+
+    // Ensure entity directory exists
+    fs.mkdirSync(config.projectPath, { recursive: true })
+
+    // Write .mcp.json for MCP auto-discovery (if entity uses MCP)
+    if (config.features.includes('mcp') && this.mcpConfig) {
+      const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}/mcp`
+      const mcpJsonPath = path.join(config.projectPath, '.mcp.json')
+      const mcpJson = {
+        mcpServers: {
+          'cipher-mux': {
+            type: 'http',
+            url: mcpUrl,
+            headers: { Authorization: `Bearer ${this.mcpConfig.mcpApiKey}` },
+          },
+        },
+      }
+      fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2), 'utf-8')
+    }
+
+    // Start session
+    const session = await this.start({
+      name: config.displayName,
+      projectPath: config.projectPath,
+      ...opts,
+    })
+
+    // Tag session with entity
+    session.entityId = entityId
+    this.entitySessionIds.set(entityId, session.id)
+    this.entityRegistry.linkSession(session.id, entityId)
+
+    // Backward compat: update orchestrator/mpo session ID refs
+    if (entityId === 'orchestrator') this.orchestratorSessionId = session.id
+    if (entityId === 'mpo') this.mpoSessionId = session.id
+
+    this.emit('entity-started', { entityId, session })
+    return session
+  }
+
+  /**
+   * Queue Claude Code launch for an entity session.
+   */
+  queueEntityClaude(entityId: EntityId): void {
+    const sessionId = this.entitySessionIds.get(entityId)
+    if (!sessionId) {
+      throw new Error(`${entityId} is not running`)
+    }
+    const config = this.entityRegistry.get(entityId)
+    if (!config) return
+
+    const adapter = this.adapterRegistry.getDefault()
+    const launchCmd = adapter.buildLaunchCommand({
+      projectPath: config.projectPath,
+      sessionName: config.displayName,
+      isOrchestrator: entityId === 'orchestrator',
+      isMpo: entityId === 'mpo',
+      resume: config.autoResume ?? true,
+    })
+    const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
+    this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
+  }
+
+  /**
+   * Stop an entity session.
+   */
+  async stopEntity(entityId: EntityId): Promise<void> {
+    const sessionId = this.entitySessionIds.get(entityId)
+    if (!sessionId) return // already stopped
+    try {
+      await this.stop(sessionId)
+    } catch {
+      // Session may already be gone
+    }
+    this.entitySessionIds.delete(entityId)
+    this.entityRegistry.unlinkSession(sessionId)
+
+    // Backward compat
+    if (entityId === 'orchestrator') this.orchestratorSessionId = null
+    if (entityId === 'mpo') this.mpoSessionId = null
+
+    this.emit('entity-stopped', { entityId })
+  }
+
+  /**
+   * Check if an entity is currently running.
+   */
+  isEntityRunning(entityId: EntityId): boolean {
+    const sessionId = this.entitySessionIds.get(entityId)
+    if (!sessionId) return false
+    const session = this.sessions.get(sessionId)
+    return (session?.status === 'active') || false
+  }
+
+  /**
+   * Get the session ID for an entity (or null).
+   */
+  getEntitySessionId(entityId: EntityId): string | null {
+    return this.entitySessionIds.get(entityId) ?? null
+  }
+
   // ─── Orchestrator ─────────────────────────────────────
 
   /**
@@ -505,13 +660,12 @@ export class SessionManager extends EventEmitter {
     if (!this.orchestratorSessionId) {
       throw new Error('Orchestrator is not running')
     }
-    // Build launch command from adapter — structured {cmd, args}, no shell injection risk.
-    // Prepending `clear` wipes the shell prompt before the TUI takes over.
     const adapter = this.adapterRegistry.getDefault()
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: this.resolveOrchestratorDir(),
       sessionName: 'Orchestrator',
       isOrchestrator: true,
+      resume: true,
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
     this.setPendingLaunch(
@@ -621,6 +775,7 @@ export class SessionManager extends EventEmitter {
       projectPath: this.resolveMpoDir(),
       sessionName: 'MPO',
       isMpo: true,
+      resume: true,
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
     this.setPendingLaunch(this.mpoSessionId, `clear; ${cmdStr}\n`)
@@ -658,11 +813,118 @@ export class SessionManager extends EventEmitter {
     return this.mpoSessionId
   }
 
+  // ─── Session Resume / Fork ──────────────────────────────
+
+  /**
+   * Update the Claude Code session ID for a session (tracked from statusline).
+   */
+  updateClaudeSessionId(sessionId: string, claudeSessionId: string): void {
+    const session = this.sessions.get(sessionId)
+    if (session) {
+      session.claudeSessionId = claudeSessionId
+      session.updatedAt = Date.now()
+    }
+  }
+
+  /**
+   * Fork an existing session: creates a new session with --fork-session --resume <id>.
+   */
+  async forkSession(sourceSessionId: string): Promise<SessionInfo> {
+    const source = this.sessions.get(sourceSessionId)
+    if (!source) throw new Error(`Source session ${sourceSessionId} not found`)
+    if (!source.claudeSessionId) {
+      throw new Error('Source session has no Claude session ID — cannot fork')
+    }
+
+    const adapter = this.adapterRegistry.getDefault()
+    const launchCmd = adapter.buildLaunchCommand({
+      projectPath: source.projectPath || os.homedir(),
+      sessionName: `${source.name}-fork`,
+      forkFromClaudeSessionId: source.claudeSessionId,
+    })
+    const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
+
+    const newSession = await this.start({
+      name: `${source.name}-fork`,
+      projectPath: source.projectPath || '',
+    })
+
+    this.setPendingLaunch(newSession.id, `clear; ${cmdStr}\n`)
+    return newSession
+  }
+
+  // ─── Orphan Detection ─────────────────────────────────
+
+  private orphanTimer: NodeJS.Timeout | null = null
+
+  /**
+   * Start periodic orphan detection (every 5 minutes).
+   */
+  startOrphanDetection(): void {
+    if (this.orphanTimer) return
+    this.orphanTimer = setInterval(() => {
+      this.detectOrphans().catch((err) => {
+        console.error('[SessionManager] orphan detection error:', err)
+      })
+    }, 5 * 60 * 1000)
+  }
+
+  /**
+   * Stop periodic orphan detection.
+   */
+  stopOrphanDetection(): void {
+    if (this.orphanTimer) {
+      clearInterval(this.orphanTimer)
+      this.orphanTimer = null
+    }
+  }
+
+  /**
+   * Detect orphaned cmux-* sessions not in the registry.
+   */
+  async detectOrphans(): Promise<SessionInfo[]> {
+    let tmuxSessions: Array<{ name: string; created: number; paneCwd?: string | null }>
+    try {
+      tmuxSessions = await this.tmux.listSessions()
+    } catch {
+      return []
+    }
+
+    const knownTmuxNames = new Set<string>()
+    for (const session of this.sessions.values()) {
+      knownTmuxNames.add(session.tmuxSession)
+    }
+
+    const orphans: SessionInfo[] = []
+    for (const ts of tmuxSessions) {
+      if (ts.name === 'cipher-mux-control') continue
+      if (!ts.name.startsWith('cmux-')) continue
+      if (knownTmuxNames.has(ts.name)) continue
+
+      orphans.push({
+        id: ulid(),
+        name: ts.name,
+        projectPath: ts.paneCwd || null,
+        tmuxSession: ts.name,
+        tmuxPane: null,
+        status: 'orphaned',
+        createdAt: ts.created * 1000,
+        updatedAt: Date.now(),
+      })
+    }
+
+    if (orphans.length > 0) {
+      this.emit('orphans-detected', orphans)
+    }
+    return orphans
+  }
+
   /**
    * Disconnect from tmux without killing sessions.
    * Sessions survive app quit and are recovered on next launch.
    */
   async destroy(): Promise<void> {
+    this.stopOrphanDetection()
     this.sessions.clear()
     this.tmux.disconnect()
   }

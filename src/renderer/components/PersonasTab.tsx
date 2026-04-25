@@ -1,5 +1,6 @@
 // src/renderer/components/PersonasTab.tsx — Personas settings tab
 import { useCallback, useEffect, useState } from 'preact/hooks'
+import { useTranslation } from 'react-i18next'
 import type { Persona, Workspace } from '../../shared/persona-types'
 import { PERSONA_SWATCHES } from '../../shared/persona-types'
 
@@ -19,6 +20,7 @@ function countUsage(personaId: string, workspaces: Workspace[]) {
 }
 
 export function PersonasTab() {
+  const { t } = useTranslation()
   const [personas, setPersonas] = useState<Persona[]>([])
   const [activeId, setActiveId] = useState('')
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
@@ -122,7 +124,7 @@ export function PersonasTab() {
 
   const handleDelete = async () => {
     if (!active || isBuiltin) return
-    const ok = confirm(`Delete persona "${draftName}"? Cells using it will fall back to (empty).`)
+    const ok = confirm(t('personasTab.confirmDelete', { name: draftName }))
     if (!ok) return
     const res = await api.personas.delete(active.id)
     if (res.ok) {
@@ -138,7 +140,7 @@ export function PersonasTab() {
   // ── Render ──
 
   if (personas.length === 0) {
-    return <div class="pp-pane"><div class="pp-edit pp-edit--empty">loading...</div></div>
+    return <div class="pp-pane"><div class="pp-edit pp-edit--empty">{t('personasTab.loading')}</div></div>
   }
 
   return (
@@ -146,8 +148,8 @@ export function PersonasTab() {
       {/* LEFT: list */}
       <div class="pp-list">
         <div class="pp-list-head">
-          <span>Personas</span>
-          <button onClick={handleAdd}>+ NEW</button>
+          <span>{t('personasTab.title')}</span>
+          <button onClick={handleAdd}>{t('personasTab.addNew')}</button>
         </div>
         <div class="pp-list-items">
           {personas.map((p) => {
@@ -162,10 +164,10 @@ export function PersonasTab() {
                 <div class="pp-item-meta">
                   <div class="pp-item-name">{p.name}</div>
                   <div class={`pp-item-sub ${preview ? '' : 'pp-item-sub--empty'}`}>
-                    {preview || '(no default prompt)'}
+                    {preview || t('personasTab.noPrompt')}
                   </div>
                 </div>
-                {p.builtin ? <div class="pp-badge">BUILT-IN</div> : <div />}
+                {p.builtin ? <div class="pp-badge">{t('personasTab.builtIn')}</div> : <div />}
               </div>
             )
           })}
@@ -182,21 +184,21 @@ export function PersonasTab() {
               class="pp-edit-name"
               value={isBuiltin ? active.name : draftName}
               disabled={isBuiltin}
-              placeholder="Persona name"
+              placeholder={t('personasTab.namePlaceholder')}
               onInput={(e) => {
                 setDraftName((e.target as HTMLInputElement).value)
                 setDirty(true)
               }}
             />
             <div class="pp-edit-actions">
-              <button onClick={handleDuplicate}>duplicate</button>
+              <button onClick={handleDuplicate}>{t('personasTab.duplicate')}</button>
               <button
                 class="pp-btn-danger"
                 onClick={handleDelete}
                 disabled={isBuiltin}
-                title={isBuiltin ? 'Built-in cannot be deleted' : undefined}
+                title={isBuiltin ? t('personasTab.deleteBuiltinHint') : undefined}
               >
-                delete
+                {t('personasTab.delete')}
               </button>
             </div>
           </div>
@@ -204,13 +206,13 @@ export function PersonasTab() {
           {/* Color swatches */}
           <div class="pp-colors">
             <div class="pp-colors-label">
-              Color{' '}
+              {t('personasTab.colorLabel')}{' '}
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'none', letterSpacing: '0', color: isBuiltin ? active.color : draftColor }}>
                 {isBuiltin ? active.color : draftColor}
               </span>
               {isBuiltin && (
                 <span style={{ color: 'var(--color-text-dim)', textTransform: 'uppercase', marginLeft: '8px' }}>
-                  · locked
+                  {t('personasTab.locked')}
                 </span>
               )}
             </div>
@@ -230,9 +232,9 @@ export function PersonasTab() {
 
           {/* Prompt textarea */}
           <div class="pp-field">
-            <label>Default Prompt</label>
+            <label>{t('personasTab.defaultPrompt')}</label>
             <div class="pp-hint">
-              Used when a cell with this persona has no per-cell prompt and no workspace override. Editable even for built-ins.
+              {t('personasTab.promptHint')}
             </div>
             <textarea
               value={draftPrompt}
@@ -240,11 +242,11 @@ export function PersonasTab() {
                 setDraftPrompt((e.target as HTMLTextAreaElement).value)
                 setDirty(true)
               }}
-              placeholder="What does this persona do? How does it behave? One paragraph."
+              placeholder={t('personasTab.promptPlaceholder')}
             />
             {active?.builtin && active.id !== 'empty' && (
               <div class="persona-hint">
-                {active.name} uses its own system template. This prompt influences communication style only.
+                {t('personasTab.builtinNote', { name: active.name })}
               </div>
             )}
           </div>
@@ -263,22 +265,22 @@ export function PersonasTab() {
                 ))}
               </span>
             ) : (
-              <span class="pp-usage-empty">Not used by any workspace yet.</span>
+              <span class="pp-usage-empty">{t('personasTab.notUsed')}</span>
             )}
           </div>
 
           {/* Save / Revert */}
           <div class="pp-foot-actions">
             <button onClick={handleRevert} disabled={!dirty}>
-              revert
+              {t('personasTab.revert')}
             </button>
             <button class="pp-btn-primary" onClick={handleSave} disabled={!dirty}>
-              save
+              {t('personasTab.save')}
             </button>
           </div>
         </div>
       ) : (
-        <div class="pp-edit pp-edit--empty">Select a persona</div>
+        <div class="pp-edit pp-edit--empty">{t('personasTab.selectPersona')}</div>
       )}
     </div>
   )

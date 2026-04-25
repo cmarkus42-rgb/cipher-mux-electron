@@ -94,6 +94,7 @@ export class ReferenceStubAdapter implements AgentAdapter {
       'sub-agents': false,
       'project-instructions': false,
       'message-bus-participant': false,
+      'companion-mcp': false,
     }
   }
 
