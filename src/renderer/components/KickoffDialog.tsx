@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'preact/hooks'
+import { useTranslation } from 'react-i18next'
 
 interface KickoffDialogProps {
   visible: boolean
@@ -13,6 +14,7 @@ interface KickoffDialogProps {
 const api = (window as any).cipherMux
 
 export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProps) {
+  const { t } = useTranslation()
   const [projectDir, setProjectDir] = useState('')
   const [requirementsFile, setRequirementsFile] = useState('')
   const [extraContext, setExtraContext] = useState('')
@@ -21,7 +23,7 @@ export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProp
 
   const handlePickDir = useCallback(async () => {
     const selected = await api.dialog.openDir({
-      title: 'Projekt-Verzeichnis wählen (das Obsidian-Verzeichnis)',
+      title: t('kickoff.projectDir'),
     })
     if (selected) setProjectDir(selected)
   }, [])
@@ -29,7 +31,7 @@ export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProp
   const handlePickReqFile = useCallback(async () => {
     // No extension filter — all formats allowed.
     const selected = await api.dialog.openFile({
-      title: 'Externe Anforderungsdatei wählen',
+      title: t('kickoff.reqFile'),
     })
     if (selected) setRequirementsFile(selected)
   }, [])
@@ -37,7 +39,7 @@ export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProp
   const handleSubmit = useCallback(async () => {
     setError(null)
     if (!projectDir.trim()) {
-      setError('Projekt-Verzeichnis fehlt')
+      setError(t('kickoff.errorMissing'))
       return
     }
 
@@ -66,14 +68,14 @@ export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProp
     <div class="kickoff-overlay" onKeyDown={handleKeyDown}>
       <div class="kickoff-dialog card card--flat">
         <div class="kickoff-dialog__header">
-          <span>Neues Projekt aus Konzept</span>
+          <span>{t('kickoff.title')}</span>
           <span class="kickoff-dialog__close" onClick={onClose}>✕</span>
         </div>
 
         <div class="kickoff-dialog__body">
           {/* Project Directory */}
           <label class="kickoff-dialog__label">
-            <span>Projekt-Verzeichnis</span>
+            <span>{t('kickoff.projectDir')}</span>
             <div class="kickoff-dialog__file-row">
               <input
                 class="input"
@@ -86,35 +88,35 @@ export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProp
               <button class="btn btn--sm" onClick={handlePickDir}>…</button>
             </div>
             <span class="text-xs text-dim" style={{ marginTop: '4px' }}>
-              Das Obsidian-Verzeichnis, in dem dein Konzept liegt.
+              {t('kickoff.projectDirHint')}
             </span>
           </label>
 
           {/* External Requirements File (optional) */}
           <label class="kickoff-dialog__label">
-            <span>Anforderungsdatei (optional)</span>
+            <span>{t('kickoff.reqFile')}</span>
             <div class="kickoff-dialog__file-row">
               <input
                 class="input"
                 type="text"
-                placeholder="Leer lassen, wenn schon im Projekt-Verzeichnis"
+                placeholder={t('kickoff.reqFilePlaceholder')}
                 value={requirementsFile}
                 onInput={(e) => setRequirementsFile((e.target as HTMLInputElement).value)}
               />
               <button class="btn btn--sm" onClick={handlePickReqFile}>…</button>
             </div>
             <span class="text-xs text-dim" style={{ marginTop: '4px' }}>
-              Beliebiges Format (.md, .txt, .docx, .yaml …). Wird als docs/requirements.&lt;ext&gt; ins Projekt kopiert.
+              {t('kickoff.reqFileHint')}
             </span>
           </label>
 
           {/* Extra Context (optional) */}
           <label class="kickoff-dialog__label">
-            <span>Zusätzlicher Kontext (optional)</span>
+            <span>{t('kickoff.extraContext')}</span>
             <textarea
               class="input"
               rows={6}
-              placeholder="Alles, was Claude zusätzlich wissen soll: Stack-Präferenzen, Referenz-Projekte, Miro-URLs, …"
+              placeholder={t('kickoff.extraContextPlaceholder')}
               value={extraContext}
               onInput={(e) => setExtraContext((e.target as HTMLTextAreaElement).value)}
               style={{ fontFamily: "'Fira Code', monospace", fontSize: '12px', resize: 'vertical' }}
@@ -125,9 +127,9 @@ export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProp
         </div>
 
         <div class="kickoff-dialog__footer">
-          <button class="btn" onClick={onClose}>Abbrechen</button>
+          <button class="btn" onClick={onClose}>{t('kickoff.cancel')}</button>
           <button class="btn btn--primary" onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Starte Launcher…' : 'Projekt aufsetzen'}
+            {loading ? t('kickoff.starting') : t('kickoff.submit')}
           </button>
         </div>
       </div>

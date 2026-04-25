@@ -21,12 +21,14 @@ import { TaskHooks } from './task/task-hooks'
 import { BugreportTaskSource } from './task/sources/bugreport-source'
 import { NoteManager } from './notes/note-manager'
 import { NoteTagging } from './notes/note-tagging'
+import { MemoryStore } from './companion/memory-store'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { AdapterRegistry } from './agent/registry'
+import { EntityRegistry, registerBuiltinEntities } from './session/entity-registry'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
 import { BRAND } from '../shared/brand'
-import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest } from '../shared/types'
+import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest, EntityId } from '../shared/types'
 import type { Persona, Workspace } from '../shared/persona-types'
 import { applyWorkspace } from './workspace/workspace-manager'
 
@@ -51,14 +53,19 @@ export class IpcHub {
   private inputRequestWatcher: InputRequestWatcher | null = null
   private noteManager!: NoteManager
   private noteTagging!: NoteTagging
+  private memoryStore: MemoryStore | null = null
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
 
   private adapterRegistry: AdapterRegistry
 
   constructor(private windowManager: WindowManager) {
     this.adapterRegistry = new AdapterRegistry()
+    const entityRegistry = new EntityRegistry()
+    registerBuiltinEntities(entityRegistry, BRAND.orchestratorDir, BRAND.mpoDir)
     this.tmux = new TmuxManager()
-    this.sessionManager = new SessionManager(this.tmux, this.adapterRegistry)
+    // Resolve app root for entity asset deployment
+    const appRoot = path.resolve(__dirname, '..', '..', '..')
+    this.sessionManager = new SessionManager(this.tmux, this.adapterRegistry, entityRegistry, appRoot)
     try {
       this.messageBus = new MessageBus({
         dbPath: path.join(app.getPath('userData'), 'messages.db'),
@@ -82,6 +89,14 @@ export class IpcHub {
     const notesDir = path.join(os.homedir(), '.config', 'cipher-mux', 'notes')
     this.noteManager = new NoteManager(notesDir)
     this.noteTagging = new NoteTagging(notesDir)
+
+    // Initialize Companion MemoryStore
+    try {
+      const companionDbPath = path.join(os.homedir(), '.config', 'cipher-mux', 'companion.db')
+      this.memoryStore = new MemoryStore(companionDbPath)
+    } catch (err) {
+      console.error('[IpcHub] MemoryStore init failed:', err)
+    }
 
     // Initialize TaskManager — reuse MessageBus DB for single-writer consistency
     try {
@@ -113,6 +128,8 @@ export class IpcHub {
     this.registerPersonaChannels()
     this.registerWorkspaceChannels()
     this.registerNoteChannels()
+    this.registerEntityChannels()
+    this.registerCompanionChannels()
     this.setupEventForwarding()
 
     // Start context usage monitor
@@ -159,8 +176,15 @@ export class IpcHub {
       if (result.orphaned.length > 0 || result.recovered.length > 0) {
         this.windowManager.sendToMainWindow(IPC.SESSIONS_RECOVERY_RESULT, result)
       }
+      // Start periodic orphan detection after initial recovery
+      this.sessionManager.startOrphanDetection()
     }).catch((err) => {
       console.error('[IpcHub] tmux connect or session recovery failed:', err)
+    })
+
+    // Forward orphan detection events to renderer
+    this.sessionManager.on('orphans-detected', (orphans: any[]) => {
+      this.windowManager.sendToMainWindow(IPC.SESSION_ORPHANS_DETECTED, orphans)
     })
 
     // Initial cleanup
@@ -192,6 +216,8 @@ export class IpcHub {
       taskManager: this.taskManager,
       inputRequestWatcher: this.inputRequestWatcher,
       windowManager: this.windowManager,
+      noteManager: this.noteManager,
+      memoryStore: this.memoryStore,
     }).then(() => {
       // Auto-start orchestrator after MCP server is ready
       this.autoStartOrchestrator()
@@ -252,6 +278,10 @@ export class IpcHub {
       this.windowManager.sendToMainWindow(IPC.MPO_STARTED, session)
     })
 
+    this.sessionManager.on('entity-started', (data: { entityId: string; session: unknown }) => {
+      this.windowManager.sendToMainWindow(IPC.ENTITY_STARTED, data)
+    })
+
     this.tmux.on('output', (paneId: string, data: string) => {
       this.windowManager.sendToMainWindow(IPC.TERMINAL_DATA, { paneId, data })
     })
@@ -268,6 +298,10 @@ export class IpcHub {
 
     this.statusLineMonitor.on('usage-warning', (sessionId: string, usage: ContextUsage) => {
       this.windowManager.sendToMainWindow(IPC.CONTEXT_WARNING, { sessionId, usage })
+    })
+
+    this.statusLineMonitor.on('claude-session-id', (sessionId: string, claudeSessionId: string) => {
+      this.sessionManager.updateClaudeSessionId(sessionId, claudeSessionId)
     })
 
     this.kickoffOrchestrator.on('kickoff-complete', (event) => {
@@ -392,6 +426,14 @@ export class IpcHub {
       } catch {
         return null
       }
+    })
+
+    ipcMain.handle(IPC.SESSION_FORK, async (_e, { sessionId }: { sessionId: string }) => {
+      return this.sessionManager.forkSession(sessionId)
+    })
+
+    ipcMain.handle(IPC.SESSION_ORPHANS, async () => {
+      return this.sessionManager.detectOrphans()
     })
   }
 
@@ -655,12 +697,13 @@ export class IpcHub {
       return this.bugreportManager.collectDiagnostics(this.sessionManager.list())
     })
 
-    ipcMain.handle(IPC.BUGREPORT_SUBMIT, async (_e, { description, project, screenshots }: {
+    ipcMain.handle(IPC.BUGREPORT_SUBMIT, async (_e, { description, project, screenshots, reportType }: {
       description: string
       project?: string
       screenshots?: string[]
+      reportType?: string
     }) => {
-      const id = await this.bugreportManager.submit(description, this.sessionManager.list(), project, undefined, screenshots)
+      const id = await this.bugreportManager.submit(description, this.sessionManager.list(), project, undefined, screenshots, reportType)
       return { id }
     })
 
@@ -1043,8 +1086,13 @@ export class IpcHub {
   // ─── Notes ─────────────────────────────────────────────
   private registerNoteChannels(): void {
     ipcMain.handle(IPC.NOTES_LIST, async (_e, { scope }: { scope?: string }) => {
-      if (scope) return this.noteManager.list(scope)
-      return this.noteManager.listAll()
+      try {
+        if (scope) return await this.noteManager.list(scope)
+        return await this.noteManager.listAll()
+      } catch (err) {
+        console.error('[IpcHub] NOTES_LIST failed:', err)
+        return []
+      }
     })
 
     ipcMain.handle(IPC.NOTES_READ, async (_e, { id, scope }: { id: string; scope: string }) => {
@@ -1090,8 +1138,74 @@ export class IpcHub {
     })
   }
 
+  // ─── Entity Framework ──────────────────────────────────
+  private registerEntityChannels(): void {
+    ipcMain.handle(IPC.ENTITY_START, async (_e, { entityId }: { entityId: EntityId }) => {
+      const mcpConfig = configStore.get('mcp')
+      // Ensure MCP config is set on session manager
+      this.sessionManager.setMcpConfig({
+        mcpHost: mcpConfig?.host ?? MCP_DEFAULT_HOST,
+        mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
+        mcpApiKey: mcpConfig?.apiKey ?? '',
+      })
+      const session = await this.sessionManager.startEntity(entityId)
+      // Queue Claude launch for entity
+      try {
+        this.sessionManager.queueEntityClaude(entityId)
+      } catch (err) {
+        console.error(`[IpcHub] Failed to queue ${entityId} claude:`, err)
+      }
+      return session
+    })
+
+    ipcMain.handle(IPC.ENTITY_STOP, async (_e, { entityId }: { entityId: EntityId }) => {
+      await this.sessionManager.stopEntity(entityId)
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.ENTITY_STATUS, async (_e, { entityId }: { entityId: EntityId }) => {
+      return {
+        running: this.sessionManager.isEntityRunning(entityId),
+        sessionId: this.sessionManager.getEntitySessionId(entityId),
+      }
+    })
+
+    ipcMain.handle(IPC.ENTITY_LIST, async () => {
+      return this.sessionManager.getEntityRegistry().list()
+    })
+  }
+
+  // ─── Companion Memory ──────────────────────────────────
+  private registerCompanionChannels(): void {
+    ipcMain.handle(IPC.COMPANION_RECALL, async (_e, { limit }: { limit?: number }) => {
+      if (!this.memoryStore) return []
+      return this.memoryStore.recall({ limit })
+    })
+
+    ipcMain.handle(IPC.COMPANION_LIST_MEMORIES, async (_e, opts?: { limit?: number; kind?: string; since?: number }) => {
+      if (!this.memoryStore) return []
+      return this.memoryStore.recall({
+        limit: opts?.limit,
+        kindFilter: opts?.kind as import('../shared/types').MemoryKind | undefined,
+        since: opts?.since,
+      })
+    })
+
+    ipcMain.handle(IPC.COMPANION_SEARCH, async (_e, { query, limit }: { query: string; limit?: number }) => {
+      if (!this.memoryStore) return []
+      return this.memoryStore.search(query, { limit })
+    })
+
+    ipcMain.handle(IPC.COMPANION_DELETE_MEMORY, async (_e, { id }: { id: string }) => {
+      if (!this.memoryStore) return { ok: false }
+      const deleted = this.memoryStore.forget(id)
+      return { ok: deleted }
+    })
+  }
+
   async destroy(): Promise<void> {
     this.noteManager.destroy()
+    this.memoryStore?.close()
     this.inputRequestWatcher?.stop()
     this.bugreportSource?.stop()
     this.taskWatcher?.stop()

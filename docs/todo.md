@@ -148,6 +148,40 @@ Phase 6: Polish (nach Phase 5)
   6.6 (nach allem)
 ```
 
+## SP-2: Notes MCP Vollausbau + Session-Handoff
+
+| # | Task | Status |
+|---|------|--------|
+| SP2.1 | NoteInfo type: add handoff frontmatter fields (fromSession, toEntity, handoffStatus) | done (2026-04-25) |
+| SP2.2 | NoteManager.parseFile(): pass through handoff frontmatter | done (2026-04-25) |
+| SP2.3 | NoteManager.search(): fulltext + tag filter + title-priority sort | done (2026-04-25) |
+| SP2.4 | NoteManager.createHandoff(): handoff note with extended frontmatter | done (2026-04-25) |
+| SP2.5 | MCP tools: mux_notes_read, mux_notes_update, mux_notes_search, mux_notes_delete | done (2026-04-25) |
+| SP2.6 | MCP tools: mux_notes_handoff_create, mux_notes_handoff_search | done (2026-04-25) |
+| SP2.7 | Tests: T1–T13 quality gate | done (2026-04-25) |
+
+## SP-5: Session Management — Resume, Fork, Orphan Detection
+
+| # | Task | Status |
+|---|------|--------|
+| SP5.1 | StartSessionOpts: add `resume` and `forkFromClaudeSessionId` fields | done (2026-04-25) |
+| SP5.2 | SessionInfo: add `claudeSessionId` field | done (2026-04-25) |
+| SP5.3 | ClaudeCodeAdapter.buildLaunchCommand: handle --resume and --fork-session flags | done (2026-04-25) |
+| SP5.4 | SessionManager: auto-launch with resume/fork flags when no explicit autoLaunch | done (2026-04-25) |
+| SP5.5 | Entity sessions (Orchestrator, MPO): default resume=true in queueClaude | done (2026-04-25) |
+| SP5.6 | SessionDialog: "Resume previous session" checkbox (i18n) | done (2026-04-25) |
+| SP5.7 | SessionCell: Fork button (⑂) for Claude Code sessions | done (2026-04-25) |
+| SP5.8 | SessionManager.forkSession(): create new session with --fork-session | done (2026-04-25) |
+| SP5.9 | StatusLineMonitor: extract Claude session ID from statusline JSON | done (2026-04-25) |
+| SP5.10 | SessionManager.updateClaudeSessionId(): track Claude session IDs | done (2026-04-25) |
+| SP5.11 | SessionManager.detectOrphans(): periodic 5min scan for orphaned cmux-* sessions | done (2026-04-25) |
+| SP5.12 | SidebarPanel: Orphaned Sessions section with Adopt/Terminate buttons | done (2026-04-25) |
+| SP5.13 | IPC channels: SESSION_FORK, SESSION_ORPHANS, SESSION_ORPHANS_DETECTED | done (2026-04-25) |
+| SP5.14 | Preload API: fork, detectOrphans, onOrphansDetected | done (2026-04-25) |
+| SP5.15 | Tests: 17 tests covering T1–T9 quality gate | done (2026-04-25) |
+
+---
+
 ## Zusammenfassung
 
 | Phase | Tasks | Dateien (ca.) | Beschreibung |
@@ -159,3 +193,15 @@ Phase 6: Polish (nach Phase 5)
 | 5 | 5 | ~7 | Orchestrator, Kickoff, MCP-Injection |
 | 6 | 6 | ~9 | Recovery, Persistenz, Info, Bugreport, Shortcuts |
 | **Total** | **33** | **~85** | |
+
+---
+
+## SP-1: i18n Foundation
+
+| # | Task | Status | Dateien |
+|---|------|--------|---------|
+| SP1.1 | i18next + react-i18next Dependencies | done (2026-04-25) | package.json |
+| SP1.2 | i18n Config + Locale Files (EN/DE) | done (2026-04-25) | src/renderer/i18n.ts, locales/en.json, locales/de.json |
+| SP1.3 | Extract strings from 24 components | done (2026-04-25) | 24 .tsx files in src/renderer/components/ |
+| SP1.4 | Language Switcher in Settings | done (2026-04-25) | InfoSettingsView.tsx, config-store.ts, types.ts |
+| SP1.5 | Documentation | done (2026-04-25) | CHANGELOG.md, docs/contributing/i18n.md, docs/todo.md |

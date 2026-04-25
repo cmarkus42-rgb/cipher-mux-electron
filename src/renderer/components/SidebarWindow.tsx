@@ -36,6 +36,11 @@ export function SidebarWindow() {
     console.log('[SidebarWindow] addToGrid requested for:', sessionId)
   }, [])
 
+  const handleKillSession = useCallback(async (sessionId: string) => {
+    const api = (window as any).cipherMux
+    await api.sessions.stop(sessionId)
+  }, [])
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div class="drag-region" style={{ height: 28, flexShrink: 0 }} />
@@ -48,6 +53,7 @@ export function SidebarWindow() {
           gridSessionIds={[]}
           contextUsages={contextUsages}
           onAddToGrid={handleAddToGrid}
+          onKillSession={handleKillSession}
           activeWorkspaceId={null}
           hasNotesCell={false}
         />

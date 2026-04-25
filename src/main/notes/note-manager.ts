@@ -2,7 +2,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import matter from 'gray-matter'
 import { ulid } from 'ulidx'
-import type { NoteInfo, NoteContent } from '../../shared/types'
+import type { NoteInfo, NoteContent, HandoffStatus } from '../../shared/types'
 
 // ─── NoteManager ────────────────────────────────────────────
 
@@ -47,6 +47,9 @@ export class NoteManager {
       tags?: string[]
       created?: string
       modified?: string
+      from_session?: string
+      to_entity?: string
+      handoff_status?: HandoffStatus
     }
 
     const id = path.basename(filePath, '.md')
@@ -58,6 +61,9 @@ export class NoteManager {
       relativePath: path.join(scope, `${id}.md`),
       createdAt: fm.created ?? new Date().toISOString(),
       modifiedAt: fm.modified ?? new Date().toISOString(),
+      ...(fm.from_session ? { fromSession: fm.from_session } : {}),
+      ...(fm.to_entity ? { toEntity: fm.to_entity } : {}),
+      ...(fm.handoff_status ? { handoffStatus: fm.handoff_status } : {}),
     }
 
     return { info, body: parsed.content.trimStart() }
@@ -169,6 +175,112 @@ export class NoteManager {
       createdAt: fm.created,
       modifiedAt: now,
     }
+  }
+
+  /** Create a handoff note with extended frontmatter fields. */
+  async createHandoff(
+    title: string,
+    body: string,
+    fromSession: string,
+    toEntity: string = 'any',
+  ): Promise<NoteInfo> {
+    const id = ulid()
+    const now = new Date().toISOString()
+    const scope = 'global'
+    const dir = this.scopeDir(scope)
+    await fs.mkdir(dir, { recursive: true })
+
+    const fm = {
+      title,
+      tags: ['handoff'] as string[],
+      from_session: fromSession,
+      to_entity: toEntity,
+      handoff_status: 'pending' as const,
+      created: now,
+      modified: now,
+    }
+
+    const content = matter.stringify('\n' + body, fm)
+    await fs.writeFile(this.filePath(id, scope), content, 'utf-8')
+
+    return {
+      id,
+      title,
+      tags: ['handoff'],
+      scope,
+      relativePath: path.join(scope, `${id}.md`),
+      createdAt: now,
+      modifiedAt: now,
+      fromSession,
+      toEntity,
+      handoffStatus: 'pending',
+    }
+  }
+
+  /**
+   * Full-text search over notes with optional scope and tag filters.
+   * Returns up to 50 results, title matches first, then by modifiedAt desc.
+   */
+  async search(query: string, opts?: {
+    scope?: string
+    tags?: string[]
+  }): Promise<NoteContent[]> {
+    // Collect all notes (scope-filtered or all scopes)
+    let scopes: string[]
+    if (opts?.scope) {
+      scopes = [opts.scope]
+    } else {
+      try {
+        const entries = await fs.readdir(this.notesDir, { withFileTypes: true })
+        scopes = entries.filter(e => e.isDirectory()).map(e => e.name)
+      } catch {
+        return []
+      }
+    }
+
+    const allNotes: NoteContent[] = []
+    for (const scope of scopes) {
+      const dir = this.scopeDir(scope)
+      let entries: string[]
+      try {
+        entries = await fs.readdir(dir)
+      } catch {
+        continue
+      }
+      const mdFiles = entries.filter(e => e.endsWith('.md'))
+      const parsed = await Promise.all(
+        mdFiles.map(f => this.parseFile(path.join(dir, f), scope))
+      )
+      for (const p of parsed) {
+        if (p) allNotes.push(p)
+      }
+    }
+
+    const lowerQuery = query.toLowerCase()
+
+    // Filter by query (case-insensitive includes on title + body)
+    let results = allNotes.filter(n =>
+      n.info.title.toLowerCase().includes(lowerQuery) ||
+      n.body.toLowerCase().includes(lowerQuery)
+    )
+
+    // Filter by tags (note must have at least one of the given tags)
+    if (opts?.tags && opts.tags.length > 0) {
+      const filterTags = new Set(opts.tags.map(t => t.toLowerCase()))
+      results = results.filter(n =>
+        n.info.tags.some(t => filterTags.has(t.toLowerCase()))
+      )
+    }
+
+    // Sort: title matches first, then by modifiedAt desc
+    results.sort((a, b) => {
+      const aTitle = a.info.title.toLowerCase().includes(lowerQuery) ? 0 : 1
+      const bTitle = b.info.title.toLowerCase().includes(lowerQuery) ? 0 : 1
+      if (aTitle !== bTitle) return aTitle - bTitle
+      return b.info.modifiedAt.localeCompare(a.info.modifiedAt)
+    })
+
+    return results.slice(0, 50)
   }
 
   async delete(id: string, scope: string): Promise<boolean> {

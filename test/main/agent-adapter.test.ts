@@ -21,13 +21,14 @@ describe('ClaudeCodeAdapter', () => {
     assert.equal(adapter.tier, 'tier-1')
   })
 
-  it('supports all 6 capabilities', () => {
+  it('supports all 7 capabilities', () => {
     assert.equal(adapter.supports('mcp-injection'), true)
     assert.equal(adapter.supports('status-line'), true)
     assert.equal(adapter.supports('skip-permissions'), true)
     assert.equal(adapter.supports('sub-agents'), true)
     assert.equal(adapter.supports('project-instructions'), true)
     assert.equal(adapter.supports('message-bus-participant'), true)
+    assert.equal(adapter.supports('companion-mcp'), true)
   })
 
   it('getCapabilities returns all true', () => {
@@ -35,7 +36,7 @@ describe('ClaudeCodeAdapter', () => {
     for (const val of Object.values(caps)) {
       assert.equal(val, true)
     }
-    assert.equal(Object.keys(caps).length, 6)
+    assert.equal(Object.keys(caps).length, 7)
   })
 
   describe('buildLaunchCommand', () => {

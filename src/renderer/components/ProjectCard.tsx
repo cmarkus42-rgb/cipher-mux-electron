@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks'
+import { useTranslation } from 'react-i18next'
 import type { ProjectInfo, SessionInfo } from '../../shared/types'
 
 interface ProjectCardProps {
@@ -15,6 +16,7 @@ function contextColorClass(pct: number): string {
 }
 
 export function ProjectCard({ project, session, contextUsage, onStartSession }: ProjectCardProps) {
+  const { t } = useTranslation()
   const isActive = session != null && session.status === 'active'
   const [copied, setCopied] = useState(false)
 
@@ -44,7 +46,7 @@ export function ProjectCard({ project, session, contextUsage, onStartSession }: 
             </span>
             {project.gitDirty && (
               <span class="badge badge--warn" style={{ marginLeft: '6px' }}>
-                uncommitted
+                {t('projectCard.uncommitted')}
               </span>
             )}
           </div>
@@ -75,10 +77,10 @@ export function ProjectCard({ project, session, contextUsage, onStartSession }: 
             cursor: 'pointer',
             userSelect: 'none',
           }}
-          title={copied ? 'Copied!' : `Click to copy: ${project.path}`}
+          title={copied ? t('projectCard.copied') : t('projectCard.copyPath', { path: project.path })}
           onClick={handleCopyPath}
         >
-          {copied ? '✓ Copied!' : project.path}
+          {copied ? '✓ ' + t('projectCard.copied') : project.path}
         </span>
 
         {isActive && contextUsage != null && (
@@ -87,13 +89,13 @@ export function ProjectCard({ project, session, contextUsage, onStartSession }: 
           </span>
         )}
         {isActive ? (
-          <span class="badge badge--ok">Active</span>
+          <span class="badge badge--ok">{t('projectCard.active')}</span>
         ) : (
           <button
             class="btn btn--primary btn--sm"
             onClick={() => onStartSession(project)}
           >
-            Start Session
+            {t('projectCard.startSession')}
           </button>
         )}
       </div>

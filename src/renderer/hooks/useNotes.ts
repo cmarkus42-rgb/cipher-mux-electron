@@ -9,13 +9,18 @@ export function useNotes(activeScope: string = 'global') {
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
-    const [list, tags] = await Promise.all([
-      api().notes.list(activeScope),
-      api().notes.tags(),
-    ])
-    setNotes(list)
-    setTagRepo(tags)
-    setLoading(false)
+    try {
+      const [list, tags] = await Promise.all([
+        api().notes.list(activeScope),
+        api().notes.tags(),
+      ])
+      setNotes(list)
+      setTagRepo(tags)
+    } catch (err) {
+      console.error('[useNotes] refresh failed:', err)
+    } finally {
+      setLoading(false)
+    }
   }, [activeScope])
 
   useEffect(() => {

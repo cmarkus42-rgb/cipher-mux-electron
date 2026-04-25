@@ -80,12 +80,15 @@ export class BugreportManager {
     project?: string,
     projectPath?: string,
     screenshots?: string[],
+    reportType?: string,
   ): Promise<string> {
     ensureDirs(this.outboxDir)
     const diagnostics = await this.collectDiagnostics(sessions)
     const now = new Date()
     const dateStr = now.toISOString().slice(0, 10)
-    const id = `BUG-${dateStr}-${ulid().slice(-6)}`
+    const type = reportType === 'feature-request' ? 'feature-request' : 'bug'
+    const prefix = type === 'feature-request' ? 'FEA' : 'BUG'
+    const id = `${prefix}-${dateStr}-${ulid().slice(-6)}`
     const filename = `${id}.md`
     const resolvedProjectPath = projectPath ?? process.cwd()
 
@@ -112,6 +115,7 @@ export class BugreportManager {
 
     const content = `---
 id: ${id}
+type: ${type}
 status: open
 project: ${project ?? 'cipher-mux-electron'}
 projectPath: ${resolvedProjectPath}

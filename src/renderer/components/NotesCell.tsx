@@ -1,6 +1,7 @@
 // src/renderer/components/NotesCell.tsx
 
 import { useState, useCallback, useEffect } from 'preact/hooks'
+import { useTranslation } from 'react-i18next'
 import { NoteEditor } from './NoteEditor'
 import { useNotes } from '../hooks/useNotes'
 import type { NoteInfo } from '../../shared/types'
@@ -34,6 +35,7 @@ export function NotesCell({
   onDragOver,
   onDrop,
 }: NotesCellProps) {
+  const { t } = useTranslation()
   const scope = activeWorkspaceId ? `workspace-${activeWorkspaceId}` : 'global'
   const { saveNote, deleteNote } = useNotes(scope)
   const [tabs, setTabs] = useState<NoteTab[]>([])
@@ -84,7 +86,7 @@ export function NotesCell({
     async (tabId: string) => {
       const tab = tabs.find((t) => t.id === tabId)
       if (!tab) return
-      if (!confirm(`Note "${tab.title || tab.id}" wirklich löschen?`)) return
+      if (!confirm(t('notesCell.confirmDelete', { title: tab.title || tab.id }))) return
       await deleteNote(tab.id, tab.scope)
       closeTab(tabId)
     },
@@ -97,7 +99,7 @@ export function NotesCell({
     const tab: NoteTab = {
       id: note.id,
       scope: note.scope,
-      title: '(new)',
+      title: t('notesCell.newTitle'),
       content: '# ',
       dirty: false,
     }
@@ -152,10 +154,10 @@ export function NotesCell({
       <div class="cell-header" draggable onDragStart={onDragStart}>
         <div class="cell-header__left">
           <span class="neon-dot neon-dot--info" />
-          <span class="cell-name">NOTES</span>
+          <span class="cell-name">{t('notesCell.header')}</span>
           <span class="cell-sep">·</span>
           <span class="cell-ctx ctx-ok">
-            {scope === 'global' ? 'global' : activeWorkspaceId}
+            {scope === 'global' ? t('notesCell.scopeGlobal') : activeWorkspaceId}
           </span>
         </div>
         <div class="cell-header__right">
@@ -166,7 +168,7 @@ export function NotesCell({
                 e.stopPropagation()
                 onToggleExpand()
               }}
-              title={expanded ? 'höhe zurücksetzen' : 'volle höhe'}
+              title={expanded ? t('notesCell.collapseHeight') : t('notesCell.expandHeight')}
             >
               {expanded ? '↥' : '↧'}
             </button>
@@ -177,7 +179,7 @@ export function NotesCell({
               e.stopPropagation()
               onClose()
             }}
-            title="notes schließen"
+            title={t('notesCell.closeNotes')}
           >
             ✕
           </button>
@@ -192,7 +194,7 @@ export function NotesCell({
             class={`notes-tab ${tab.id === activeTabId ? 'notes-tab--active' : ''}`}
             onClick={() => setActiveTabId(tab.id)}
           >
-            <span class="notes-tab__title">{tab.title || '(new)'}</span>
+            <span class="notes-tab__title">{tab.title || t('notesCell.newTitle')}</span>
             {tab.id === activeTabId && (
               <button
                 class="notes-tab__delete"
@@ -200,7 +202,7 @@ export function NotesCell({
                   e.stopPropagation()
                   handleDeleteNote(tab.id)
                 }}
-                title="Note löschen"
+                title={t('notesCell.deleteNote')}
               >
                 🗑
               </button>
@@ -216,7 +218,7 @@ export function NotesCell({
             </button>
           </div>
         ))}
-        <button class="notes-tab notes-tab--add" onClick={handleCreateNote} title="neue note">
+        <button class="notes-tab notes-tab--add" onClick={handleCreateNote} title={t('notesCell.newNote')}>
           +
         </button>
       </div>
@@ -232,10 +234,10 @@ export function NotesCell({
           />
         ) : (
           <div class="notes-empty">
-            <p>Doppelklick auf eine Note in der Sidebar</p>
-            <p>oder</p>
+            <p>{t('notesCell.emptyHint')}</p>
+            <p>{t('notesCell.emptyOr')}</p>
             <button class="btn btn--sm" onClick={handleCreateNote}>
-              + neue note
+              {t('notesCell.newNoteButton')}
             </button>
           </div>
         )}

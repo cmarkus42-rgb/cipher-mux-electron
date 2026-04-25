@@ -35,6 +35,13 @@ const api = {
       return () => ipcRenderer.removeListener(IPC.SESSION_VISIBLE_ADD, handler)
     },
     capture: (sessionId: string): Promise<string | null> => ipcRenderer.invoke('cipher-mux:sessions:capture', sessionId),
+    fork: (sessionId: string) => ipcRenderer.invoke(IPC.SESSION_FORK, { sessionId }),
+    detectOrphans: () => ipcRenderer.invoke(IPC.SESSION_ORPHANS),
+    onOrphansDetected: (cb: (data: unknown[]) => void) => {
+      const handler = (_e: unknown, data: unknown[]) => cb(data)
+      ipcRenderer.on(IPC.SESSION_ORPHANS_DETECTED, handler)
+      return () => ipcRenderer.removeListener(IPC.SESSION_ORPHANS_DETECTED, handler)
+    },
   },
 
   // ─── Terminal ──────────────────────────────────────────
@@ -160,8 +167,8 @@ const api = {
   // ─── Bugreport ─────────────────────────────────────────
   bugreport: {
     collect: () => ipcRenderer.invoke(IPC.BUGREPORT_COLLECT),
-    submit: (description: string, project?: string, screenshots?: string[]) =>
-      ipcRenderer.invoke(IPC.BUGREPORT_SUBMIT, { description, project, screenshots }),
+    submit: (description: string, project?: string, screenshots?: string[], reportType?: string) =>
+      ipcRenderer.invoke(IPC.BUGREPORT_SUBMIT, { description, project, screenshots, reportType }),
     enrich: (description: string) =>
       ipcRenderer.invoke(IPC.BUGREPORT_ENRICH, { description }),
     pickScreenshot: (): Promise<string[]> =>
@@ -239,6 +246,19 @@ const api = {
     active: (id?: string): Promise<string | null> => ipcRenderer.invoke('cipher-mux:workspaces:active', id),
   },
 
+  // ─── Entities ──────────────────────────────────────────
+  entity: {
+    start: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_START, { entityId }),
+    stop: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_STOP, { entityId }),
+    status: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_STATUS, { entityId }),
+    list: () => ipcRenderer.invoke(IPC.ENTITY_LIST),
+    onStarted: (cb: (data: { entityId: string; session: unknown }) => void) => {
+      const handler = (_e: unknown, data: { entityId: string; session: unknown }) => cb(data)
+      ipcRenderer.on(IPC.ENTITY_STARTED, handler)
+      return () => ipcRenderer.removeListener(IPC.ENTITY_STARTED, handler)
+    },
+  },
+
   // ─── Voice ──────────────────────────────────────────────
   voice: {
     available: () => ipcRenderer.invoke(IPC.VOICE_AVAILABLE),
@@ -301,6 +321,17 @@ const api = {
       ipcRenderer.on(IPC.VOICE_DISPATCHED, handler)
       return () => ipcRenderer.removeListener(IPC.VOICE_DISPATCHED, handler)
     },
+  },
+
+  // ─── Companion Memory ────────────────────────────────────
+  companion: {
+    recall: (limit?: number) => ipcRenderer.invoke(IPC.COMPANION_RECALL, { limit }),
+    listMemories: (opts?: { limit?: number; kind?: string; since?: number }) =>
+      ipcRenderer.invoke(IPC.COMPANION_LIST_MEMORIES, opts),
+    search: (query: string, limit?: number) =>
+      ipcRenderer.invoke(IPC.COMPANION_SEARCH, { query, limit }),
+    deleteMemory: (id: string) =>
+      ipcRenderer.invoke(IPC.COMPANION_DELETE_MEMORY, { id }),
   },
 }
 

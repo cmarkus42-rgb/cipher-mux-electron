@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks'
+import { useTranslation } from 'react-i18next'
 import { useVoiceBugreport, type ChatTurn } from '../voice/use-voice-bugreport'
 
 const api = () => (window as any).cipherMux
@@ -66,7 +67,11 @@ function ChatBubbles({ turns }: { turns: ChatTurn[] }) {
   )
 }
 
+export type ReportType = 'bug' | 'feature-request'
+
 export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
+  const { t } = useTranslation()
+  const [reportType, setReportType] = useState<ReportType>('bug')
   const [description, setDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [enriching, setEnriching] = useState(false)
@@ -94,6 +99,7 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   }, [report, description, voiceState, stopVoiceInterview])
 
   const resetForm = useCallback(() => {
+    setReportType('bug')
     setDescription('')
     setEnriched(null)
     setPreview('')
@@ -130,6 +136,7 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
       const res = await api().bugreport.submit(
         finalDescription, undefined,
         screenshots.length > 0 ? screenshots : undefined,
+        reportType,
       )
       setResult(res.id)
       resetForm()
@@ -138,7 +145,7 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
     } finally {
       setSubmitting(false)
     }
-  }, [description, enriched, preview, screenshots, resetForm])
+  }, [description, enriched, preview, screenshots, resetForm, reportType])
 
   const handleClose = useCallback(() => {
     setResult(null)
@@ -169,26 +176,38 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
     <div class="modal-overlay" onClick={handleClose}>
       <div class="modal-panel bugreport-panel" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
-          <span class="modal-title">bug-assistant</span>
+          <span class="modal-title">{t('bugreport.title')}</span>
           <button class="cell-btn" onClick={handleClose}>&times;</button>
         </div>
 
         <div class="bugreport-body">
           {result ? (
             <>
-              <p class="bugreport-body__text">Report <strong>{result}</strong> in Outbox abgelegt.</p>
+              <p class="bugreport-body__text">{t('bugreport.resultText', { id: result })}</p>
               <div class="bugreport-footer">
                 <button class="btn btn--sm btn--primary" onClick={handleClose}>OK</button>
               </div>
             </>
           ) : (
             <>
+              <div class="bugreport-type-toggle">
+                <button
+                  class={`btn btn--sm ${reportType === 'bug' ? 'btn--primary' : ''}`}
+                  onClick={() => setReportType('bug')}
+                >{t('bugreport.typeBug')}</button>
+                <button
+                  class={`btn btn--sm ${reportType === 'feature-request' ? 'btn--primary' : ''}`}
+                  onClick={() => setReportType('feature-request')}
+                >{t('bugreport.typeFeature')}</button>
+              </div>
               <p class="bugreport-body__text">
-                {voiceAvailable ? 'beschreibe das problem oder nutze voice-interview.' : 'beschreibe das problem.'}
+                {reportType === 'bug'
+                  ? (voiceAvailable ? t('bugreport.describeWithVoice') : t('bugreport.describe'))
+                  : t('bugreport.describeFeature')}
               </p>
               {isVoiceActive && <ChatBubbles turns={turns} />}
               {isVoiceActive && turns.length === 0 && (
-                <p class="bugreport-body__hint">sag &laquo;erstell jetzt den report&raquo; zum abschluss.</p>
+                <p class="bugreport-body__hint">{t('bugreport.voiceHint')}</p>
               )}
               {voiceAvailable && voiceError && (
                 <p class="bugreport-body__notice">
@@ -205,16 +224,16 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
                     setEnrichFailed(false)
                   }
                 }}
-                placeholder="was ist passiert? was hast du erwartet?" autoFocus disabled={isVoiceActive} />
+                placeholder={reportType === 'bug' ? t('bugreport.placeholder') : t('bugreport.placeholderFeature')} autoFocus disabled={isVoiceActive} />
 
               <div class="bugreport-actions">
                 <button class="btn btn--sm" onClick={handleAttachScreenshot} disabled={isVoiceActive}>
-                  screenshot
+                  {t('bugreport.screenshot')}
                 </button>
                 {voiceAvailable && (
                   <button class="btn btn--sm" onClick={handleVoiceClick}
                     disabled={voiceState === 'initializing'}>
-                    {isVoiceActive ? 'voice stoppen' : 'voice'}
+                    {isVoiceActive ? t('bugreport.voiceStop') : t('bugreport.voice')}
                   </button>
                 )}
               </div>
@@ -224,31 +243,31 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
                   {screenshots.map((p, i) => (
                     <div key={p} class="bugreport-screenshots__item">
                       <img src={`file://${p}`} alt={`Screenshot ${i + 1}`} class="bugreport-screenshots__thumb" />
-                      <button class="bugreport-screenshots__remove" onClick={() => handleRemoveScreenshot(i)} title="Entfernen">&times;</button>
+                      <button class="bugreport-screenshots__remove" onClick={() => handleRemoveScreenshot(i)} title={t('bugreport.removeScreenshot')}>&times;</button>
                     </div>
                   ))}
                 </div>
               )}
 
-              {enrichFailed && <p class="bugreport-body__notice">ollama nicht erreichbar — rohtext wird verwendet.</p>}
+              {enrichFailed && <p class="bugreport-body__notice">{t('bugreport.ollamaFailed')}</p>}
               {enriched && (
                 <>
-                  <p class="bugreport-body__label">vorschau (bearbeitbar):</p>
+                  <p class="bugreport-body__label">{t('bugreport.previewLabel')}</p>
                   <textarea class="bugreport-textarea bugreport-textarea--preview" rows={10} value={preview}
                     onInput={(e) => setPreview((e.target as HTMLTextAreaElement).value)} />
                 </>
               )}
 
               <div class="bugreport-footer">
-                <button class="btn btn--sm" onClick={handleClose}>abbrechen</button>
+                <button class="btn btn--sm" onClick={handleClose}>{t('bugreport.cancel')}</button>
                 {!enriched && !isVoiceActive && (
                   <button class="btn btn--sm" onClick={handleEnrich} disabled={enriching || !description.trim()}>
-                    {enriching ? 'analysiere\u2026' : 'vorschau'}
+                    {enriching ? t('bugreport.analyzing') : t('bugreport.preview')}
                   </button>
                 )}
                 <button class="btn btn--sm btn--primary" onClick={handleSubmit}
                   disabled={submitting || isVoiceActive || (!description.trim() && !preview.trim())}>
-                  {submitting ? 'sende\u2026' : 'absenden'}
+                  {submitting ? t('bugreport.sending') : t('bugreport.submit')}
                 </button>
               </div>
             </>

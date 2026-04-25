@@ -58,6 +58,7 @@ const defaults: AppConfig = {
     chatroomVisible: false,
     theme: 'cipher-ivory' as const,
     grid: createEmptyGrid(),
+    language: 'en' as const,
   },
   windows: {
     main: { x: 0, y: 0, width: DEFAULT_WINDOW_WIDTH, height: DEFAULT_WINDOW_HEIGHT },

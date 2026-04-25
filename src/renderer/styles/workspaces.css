@@ -1396,6 +1396,40 @@
   background: transparent;
 }
 
+/* Save Current Workspace overlay */
+.wp-save-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--color-bg-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.wp-save-dialog {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  padding: 16px;
+  min-width: 260px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.wp-save-dialog__title {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-md);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+  color: var(--color-text);
+}
+
+.wp-save-dialog__info {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+}
+
 /* ================================================================
    Workspaces Window (standalone)
    ================================================================ */

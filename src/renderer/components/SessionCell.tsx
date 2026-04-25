@@ -1,7 +1,8 @@
 // src/renderer/components/SessionCell.tsx
+import { useTranslation } from 'react-i18next'
 import { useCallback } from 'preact/hooks'
 import { useTerminal } from '../hooks/useTerminal'
-import type { SessionInfo, ContextUsage } from '../../shared/types'
+import type { SessionInfo, ContextUsage, EntityId } from '../../shared/types'
 import type { ThemeName } from '../../shared/grid-types'
 
 interface SessionCellProps {
@@ -17,6 +18,7 @@ interface SessionCellProps {
   onSwitchProject: (sessionId: string) => void
   onToggleExpand: (sessionId: string) => void
   onShell: (sessionId: string, projectPath: string | null) => void
+  onFork: (sessionId: string) => void
   onDragStart: (sessionId: string) => void
   onDragOver: (e: DragEvent) => void
   onDrop: (e: DragEvent) => void
@@ -25,8 +27,9 @@ interface SessionCellProps {
 export function SessionCell({
   session, contextUsage, focused, isOrchestrator, theme,
   rowSpan, maxRows,
-  onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onDragStart, onDragOver, onDrop,
+  onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onDragStart, onDragOver, onDrop,
 }: SessionCellProps) {
+  const { t } = useTranslation()
   const { terminalRef } = useTerminal(session.id, theme, session.createdAt)
   const pct = contextUsage?.usedPercentage ?? 0
 
@@ -47,17 +50,37 @@ export function SessionCell({
     e.stopPropagation()
     onShell(session.id, session.projectPath)
   }, [session.id, session.projectPath, onShell])
+  const handleFork = useCallback((e: Event) => {
+    e.stopPropagation()
+    onFork(session.id)
+  }, [session.id, onFork])
+
+  // Fork only available for Claude Code sessions (have adapter capabilities)
+  const isClaudeSession = session.capabilities?.['status-line'] === true
 
   const ctxClass = pct >= 85 ? 'ctx-error' : pct >= 60 ? 'ctx-warn' : 'ctx-ok'
   const dotClass = pct >= 85 ? 'neon-dot--error' : pct >= 60 ? 'neon-dot--warn' : 'neon-dot--ok'
+
+  // Entity color mapping — matches EntityConfig.color values
+  const ENTITY_COLORS: Partial<Record<EntityId, string>> = {
+    orchestrator: '#4fc3f7',
+    mpo: '#ab47bc',
+    companion: '#ffb74d',
+    refinement: '#ef5350',
+    launcher: '#66bb6a',
+  }
+  const entityColor = session.entityId ? ENTITY_COLORS[session.entityId] : undefined
+  const isEntity = !!session.entityId
+
   const cellClass = [
     'session-cell',
     focused && 'session-cell--focused',
-    isOrchestrator && 'session-cell--orchestrator',
+    (isOrchestrator || isEntity) && 'session-cell--orchestrator',
   ].filter(Boolean).join(' ')
 
   const expanded = rowSpan > 1
-  const cellStyle = expanded ? { gridRow: `span ${rowSpan}` } : undefined
+  const cellStyle: Record<string, string | number> = {}
+  if (expanded) cellStyle.gridRow = `span ${rowSpan}`
 
   return (
     <div
@@ -71,9 +94,12 @@ export function SessionCell({
         class="cell-header"
         draggable
         onDragStart={() => onDragStart(session.id)}
+        style={entityColor ? { borderLeft: `3px solid ${entityColor}` } : undefined}
       >
         <div class="cell-header__left">
-          <span class={`neon-dot ${dotClass}`} />
+          {entityColor
+            ? <span class="neon-dot" style={{ background: entityColor, boxShadow: `0 0 4px ${entityColor}` }} />
+            : <span class={`neon-dot ${dotClass}`} />}
           <span class="cell-name">{session.name}</span>
           <span class="cell-sep">·</span>
           <span class={`cell-ctx ${ctxClass}`}>{pct}%</span>
@@ -83,14 +109,17 @@ export function SessionCell({
             <button
               class={`cell-btn ${expanded ? 'cell-btn--active' : ''}`}
               onClick={handleExpand}
-              title={expanded ? 'höhe zurücksetzen' : 'volle höhe'}
+              title={expanded ? t('sessionCell.collapseHeight') : t('sessionCell.expandHeight')}
             >{expanded ? '↥' : '↧'}</button>
           )}
-          {!isOrchestrator && (
-            <button class="cell-btn" onClick={handleSwitch} title="projekt wechseln">⇄</button>
+          {isClaudeSession && (
+            <button class="cell-btn" onClick={handleFork} title={t('sessionCell.forkSession')}>⑂</button>
           )}
-          <button class="cell-btn" onClick={handleShell} title="shell öffnen">$</button>
-          <button class="cell-btn" onClick={handleClose} title="session schließen">✕</button>
+          {!isOrchestrator && (
+            <button class="cell-btn" onClick={handleSwitch} title={t('sessionCell.switchProject')}>⇄</button>
+          )}
+          <button class="cell-btn" onClick={handleShell} title={t('sessionCell.openShell')}>$</button>
+          <button class="cell-btn" onClick={handleClose} title={t('sessionCell.closeSession')}>✕</button>
         </div>
       </div>
       <div class="cell-terminal" ref={terminalRef} />

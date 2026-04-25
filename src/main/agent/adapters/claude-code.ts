@@ -48,10 +48,15 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     this.configReader = configReader ?? defaultConfigReader
   }
 
-  buildLaunchCommand(_opts: LaunchOpts): LaunchCommand {
+  buildLaunchCommand(opts: LaunchOpts): LaunchCommand {
     const args: string[] = []
     if (this.configReader.getSkipPermissions()) {
       args.push('--dangerously-skip-permissions')
+    }
+    if (opts.forkFromClaudeSessionId) {
+      args.push('--fork-session', opts.forkFromClaudeSessionId, '--resume')
+    } else if (opts.resume) {
+      args.push('--resume')
     }
     return { cmd: 'claude', args }
   }
@@ -139,6 +144,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
       'sub-agents': true,
       'project-instructions': true,
       'message-bus-participant': true,
+      'companion-mcp': true,
     }
   }
 
