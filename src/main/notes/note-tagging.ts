@@ -7,7 +7,7 @@ import type { TagRepository, TagEntry } from '../../shared/types'
 
 const OLLAMA_HOST = '127.0.0.1'
 const OLLAMA_PORT = 11433
-const OLLAMA_MODEL = 'gemma4:27b'
+const OLLAMA_MODEL = 'gemma4:26b'
 const TIMEOUT_MS = 60_000
 
 // ─── Seed Tags ────────────────────────────────────────────

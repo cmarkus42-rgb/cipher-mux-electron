@@ -35,7 +35,7 @@ export function NotesCell({
   onDrop,
 }: NotesCellProps) {
   const scope = activeWorkspaceId ? `workspace-${activeWorkspaceId}` : 'global'
-  const { saveNote } = useNotes(scope)
+  const { saveNote, deleteNote } = useNotes(scope)
   const [tabs, setTabs] = useState<NoteTab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
 
@@ -80,6 +80,17 @@ export function NotesCell({
     [activeTabId],
   )
 
+  const handleDeleteNote = useCallback(
+    async (tabId: string) => {
+      const tab = tabs.find((t) => t.id === tabId)
+      if (!tab) return
+      if (!confirm(`Note "${tab.title || tab.id}" wirklich löschen?`)) return
+      await deleteNote(tab.id, tab.scope)
+      closeTab(tabId)
+    },
+    [tabs, deleteNote, closeTab],
+  )
+
   const handleCreateNote = useCallback(async () => {
     const apiObj = (window as any).cipherMux
     const note = await apiObj.notes.create(scope, '', '# ')
@@ -95,24 +106,26 @@ export function NotesCell({
   }, [scope])
 
   const handleSave = useCallback(
-    (content: string) => {
+    async (content: string) => {
       if (!activeTab) return
-      saveNote(activeTab.id, activeTab.scope, content)
+      const result = await saveNote(activeTab.id, activeTab.scope, content)
+      const title = result?.title || activeTab.title
       setTabs((prev) =>
-        prev.map((t) => (t.id === activeTab.id ? { ...t, content, dirty: false } : t)),
+        prev.map((t) => (t.id === activeTab.id ? { ...t, content, title, dirty: false } : t)),
       )
     },
     [activeTab, saveNote],
   )
 
   const handleAutoSave = useCallback(
-    (content: string) => {
+    async (content: string) => {
       if (!activeTab) return
       const apiObj = (window as any).cipherMux
       // Auto-save writes file but doesn't trigger tagging
-      apiObj.notes.save(activeTab.id, activeTab.scope, content, undefined, true)
+      const result = await apiObj.notes.save(activeTab.id, activeTab.scope, content, undefined, true)
+      const title = result?.title || activeTab.title
       setTabs((prev) =>
-        prev.map((t) => (t.id === activeTab.id ? { ...t, content, dirty: false } : t)),
+        prev.map((t) => (t.id === activeTab.id ? { ...t, content, title, dirty: false } : t)),
       )
     },
     [activeTab],
@@ -180,6 +193,18 @@ export function NotesCell({
             onClick={() => setActiveTabId(tab.id)}
           >
             <span class="notes-tab__title">{tab.title || '(new)'}</span>
+            {tab.id === activeTabId && (
+              <button
+                class="notes-tab__delete"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDeleteNote(tab.id)
+                }}
+                title="Note löschen"
+              >
+                🗑
+              </button>
+            )}
             <button
               class="notes-tab__close"
               onClick={(e) => {
