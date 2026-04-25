@@ -110,7 +110,7 @@ export function NotesCell({
       if (!activeTab) return
       const apiObj = (window as any).cipherMux
       // Auto-save writes file but doesn't trigger tagging
-      apiObj.notes.save(activeTab.id, activeTab.scope, content)
+      apiObj.notes.save(activeTab.id, activeTab.scope, content, undefined, true)
       setTabs((prev) =>
         prev.map((t) => (t.id === activeTab.id ? { ...t, content, dirty: false } : t)),
       )
