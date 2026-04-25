@@ -12,6 +12,7 @@ export interface WorkspaceCell {
   persona: string    // persona.id
   project: string    // project path or slug
   prompt: string     // per-cell override (empty = use persona/workspace default)
+  type?: 'session' | 'notes'
 }
 
 export interface Workspace {
