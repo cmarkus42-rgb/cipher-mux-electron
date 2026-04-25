@@ -139,5 +139,43 @@ export function useGrid(panelWidth = 0) {
     })
   }, [persist])
 
-  return { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges }
+  const setSlotType = useCallback((slotIndex: number, type: 'session' | 'notes') => {
+    setGrid((prev) => {
+      // Max one notes cell validation
+      if (type === 'notes' && prev.slots.some((s, i) => s.type === 'notes' && i !== slotIndex)) {
+        console.warn('[useGrid] Only one notes cell allowed')
+        return prev
+      }
+      const newSlots = [...prev.slots]
+      newSlots[slotIndex] = { ...newSlots[slotIndex], type, sessionId: null }
+      const next = { ...prev, slots: newSlots }
+      persist(next)
+      return next
+    })
+  }, [persist])
+
+  const clearSlotType = useCallback((slotIndex: number) => {
+    setGrid((prev) => {
+      const newSlots = [...prev.slots]
+      newSlots[slotIndex] = { ...newSlots[slotIndex], type: 'session', sessionId: null }
+      const next = { ...prev, slots: newSlots }
+      persist(next)
+      return next
+    })
+  }, [persist])
+
+  const toggleExpandSlot = useCallback((slotIndex: number) => {
+    setGrid((prev) => {
+      if (slotIndex < 0 || slotIndex >= prev.slots.length) return prev
+      const currentSpan = prev.slots[slotIndex].rowSpan
+      const newSpan = currentSpan > 1 ? 1 : prev.config.rows
+      const newSlots = [...prev.slots]
+      newSlots[slotIndex] = { ...newSlots[slotIndex], rowSpan: newSpan }
+      const next = { ...prev, slots: newSlots }
+      persist(next)
+      return next
+    })
+  }, [persist])
+
+  return { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot }
 }
