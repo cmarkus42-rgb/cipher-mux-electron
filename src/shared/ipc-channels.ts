@@ -124,6 +124,15 @@ export const IPC = {
   TASKS_CANCEL: 'cipher-mux:tasks:cancel',
   TASK_CREATED: 'cipher-mux:task:created',
   TASK_STATE_CHANGED: 'cipher-mux:task:state-changed',
+
+  // Notes
+  NOTES_LIST: 'cipher-mux:notes:list',
+  NOTES_READ: 'cipher-mux:notes:read',
+  NOTES_SAVE: 'cipher-mux:notes:save',
+  NOTES_CREATE: 'cipher-mux:notes:create',
+  NOTES_DELETE: 'cipher-mux:notes:delete',
+  NOTES_TAGS: 'cipher-mux:notes:tags',
+  NOTES_CHANGED: 'cipher-mux:notes:changed',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

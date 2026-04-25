@@ -12,6 +12,8 @@ export interface GridSlot {
   sessionId: string | null
   /** Vertical span (1–3). Width is always 1 column. */
   rowSpan: number
+  /** Cell type: 'session' for terminal sessions, 'notes' for the embedded notes editor. */
+  type: 'session' | 'notes'
 }
 
 /** Persisted grid state — stored in ConfigStore under ui.grid. */
@@ -43,13 +45,14 @@ export function createEmptyGrid(config: GridConfig = DEFAULT_GRID_CONFIG): GridS
   const slots: GridSlot[] = Array.from({ length: totalSlots }, () => ({
     sessionId: null,
     rowSpan: 1,
+    type: 'session' as const,
   }))
   return { config, slots }
 }
 
 /** Find the index of the first empty slot, or -1 if grid is full. */
 export function findFirstEmptySlot(state: GridState): number {
-  return state.slots.findIndex((s) => s.sessionId === null)
+  return state.slots.findIndex((s) => s.sessionId === null && s.type !== 'notes')
 }
 
 /** Assign a session to the first empty slot. Returns the slot index or -1 if full. */
@@ -99,12 +102,12 @@ export function resizeGrid(state: GridState, newConfig: GridConfig): GridState {
   const newTotal = newConfig.cols * newConfig.rows
   const newSlots: GridSlot[] = Array.from({ length: newTotal }, (_, i) => {
     if (i < state.slots.length) return { ...state.slots[i] }
-    return { sessionId: null, rowSpan: 1 }
+    return { sessionId: null, rowSpan: 1, type: 'session' as const }
   })
   // Sessions that fell off the grid need to be redistributed
   const overflow = state.slots.slice(newTotal).filter((s) => s.sessionId !== null)
   for (const orphan of overflow) {
-    const emptyIdx = newSlots.findIndex((s) => s.sessionId === null)
+    const emptyIdx = newSlots.findIndex((s) => s.sessionId === null && s.type !== 'notes')
     if (emptyIdx !== -1) {
       newSlots[emptyIdx] = { ...orphan }
     }

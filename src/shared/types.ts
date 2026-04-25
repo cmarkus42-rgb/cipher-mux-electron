@@ -340,6 +340,32 @@ export interface TaskFilter {
   sessionId?: string
 }
 
+// ─── Notes ──────────────────────────────────────────────────
+
+export interface NoteInfo {
+  id: string
+  title: string
+  tags: string[]
+  scope: string
+  relativePath: string
+  createdAt: string
+  modifiedAt: string
+}
+
+export interface NoteContent {
+  info: NoteInfo
+  body: string
+}
+
+export interface TagEntry {
+  count: number
+  description: string
+}
+
+export interface TagRepository {
+  tags: Record<string, TagEntry>
+}
+
 // ─── Personas & Workspaces ────────────────────────────────
 
 export type {
