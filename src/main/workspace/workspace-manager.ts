@@ -105,8 +105,6 @@ export function resizeCells(
     const [colStr, rowStr] = key.split(':')
     const col = parseInt(colStr, 10)
     const row = parseInt(rowStr, 10)
-    // Drop if out of new bounds: col must be < newCols, row must be < newRows - 1
-    // (a merge at row r means r+1 must exist, so r < newRows - 1)
     if (col < newCols && row < newRows - 1) {
       merges[key] = true
     }
@@ -117,7 +115,7 @@ export function resizeCells(
 
 /**
  * applyWorkspace — Applies a workspace by resizing the grid and spawning sessions
- * for each non-empty cell that has a project assigned.
+ * for each cell that has a project assigned.
  */
 export interface ApplyResultSession {
   cellIndex: number
@@ -137,10 +135,9 @@ export async function applyWorkspace(
   // 1. Set grid dimensions
   gridCallback(workspace.cols, workspace.rows)
 
-  // 2. For each non-empty cell, spawn a session
+  // 2. For each cell with a project, spawn a session
   for (let i = 0; i < workspace.cells.length; i++) {
     const cell = workspace.cells[i]
-    if (cell.persona === 'empty') continue
 
     // Skip notes cells — they don't spawn sessions, renderer handles them
     if (cell.type === 'notes') continue
@@ -150,31 +147,25 @@ export async function applyWorkspace(
     const row = Math.floor(i / workspace.cols)
     if (spanOf(workspace, col, row) === 0) continue
 
-    const persona = personas.find(p => p.id === cell.persona)
-    if (!persona) {
-      warnings.push(`Persona "${cell.persona}" not found — cell ${i} skipped`)
-      continue
-    }
-
     if (!cell.project) {
-      warnings.push(`Cell ${i} (${persona.name}) has no project — skipped`)
       continue
     }
 
     // Build launch command: clear + claude with skip-permissions + optional prompt
-    const resolved = resolvePrompt(workspace, cell, personas)
-    const promptArg = resolved.text ? ` "${resolved.text.replace(/"/g, '\\"')}"` : ''
+    const promptText = cell.prompt.trim()
+    const promptArg = promptText ? ` "${promptText.replace(/"/g, '\\"')}"` : ''
     const launchCmd = `clear; claude --dangerously-skip-permissions${promptArg}\n`
+    const sessionName = cell.project.split('/').pop() || 'session'
     try {
       const session = await sessionStarter.start({
-        name: persona.name,
+        name: sessionName,
         projectPath: cell.project,
         autoLaunch: launchCmd,
       })
       startedSessions.push({ cellIndex: i, sessionId: session.id })
       sessionsStarted++
     } catch (err) {
-      warnings.push(`Failed to start ${persona.name}: ${(err as Error).message}`)
+      warnings.push(`Failed to start session for ${cell.project}: ${(err as Error).message}`)
     }
   }
 

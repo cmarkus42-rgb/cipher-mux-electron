@@ -1,7 +1,7 @@
 // src/renderer/components/WorkspacePopup.tsx
-import { useState, useEffect, useCallback, useMemo } from 'preact/hooks'
+import { useState, useEffect, useCallback } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
-import type { Workspace, Persona, WorkspaceCell } from '../../shared/persona-types'
+import type { Workspace, WorkspaceCell } from '../../shared/persona-types'
 import type { GridState } from '../../shared/grid-types'
 
 interface WorkspacePopupProps {
@@ -13,7 +13,7 @@ interface WorkspacePopupProps {
   sessions?: Array<{ id: string; name: string; projectPath?: string }>
 }
 
-/** Inline span calculation (mirrors main/workspace/workspace-manager spanOf, renderer-safe) */
+/** Inline span calculation (mirrors workspace-manager spanOf) */
 function thumbSpanOf(ws: Workspace, col: number, row: number): number {
   if (row > 0 && ws.merges[`${col}:${row - 1}`]) return 0
   let span = 1
@@ -25,13 +25,7 @@ function thumbSpanOf(ws: Workspace, col: number, row: number): number {
   return span
 }
 
-function WorkspaceThumbnail({ ws, personas }: { ws: Workspace; personas: Persona[] }) {
-  const personaMap = useMemo(() => {
-    const m: Record<string, Persona> = {}
-    for (const p of personas) m[p.id] = p
-    return m
-  }, [personas])
-
+function WorkspaceThumbnail({ ws }: { ws: Workspace }) {
   return (
     <div
       class="wp-thumb"
@@ -46,8 +40,7 @@ function WorkspaceThumbnail({ ws, personas }: { ws: Workspace; personas: Persona
           if (span === 0) return null
           const cellIdx = row * ws.cols + col
           const cell = ws.cells[cellIdx]
-          const persona = cell ? personaMap[cell.persona] : undefined
-          const color = persona?.color ?? '#6A6A72'
+          const hasProject = cell?.project && cell.project !== ''
           return (
             <div
               key={`${col}:${row}`}
@@ -55,7 +48,7 @@ function WorkspaceThumbnail({ ws, personas }: { ws: Workspace; personas: Persona
               style={{
                 gridColumn: `${col + 1}`,
                 gridRow: `${row + 1} / span ${span}`,
-                background: color,
+                background: hasProject ? 'var(--color-accent, #4fc3f7)' : '#6A6A72',
               }}
             />
           )
@@ -65,54 +58,24 @@ function WorkspaceThumbnail({ ws, personas }: { ws: Workspace; personas: Persona
   )
 }
 
-function buildLegend(ws: Workspace, personas: Persona[]): Array<{ persona: Persona; count: number }> {
-  const personaMap: Record<string, Persona> = {}
-  for (const p of personas) personaMap[p.id] = p
-
-  const counts: Record<string, number> = {}
-  for (const cell of ws.cells) {
-    if (cell.persona && cell.persona !== 'empty') {
-      counts[cell.persona] = (counts[cell.persona] ?? 0) + 1
-    }
-  }
-
-  return Object.entries(counts)
-    .map(([id, count]) => ({ persona: personaMap[id], count }))
-    .filter((e) => e.persona != null) as Array<{ persona: Persona; count: number }>
-}
-
-function buildSubtitle(ws: Workspace, personas: Persona[]): string {
-  const personaMap: Record<string, Persona> = {}
-  for (const p of personas) personaMap[p.id] = p
-
-  const uniquePersonas = Array.from(
-    new Set(ws.cells.map((c) => c.persona).filter((id) => id && id !== 'empty'))
-  )
-    .map((id) => personaMap[id]?.name ?? id)
-
-  const slotCount = ws.cols * ws.rows
-  return `${ws.cols}×${ws.rows} · ${slotCount} slots · ${uniquePersonas.join(', ')}`
+function buildSubtitle(ws: Workspace): string {
+  const filledCount = ws.cells.filter(c => c.project && c.project !== '').length
+  return `${ws.cols}\u00D7${ws.rows} \u00B7 ${filledCount} slot${filledCount === 1 ? '' : 's'}`
 }
 
 export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, currentGrid, sessions: currentSessions }: WorkspacePopupProps) {
   const { t } = useTranslation()
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
-  const [personas, setPersonas] = useState<Persona[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [showSaveDialog, setShowSaveDialog] = useState(false)
 
-  // Load data on mount
   useEffect(() => {
     const api = (window as any).cipherMux
-    Promise.all([
-      api.workspaces.list() as Promise<Workspace[]>,
-      api.personas.list() as Promise<Persona[]>,
-    ]).then(([wsList, pList]) => {
+    api.workspaces.list().then((wsList: Workspace[]) => {
       setWorkspaces(wsList ?? [])
-      setPersonas(pList ?? [])
       if (wsList?.length && selectedId === null) {
         setSelectedId(wsList[0].id)
       }
@@ -120,13 +83,11 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
       console.error('[WorkspacePopup] Failed to load data:', err)
     })
 
-    // Load active workspace
     api.workspaces.active().then((id: string | null) => {
       setActiveId(id ?? null)
     }).catch(() => {})
-  }, [visible]) // reload whenever popup becomes visible
+  }, [visible])
 
-  // Click outside to close
   const handleBackdropClick = useCallback(
     (e: MouseEvent) => {
       if ((e.target as HTMLElement).classList.contains('wp-backdrop')) {
@@ -136,7 +97,6 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     [onClose]
   )
 
-  // Double-click applies
   const handleRowDoubleClick = useCallback(
     (id: string) => {
       setSelectedId(id)
@@ -187,7 +147,6 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
       }
 
       await api.workspaces.save(ws)
-      // Reload list
       const wsList = await api.workspaces.list() as Workspace[]
       setWorkspaces(wsList ?? [])
       setSelectedId(ws.id)
@@ -199,15 +158,11 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     }
   }, [currentGrid, currentSessions, saveName])
 
-  const selectedWorkspace = workspaces.find((w) => w.id === selectedId) ?? null
-  const legend = selectedWorkspace ? buildLegend(selectedWorkspace, personas) : []
-
   if (!visible) return null
 
   return (
     <div class="wp-backdrop" onClick={handleBackdropClick} style={{ position: 'fixed', inset: 0, zIndex: 9 }}>
       <div class="workspaces-popup" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
         <div class="wp-head">
           <span class="wp-title">{t('workspacePopup.title')}</span>
           <div class="wp-head-actions">
@@ -215,7 +170,6 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
           </div>
         </div>
 
-        {/* List */}
         <div class="wp-list">
           {workspaces.length === 0 && (
             <div style={{ padding: '16px 12px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--color-text-dim)' }}>
@@ -230,10 +184,10 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
               onClick={() => setSelectedId(ws.id)}
               onDblClick={() => handleRowDoubleClick(ws.id)}
             >
-              <WorkspaceThumbnail ws={ws} personas={personas} />
+              <WorkspaceThumbnail ws={ws} />
               <div class="wp-meta">
                 <div class="wp-name">{ws.name}</div>
-                <div class="wp-sub">{buildSubtitle(ws, personas)}</div>
+                <div class="wp-sub">{buildSubtitle(ws)}</div>
               </div>
               {activeId === ws.id && (
                 <span class="wp-badge">{t('workspacePopup.active')}</span>
@@ -242,21 +196,6 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
           ))}
         </div>
 
-        {/* Legend */}
-        {legend.length > 0 && (
-          <div class="wp-legend">
-            <span class="wp-legend-label">{t('workspacePopup.personas')}</span>
-            {legend.map(({ persona, count }) => (
-              <span key={persona.id} class="wp-legend-item">
-                <span class="dot" style={{ background: persona.color }} />
-                <span>{persona.name}</span>
-                <span class="count">×{count}</span>
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Save Dialog */}
         {showSaveDialog && (
           <div class="wp-save-overlay">
             <div class="wp-save-dialog">
@@ -284,10 +223,9 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
           </div>
         )}
 
-        {/* Footer */}
         <div class="wp-foot">
           <button class="ghost" onClick={handleSaveCurrentOpen} disabled={!currentGrid}>{t('workspacePopup.saveCurrent')}</button>
-          <button class="ghost" onClick={() => onOpenSettings('personas')}>{t('workspacePopup.personasBtn')}</button>
+          <button class="ghost" onClick={() => onOpenSettings('personas')}>Companion</button>
           <button class="ghost" onClick={() => onOpenSettings('workspaces')}>{t('workspacePopup.editBtn')}</button>
           <button onClick={handleLoad} disabled={!selectedId}>{t('workspacePopup.load')}</button>
         </div>

@@ -294,6 +294,7 @@
 
   "statusBar.companion": "companion",
   "statusBar.refinement": "refinement",
+  "statusBar.voiceRelay": "voice",
   "statusBar.audit": "audit",
 
   "launcher.companion": "companion",

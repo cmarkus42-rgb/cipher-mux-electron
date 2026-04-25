@@ -6,6 +6,7 @@ function makeStubSessionManager(sessions: Map<string, { id: string; name: string
   return {
     sendKeys: async (_id: string, _keys: string) => {},
     get: (id: string) => sessions.get(id) ?? undefined,
+    getEntitySessionId: (_entityId: string) => null,
   }
 }
 

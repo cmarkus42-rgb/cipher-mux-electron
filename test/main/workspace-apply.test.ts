@@ -21,7 +21,7 @@ function makeMockStarter() {
 }
 
 describe('applyWorkspace', () => {
-  it('spawns sessions for non-empty cells with projects', async () => {
+  it('spawns sessions for cells with projects', async () => {
     const ws: Workspace = {
       id: 'test', name: 'Test', cols: 2, rows: 1,
       cells: [
@@ -39,11 +39,12 @@ describe('applyWorkspace', () => {
     assert.equal(result.warnings.length, 0)
     assert.deepEqual(gridSize, { cols: 2, rows: 1 })
     assert.equal(starter.started.length, 2)
-    assert.equal(starter.started[0].name, 'Orchestrator')
+    // Session name derived from project path
+    assert.equal(starter.started[0].name, 'a')
     assert.equal(starter.started[0].projectPath, '/proj/a')
   })
 
-  it('skips empty cells', async () => {
+  it('skips cells without projects', async () => {
     const ws: Workspace = {
       id: 'test', name: 'Test', cols: 2, rows: 1,
       cells: [
@@ -58,7 +59,7 @@ describe('applyWorkspace', () => {
     assert.equal(starter.started.length, 1)
   })
 
-  it('warns on cells with no project', async () => {
+  it('skips cells with no project without warning', async () => {
     const ws: Workspace = {
       id: 'test', name: 'Test', cols: 1, rows: 1,
       cells: [{ persona: 'worker', project: '', prompt: '' }],
@@ -67,11 +68,9 @@ describe('applyWorkspace', () => {
     const starter = makeMockStarter()
     const result = await applyWorkspace(ws, PERSONAS, starter, () => {})
     assert.equal(result.sessionsStarted, 0)
-    assert.equal(result.warnings.length, 1)
-    assert.ok(result.warnings[0].includes('no project'))
   })
 
-  it('warns on unknown persona', async () => {
+  it('starts sessions even with unknown persona (only project matters now)', async () => {
     const ws: Workspace = {
       id: 'test', name: 'Test', cols: 1, rows: 1,
       cells: [{ persona: 'unknown-persona', project: '/proj/a', prompt: '' }],
@@ -79,12 +78,10 @@ describe('applyWorkspace', () => {
     }
     const starter = makeMockStarter()
     const result = await applyWorkspace(ws, PERSONAS, starter, () => {})
-    assert.equal(result.sessionsStarted, 0)
-    assert.equal(result.warnings.length, 1)
-    assert.ok(result.warnings[0].includes('not found'))
+    assert.equal(result.sessionsStarted, 1)
   })
 
-  it('uses resolved prompt as autoLaunch', async () => {
+  it('uses cell prompt as autoLaunch', async () => {
     const ws: Workspace = {
       id: 'test', name: 'Test', cols: 1, rows: 1,
       cells: [{ persona: 'worker', project: '/proj/a', prompt: 'run tests' }],
@@ -122,14 +119,14 @@ describe('applyWorkspace', () => {
         { persona: 'orchestrator', project: '/proj/a', prompt: '' },
         { persona: 'worker', project: '/proj/b', prompt: '' },
       ],
-      merges: { '0:0': true }, // col 0, row 0 merges down — cell at row 1 is hidden
+      merges: { '0:0': true },
       promptOverrides: {},
     }
     const starter = makeMockStarter()
     const result = await applyWorkspace(ws, PERSONAS, starter, () => {})
     assert.equal(result.sessionsStarted, 1)
     assert.equal(starter.started.length, 1)
-    assert.equal(starter.started[0].name, 'Orchestrator')
+    assert.equal(starter.started[0].projectPath, '/proj/a')
   })
 
   it('catches start failures and adds warning', async () => {

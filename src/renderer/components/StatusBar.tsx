@@ -23,6 +23,7 @@ interface StatusBarProps {
   mpoRunning: boolean
   companionRunning: boolean
   refinementRunning: boolean
+  voiceRelayRunning: boolean
   auditRunning: boolean
   workspacesPopupVisible: boolean
   gridCols: number
@@ -33,6 +34,7 @@ interface StatusBarProps {
   onMpo: () => void
   onCompanion: () => void
   onRefinement: () => void
+  onVoiceRelay: () => void
   onAudit: () => void
   onBugreport: () => void
   onToggleTheme: () => void
@@ -45,8 +47,8 @@ interface StatusBarProps {
 export function StatusBar({
   theme, sidebarVisible, sidebarHasContent, onToggleSidebar, orchestratorRunning,
   gridCols, gridRows, focusedSessionId, focusedSessionName,
-  onOrchestrator, onMpo, onCompanion, onRefinement, onAudit, onBugreport, onToggleTheme, onInfo, onThemeSettings,
-  onGridResize, mpoRunning, companionRunning, refinementRunning, auditRunning, workspacesPopupVisible, onToggleWorkspaces,
+  onOrchestrator, onMpo, onCompanion, onRefinement, onVoiceRelay, onAudit, onBugreport, onToggleTheme, onInfo, onThemeSettings,
+  onGridResize, mpoRunning, companionRunning, refinementRunning, voiceRelayRunning, auditRunning, workspacesPopupVisible, onToggleWorkspaces,
 }: StatusBarProps) {
   const { t } = useTranslation()
   return (
@@ -89,6 +91,12 @@ export function StatusBar({
           onClick={onMpo}
         >
           <span class="status-bar__dot status-bar__dot--mpo" />{t('statusBar.mpo')}
+        </button>
+        <button
+          class={`status-bar__btn status-bar__btn--session${voiceRelayRunning ? ' status-bar__btn--active' : ''}`}
+          onClick={onVoiceRelay}
+        >
+          <span class="status-bar__dot status-bar__dot--voice-relay" />{t('statusBar.voiceRelay')}
         </button>
         <button
           class={`status-bar__btn status-bar__btn--session${auditRunning ? ' status-bar__btn--active' : ''}`}

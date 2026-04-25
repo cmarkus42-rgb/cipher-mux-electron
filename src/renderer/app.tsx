@@ -80,6 +80,7 @@ export function App() {
   const [mpoSessionId, setMpoSessionId] = useState<string | null>(null)
   const [companionSessionId, setCompanionSessionId] = useState<string | null>(null)
   const [refinementSessionId, setRefinementSessionId] = useState<string | null>(null)
+  const [voiceRelaySessionId, setVoiceRelaySessionId] = useState<string | null>(null)
   const [auditSessionId, setAuditSessionId] = useState<string | null>(null)
 
   // Compute grid session IDs for sidebar
@@ -575,6 +576,32 @@ export function App() {
     }
   }, [auditSessionId, removeSession, placeEntity])
 
+  const handleVoiceRelayToggle = useCallback(async () => {
+    const api = (window as any).cipherMux
+    try {
+      const status = await api.entity.status('voice-relay')
+      if (status.running && status.sessionId) {
+        await api.entity.stop('voice-relay')
+        removeSession(status.sessionId)
+        setVoiceRelaySessionId(null)
+      } else {
+        if (voiceRelaySessionId) {
+          removeSession(voiceRelaySessionId)
+          setVoiceRelaySessionId(null)
+        }
+        const session = await api.entity.start('voice-relay')
+        const sid = session?.id
+        if (sid) {
+          setVoiceRelaySessionId(sid)
+          placeEntity(sid)
+        }
+      }
+    } catch (err) {
+      console.error('[App] Voice Relay toggle failed:', err)
+      setVoiceRelaySessionId(null)
+    }
+  }, [voiceRelaySessionId, removeSession, placeEntity])
+
   // Listen for entity-started events (e.g. from other sources)
   useEffect(() => {
     const api = (window as any).cipherMux
@@ -588,15 +615,18 @@ export function App() {
       } else if (data.entityId === 'refinement' && !refinementSessionId) {
         setRefinementSessionId(sid)
         placeEntity(sid)
+      } else if (data.entityId === 'voice-relay' && !voiceRelaySessionId) {
+        setVoiceRelaySessionId(sid)
+        placeEntity(sid)
       } else if (data.entityId === 'audit' && !auditSessionId) {
         setAuditSessionId(sid)
         placeEntity(sid)
       }
     })
     return () => unsub()
-  }, [companionSessionId, refinementSessionId, auditSessionId, placeEntity])
+  }, [companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId, placeEntity])
 
-  // Check companion/refinement status on mount
+  // Check companion/refinement/voice-relay status on mount
   useEffect(() => {
     const api = (window as any).cipherMux
     if (!api.entity?.status) return
@@ -609,6 +639,12 @@ export function App() {
     api.entity.status('refinement').then((s: { running: boolean; sessionId?: string }) => {
       if (s.running && s.sessionId) {
         setRefinementSessionId(s.sessionId)
+        placeEntity(s.sessionId)
+      }
+    })
+    api.entity.status('voice-relay').then((s: { running: boolean; sessionId?: string }) => {
+      if (s.running && s.sessionId) {
+        setVoiceRelaySessionId(s.sessionId)
         placeEntity(s.sessionId)
       }
     })
@@ -671,11 +707,13 @@ export function App() {
         mpoRunning={!!mpoSessionId}
         companionRunning={!!companionSessionId}
         refinementRunning={!!refinementSessionId}
+        voiceRelayRunning={!!voiceRelaySessionId}
         auditRunning={!!auditSessionId}
         workspacesPopupVisible={workspacesPopupVisible}
         onMpo={handleMpoToggle}
         onCompanion={handleCompanionToggle}
         onRefinement={handleRefinementToggle}
+        onVoiceRelay={handleVoiceRelayToggle}
         onAudit={handleAuditToggle}
         gridCols={grid.config.cols}
         gridRows={grid.config.rows}

@@ -5,7 +5,7 @@
  * Derived from the standalone code-audit project prompt.
  */
 
-export function generateAuditClaudeMd(): string {
+export function generateAuditClaudeMd(opts?: { companionPrompt?: string }): string {
   return `# Code Audit Session
 
 Du bist ein erfahrener Software-Auditor. Gruendlich, unbestechlich, fair. Du pruefst vibe-gecodete Projekte auf Herz und Nieren — Security, Code-Qualitaet, Dokumentation — und lieferst einen belastbaren Audit-Report.
@@ -197,5 +197,6 @@ Diese Session ist NICHT fuer:
 - Code schreiben oder Bugs fixen (das macht eine andere Session)
 - Architektur-Entscheidungen treffen
 - Allgemeine Code-Reviews einzelner PRs
+${opts?.companionPrompt ? `\n## Companion-Persona\n\n${opts.companionPrompt}` : ''}
 `
 }

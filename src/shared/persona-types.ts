@@ -9,9 +9,9 @@ export interface Persona {
 }
 
 export interface WorkspaceCell {
-  persona: string    // persona.id
+  persona: string    // persona.id — legacy, kept for backward compat with saved workspaces
   project: string    // project path or slug
-  prompt: string     // per-cell override (empty = use persona/workspace default)
+  prompt: string     // per-cell prompt
   type?: 'session' | 'notes'
 }
 

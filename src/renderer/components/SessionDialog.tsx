@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
-
-const api = () => (window as any).cipherMux
+import { FolderPickerInput } from './FolderPickerInput'
 
 interface SessionDialogProps {
   visible: boolean
@@ -13,11 +12,6 @@ export function SessionDialog({ visible, onStart, onClose }: SessionDialogProps)
   const { t } = useTranslation()
   const [path, setPath] = useState('')
   const [resume, setResume] = useState(false)
-
-  const handleBrowse = useCallback(async () => {
-    const result = await api().dialog.openDir()
-    if (result) setPath(result)
-  }, [])
 
   const handleStart = useCallback(() => {
     onStart(path.trim(), { resume })
@@ -45,18 +39,13 @@ export function SessionDialog({ visible, onStart, onClose }: SessionDialogProps)
           <button class="cell-btn" onClick={handleClose}>&times;</button>
         </div>
         <div class="session-dialog__body">
-          <div class="session-dialog__row">
-            <input
-              type="text"
-              class="project-popup__input"
-              placeholder={t('sessionDialog.placeholder')}
-              value={path}
-              onInput={(e) => setPath((e.target as HTMLInputElement).value)}
-              onKeyDown={handleKeyDown}
-              autofocus
-            />
-            <button class="cell-btn" onClick={handleBrowse} title={t('sessionDialog.selectDir')}>...</button>
-          </div>
+          <FolderPickerInput
+            value={path}
+            onChange={setPath}
+            placeholder={t('sessionDialog.placeholder')}
+            onKeyDown={handleKeyDown}
+            autofocus
+          />
           <label class="session-dialog__checkbox">
             <input
               type="checkbox"
