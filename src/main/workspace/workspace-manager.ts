@@ -142,6 +142,9 @@ export async function applyWorkspace(
     const cell = workspace.cells[i]
     if (cell.persona === 'empty') continue
 
+    // Skip notes cells — they don't spawn sessions, renderer handles them
+    if (cell.type === 'notes') continue
+
     // Skip cells that are hidden by merges (spanOf returns 0)
     const col = i % workspace.cols
     const row = Math.floor(i / workspace.cols)
