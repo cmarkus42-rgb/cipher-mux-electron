@@ -112,6 +112,7 @@ _Implementiert nach Phase 6, nicht im ursprünglichen Scope._
 | TP-8 | **MPO (Multi-Project Orchestrator)** — MpoTemplate, InputRequestWatcher, mux_input_request_create, StatusBar-Button, Grid-Placement | done (2026-04-23) | src/main/mpo/, src/main/session/mpo-template.ts |
 | Phase-A | **Theme-System** — 10 Themes via themes.json Manifest, body[data-theme] Switching, Theme-Picker in Settings, CSS Custom Properties + ANSI-Farben pro Theme, useTheme Hook | done (2026-04-23) | src/renderer/themes.json, src/renderer/styles/theme-*.css, src/renderer/hooks/useTheme.ts |
 | Phase-B | **MCP/Terminal/StatusLine Polish** — MCP Session-Lifecycle (GC 30min, max 5, /health), StatusLine 2.x context_window Parser, Terminal Fit-Debounce (150ms) + Min-Size-Guard, agent.skipPermissions ConfigStore-Flag | done (2026-04-23) | src/main/mcp/, src/main/monitoring/, src/main/agent/ |
+| Phase-F | **Notes Editor** — Dritte Grid-Cell-Option (neben Session/Launcher). CodeMirror 6, Markdown-Highlighting, Frontmatter (gray-matter), Auto-Tagging via Ollama, Sidebar-Integration (Search, Tag-Filter), Delete UI | done (2026-04-25) | src/main/notes/, NoteEditor.tsx, NotesCell.tsx, useNotes.ts, SidebarPanel.tsx |
 
 ---
 
