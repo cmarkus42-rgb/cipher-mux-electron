@@ -10,10 +10,12 @@ import { TmuxManager } from '../tmux/tmux-manager'
 import { generateOrchestratorClaudeMd } from './orchestrator-template'
 import { generateMpoClaudeMd } from './mpo-template'
 import { generateAuditClaudeMd } from './audit-template'
+import { generateVoiceRelayClaudeMd } from './voice-relay-template'
 import { EntityRegistry } from './entity-registry'
 import { deployEntityAssets } from './entity-assets'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
+import { configStore } from '../config/config-store'
 
 /**
  * SessionManager — Registry for cipher-mux sessions.
@@ -300,6 +302,7 @@ export class SessionManager extends EventEmitter {
       'MPO': 'mpo',
       'Coding Companion': 'companion',
       'Refinement': 'refinement',
+      'Voice': 'voice-relay',
     }
     for (const session of recovered) {
       const entityId = entityNameMap[session.name]
@@ -462,6 +465,18 @@ export class SessionManager extends EventEmitter {
     return this.sessionAdapters.get(sessionId)
   }
 
+  /** Get the active companion character prompt (or empty string). */
+  private getActiveCompanionPrompt(): string {
+    try {
+      const activeId = configStore.get('activeCharacterId')
+      const characters = configStore.get('characters')
+      const active = characters.find(c => c.id === activeId)
+      return active?.prompt ?? ''
+    } catch {
+      return ''
+    }
+  }
+
   // ─── Entity Framework ───────────────────────────────────
 
   /**
@@ -497,7 +512,10 @@ export class SessionManager extends EventEmitter {
     if (!config.templatePath) {
       const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
       if (config.id === 'audit') {
-        fs.writeFileSync(claudeMdPath, generateAuditClaudeMd(), 'utf-8')
+        const companionPrompt = this.getActiveCompanionPrompt()
+        fs.writeFileSync(claudeMdPath, generateAuditClaudeMd({ companionPrompt }), 'utf-8')
+      } else if (config.id === 'voice-relay') {
+        fs.writeFileSync(claudeMdPath, generateVoiceRelayClaudeMd(), 'utf-8')
       } else if (!fs.existsSync(claudeMdPath)) {
         fs.writeFileSync(claudeMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')
       }
@@ -650,6 +668,7 @@ export class SessionManager extends EventEmitter {
       mcpApiKey: config.mcpApiKey,
       maxRetries: ORCHESTRATOR_MAX_RETRIES,
       adapterFragment: adapter.buildOrchestratorPromptFragment('de'),
+      companionPrompt: this.getActiveCompanionPrompt(),
     })
     fs.writeFileSync(path.join(orchestratorDir, 'CLAUDE.md'), claudeMd, 'utf-8')
 
@@ -770,6 +789,7 @@ export class SessionManager extends EventEmitter {
       mcpApiKey: config.mcpApiKey,
       maxRetries: MPO_MAX_RETRIES,
       adapterFragment: adapter.buildMpoPromptFragment('de'),
+      companionPrompt: this.getActiveCompanionPrompt(),
     })
     fs.writeFileSync(path.join(mpoDir, 'CLAUDE.md'), claudeMd, 'utf-8')
 

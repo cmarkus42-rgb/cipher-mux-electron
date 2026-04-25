@@ -18,7 +18,7 @@ export type AdapterCapabilities = Record<AdapterFeature, boolean>
 // ─── Entity Framework ─────────────────────────────────────
 
 /** Well-known entity identifiers. */
-export type EntityId = 'orchestrator' | 'mpo' | 'launcher' | 'companion' | 'refinement' | 'audit'
+export type EntityId = 'orchestrator' | 'mpo' | 'launcher' | 'companion' | 'refinement' | 'voice-relay' | 'audit'
 
 /**
  * Configuration for a functional entity (Orchestrator, MPO, Companion, etc.).
@@ -150,6 +150,10 @@ export interface AppConfig {
   personas: import('./persona-types').Persona[]
   workspaces: import('./persona-types').Workspace[]
   activeWorkspaceId: string | null
+  /** Active companion character ID. */
+  activeCharacterId: string
+  /** Available companion characters. */
+  characters: Character[]
   app: {
     scanPaths: string[]
     /** Directory levels below each scanPath that are inspected (1 = children only). */
@@ -460,6 +464,17 @@ export interface PendingUpdate {
   reasoning: string | null
   evidenceMemoryIds: string[] | null
   status: PendingUpdateStatus
+}
+
+// ─── Character (Companion Persona) ───────────────────────
+
+export interface Character {
+  id: string           // e.g. 'relay', 'wayne'
+  name: string         // Display name
+  prompt: string       // Full persona prompt text
+  isDefault: boolean   // Relay = true
+  createdAt: string
+  updatedAt: string
 }
 
 // ─── Personas & Workspaces ────────────────────────────────

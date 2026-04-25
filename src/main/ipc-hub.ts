@@ -28,7 +28,7 @@ import { EntityRegistry, registerBuiltinEntities } from './session/entity-regist
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
 import { BRAND } from '../shared/brand'
-import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest, EntityId } from '../shared/types'
+import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest, EntityId, Character } from '../shared/types'
 import type { Persona, Workspace } from '../shared/persona-types'
 import { applyWorkspace } from './workspace/workspace-manager'
 
@@ -126,6 +126,7 @@ export class IpcHub {
     this.registerTaskChannels()
     this.registerInputRequestChannels()
     this.registerPersonaChannels()
+    this.registerCharacterChannels()
     this.registerWorkspaceChannels()
     this.registerNoteChannels()
     this.registerEntityChannels()
@@ -280,6 +281,17 @@ export class IpcHub {
 
     this.sessionManager.on('entity-started', (data: { entityId: string; session: unknown }) => {
       this.windowManager.sendToMainWindow(IPC.ENTITY_STARTED, data)
+      // Start voice output routing when voice-relay entity starts
+      if (data.entityId === 'voice-relay' && this.voiceManager) {
+        this.voiceManager.startOutputRouting()
+      }
+    })
+
+    this.sessionManager.on('entity-stopped', (data: { entityId: string }) => {
+      // Stop voice output routing when voice-relay entity stops
+      if (data.entityId === 'voice-relay' && this.voiceManager) {
+        this.voiceManager.stopOutputRouting()
+      }
     })
 
     this.tmux.on('output', (paneId: string, data: string) => {
@@ -586,7 +598,9 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.WINDOW_OPEN_WORKSPACES, (_e, initialTab?: string) => {
-      this.windowManager.openWorkspacesWindow(initialTab as 'workspaces' | 'personas' | undefined)
+      // Map legacy 'personas' tab to 'companion'
+      const tab = initialTab === 'personas' ? 'companion' : initialTab
+      this.windowManager.openWorkspacesWindow(tab as 'workspaces' | 'companion' | undefined)
     })
 
     ipcMain.handle(IPC.SIDEBAR_DETACH, () => {
@@ -619,11 +633,12 @@ export class IpcHub {
       return result.canceled ? null : result.filePaths[0] ?? null
     })
 
-    ipcMain.handle(IPC.DIALOG_OPEN_DIR, async (_e, opts?: { title?: string }) => {
+    ipcMain.handle(IPC.DIALOG_OPEN_DIR, async (_e, opts?: { title?: string; defaultPath?: string }) => {
       const win = this.windowManager.getMainWindow()
       if (!win) return null
       const result = await dialog.showOpenDialog(win, {
         title: opts?.title ?? 'Select Directory',
+        defaultPath: opts?.defaultPath ?? os.homedir(),
         properties: ['openDirectory', 'createDirectory'],
       })
       return result.canceled ? null : result.filePaths[0] ?? null
@@ -1038,6 +1053,78 @@ export class IpcHub {
       configStore.set('personas', personas.filter(p => p.id !== personaId))
       return { ok: true }
     })
+  }
+
+  // ─── Characters (Companion Persona) ──────────────────
+  private registerCharacterChannels(): void {
+    ipcMain.handle(IPC.CHARACTERS_LIST, () => {
+      return configStore.get('characters')
+    })
+
+    ipcMain.handle(IPC.CHARACTERS_ACTIVE, () => {
+      const activeId = configStore.get('activeCharacterId')
+      const characters = configStore.get('characters')
+      return characters.find(c => c.id === activeId) ?? characters[0] ?? null
+    })
+
+    ipcMain.handle(IPC.CHARACTERS_SAVE, (_e, character: Character) => {
+      const characters = [...configStore.get('characters')]
+      const idx = characters.findIndex(c => c.id === character.id)
+      const now = new Date().toISOString()
+      if (idx >= 0) {
+        characters[idx] = { ...character, updatedAt: now }
+      } else {
+        characters.push({ ...character, isDefault: false, createdAt: now, updatedAt: now })
+      }
+      configStore.set('characters', characters)
+      // Re-sync skill for active character
+      const activeId = configStore.get('activeCharacterId')
+      if (character.id === activeId) {
+        this.syncActiveCharacterSkill()
+      }
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.CHARACTERS_DELETE, (_e, characterId: string) => {
+      const characters = configStore.get('characters')
+      const target = characters.find(c => c.id === characterId)
+      if (!target) return { ok: false, error: 'Character not found' }
+      if (target.isDefault) return { ok: false, error: 'Cannot delete default character' }
+      configStore.set('characters', characters.filter(c => c.id !== characterId))
+      // If deleted character was active, switch to default
+      if (configStore.get('activeCharacterId') === characterId) {
+        const defaultChar = configStore.get('characters').find(c => c.isDefault)
+        if (defaultChar) {
+          configStore.set('activeCharacterId', defaultChar.id)
+          this.syncActiveCharacterSkill()
+        }
+      }
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.CHARACTERS_SWITCH, (_e, characterId: string) => {
+      const characters = configStore.get('characters')
+      const target = characters.find(c => c.id === characterId)
+      if (!target) return { ok: false, error: 'Character not found' }
+      configStore.set('activeCharacterId', characterId)
+      this.syncActiveCharacterSkill()
+      return { ok: true }
+    })
+  }
+
+  /** Sync the active character's prompt as a SKILL.md to all project skills directories. */
+  private syncActiveCharacterSkill(): void {
+    const activeId = configStore.get('activeCharacterId')
+    const characters = configStore.get('characters')
+    const active = characters.find(c => c.id === activeId)
+    if (!active) return
+
+    const { syncCharacterSkill } = require('./workspace/persona-skill-sync')
+    // Sync to the app-level skills dir
+    const os = require('os')
+    const path = require('path')
+    const skillsDir = path.join(os.homedir(), '.claude', 'skills', 'personas')
+    syncCharacterSkill(active, skillsDir)
   }
 
   // ─── Workspaces ───────────────────────────────────────

@@ -1,11 +1,14 @@
 /**
- * VoiceInputRouter — routes transcribed text to the focused tmux session.
+ * VoiceInputRouter — routes transcribed text to sessions.
  *
- * In 'session' mode, transcriptions are sent as keystrokes to the focused
- * session via SessionManager.sendKeys(). In 'off' mode, transcriptions
- * are silently discarded (the bugreport flow handles its own routing).
+ * Two routing modes:
+ *   1. Voice-Relay mode: When the voice-relay entity is running, all
+ *      transcriptions go there (with auto-Enter, since it's a conversation).
+ *   2. Session mode: transcriptions go to the focused session as keystrokes.
+ *      User submits via "abschicken" voice command.
+ *   3. Off: transcriptions are silently discarded.
  *
- * Voice commands:
+ * Voice commands (session mode only):
  *   "abschicken" / "absenden" / "senden" / "enter" / "send" → sends Enter
  *   "neue zeile" / "new line" → sends newline without submitting
  *   Everything else → typed into the session (no Enter)
@@ -51,6 +54,14 @@ export class VoiceInputRouter extends EventEmitter {
     this.focusedSessionId = sessionId
   }
 
+  /**
+   * Get the voice-relay entity session ID if it's running.
+   * Returns null if voice-relay is not active.
+   */
+  private getVoiceRelaySessionId(): string | null {
+    return this.sessionManager.getEntitySessionId('voice-relay')
+  }
+
   async routeTranscription(text: string): Promise<void> {
     console.log('[VoiceRouter] routeTranscription — mode:', this.mode, 'session:', this.focusedSessionId, 'text:', JSON.stringify(text?.slice(0, 80)))
     if (this.mode === 'off') return
@@ -58,6 +69,44 @@ export class VoiceInputRouter extends EventEmitter {
     const trimmed = text.trim()
     if (trimmed === '') return
 
+    // Check if voice-relay entity is running — if so, route there
+    const voiceRelayId = this.getVoiceRelaySessionId()
+    if (voiceRelayId) {
+      const relaySession = this.sessionManager.get(voiceRelayId)
+      if (relaySession && relaySession.status === 'active') {
+        return this.routeToVoiceRelay(voiceRelayId, trimmed, relaySession.name)
+      }
+    }
+
+    // Fallback: route to focused session (existing behavior)
+    return this.routeToFocusedSession(trimmed)
+  }
+
+  /**
+   * Route transcription to the voice-relay entity session.
+   * Sends text + Enter (conversational mode — auto-submit).
+   */
+  private async routeToVoiceRelay(sessionId: string, text: string, sessionName: string): Promise<void> {
+    try {
+      console.log('[VoiceRouter] routing to voice-relay:', JSON.stringify(text.slice(0, 60)))
+      // Send text followed by Enter — voice relay is conversational
+      await this.sessionManager.sendKeys(sessionId, text + '\r')
+      this.emit('dispatched', { sessionId, sessionName, text })
+      console.log('[VoiceRouter] voice-relay dispatch OK')
+    } catch (err) {
+      console.log('[VoiceRouter] voice-relay sendKeys FAILED:', (err as Error).message)
+      this.emit('error', {
+        code: 'send-failed',
+        message: (err as Error).message,
+      })
+    }
+  }
+
+  /**
+   * Route transcription to the focused session (existing behavior).
+   * Text is sent without Enter — user submits via voice command.
+   */
+  private async routeToFocusedSession(text: string): Promise<void> {
     if (!this.focusedSessionId) {
       console.log('[VoiceRouter] ERROR: no focused session')
       this.emit('error', { code: 'no-session', message: 'No session focused — click a session first' })
@@ -76,7 +125,7 @@ export class VoiceInputRouter extends EventEmitter {
     }
 
     // Check for voice commands before sending as text
-    const normalized = stripPunctuation(trimmed.toLowerCase())
+    const normalized = stripPunctuation(text.toLowerCase())
     const command = VOICE_COMMANDS.find(cmd => cmd.patterns.includes(normalized))
 
     try {
@@ -89,13 +138,13 @@ export class VoiceInputRouter extends EventEmitter {
           text: `[${command.label}]`,
         })
       } else {
-        // Send text WITHOUT Enter — user submits via "abschicken" voice command
-        console.log('[VoiceRouter] sendKeys to', this.focusedSessionId, ':', JSON.stringify(trimmed.slice(0, 60)))
-        await this.sessionManager.sendKeys(this.focusedSessionId, trimmed)
+        // Send text WITHOUT Enter �� user submits via "abschicken" voice command
+        console.log('[VoiceRouter] sendKeys to', this.focusedSessionId, ':', JSON.stringify(text.slice(0, 60)))
+        await this.sessionManager.sendKeys(this.focusedSessionId, text)
         this.emit('dispatched', {
           sessionId: this.focusedSessionId,
           sessionName: session?.name ?? this.focusedSessionId,
-          text: trimmed,
+          text,
         })
       }
       console.log('[VoiceRouter] dispatched OK')

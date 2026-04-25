@@ -128,6 +128,17 @@ export function registerBuiltinEntities(
   })
 
   registry.register({
+    id: 'voice-relay',
+    displayName: 'Voice',
+    icon: '🎙',
+    color: '#9b59b6',
+    projectPath: `${entitiesBase}/voice-relay`,
+    features: ['mcp'],
+    visible: true,
+    autoResume: false,
+  })
+
+  registry.register({
     id: 'audit',
     displayName: 'Audit',
     icon: '🛡',

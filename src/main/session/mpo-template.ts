@@ -19,6 +19,8 @@ export interface MpoTemplateOpts {
   maxRetries: number
   /** Agent-specific MPO instructions from adapter */
   adapterFragment?: string
+  /** Active companion character prompt to inject */
+  companionPrompt?: string
 }
 
 export function generateMpoClaudeMd(opts: MpoTemplateOpts): string {
@@ -223,5 +225,6 @@ Explizite Message + finaler Commit + 10+ Min Inaktivitaet, ODER explizites "fert
 - Warnungen an topic "system" wenn Context-Usage >80%
 - Abschlussberichte an topic "chat"
 ${opts.adapterFragment ? `\n## Agent-spezifische Hinweise\n\n${opts.adapterFragment}` : ''}
+${opts.companionPrompt ? `\n## Companion-Persona\n\n${opts.companionPrompt}` : ''}
 `
 }

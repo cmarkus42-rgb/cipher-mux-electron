@@ -118,7 +118,7 @@ const api = {
   dialog: {
     openFile: (opts?: { title?: string; filters?: Array<{ name: string; extensions: string[] }> }) =>
       ipcRenderer.invoke(IPC.DIALOG_OPEN_FILE, opts),
-    openDir: (opts?: { title?: string }) =>
+    openDir: (opts?: { title?: string; defaultPath?: string }) =>
       ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR, opts),
   },
 
@@ -230,11 +230,20 @@ const api = {
     },
   },
 
-  // ─── Personas ────────────────────────────────────────────
+  // ─── Personas (legacy) ──────────────────────────────────
   personas: {
     list: (): Promise<unknown[]> => ipcRenderer.invoke('cipher-mux:personas:list'),
     save: (p: unknown): Promise<{ ok: boolean }> => ipcRenderer.invoke('cipher-mux:personas:save', p),
     delete: (id: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('cipher-mux:personas:delete', id),
+  },
+
+  // ─── Characters (Companion Persona) ─────────────────────
+  characters: {
+    list: (): Promise<unknown[]> => ipcRenderer.invoke(IPC.CHARACTERS_LIST),
+    active: (): Promise<unknown> => ipcRenderer.invoke(IPC.CHARACTERS_ACTIVE),
+    save: (c: unknown): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.CHARACTERS_SAVE, c),
+    delete: (id: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke(IPC.CHARACTERS_DELETE, id),
+    switch: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.CHARACTERS_SWITCH, id),
   },
 
   // ─── Workspaces ──────────────────────────────────────────

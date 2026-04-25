@@ -1,23 +1,80 @@
-// src/main/workspace/persona-skill-sync.ts — Sync persona definitions to .claude/skills/personas/
+// src/main/workspace/persona-skill-sync.ts — Sync active character as SKILL.md
 
-import type { Persona } from '../../shared/persona-types'
+import type { Character } from '../../shared/types'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 /**
- * generateSkillContent — Generates a markdown SKILL.md for a given persona.
+ * generateCharacterSkillContent — Generates a markdown SKILL.md for the active character.
  *
- * Returns null for the 'empty' persona or any persona with a whitespace-only
- * defaultPrompt. Otherwise returns a fully-formed skill markdown file.
+ * Returns null if prompt is empty/whitespace.
  */
-export function generateSkillContent(persona: Persona): string | null {
-  if (persona.id === 'empty') {
+export function generateCharacterSkillContent(character: Character): string | null {
+  if (character.prompt.trim() === '') {
     return null
   }
 
-  if (persona.defaultPrompt.trim() === '') {
-    return null
+  return `---
+name: companion-persona
+description: Active companion persona — ${character.name}
+---
+
+${character.prompt}
+`
+}
+
+/**
+ * syncCharacterSkill — Writes a single SKILL.md for the active companion character.
+ *
+ * - Creates skillsDir if it does not exist.
+ * - Writes companion-persona/SKILL.md with the active character's prompt.
+ * - Removes any old persona-* directories (legacy cleanup).
+ * - Skips write if content is unchanged.
+ */
+export function syncCharacterSkill(character: Character, skillsDir: string): void {
+  fs.mkdirSync(skillsDir, { recursive: true })
+
+  const dirName = 'companion-persona'
+  const personaDir = path.join(skillsDir, dirName)
+  fs.mkdirSync(personaDir, { recursive: true })
+
+  const content = generateCharacterSkillContent(character)
+  const skillFile = path.join(personaDir, 'SKILL.md')
+
+  if (content === null) {
+    // Remove skill file if character has no prompt
+    try { fs.unlinkSync(skillFile) } catch { /* ok */ }
+    return
   }
+
+  // Only write if content differs
+  let existingContent: string | null = null
+  try {
+    existingContent = fs.readFileSync(skillFile, 'utf8')
+  } catch { /* ok */ }
+
+  if (existingContent !== content) {
+    fs.writeFileSync(skillFile, content, 'utf8')
+  }
+
+  // Clean up old persona-* directories (legacy)
+  const entries = fs.readdirSync(skillsDir, { withFileTypes: true })
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    if (entry.name.startsWith('persona-')) {
+      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true, force: true })
+    }
+  }
+}
+
+// ── Legacy API (kept for backward compat with existing tests) ──
+
+import type { Persona } from '../../shared/persona-types'
+
+/** @deprecated Use generateCharacterSkillContent instead */
+export function generateSkillContent(persona: Persona): string | null {
+  if (persona.id === 'empty') return null
+  if (persona.defaultPrompt.trim() === '') return null
 
   return `---
 name: persona-${persona.id}
@@ -32,51 +89,28 @@ ${persona.defaultPrompt}
 `
 }
 
-/**
- * syncPersonaSkills — Synchronises .claude/skills/personas/ with the current persona list.
- *
- * - Creates skillsDir if it does not exist.
- * - For each persona where generateSkillContent() returns non-null:
- *     - Creates persona-{id}/ directory under skillsDir
- *     - Writes SKILL.md inside it
- *     - Skips write if content is unchanged (avoids unnecessary disk writes / mtime churn)
- * - Removes any persona-* directories in skillsDir that don't correspond to a current persona.
- */
+/** @deprecated Use syncCharacterSkill instead */
 export function syncPersonaSkills(personas: Persona[], skillsDir: string): void {
-  // Ensure the skills directory exists
   fs.mkdirSync(skillsDir, { recursive: true })
-
-  // Build set of expected dir names for personas that have skill content
   const expectedDirs = new Set<string>()
 
   for (const persona of personas) {
     const content = generateSkillContent(persona)
-    if (content === null) {
-      continue
-    }
+    if (content === null) continue
 
     const dirName = `persona-${persona.id}`
     expectedDirs.add(dirName)
-
     const personaDir = path.join(skillsDir, dirName)
     fs.mkdirSync(personaDir, { recursive: true })
-
     const skillFile = path.join(personaDir, 'SKILL.md')
 
-    // Only write if content differs from what's already on disk
     let existingContent: string | null = null
-    try {
-      existingContent = fs.readFileSync(skillFile, 'utf8')
-    } catch {
-      // File doesn't exist yet — that's fine
-    }
-
+    try { existingContent = fs.readFileSync(skillFile, 'utf8') } catch { /* ok */ }
     if (existingContent !== content) {
       fs.writeFileSync(skillFile, content, 'utf8')
     }
   }
 
-  // Remove stale persona-* directories
   const entries = fs.readdirSync(skillsDir, { withFileTypes: true })
   for (const entry of entries) {
     if (!entry.isDirectory()) continue

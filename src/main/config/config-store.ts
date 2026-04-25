@@ -1,11 +1,12 @@
 import { app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
-import type { AppConfig } from '../../shared/types'
+import type { AppConfig, Character } from '../../shared/types'
 import { createEmptyGrid } from '../../shared/grid-types'
 import { deepMerge } from '../util/deep-merge'
 import { BRAND } from '../../shared/brand'
 import { BUILTIN_PERSONAS, SEED_CUSTOM_PERSONAS, SEED_WORKSPACES } from '../../shared/persona-types'
+import { SEED_CHARACTERS, DEFAULT_CHARACTER_ID } from '../character/character-defaults'
 import {
   DEFAULT_SCAN_DEPTH,
   MAX_SESSIONS,
@@ -24,6 +25,8 @@ const defaults: AppConfig = {
   personas: [...BUILTIN_PERSONAS, ...SEED_CUSTOM_PERSONAS] as AppConfig['personas'],
   workspaces: [...SEED_WORKSPACES] as AppConfig['workspaces'],
   activeWorkspaceId: null,
+  activeCharacterId: DEFAULT_CHARACTER_ID,
+  characters: [...SEED_CHARACTERS],
   app: {
     scanPaths: [...BRAND.scanPaths],
     scanDepth: DEFAULT_SCAN_DEPTH,

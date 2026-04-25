@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
+import { FolderPickerInput } from './FolderPickerInput'
 
 interface KickoffDialogProps {
   visible: boolean
@@ -20,13 +21,6 @@ export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProp
   const [extraContext, setExtraContext] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-
-  const handlePickDir = useCallback(async () => {
-    const selected = await api.dialog.openDir({
-      title: t('kickoff.projectDir'),
-    })
-    if (selected) setProjectDir(selected)
-  }, [])
 
   const handlePickReqFile = useCallback(async () => {
     // No extension filter — all formats allowed.
@@ -76,17 +70,15 @@ export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProp
           {/* Project Directory */}
           <label class="kickoff-dialog__label">
             <span>{t('kickoff.projectDir')}</span>
-            <div class="kickoff-dialog__file-row">
-              <input
-                class="input"
-                type="text"
-                placeholder="/Users/cipher/Nextcloud/…"
-                value={projectDir}
-                onInput={(e) => setProjectDir((e.target as HTMLInputElement).value)}
-                autoFocus
-              />
-              <button class="btn btn--sm" onClick={handlePickDir}>…</button>
-            </div>
+            <FolderPickerInput
+              value={projectDir}
+              onChange={setProjectDir}
+              placeholder="/Users/cipher/Nextcloud/…"
+              inputClass="input"
+              buttonClass="btn btn--sm"
+              class="kickoff-dialog__file-row"
+              autofocus
+            />
             <span class="text-xs text-dim" style={{ marginTop: '4px' }}>
               {t('kickoff.projectDirHint')}
             </span>

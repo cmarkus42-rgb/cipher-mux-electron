@@ -2,6 +2,7 @@
 import { useState, useCallback, useMemo } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { ProjectInfo } from '../../shared/types'
+import { FolderPickerInput } from './FolderPickerInput'
 
 const api = () => (window as any).cipherMux
 
@@ -80,11 +81,6 @@ export function ProjectPopup({
   }, [handleSelect])
 
   // Kickoff handlers
-  const handleKickoffPickDir = useCallback(async () => {
-    const selected = await api().dialog.openDir({ title: t('projectPopup.projectDir') })
-    if (selected) setKickoffDir(selected)
-  }, [])
-
   const handleKickoffPickReqFile = useCallback(async () => {
     const selected = await api().dialog.openFile({ title: t('projectPopup.reqFile') })
     if (selected) setKickoffReqFile(selected)
@@ -199,16 +195,12 @@ export function ProjectPopup({
               <div class="project-popup__kickoff-body">
                 <label class="project-popup__kickoff-label">
                   <span>{t('projectPopup.projectDir')}</span>
-                  <div class="project-popup__kickoff-row">
-                    <input
-                      class="project-popup__input"
-                      type="text"
-                      placeholder={t('projectPopup.projectDirPlaceholder')}
-                      value={kickoffDir}
-                      onInput={(e) => setKickoffDir((e.target as HTMLInputElement).value)}
-                    />
-                    <button class="cell-btn" onClick={handleKickoffPickDir} title={t('projectPopup.selectDir')}>{'\u22EF'}</button>
-                  </div>
+                  <FolderPickerInput
+                    value={kickoffDir}
+                    onChange={setKickoffDir}
+                    placeholder={t('projectPopup.projectDirPlaceholder')}
+                    class="project-popup__kickoff-row"
+                  />
                 </label>
 
                 <label class="project-popup__kickoff-label">

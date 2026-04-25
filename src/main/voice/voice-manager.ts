@@ -17,6 +17,7 @@ import { VoiceState } from './voice-state'
 import { OllamaChat } from './ollama-chat'
 import { BugreportInterview, BUGREPORT_SYSTEM_PROMPT } from './bugreport-interview'
 import { VoiceInputRouter } from './voice-input-router'
+import { VoiceOutputRouter } from './voice-output-router'
 
 
 
@@ -43,6 +44,7 @@ export class VoiceManager extends EventEmitter {
   private conversation: ConversationEngine | null = null
   private interview: BugreportInterview | null = null
   private inputRouter: VoiceInputRouter | null = null
+  private outputRouter: VoiceOutputRouter | null = null
   private transport: ConversationTransport | null = null
   private _initialized = false
 
@@ -177,6 +179,16 @@ export class VoiceManager extends EventEmitter {
     this.inputRouter = new VoiceInputRouter({ sessionManager })
     this.inputRouter.setMode('session')
 
+    // Set up voice output router for TTS playback of voice-relay responses
+    this.outputRouter = new VoiceOutputRouter(sessionManager)
+    if (this.conversation) {
+      this.outputRouter.setConversationEngine(this.conversation)
+    }
+    // Start output polling if voice-relay entity is already running
+    if (sessionManager.isEntityRunning('voice-relay')) {
+      this.outputRouter.start()
+    }
+
     // Wire: conversation transcription -> input router (session dispatch)
     // In session mode there's no TTS/LLM, so we must transition back to READY
     // after dispatch — otherwise the state machine stays stuck in PROCESSING.
@@ -204,6 +216,21 @@ export class VoiceManager extends EventEmitter {
   /** Get the input router (null if not in session mode) */
   getInputRouter(): VoiceInputRouter | null {
     return this.inputRouter
+  }
+
+  /** Get the output router (null if not in session mode) */
+  getOutputRouter(): VoiceOutputRouter | null {
+    return this.outputRouter
+  }
+
+  /** Start output routing (call when voice-relay entity starts) */
+  startOutputRouting(): void {
+    if (this.outputRouter) this.outputRouter.start()
+  }
+
+  /** Stop output routing (call when voice-relay entity stops) */
+  stopOutputRouting(): void {
+    if (this.outputRouter) this.outputRouter.stop()
   }
 
   /** Delegate VAD speech-start event to the conversation engine */
@@ -247,6 +274,11 @@ export class VoiceManager extends EventEmitter {
   /** Shut down all subsystems and release references */
   shutdown(): void {
     this._initialized = false
+
+    if (this.outputRouter) {
+      this.outputRouter.shutdown()
+      this.outputRouter = null
+    }
 
     if (this.inputRouter) {
       this.inputRouter.removeAllListeners()

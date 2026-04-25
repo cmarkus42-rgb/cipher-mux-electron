@@ -98,7 +98,7 @@ export class WindowManager {
     }
   }
 
-  openWorkspacesWindow(initialTab?: 'workspaces' | 'personas'): void {
+  openWorkspacesWindow(initialTab?: 'workspaces' | 'personas' | 'companion'): void {
     // Focus existing window if already open
     if (this.workspacesWindow && !this.workspacesWindow.isDestroyed()) {
       this.workspacesWindow.focus()

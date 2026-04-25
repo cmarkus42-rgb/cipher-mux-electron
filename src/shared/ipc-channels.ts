@@ -143,6 +143,13 @@ export const IPC = {
   COMPANION_DELETE_MEMORY: 'cipher-mux:companion:delete-memory',
   COMPANION_SEARCH: 'cipher-mux:companion:search',
 
+  // Characters (Companion Persona)
+  CHARACTERS_LIST: 'cipher-mux:characters:list',
+  CHARACTERS_SAVE: 'cipher-mux:characters:save',
+  CHARACTERS_DELETE: 'cipher-mux:characters:delete',
+  CHARACTERS_SWITCH: 'cipher-mux:characters:switch',
+  CHARACTERS_ACTIVE: 'cipher-mux:characters:active',
+
   // Entity Framework
   ENTITY_START: 'cipher-mux:entity:start',
   ENTITY_STOP: 'cipher-mux:entity:stop',
