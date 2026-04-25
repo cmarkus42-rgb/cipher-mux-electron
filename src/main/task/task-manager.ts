@@ -14,8 +14,8 @@ import type {
 // ─── Valid State Transitions ────────────────────────────────
 
 const VALID_TRANSITIONS: Partial<Record<TaskState, TaskState[]>> = {
-  queued:      ['dispatched'],
-  dispatched:  ['running', 'stalled'],
+  queued:      ['dispatched', 'failed'],
+  dispatched:  ['running', 'stalled', 'failed'],
   running:     ['validating', 'completed', 'stalled', 'failed'],
   validating:  ['completed', 'failed'],
   stalled:     ['queued', 'failed'],
@@ -283,7 +283,7 @@ export class TaskManager extends EventEmitter {
     return updated
   }
 
-  /** running|validating|stalled → failed */
+  /** queued|dispatched|running|validating|stalled → failed */
   markFailed(id: string, result?: Task['result']): Task {
     const task = this.get(id)
     if (!task) throw new Error(`Task not found: ${id}`)
