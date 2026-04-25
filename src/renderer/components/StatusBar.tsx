@@ -23,6 +23,7 @@ interface StatusBarProps {
   mpoRunning: boolean
   companionRunning: boolean
   refinementRunning: boolean
+  auditRunning: boolean
   workspacesPopupVisible: boolean
   gridCols: number
   gridRows: number
@@ -32,6 +33,7 @@ interface StatusBarProps {
   onMpo: () => void
   onCompanion: () => void
   onRefinement: () => void
+  onAudit: () => void
   onBugreport: () => void
   onToggleTheme: () => void
   onToggleWorkspaces: () => void
@@ -43,8 +45,8 @@ interface StatusBarProps {
 export function StatusBar({
   theme, sidebarVisible, sidebarHasContent, onToggleSidebar, orchestratorRunning,
   gridCols, gridRows, focusedSessionId, focusedSessionName,
-  onOrchestrator, onMpo, onCompanion, onRefinement, onBugreport, onToggleTheme, onInfo, onThemeSettings,
-  onGridResize, mpoRunning, companionRunning, refinementRunning, workspacesPopupVisible, onToggleWorkspaces,
+  onOrchestrator, onMpo, onCompanion, onRefinement, onAudit, onBugreport, onToggleTheme, onInfo, onThemeSettings,
+  onGridResize, mpoRunning, companionRunning, refinementRunning, auditRunning, workspacesPopupVisible, onToggleWorkspaces,
 }: StatusBarProps) {
   const { t } = useTranslation()
   return (
@@ -65,6 +67,18 @@ export function StatusBar({
           {t('statusBar.workspaces')}
         </button>
         <button
+          class={`status-bar__btn status-bar__btn--session${companionRunning ? ' status-bar__btn--active' : ''}`}
+          onClick={onCompanion}
+        >
+          <span class="status-bar__dot status-bar__dot--companion" />{t('statusBar.companion')}
+        </button>
+        <button
+          class={`status-bar__btn status-bar__btn--session${refinementRunning ? ' status-bar__btn--active' : ''}`}
+          onClick={onRefinement}
+        >
+          <span class="status-bar__dot status-bar__dot--refinement" />{t('statusBar.refinement')}
+        </button>
+        <button
           class={`status-bar__btn status-bar__btn--session${orchestratorRunning ? ' status-bar__btn--active' : ''}`}
           onClick={onOrchestrator}
         >
@@ -77,16 +91,10 @@ export function StatusBar({
           <span class="status-bar__dot status-bar__dot--mpo" />{t('statusBar.mpo')}
         </button>
         <button
-          class={`status-bar__btn status-bar__btn--session${companionRunning ? ' status-bar__btn--active' : ''}`}
-          onClick={onCompanion}
+          class={`status-bar__btn status-bar__btn--session${auditRunning ? ' status-bar__btn--active' : ''}`}
+          onClick={onAudit}
         >
-          <span class="status-bar__dot status-bar__dot--companion" />{t('statusBar.companion')}
-        </button>
-        <button
-          class={`status-bar__btn status-bar__btn--session${refinementRunning ? ' status-bar__btn--active' : ''}`}
-          onClick={onRefinement}
-        >
-          <span class="status-bar__dot status-bar__dot--refinement" />{t('statusBar.refinement')}
+          <span class="status-bar__dot status-bar__dot--audit" />{t('statusBar.audit')}
         </button>
         <button class="status-bar__btn" onClick={onBugreport}>{t('statusBar.bugreport')}</button>
         <button

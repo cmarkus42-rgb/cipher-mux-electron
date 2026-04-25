@@ -95,6 +95,8 @@ export function NoteEditor({ content, onSave, onAutoSave }: NoteEditorProps) {
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         const doc = update.state.doc.toString()
+        // Track editor content to avoid re-dispatching on auto-save round-trip
+        prevContentProp.current = doc
         // Debounced auto-save
         if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
         autoSaveTimer.current = setTimeout(() => {

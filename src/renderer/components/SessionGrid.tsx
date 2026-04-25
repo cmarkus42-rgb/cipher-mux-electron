@@ -27,8 +27,6 @@ interface SessionGridProps {
   onCloseNotes: (slotIndex: number) => void
   onToggleExpandSlot: (slotIndex: number) => void
   onSwap: (idxA: number, idxB: number) => void
-  onCompanion: () => void
-  onRefinement: () => void
 }
 
 /**
@@ -54,7 +52,7 @@ export function SessionGrid({
   grid, sessions, contextUsages, focusedSessionId, theme,
   orchestratorSessionId, activeWorkspaceId, onFocusSession, onCloseSession,
   onSwitchProject, onToggleExpand, onShell, onFork, onLaunch, onOpenSession,
-  onOpenNotes, onCloseNotes, onToggleExpandSlot, onSwap, onCompanion, onRefinement,
+  onOpenNotes, onCloseNotes, onToggleExpandSlot, onSwap,
 }: SessionGridProps) {
   const [dragSourceIdx, setDragSourceIdx] = useState<number | null>(null)
   const { cols, rows } = grid.config
@@ -137,8 +135,6 @@ export function SessionGrid({
               onLaunch={() => onLaunch(idx)}
               onOpenSession={() => onOpenSession(idx)}
               onOpenNotes={() => onOpenNotes(idx)}
-              onCompanion={onCompanion}
-              onRefinement={onRefinement}
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(idx)}
             />

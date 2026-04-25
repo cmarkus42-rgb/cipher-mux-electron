@@ -90,13 +90,13 @@ describe('EntityRegistry', () => {
 })
 
 describe('registerBuiltinEntities()', () => {
-  it('registers all 5 builtin entities', () => {
+  it('registers all 6 builtin entities', () => {
     const registry = new EntityRegistry()
     registerBuiltinEntities(registry, '~/.config/cipher-mux/orchestrator', '~/.config/cipher-mux/mpo')
     const entities = registry.list()
-    assert.strictEqual(entities.length, 5)
+    assert.strictEqual(entities.length, 6)
     const ids = entities.map((e: any) => e.id).sort()
-    assert.deepStrictEqual(ids, ['companion', 'launcher', 'mpo', 'orchestrator', 'refinement'])
+    assert.deepStrictEqual(ids, ['audit', 'companion', 'launcher', 'mpo', 'orchestrator', 'refinement'])
   })
 
   it('companion has correct display name and color', () => {
@@ -106,7 +106,8 @@ describe('registerBuiltinEntities()', () => {
     assert.strictEqual(companion?.displayName, 'Coding Companion')
     assert.strictEqual(companion?.color, '#ffb74d')
     assert.ok(companion?.features.includes('mcp'))
-    assert.ok(companion?.features.includes('resume'))
+    assert.ok(companion?.features.includes('memory'))
+    assert.strictEqual(companion?.autoResume, false)
   })
 
   it('refinement has correct display name and color', () => {

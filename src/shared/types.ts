@@ -18,7 +18,7 @@ export type AdapterCapabilities = Record<AdapterFeature, boolean>
 // ─── Entity Framework ─────────────────────────────────────
 
 /** Well-known entity identifiers. */
-export type EntityId = 'orchestrator' | 'mpo' | 'launcher' | 'companion' | 'refinement'
+export type EntityId = 'orchestrator' | 'mpo' | 'launcher' | 'companion' | 'refinement' | 'audit'
 
 /**
  * Configuration for a functional entity (Orchestrator, MPO, Companion, etc.).

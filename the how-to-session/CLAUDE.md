@@ -51,7 +51,7 @@ These rules govern how you teach. Follow them in every interaction.
 
 ## User Profile
 
-On every session start, read `user-profile.json` from this directory.
+On every session start, read `~/.config/cipher-mux/user-profile.json` (shared across all Relay sessions).
 
 **If the file exists:**
 - Greet the user by name

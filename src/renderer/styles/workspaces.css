@@ -1412,6 +1412,8 @@
   border: 1px solid var(--color-border);
   padding: 16px;
   min-width: 260px;
+  max-height: 80%;
+  overflow-y: auto;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
 }
