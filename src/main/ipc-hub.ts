@@ -19,6 +19,8 @@ import { TaskWatcher } from './task/task-watcher'
 import { InputRequestWatcher } from './mpo/input-request-watcher'
 import { TaskHooks } from './task/task-hooks'
 import { BugreportTaskSource } from './task/sources/bugreport-source'
+import { NoteManager } from './notes/note-manager'
+import { NoteTagging } from './notes/note-tagging'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { AdapterRegistry } from './agent/registry'
 import { IPC } from '../shared/ipc-channels'
@@ -47,6 +49,8 @@ export class IpcHub {
   private taskHooks: TaskHooks | null = null
   private bugreportSource: BugreportTaskSource | null = null
   private inputRequestWatcher: InputRequestWatcher | null = null
+  private noteManager!: NoteManager
+  private noteTagging!: NoteTagging
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
 
   private adapterRegistry: AdapterRegistry
@@ -74,6 +78,10 @@ export class IpcHub {
       timeoutMs: ((appConfig?.kickoffTimeoutMinutes ?? 15) * 60_000),
     })
     this.bugreportManager = new BugreportManager({ messageBus: this.messageBus })
+
+    const notesDir = path.join(os.homedir(), '.config', 'cipher-mux', 'notes')
+    this.noteManager = new NoteManager(notesDir)
+    this.noteTagging = new NoteTagging(notesDir)
 
     // Initialize TaskManager — reuse MessageBus DB for single-writer consistency
     try {
@@ -104,6 +112,7 @@ export class IpcHub {
     this.registerInputRequestChannels()
     this.registerPersonaChannels()
     this.registerWorkspaceChannels()
+    this.registerNoteChannels()
     this.setupEventForwarding()
 
     // Start context usage monitor
@@ -1031,7 +1040,57 @@ export class IpcHub {
     })
   }
 
+  // ─── Notes ─────────────────────────────────────────────
+  private registerNoteChannels(): void {
+    ipcMain.handle(IPC.NOTES_LIST, async (_e, { scope }: { scope?: string }) => {
+      if (scope) return this.noteManager.list(scope)
+      return this.noteManager.listAll()
+    })
+
+    ipcMain.handle(IPC.NOTES_READ, async (_e, { id, scope }: { id: string; scope: string }) => {
+      return this.noteManager.read(id, scope)
+    })
+
+    ipcMain.handle(IPC.NOTES_SAVE, async (_e, { id, scope, body, tags }: {
+      id: string; scope: string; body: string; tags?: string[]
+    }) => {
+      const note = await this.noteManager.save(id, scope, body, tags)
+      this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', note })
+      // Async auto-tagging (fire-and-forget, only on manual save)
+      if (!tags) {
+        this.noteTagging.autoTag(body).then(async (autoTags) => {
+          if (autoTags && autoTags.length > 0) {
+            const updated = await this.noteManager.save(id, scope, body, autoTags)
+            this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tagged', note: updated })
+          }
+        }).catch(() => { /* Ollama not available — ignore */ })
+      }
+      return note
+    })
+
+    ipcMain.handle(IPC.NOTES_CREATE, async (_e, { scope, title, body }: {
+      scope: string; title: string; body: string
+    }) => {
+      const note = await this.noteManager.create(scope, title, body)
+      this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created', note })
+      return note
+    })
+
+    ipcMain.handle(IPC.NOTES_DELETE, async (_e, { id, scope }: { id: string; scope: string }) => {
+      const ok = await this.noteManager.delete(id, scope)
+      if (ok) {
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'deleted', id, scope })
+      }
+      return { ok }
+    })
+
+    ipcMain.handle(IPC.NOTES_TAGS, async () => {
+      return this.noteTagging.getTagRepository()
+    })
+  }
+
   async destroy(): Promise<void> {
+    this.noteManager.destroy()
     this.inputRequestWatcher?.stop()
     this.bugreportSource?.stop()
     this.taskWatcher?.stop()

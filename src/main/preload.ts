@@ -186,6 +186,24 @@ const api = {
     },
   },
 
+  // ─── Notes ──────────────────────────────────────────────
+  notes: {
+    list: (scope?: string) => ipcRenderer.invoke(IPC.NOTES_LIST, { scope }),
+    read: (id: string, scope: string) => ipcRenderer.invoke(IPC.NOTES_READ, { id, scope }),
+    save: (id: string, scope: string, body: string, tags?: string[]) =>
+      ipcRenderer.invoke(IPC.NOTES_SAVE, { id, scope, body, tags }),
+    create: (scope: string, title: string, body: string) =>
+      ipcRenderer.invoke(IPC.NOTES_CREATE, { scope, title, body }),
+    delete: (id: string, scope: string) =>
+      ipcRenderer.invoke(IPC.NOTES_DELETE, { id, scope }),
+    tags: () => ipcRenderer.invoke(IPC.NOTES_TAGS),
+    onChanged: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.NOTES_CHANGED, handler)
+      return () => ipcRenderer.removeListener(IPC.NOTES_CHANGED, handler)
+    },
+  },
+
   // ─── Input Requests (MPO) ──────────────────────────────
   inputRequests: {
     get: () => ipcRenderer.invoke(IPC.MPO_INPUT_REQUESTS),
