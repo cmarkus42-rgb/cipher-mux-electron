@@ -5,6 +5,7 @@ import { computeGridStyle } from '../../shared/grid-types'
 import type { GridState, ThemeName } from '../../shared/grid-types'
 import { SessionCell } from './SessionCell'
 import { LauncherCell } from './LauncherCell'
+import { NotesCell } from './NotesCell'
 
 interface SessionGridProps {
   grid: GridState
@@ -13,6 +14,7 @@ interface SessionGridProps {
   focusedSessionId: string | null
   theme: ThemeName
   orchestratorSessionId: string | null
+  activeWorkspaceId: string | null
   onFocusSession: (sessionId: string) => void
   onCloseSession: (sessionId: string) => void
   onSwitchProject: (sessionId: string) => void
@@ -20,6 +22,9 @@ interface SessionGridProps {
   onShell: (sessionId: string, projectPath: string | null) => void
   onLaunch: (slotIndex: number) => void
   onOpenSession: (slotIndex: number) => void
+  onOpenNotes: (slotIndex: number) => void
+  onCloseNotes: (slotIndex: number) => void
+  onToggleExpandSlot: (slotIndex: number) => void
   onSwap: (idxA: number, idxB: number) => void
 }
 
@@ -44,8 +49,9 @@ function getCoveredSlots(slots: GridState['slots'], cols: number, rows: number):
 
 export function SessionGrid({
   grid, sessions, contextUsages, focusedSessionId, theme,
-  orchestratorSessionId, onFocusSession, onCloseSession,
-  onSwitchProject, onToggleExpand, onShell, onLaunch, onOpenSession, onSwap,
+  orchestratorSessionId, activeWorkspaceId, onFocusSession, onCloseSession,
+  onSwitchProject, onToggleExpand, onShell, onLaunch, onOpenSession,
+  onOpenNotes, onCloseNotes, onToggleExpandSlot, onSwap,
 }: SessionGridProps) {
   const [dragSourceIdx, setDragSourceIdx] = useState<number | null>(null)
   const { cols, rows } = grid.config
@@ -76,6 +82,24 @@ export function SessionGrid({
           // Skip cells covered by a rowSpan above
           if (covered.has(idx)) return null
 
+          // Notes cell
+          if (slot.type === 'notes') {
+            return (
+              <NotesCell
+                key={`notes-${idx}`}
+                rowSpan={slot.rowSpan}
+                maxRows={rows}
+                activeWorkspaceId={activeWorkspaceId}
+                onClose={() => onCloseNotes(idx)}
+                onToggleExpand={() => onToggleExpandSlot(idx)}
+                onDragStart={() => handleDragStart(idx)}
+                onDragOver={handleDragOver}
+                onDrop={() => handleDrop(idx)}
+              />
+            )
+          }
+
+          // Session cell
           const session = slot.sessionId
             ? sessions.find((s) => s.id === slot.sessionId)
             : null
@@ -108,6 +132,7 @@ export function SessionGrid({
               key={`launcher-${idx}`}
               onLaunch={() => onLaunch(idx)}
               onOpenSession={() => onOpenSession(idx)}
+              onOpenNotes={() => onOpenNotes(idx)}
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(idx)}
             />
