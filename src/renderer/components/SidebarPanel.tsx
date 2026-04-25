@@ -35,7 +35,7 @@ export function SidebarPanel({
   const [searchTerm, setSearchTerm] = useState('')
 
   const scope = activeWorkspaceId ? `workspace-${activeWorkspaceId}` : 'global'
-  const { notes, tagRepo } = useNotes(scope)
+  const { notes, tagRepo, deleteNote } = useNotes(scope)
 
   const showNotes = true
 
@@ -55,6 +55,12 @@ export function SidebarPanel({
     const openFn = (window as any).__notesCell_openNote
     if (openFn) openFn(note)
   }, [])
+
+  const handleNoteDelete = useCallback(async (note: any, e: Event) => {
+    e.stopPropagation()
+    if (!confirm(`Note "${note.title || note.id}" wirklich löschen?`)) return
+    await deleteNote(note.id, note.scope)
+  }, [deleteNote])
 
   const toggleTag = useCallback((tag: string) => {
     setTagFilter(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
@@ -175,6 +181,11 @@ export function SidebarPanel({
                 >
                   <div class="bg-card__head">
                     <span class="bg-card__name">{note.title || note.id}</span>
+                    <button
+                      class="bg-card__delete"
+                      onClick={(e) => handleNoteDelete(note, e)}
+                      title="Note löschen"
+                    >✕</button>
                   </div>
                   <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)' }}>
                     {note.tags.map(t => `#${t}`).join(' ')}

@@ -1431,6 +1431,26 @@
   letter-spacing: 0.05em;
 }
 
+.bg-card__delete {
+  background: none;
+  border: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.bg-card:hover .bg-card__delete {
+  opacity: 1;
+}
+
+.bg-card__delete:hover {
+  color: var(--color-neon-red);
+}
+
 .bg-card__path {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -1612,15 +1632,32 @@
   color: var(--color-neon-red);
 }
 
+.notes-tab__delete {
+  background: none;
+  border: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.notes-tab__delete:hover {
+  color: var(--color-neon-red);
+}
+
 .notes-tab--add {
   color: var(--color-text-dim);
   border-right: none;
+  border: none;
+  background: none;
   font-size: 14px;
   padding: var(--space-xs) var(--space-sm);
 }
 
 .notes-tab--add:hover {
   color: var(--color-accent);
+  background: none;
 }
 
 .notes-editor-area {
