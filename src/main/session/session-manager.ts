@@ -9,6 +9,7 @@ import { BRAND } from '../../shared/brand'
 import { TmuxManager } from '../tmux/tmux-manager'
 import { generateOrchestratorClaudeMd } from './orchestrator-template'
 import { generateMpoClaudeMd } from './mpo-template'
+import { generateAuditClaudeMd } from './audit-template'
 import { EntityRegistry } from './entity-registry'
 import { deployEntityAssets } from './entity-assets'
 import type { AgentAdapter } from '../agent/agent-adapter'
@@ -165,7 +166,17 @@ export class SessionManager extends EventEmitter {
         forkFromClaudeSessionId: opts.forkFromClaudeSessionId,
       })
       const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
-      this.setPendingLaunch(id, `clear; ${cmdStr}\n`)
+      // When resuming, fall back to fresh start if no prior session exists
+      if (opts.resume && !opts.forkFromClaudeSessionId) {
+        const fallbackCmd = adapter.buildLaunchCommand({
+          projectPath: opts.projectPath || os.homedir(),
+          sessionName: opts.name,
+        })
+        const fallbackStr = [fallbackCmd.cmd, ...fallbackCmd.args].join(' ')
+        this.setPendingLaunch(id, `clear; ${cmdStr} || ${fallbackStr}\n`)
+      } else {
+        this.setPendingLaunch(id, `clear; ${cmdStr}\n`)
+      }
     }
 
     this.emit('session-changed', session)
@@ -482,6 +493,16 @@ export class SessionManager extends EventEmitter {
     // Ensure entity directory exists
     fs.mkdirSync(config.projectPath, { recursive: true })
 
+    // Write CLAUDE.md for entities without asset templates
+    if (!config.templatePath) {
+      const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
+      if (config.id === 'audit') {
+        fs.writeFileSync(claudeMdPath, generateAuditClaudeMd(), 'utf-8')
+      } else if (!fs.existsSync(claudeMdPath)) {
+        fs.writeFileSync(claudeMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')
+      }
+    }
+
     // Write .mcp.json for MCP auto-discovery (if entity uses MCP)
     if (config.features.includes('mcp') && this.mcpConfig) {
       const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}/mcp`
@@ -530,15 +551,28 @@ export class SessionManager extends EventEmitter {
     if (!config) return
 
     const adapter = this.adapterRegistry.getDefault()
+    const useResume = config.autoResume ?? true
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: config.projectPath,
       sessionName: config.displayName,
       isOrchestrator: entityId === 'orchestrator',
       isMpo: entityId === 'mpo',
-      resume: config.autoResume ?? true,
+      resume: useResume,
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
-    this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
+    // When resuming, fall back to fresh start if no prior session exists
+    if (useResume) {
+      const fallbackCmd = adapter.buildLaunchCommand({
+        projectPath: config.projectPath,
+        sessionName: config.displayName,
+        isOrchestrator: entityId === 'orchestrator',
+        isMpo: entityId === 'mpo',
+      })
+      const fallbackStr = [fallbackCmd.cmd, ...fallbackCmd.args].join(' ')
+      this.setPendingLaunch(sessionId, `clear; ${cmdStr} || ${fallbackStr}\n`)
+    } else {
+      this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
+    }
   }
 
   /**
@@ -832,6 +866,22 @@ export class SessionManager extends EventEmitter {
   async forkSession(sourceSessionId: string): Promise<SessionInfo> {
     const source = this.sessions.get(sourceSessionId)
     if (!source) throw new Error(`Source session ${sourceSessionId} not found`)
+
+    // Try to read Claude session ID from statusline file if not already set
+    if (!source.claudeSessionId) {
+      const statusFile = path.join(BRAND.statusLineDir, `${sourceSessionId}.json`)
+      try {
+        const raw = fs.readFileSync(statusFile, 'utf-8')
+        const data = JSON.parse(raw)
+        const sid = data?.session_id || data?.sessionId
+        if (typeof sid === 'string' && sid) {
+          source.claudeSessionId = sid
+          source.updatedAt = Date.now()
+        }
+      } catch {
+        // File may not exist or be invalid
+      }
+    }
     if (!source.claudeSessionId) {
       throw new Error('Source session has no Claude session ID — cannot fork')
     }

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import i18n from '../i18n'
 import { APP_VERSION } from '../../shared/constants'
 import type { ThemeName } from '../../shared/grid-types'
+import type { CustomTheme } from '../hooks/useTheme'
 import themesManifest from '../themes.json'
 import '../styles/workspaces.css'
 
@@ -13,6 +14,12 @@ interface InfoSettingsViewProps {
   theme: ThemeName
   onSetTheme: (t: ThemeName) => void
   initialTab?: TabId
+  onThemeEditorToggle?: (open: boolean) => void
+  customThemes?: CustomTheme[]
+  activeCustomThemeId?: string | null
+  onSelectCustomTheme?: (ct: CustomTheme) => void
+  onSaveCustomTheme?: (name: string, baseTheme: ThemeName, tokens: Record<string, string>) => Promise<CustomTheme>
+  onDeleteCustomTheme?: (id: string) => Promise<void>
 }
 
 const api = (window as any).cipherMux
@@ -57,7 +64,7 @@ const THEME_TOKEN_GROUPS: Array<{ labelKey: string; tokens: string[] }> = [
   },
 ]
 
-export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initialTab }: InfoSettingsViewProps) {
+export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme }: InfoSettingsViewProps) {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'features')
   const [scanPaths, setScanPaths] = useState<string[]>([])
@@ -68,6 +75,8 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
   const [themeEditorOpen, setThemeEditorOpen] = useState(false)
   const [customTokens, setCustomTokens] = useState<Record<string, string>>({})
   const [savedNotice, setSavedNotice] = useState(false)
+  const [saveAsName, setSaveAsName] = useState('')
+  const [saveAsOpen, setSaveAsOpen] = useState(false)
 
   const load = useCallback(async () => {
     const app: AppSection | null = await api.config.get('app')
@@ -163,6 +172,16 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
     setSavedNotice(true)
     setTimeout(() => setSavedNotice(false), 2000)
   }, [theme, customTokens])
+
+  const handleSaveAs = useCallback(async () => {
+    const name = saveAsName.trim()
+    if (!name || !onSaveCustomTheme) return
+    await onSaveCustomTheme(name, theme, { ...customTokens })
+    setSaveAsName('')
+    setSaveAsOpen(false)
+    setSavedNotice(true)
+    setTimeout(() => setSavedNotice(false), 2000)
+  }, [saveAsName, theme, customTokens, onSaveCustomTheme])
 
   const shortcuts = SHORTCUT_KEYS.map(s => ({ ...s, label: t(s.labelKey) }))
   const grouped = shortcuts.reduce<Record<string, typeof shortcuts>>((acc, s) => {
@@ -294,9 +313,9 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
             {themes.map((thm) => (
               <div
                 key={thm.id}
-                class={`theme-row ${thm.id === theme ? 'theme-row--active' : ''}`}
+                class={`theme-row ${thm.id === theme && !activeCustomThemeId ? 'theme-row--active' : ''}`}
                 role="radio"
-                aria-checked={thm.id === theme}
+                aria-checked={thm.id === theme && !activeCustomThemeId}
                 tabIndex={0}
                 onClick={() => onSetTheme(thm.id as ThemeName)}
                 onKeyDown={(e) => {
@@ -317,13 +336,37 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
                 <div class="theme-mode">{thm.mode}</div>
               </div>
             ))}
+            {customThemes.map((ct) => (
+              <div
+                key={ct.id}
+                class={`theme-row ${activeCustomThemeId === ct.id ? 'theme-row--active' : ''}`}
+                role="radio"
+                aria-checked={activeCustomThemeId === ct.id}
+                tabIndex={0}
+                onClick={() => onSelectCustomTheme?.(ct)}
+              >
+                <div class="theme-radio" />
+                <div class="theme-strip" aria-hidden="true">
+                  {Object.values(ct.tokens).slice(0, 5).map((c, i) => <span key={i} style={{ background: c }} />)}
+                </div>
+                <div class="theme-meta">
+                  <div class="theme-name">{ct.name}</div>
+                  <div class="theme-tag">{t('themeEditor.custom')}</div>
+                </div>
+                <button
+                  class="btn btn--sm theme-row__delete"
+                  onClick={(e) => { e.stopPropagation(); onDeleteCustomTheme?.(ct.id) }}
+                  title={t('themeEditor.deleteTheme')}
+                >✕</button>
+              </div>
+            ))}
           </div>
 
           {/* Theme Editor */}
           <div
             class="settings-section__title"
             style={{ marginTop: 'var(--space-lg)', cursor: 'pointer', userSelect: 'none' }}
-            onClick={() => setThemeEditorOpen(v => !v)}
+            onClick={() => { setThemeEditorOpen(v => { const next = !v; onThemeEditorToggle?.(next); return next }) }}
           >
             {themeEditorOpen ? '▾' : '▸'} {t('themeEditor.title')}
           </div>
@@ -353,10 +396,24 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
               ))}
               <div class="theme-editor__actions">
                 <button class="btn btn--sm btn--primary" onClick={handleThemeSave}>{t('themeEditor.save')}</button>
+                <button class="btn btn--sm" onClick={() => setSaveAsOpen(v => !v)}>{t('themeEditor.saveAs')}</button>
                 <button class="btn btn--sm" onClick={handleThemeReset}>{t('themeEditor.reset')}</button>
                 <button class="btn btn--sm" onClick={handleThemeExport}>{t('themeEditor.export')}</button>
                 {savedNotice && <span class="theme-editor__notice">{t('themeEditor.saved')}</span>}
               </div>
+              {saveAsOpen && (
+                <div class="theme-editor__save-as">
+                  <input
+                    type="text"
+                    class="input input--sm"
+                    placeholder={t('themeEditor.saveAsPlaceholder')}
+                    value={saveAsName}
+                    onInput={(e) => setSaveAsName((e.target as HTMLInputElement).value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveAs() }}
+                  />
+                  <button class="btn btn--sm btn--primary" onClick={handleSaveAs} disabled={!saveAsName.trim()}>{t('themeEditor.saveAsConfirm')}</button>
+                </div>
+              )}
             </div>
           )}
 

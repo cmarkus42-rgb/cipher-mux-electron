@@ -110,9 +110,9 @@ export function registerBuiltinEntities(
     projectPath: `${entitiesBase}/companion`,
     templatePath: 'the how-to-session',
     startupGreeting: 'Hey, kannst du mir was erklaeren?',
-    features: ['mcp', 'resume', 'memory'],
+    features: ['mcp', 'memory'],
     visible: true,
-    autoResume: true,
+    autoResume: false,
   })
 
   registry.register({
@@ -122,8 +122,19 @@ export function registerBuiltinEntities(
     color: '#ef5350',
     projectPath: `${entitiesBase}/refinement`,
     templatePath: 'the refinement session',
-    features: ['mcp', 'resume', 'memory'],
+    features: ['mcp', 'memory'],
     visible: true,
-    autoResume: true,
+    autoResume: false,
+  })
+
+  registry.register({
+    id: 'audit',
+    displayName: 'Audit',
+    icon: '🛡',
+    color: '#c0392b',
+    projectPath: `${entitiesBase}/audit`,
+    features: ['mcp'],
+    visible: true,
+    autoResume: false,
   })
 }

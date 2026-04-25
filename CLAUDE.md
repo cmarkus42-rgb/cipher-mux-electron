@@ -20,7 +20,7 @@ Phasen-Übersicht:
 11. ~~v0.9.1–0.9.5: Unified Sidebar, Workspace Apply E2E, Bugfixes, Cell Split, Terminal Width~~ ✅ (2026-04-24)
 12. ~~v0.9.6: Notes Editor — dritte Grid-Cell-Option, CodeMirror 6, Ollama Auto-Tagging~~ ✅ (2026-04-25)
 
-**Status:** v0.9.6-beta, ~448 Tests (43 Test-Dateien), Build sauber. Notes Editor (CodeMirror 6 Markdown, Frontmatter, Ollama Auto-Tagging, Sidebar Notes-Tab mit Search/Tag-Filter, Delete UI). Unified Sidebar, Detachable Sidebar, Cell Split, Terminal Width Fix, Workspace Apply E2E, Config Migration.
+**Status:** v0.9.6-beta, 527 Tests (50 Test-Dateien), Build sauber. Notes Editor (CodeMirror 6 Markdown, Frontmatter, Ollama Auto-Tagging, MCP-Tools, Sidebar Notes-Tab mit Search/Tag-Filter, Delete UI). Unified Sidebar, Detachable Sidebar, Cell Split, Terminal Width Fix, Workspace Apply E2E, Config Migration.
 
 ## Build & Test
 
@@ -141,7 +141,14 @@ Personas definieren Rollen (Name, Farbe, Default-Prompt). Workspaces kombinieren
 
 ## MCP-Server: Worker-Session-Handling
 
-Der MCP-Server stellt Tools bereit (`mux_create_session`, `mux_send`, etc.), die von der Orchestrator-Session genutzt werden. **Wichtig für Konsumenten (Orchestrator/Clients):**
+Der MCP-Server stellt 16 Tools bereit, die von Orchestrator, MPO und Worker-Sessions genutzt werden:
+
+**Session-Tools:** `mux_create_session`, `mux_kill_session`, `mux_sessions`, `mux_send`, `mux_read`, `mux_status`, `mux_context_usage`
+**Task-Tools:** `mux_task_create`, `mux_task_update`, `mux_task_list`, `mux_task_get`
+**Notes-Tools:** `mux_notes_create`, `mux_notes_list` — erlauben MCP-Clients (z.B. Refinement-Sessions) Notes in der Sidebar anzulegen
+**Sonstige:** `kickoff_complete`, `mux_bugreport_resolve`, `mux_input_request_create`
+
+**Wichtig für Konsumenten (Orchestrator/Clients):**
 
 ### Worker-Startup-Protokoll (Pflicht)
 
@@ -197,7 +204,7 @@ Eingebaute Funktion von cipher-mux. Empfaengt Anforderungspakete, zerlegt sie in
 - **MCP-Tool:** `mux_input_request_create` fuer Bubble-Requests an die Sidebar
 - **StatusBar:** `mpo`-Button mit Active-State
 - **Kein Auto-Start** — manuell per Button
-- **Grid-Placement:** Naechster freier Slot (oben-links, links-nach-rechts)
+- **Grid-Placement:** Naechster freier Slot; bei vollem Grid oeffnet PlacementPopup zur Slot-Auswahl
 
 ## Notes Editor
 
@@ -211,6 +218,7 @@ Minimalistischer Markdown-Editor als dritte Grid-Cell-Option (neben Session und 
 - **Sidebar:** Notes-Tab mit Suchfeld, Tag-Filter-Chips, Doppelklick oeffnet in NotesCell, Delete-Button (hover)
 - **Grid-Integration:** LauncherCell hat dritten "notes"-Button, GridSlot hat `type: 'session' | 'notes'`
 - **IPC:** 7 Channels (NOTES_LIST, NOTES_READ, NOTES_SAVE, NOTES_CREATE, NOTES_DELETE, NOTES_TAGS, NOTES_CHANGED)
+- **MCP:** `mux_notes_create` (mit Tags + Scope) und `mux_notes_list` — MCP-Clients koennen Notes anlegen, UI aktualisiert via NOTES_CHANGED Event
 - **Delete:** Sidebar (hover-reveal Button) + aktiver Tab (Trash-Icon), jeweils mit Confirm-Dialog
 
 ## Bekannte Constraints

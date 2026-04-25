@@ -294,12 +294,14 @@
 
   "statusBar.companion": "companion",
   "statusBar.refinement": "refinement",
+  "statusBar.audit": "audit",
 
   "launcher.companion": "companion",
   "launcher.refinement": "refinement",
 
   "entity.companion": "Coding Companion",
   "entity.refinement": "Refinement",
+  "entity.audit": "Audit",
   "entity.alreadyRunning": "{{name}} läuft bereits",
 
   "bugreport.typeBug": "bug",
@@ -327,6 +329,11 @@
   "themeEditor.reset": "zurücksetzen",
   "themeEditor.export": "in zwischenablage",
   "themeEditor.saved": "gespeichert!",
+  "themeEditor.saveAs": "speichern als…",
+  "themeEditor.saveAsPlaceholder": "theme-name",
+  "themeEditor.saveAsConfirm": "speichern",
+  "themeEditor.custom": "eigenes",
+  "themeEditor.deleteTheme": "theme löschen",
 
   "companion.title": "MEMORY",
   "companion.searchPlaceholder": "erinnerungen durchsuchen...",

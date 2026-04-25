@@ -27,6 +27,7 @@ export function App() {
   const [bugreportVisible, setBugreportVisible] = useState(false)
   const [infoVisible, setInfoVisible] = useState(false)
   const [infoInitialTab, setInfoInitialTab] = useState<'shortcuts' | 'features' | 'settings' | undefined>(undefined)
+  const [themeEditorActive, setThemeEditorActive] = useState(false)
   const [workspacesPopupVisible, setWorkspacesPopupVisible] = useState(false)
   const [placementPopup, setPlacementPopup] = useState<{ sessionId: string } | null>(null)
 
@@ -42,7 +43,7 @@ export function App() {
   // without circular dependency (sidebarHasContent depends on grid which depends on useGrid)
   const panelWidthRef = useRef(0)
   const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot } = useGrid(panelWidthRef.current)
-  const { theme, setTheme, toggleTheme } = useTheme()
+  const { theme, setTheme, toggleTheme, customThemes, activeCustomThemeId, selectCustomTheme, saveCustomTheme, deleteCustomTheme } = useTheme()
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
 
   // Global keyboard shortcuts
@@ -79,6 +80,7 @@ export function App() {
   const [mpoSessionId, setMpoSessionId] = useState<string | null>(null)
   const [companionSessionId, setCompanionSessionId] = useState<string | null>(null)
   const [refinementSessionId, setRefinementSessionId] = useState<string | null>(null)
+  const [auditSessionId, setAuditSessionId] = useState<string | null>(null)
 
   // Compute grid session IDs for sidebar
   const gridSessionIds = grid.slots.filter(s => s.sessionId).map(s => s.sessionId!)
@@ -547,6 +549,32 @@ export function App() {
     }
   }, [refinementSessionId, removeSession, placeEntity])
 
+  const handleAuditToggle = useCallback(async () => {
+    const api = (window as any).cipherMux
+    try {
+      const status = await api.entity.status('audit')
+      if (status.running && status.sessionId) {
+        await api.entity.stop('audit')
+        removeSession(status.sessionId)
+        setAuditSessionId(null)
+      } else {
+        if (auditSessionId) {
+          removeSession(auditSessionId)
+          setAuditSessionId(null)
+        }
+        const session = await api.entity.start('audit')
+        const sid = session?.id
+        if (sid) {
+          setAuditSessionId(sid)
+          placeEntity(sid)
+        }
+      }
+    } catch (err) {
+      console.error('[App] Audit toggle failed:', err)
+      setAuditSessionId(null)
+    }
+  }, [auditSessionId, removeSession, placeEntity])
+
   // Listen for entity-started events (e.g. from other sources)
   useEffect(() => {
     const api = (window as any).cipherMux
@@ -560,10 +588,13 @@ export function App() {
       } else if (data.entityId === 'refinement' && !refinementSessionId) {
         setRefinementSessionId(sid)
         placeEntity(sid)
+      } else if (data.entityId === 'audit' && !auditSessionId) {
+        setAuditSessionId(sid)
+        placeEntity(sid)
       }
     })
     return () => unsub()
-  }, [companionSessionId, refinementSessionId, placeEntity])
+  }, [companionSessionId, refinementSessionId, auditSessionId, placeEntity])
 
   // Check companion/refinement status on mount
   useEffect(() => {
@@ -612,8 +643,6 @@ export function App() {
           onCloseNotes={handleCloseNotes}
           onToggleExpandSlot={toggleExpandSlot}
           onSwap={swap}
-          onCompanion={handleCompanionToggle}
-          onRefinement={handleRefinementToggle}
         />
         {!sidebarDetached && (
           <SidebarPanel
@@ -642,10 +671,12 @@ export function App() {
         mpoRunning={!!mpoSessionId}
         companionRunning={!!companionSessionId}
         refinementRunning={!!refinementSessionId}
+        auditRunning={!!auditSessionId}
         workspacesPopupVisible={workspacesPopupVisible}
         onMpo={handleMpoToggle}
         onCompanion={handleCompanionToggle}
         onRefinement={handleRefinementToggle}
+        onAudit={handleAuditToggle}
         gridCols={grid.config.cols}
         gridRows={grid.config.rows}
         focusedSessionId={focusedSessionId}
@@ -700,7 +731,7 @@ export function App() {
         onClose={() => setBugreportVisible(false)}
       />
       {infoVisible && (
-        <div class="modal-overlay" onClick={() => setInfoVisible(false)}>
+        <div class={`modal-overlay${themeEditorActive ? ' modal-overlay--transparent' : ''}`} onClick={() => { setInfoVisible(false); setThemeEditorActive(false) }}>
           <div class="modal-panel" style={{ width: '600px' }} onClick={(e) => e.stopPropagation()}>
             <InfoSettingsView
               onRescan={rescan}
@@ -708,6 +739,12 @@ export function App() {
               theme={theme}
               onSetTheme={setTheme}
               initialTab={infoInitialTab}
+              onThemeEditorToggle={setThemeEditorActive}
+              customThemes={customThemes}
+              activeCustomThemeId={activeCustomThemeId}
+              onSelectCustomTheme={selectCustomTheme}
+              onSaveCustomTheme={saveCustomTheme}
+              onDeleteCustomTheme={deleteCustomTheme}
             />
           </div>
         </div>
