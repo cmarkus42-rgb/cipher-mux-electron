@@ -1649,3 +1649,47 @@
 .note-editor .cm-scroller {
   font-family: var(--font-mono) !important;
 }
+
+/* ─── Sidebar Notes ──────────────────────────────── */
+
+.sidebar-notes__search {
+  width: 100%;
+  background: var(--color-bg-sunken);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  padding: var(--space-xs) var(--space-sm);
+  margin-bottom: var(--space-xs);
+  outline: none;
+}
+
+.sidebar-notes__search:focus {
+  border-color: var(--color-accent);
+}
+
+.sidebar-notes__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: var(--space-sm);
+}
+
+.sidebar-notes__tag {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--color-text-dim);
+  background: var(--color-bg-sunken);
+  padding: 1px 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sidebar-notes__tag:hover {
+  color: var(--color-text-secondary);
+}
+
+.sidebar-notes__tag--active {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}

@@ -48,6 +48,8 @@ export function SidebarWindow() {
           gridSessionIds={[]}
           contextUsages={contextUsages}
           onAddToGrid={handleAddToGrid}
+          activeWorkspaceId={null}
+          hasNotesCell={false}
         />
       </div>
     </div>
