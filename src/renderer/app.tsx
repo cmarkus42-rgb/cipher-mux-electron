@@ -39,8 +39,9 @@ export function App() {
   // panelWidth needs a ref so useGrid callbacks can access the latest value
   // without circular dependency (sidebarHasContent depends on grid which depends on useGrid)
   const panelWidthRef = useRef(0)
-  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges } = useGrid(panelWidthRef.current)
+  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot } = useGrid(panelWidthRef.current)
   const { theme, setTheme, toggleTheme } = useTheme()
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
 
   // Global keyboard shortcuts
   const shortcutEntries = useMemo(() => [
@@ -80,7 +81,8 @@ export function App() {
 
   // Check if sidebar has content (for LED indicator)
   const sidebarHasContent = !!orchestratorSessionId || !!mpoSessionId ||
-    sessions.some(s => s.status === 'active' && !gridSessionIds.includes(s.id))
+    sessions.some(s => s.status === 'active' && !gridSessionIds.includes(s.id)) ||
+    grid.slots.some(s => s.type === 'notes')
 
   // Keep panelWidth ref in sync for useGrid callbacks
   const computedPanelWidth = sidebarVisible && sidebarHasContent && !sidebarDetached ? 280 : 0
@@ -194,6 +196,15 @@ export function App() {
     setSessionDialogSlotIndex(slotIndex)
     setSessionDialogVisible(true)
   }, [])
+
+  const handleOpenNotes = useCallback((slotIndex: number) => {
+    setSlotType(slotIndex, 'notes')
+    setSidebarVisible(true)
+  }, [setSlotType])
+
+  const handleCloseNotes = useCallback((slotIndex: number) => {
+    clearSlotType(slotIndex)
+  }, [clearSlotType])
 
   const handleSessionStart = useCallback(async (dirPath: string) => {
     setSessionDialogVisible(false)
@@ -344,6 +355,14 @@ export function App() {
     return () => unsub()
   }, [])
 
+  // Load active workspace ID on mount
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    api.workspaces.active().then((id: string | null) => {
+      setActiveWorkspaceId(id)
+    })
+  }, [])
+
   const handleToggleWorkspaces = useCallback(() => {
     setWorkspacesPopupVisible((v) => !v)
   }, [])
@@ -364,6 +383,7 @@ export function App() {
       }
       // Apply workspace (spawns sessions in main process)
       const result = await api.workspaces.apply(workspaceId)
+      setActiveWorkspaceId(workspaceId)
       if (result?.warnings?.length) {
         console.warn('[App] Workspace apply warnings:', result.warnings)
       }
@@ -451,6 +471,7 @@ export function App() {
           focusedSessionId={focusedSessionId}
           theme={theme}
           orchestratorSessionId={orchestratorSessionId}
+          activeWorkspaceId={activeWorkspaceId}
           onFocusSession={setFocusedSessionId}
           onCloseSession={handleCloseSession}
           onSwitchProject={handleSwitchProject}
@@ -458,6 +479,9 @@ export function App() {
           onShell={handleShell}
           onLaunch={handleLaunch}
           onOpenSession={handleOpenSession}
+          onOpenNotes={handleOpenNotes}
+          onCloseNotes={handleCloseNotes}
+          onToggleExpandSlot={toggleExpandSlot}
           onSwap={swap}
         />
         {!sidebarDetached && (
