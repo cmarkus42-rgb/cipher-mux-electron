@@ -110,7 +110,7 @@ export function SidebarPanel({
     (s) => s.status === 'active' && !gridSessionIds.includes(s.id)
   )
 
-  const showMessages = (orchestratorActive || mpoActive) && messages.length > 0
+  const showMessages = messages.length > 0
   const showBackground = backgroundSessions.length > 0
   const showRequests = mpoActive && requests.length > 0
 
