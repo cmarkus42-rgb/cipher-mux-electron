@@ -1077,8 +1077,20 @@ export class IpcHub {
           this.voiceManager.shutdown()
           this.voiceManager = null
         }
-        // Stop voice-relay entity
+        // Graceful shutdown: send farewell to voice-relay before killing
         if (this.sessionManager.isEntityRunning('voice-relay')) {
+          const relaySessionId = this.sessionManager.getEntitySessionId('voice-relay')
+          if (relaySessionId) {
+            try {
+              console.log('[Voice] Sending graceful shutdown to voice-relay...')
+              await this.sessionManager.sendKeys(relaySessionId, 'Session wird beendet. Sichere offene Notizen und beende dich.')
+              await this.sessionManager.sendKeys(relaySessionId, '\r')
+              // Give voice-relay time to process the farewell (max 8s)
+              await new Promise(r => setTimeout(r, 8_000))
+            } catch (err) {
+              console.warn('[Voice] Graceful shutdown message failed:', err)
+            }
+          }
           await this.sessionManager.stopEntity('voice-relay')
         }
         this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'idle')
