@@ -2187,13 +2187,26 @@
   cursor: pointer;
 }
 
+.launcher-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  -webkit-app-region: no-drag;
+}
+
 .launcher-popup {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  width: 420px;
+  max-height: 80vh;
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .launcher-popup__header {
