@@ -54,9 +54,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
       args.push('--dangerously-skip-permissions')
     }
     if (opts.forkFromClaudeSessionId) {
-      args.push('--fork-session', opts.forkFromClaudeSessionId, '--resume')
-    } else if (opts.resume) {
-      args.push('--resume')
+      args.push('--fork-session', opts.forkFromClaudeSessionId)
     }
     return { cmd: 'claude', args }
   }

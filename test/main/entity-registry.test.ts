@@ -107,7 +107,7 @@ describe('registerBuiltinEntities()', () => {
     assert.strictEqual(companion?.color, '#ffb74d')
     assert.ok(companion?.features.includes('mcp'))
     assert.ok(companion?.features.includes('memory'))
-    assert.strictEqual(companion?.autoResume, false)
+    assert.ok(!('autoResume' in (companion ?? {})), 'autoResume should not exist')
   })
 
   it('refinement has correct display name and color', () => {

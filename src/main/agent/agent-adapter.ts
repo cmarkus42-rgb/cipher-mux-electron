@@ -38,9 +38,7 @@ export interface LaunchOpts {
   isOrchestrator?: boolean
   /** Whether this is an MPO session */
   isMpo?: boolean
-  /** Pass --resume to continue the last session in this project dir */
-  resume?: boolean
-  /** Fork from an existing Claude session (--fork-session --resume <id>) */
+  /** Fork from an existing Claude session (--fork-session <id>) */
   forkFromClaudeSessionId?: string
 }
 
