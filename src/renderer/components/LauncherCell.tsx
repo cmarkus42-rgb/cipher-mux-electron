@@ -36,6 +36,8 @@ type TabMode = 'presets' | 'path' | 'notes'
 
 interface LauncherCellProps {
   slotIndex: number
+  slotCol?: number
+  slotRow?: number
   onStartEntity: (entityId: EntityId) => Promise<void>
   onFocusEntity: (entityId: EntityId) => void
   onStartPath: (path: string, opts: PathStartOpts) => void
@@ -48,7 +50,7 @@ interface LauncherCellProps {
 }
 
 export function LauncherCell({
-  slotIndex, onStartEntity, onFocusEntity, onStartPath,
+  slotIndex, slotCol, slotRow, onStartEntity, onFocusEntity, onStartPath,
   onOpenNotes, onOpenNote, entityStatus,
   activeWorkspaceId, onDragOver, onDrop,
 }: LauncherCellProps) {
@@ -166,6 +168,7 @@ export function LauncherCell({
       class="launcher-cell"
       onDragOver={onDragOver}
       onDrop={onDrop}
+      data-highlight={slotCol != null && slotRow != null ? `cell-${slotCol}-${slotRow}` : undefined}
     >
       <div class="launcher-cell__trigger" onClick={handleOpen}>
         <div class="launcher-circle"><span>+</span></div>
@@ -173,7 +176,7 @@ export function LauncherCell({
 
       {popupOpen && (
         <div class="launcher-popup-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}>
-          <div class="launcher-popup">
+          <div class="launcher-popup" data-highlight="popup-launcher">
             <div class="launcher-popup__header">
               <span class="launcher-popup__title">{t('unified.title')}</span>
               <button class="cell-btn" onClick={handleClose}>&times;</button>

@@ -41,17 +41,22 @@ export function StatusBar({
   return (
     <div class="status-bar">
       <div class="status-bar__actions">
-        <VoiceControl
-          focusedSessionId={focusedSessionId}
-          focusedSessionName={focusedSessionName}
-          inline
-        />
+        <span data-highlight="sb-voice">
+          <VoiceControl
+            focusedSessionId={focusedSessionId}
+            focusedSessionName={focusedSessionName}
+            inline
+          />
+        </span>
         <span class="status-bar__sep">|</span>
-        <GridControls cols={gridCols} rows={gridRows} onResize={onGridResize} inline />
+        <span data-highlight="sb-grid">
+          <GridControls cols={gridCols} rows={gridRows} onResize={onGridResize} inline />
+        </span>
         <span class="status-bar__sep">|</span>
         <button
           class={`status-bar__btn${workspacesPopupVisible ? ' status-bar__btn--active' : ''}`}
           onClick={onToggleWorkspaces}
+          data-highlight="sb-workspaces"
         >
           {t('statusBar.workspaces')}
         </button>
@@ -59,13 +64,14 @@ export function StatusBar({
           class={`status-bar__btn${sidebarVisible ? ' status-bar__btn--active' : ''}`}
           onClick={onToggleSidebar}
           title={t('statusBar.sidebarToggle')}
+          data-highlight="sb-sidebar"
         >
           {t('statusBar.sidebar')}
         </button>
-        <button class="status-bar__btn status-bar__btn--active" onClick={onThemeSettings}>
+        <button class="status-bar__btn status-bar__btn--active" onClick={onThemeSettings} data-highlight="sb-theme">
           {themeDisplayName(theme)}
         </button>
-        <button class="status-bar__btn" onClick={onInfo}>{t('statusBar.info')}</button>
+        <button class="status-bar__btn" onClick={onInfo} data-highlight="sb-info">{t('statusBar.info')}</button>
       </div>
       <span class="status-bar__version">{APP_VERSION}</span>
     </div>

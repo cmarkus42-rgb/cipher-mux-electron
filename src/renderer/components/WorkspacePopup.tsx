@@ -179,7 +179,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
 
   return (
     <div class="wp-backdrop" onClick={handleBackdropClick} style={{ position: 'fixed', inset: 0, zIndex: 9 }}>
-      <div class="workspaces-popup" onClick={(e) => e.stopPropagation()}>
+      <div class="workspaces-popup" data-highlight="popup-workspace" onClick={(e) => e.stopPropagation()}>
         <div class="wp-head">
           <span class="wp-title">{t('workspacePopup.title')}</span>
           <div class="wp-head-actions">

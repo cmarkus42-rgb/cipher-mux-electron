@@ -17,6 +17,7 @@ import { StatusBar } from './components/StatusBar'
 import type { PathStartOpts } from './components/LauncherCell'
 import { WorkspacePopup } from './components/WorkspacePopup'
 import { GridPlacementPopup } from './components/GridPlacementPopup'
+import { HighlightOverlay } from './components/HighlightOverlay'
 
 export function App() {
   const { t } = useTranslation()
@@ -554,8 +555,47 @@ export function App() {
     return () => { mounted = false }
   }, [placeEntity])
 
+  // Listen for MCP UI_OPEN events
+  useEffect(() => {
+    const a = (window as any).cipherMux
+    if (!a?.ui?.onOpen) return
+    const unsub = a.ui.onOpen((data: { target: string; context?: Record<string, unknown> }) => {
+      switch (data.target) {
+        case 'workspace-popup':
+          setWorkspacesPopupVisible(true)
+          break
+        case 'info-dialog':
+          setInfoInitialTab(undefined)
+          setInfoVisible(true)
+          break
+        case 'launcher-popup': {
+          // Dispatch custom event to open launcher popup at specified cell
+          const cell = (data.context?.cell as string) ?? '0-0'
+          const [col, row] = cell.split('-').map(Number)
+          const slotIndex = (row || 0) * grid.config.cols + (col || 0)
+          window.dispatchEvent(new CustomEvent('cipher-mux:launcher-open', { detail: { slotIndex } }))
+          break
+        }
+      }
+    })
+    return () => unsub()
+  }, [grid.config.cols])
+
+  // Listen for MCP THEME_SET events
+  useEffect(() => {
+    const a = (window as any).cipherMux
+    if (!a?.ui?.onThemeSet) return
+    const unsub = a.ui.onThemeSet((data: { theme: string }) => {
+      if (data.theme) {
+        setTheme(data.theme as any)
+      }
+    })
+    return () => unsub()
+  }, [setTheme])
+
   return (
     <div class="app-shell">
+      <HighlightOverlay />
       <div class="drag-region">
         <span class="title">cipher-mux</span>
       </div>

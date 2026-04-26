@@ -242,7 +242,7 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
   }, {})
 
   return (
-    <div class="settings-view">
+    <div class="settings-view" data-highlight="popup-info">
       <div class="info-tabs">
         {(['settings', 'about', 'shortcuts'] as TabId[]).map((tab) => (
           <button

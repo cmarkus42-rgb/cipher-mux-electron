@@ -1187,4 +1187,105 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       }
     }
   )
+
+  // ─── Companion Demo Mode Tools ─────────────────────────
+
+  // 32. mux_ui_highlight — Highlight a UI element
+  ;(server.registerTool as any)(
+    'mux_ui_highlight',
+    {
+      description:
+        'Highlight a UI element in the cipher-mux interface. Elements are identified by their data-highlight attribute. '
+        + 'Use to visually guide users to specific parts of the UI during demos or help flows. '
+        + 'Known targets: sb-voice, sb-grid, sb-workspaces, sb-sidebar, sb-theme, sb-info, '
+        + 'cell-{col}-{row}, cell-head-{col}-{row}, side-messages, side-background, side-notes, '
+        + 'side-requests, side-memory, popup-workspace, popup-launcher, popup-info.',
+      inputSchema: {
+        target: z.string().describe('Value of the data-highlight attribute on the target element'),
+        duration: z.number().optional().describe('Milliseconds to show the highlight (default 3000, 0 = stays until clear)'),
+        style: z.enum(['glow', 'outline']).optional().describe('Highlight style (default: glow)'),
+        clear: z.boolean().optional().describe('If true, remove all active highlights'),
+      },
+    },
+    async (args: { target?: string; duration?: number; style?: 'glow' | 'outline'; clear?: boolean }) => {
+      if (!ctx.windowManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'WindowManager not available' }) }], isError: true }
+      }
+      ctx.windowManager.sendToMainWindow(IPC.UI_HIGHLIGHT, {
+        target: args.target,
+        duration: args.duration ?? 3000,
+        style: args.style ?? 'glow',
+        clear: args.clear ?? false,
+      })
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, target: args.target ?? 'clear' }) }],
+      }
+    }
+  )
+
+  // 33. mux_ui_open — Open a popup/dialog
+  ;(server.registerTool as any)(
+    'mux_ui_open',
+    {
+      description:
+        'Open a popup or dialog in the cipher-mux interface. Known targets: '
+        + 'workspace-popup (workspace chooser), info-dialog (info/settings/shortcuts), '
+        + 'launcher-popup (launcher cell popup, use context.cell e.g. "1-0" to specify which cell).',
+      inputSchema: {
+        target: z.string().describe('Logical name of the popup/dialog to open'),
+        context: z.record(z.unknown()).optional().describe('Additional context, e.g. { cell: "1-0" }'),
+      },
+    },
+    async (args: { target: string; context?: Record<string, unknown> }) => {
+      if (!ctx.windowManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'WindowManager not available' }) }], isError: true }
+      }
+      const knownTargets = ['workspace-popup', 'info-dialog', 'launcher-popup']
+      if (!knownTargets.includes(args.target)) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: `Unknown target: ${args.target}. Known: ${knownTargets.join(', ')}` }) }],
+          isError: true,
+        }
+      }
+      ctx.windowManager.sendToMainWindow(IPC.UI_OPEN, {
+        target: args.target,
+        context: args.context,
+      })
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, target: args.target }) }],
+      }
+    }
+  )
+
+  // 34. mux_theme_set — Set the active theme
+  ;(server.registerTool as any)(
+    'mux_theme_set',
+    {
+      description:
+        'Set the active theme in cipher-mux. Valid theme IDs: cipher-ivory, cipher-dark, blueprint, '
+        + 'warm-paper, gruvbox-dark, nord, synthwave, matrix, brutalist, high-contrast.',
+      inputSchema: {
+        theme: z.string().describe('Theme ID to activate'),
+      },
+    },
+    async (args: { theme: string }) => {
+      if (!ctx.windowManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'WindowManager not available' }) }], isError: true }
+      }
+      const validThemes = [
+        'cipher-ivory', 'cipher-dark', 'blueprint', 'warm-paper',
+        'gruvbox-dark', 'nord', 'synthwave', 'matrix', 'brutalist', 'high-contrast',
+      ]
+      if (!validThemes.includes(args.theme)) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: `Unknown theme: ${args.theme}. Valid: ${validThemes.join(', ')}` }) }],
+          isError: true,
+        }
+      }
+      ctx.windowManager.sendToMainWindow(IPC.THEME_SET, { theme: args.theme })
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, theme: args.theme }) }],
+      }
+    }
+  )
 }
