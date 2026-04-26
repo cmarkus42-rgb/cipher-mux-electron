@@ -20,6 +20,7 @@ interface InfoSettingsViewProps {
   onSelectCustomTheme?: (ct: CustomTheme) => void
   onSaveCustomTheme?: (name: string, baseTheme: ThemeName, tokens: Record<string, string>) => Promise<CustomTheme>
   onDeleteCustomTheme?: (id: string) => Promise<void>
+  onOpenBugreport?: () => void
 }
 
 const api = (window as any).cipherMux
@@ -27,6 +28,12 @@ const api = (window as any).cipherMux
 interface AppSection {
   scanPaths: string[]
   scanDepth: number
+}
+
+interface LlmConfig {
+  ollamaHost: string
+  ollamaPort: number
+  ollamaModel: string
 }
 
 type TabId = 'shortcuts' | 'features' | 'settings'
@@ -64,7 +71,7 @@ const THEME_TOKEN_GROUPS: Array<{ labelKey: string; tokens: string[] }> = [
   },
 ]
 
-export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme }: InfoSettingsViewProps) {
+export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme, onOpenBugreport }: InfoSettingsViewProps) {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'features')
   const [scanPaths, setScanPaths] = useState<string[]>([])
@@ -77,6 +84,15 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
   const [savedNotice, setSavedNotice] = useState(false)
   const [saveAsName, setSaveAsName] = useState('')
   const [saveAsOpen, setSaveAsOpen] = useState(false)
+
+  // LLM Provider state
+  const [ollamaHost, setOllamaHost] = useState('127.0.0.1')
+  const [ollamaPort, setOllamaPort] = useState(11434)
+  const [ollamaModel, setOllamaModel] = useState('gemma4:26b')
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+  const [llmTestResult, setLlmTestResult] = useState<{ ok: boolean; error?: string } | null>(null)
+  const [llmTesting, setLlmTesting] = useState(false)
+  const [llmSaved, setLlmSaved] = useState(false)
 
   const load = useCallback(async () => {
     const app: AppSection | null = await api.config.get('app')
@@ -92,6 +108,13 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
       for (const [prop, val] of Object.entries(ui.customThemeTokens as Record<string, string>)) {
         document.documentElement.style.setProperty(prop, val)
       }
+    }
+    // Load LLM config
+    const llm: LlmConfig | null = await api.config.get('llm')
+    if (llm) {
+      setOllamaHost(llm.ollamaHost ?? '127.0.0.1')
+      setOllamaPort(llm.ollamaPort ?? 11434)
+      setOllamaModel(llm.ollamaModel ?? 'gemma4:26b')
     }
     setLoading(false)
   }, [])
@@ -182,6 +205,35 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
     setSavedNotice(true)
     setTimeout(() => setSavedNotice(false), 2000)
   }, [saveAsName, theme, customTokens, onSaveCustomTheme])
+
+  // ─── LLM Provider Handlers ─────────────────────────────
+
+  const handleLlmTestConnection = useCallback(async () => {
+    setLlmTesting(true)
+    setLlmTestResult(null)
+    try {
+      const result = await api.llm.testConnection(ollamaHost, ollamaPort)
+      setLlmTestResult(result)
+      if (result.ok) {
+        const models = await api.llm.listModels(ollamaHost, ollamaPort)
+        setAvailableModels(models)
+      }
+    } catch (err: any) {
+      setLlmTestResult({ ok: false, error: err?.message ?? 'Unknown error' })
+    } finally {
+      setLlmTesting(false)
+    }
+  }, [ollamaHost, ollamaPort])
+
+  const handleLlmSave = useCallback(async () => {
+    await api.config.set('llm', {
+      ollamaHost,
+      ollamaPort,
+      ollamaModel,
+    })
+    setLlmSaved(true)
+    setTimeout(() => setLlmSaved(false), 2000)
+  }, [ollamaHost, ollamaPort, ollamaModel])
 
   const shortcuts = SHORTCUT_KEYS.map(s => ({ ...s, label: t(s.labelKey) }))
   const grouped = shortcuts.reduce<Record<string, typeof shortcuts>>((acc, s) => {
@@ -486,6 +538,90 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
               {t('settings.skipPermissionsWarning')}
             </div>
           )}
+
+          {/* ─── LLM Provider ─────────────────────────────── */}
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.llmProvider')}</div>
+          <div class="settings-section__hint">{t('settings.llmProviderHint')}</div>
+
+          <div class="settings-row" style={{ marginTop: '8px', gap: '8px' }}>
+            <label class="settings-label">
+              <span>{t('settings.ollamaHost')}</span>
+              <input
+                class="input input--sm"
+                type="text"
+                value={ollamaHost}
+                onInput={(e) => setOllamaHost((e.target as HTMLInputElement).value)}
+                style={{ width: '180px' }}
+              />
+            </label>
+            <label class="settings-label">
+              <span>{t('settings.ollamaPort')}</span>
+              <input
+                class="input input--sm"
+                type="number"
+                value={ollamaPort}
+                onInput={(e) => setOllamaPort(Number((e.target as HTMLInputElement).value))}
+                style={{ width: '80px' }}
+              />
+            </label>
+          </div>
+
+          <div class="settings-row" style={{ marginTop: '8px', gap: '8px' }}>
+            <label class="settings-label">
+              <span>{t('settings.ollamaModel')}</span>
+              {availableModels.length > 0 ? (
+                <select
+                  class="input input--sm"
+                  value={ollamaModel}
+                  onChange={(e) => setOllamaModel((e.target as HTMLSelectElement).value)}
+                  style={{ width: '220px' }}
+                >
+                  {!availableModels.includes(ollamaModel) && (
+                    <option value={ollamaModel}>{ollamaModel}</option>
+                  )}
+                  {availableModels.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  class="input input--sm"
+                  type="text"
+                  value={ollamaModel}
+                  onInput={(e) => setOllamaModel((e.target as HTMLInputElement).value)}
+                  style={{ width: '220px' }}
+                />
+              )}
+            </label>
+          </div>
+
+          <div class="settings-row" style={{ marginTop: '8px', gap: '8px' }}>
+            <button class="btn btn--sm" onClick={handleLlmTestConnection} disabled={llmTesting}>
+              {llmTesting ? t('settings.llmTesting') : t('settings.llmTestConnection')}
+            </button>
+            <button class="btn btn--sm btn--primary" onClick={handleLlmSave}>
+              {t('settings.llmSave')}
+            </button>
+            {llmSaved && <span class="theme-editor__notice">{t('settings.llmSaved')}</span>}
+          </div>
+
+          {llmTestResult && (
+            <div class="settings-section__hint" style={{
+              marginTop: '6px',
+              color: llmTestResult.ok ? 'var(--color-neon-green)' : 'var(--color-neon-red)',
+            }}>
+              {llmTestResult.ok ? t('settings.llmConnected') : t('settings.llmConnectionFailed', { error: llmTestResult.error })}
+            </div>
+          )}
+
+          {/* ─── Bugreport ─────────────────────────────────── */}
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.bugreport')}</div>
+          <div class="settings-section__hint">{t('settings.bugreportHint')}</div>
+          <div class="settings-row" style={{ marginTop: '8px' }}>
+            <button class="btn btn--sm btn--primary" onClick={() => onOpenBugreport?.()}>
+              {t('settings.bugreportCreate')}
+            </button>
+          </div>
 
           <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.about')}</div>
           <div class="settings-section__hint">

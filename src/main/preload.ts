@@ -175,6 +175,14 @@ const api = {
       ipcRenderer.invoke(IPC.BUGREPORT_PICK_SCREENSHOT),
   },
 
+  // ─── LLM Provider ─────────────────────────────────────────
+  llm: {
+    testConnection: (host?: string, port?: number): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IPC.LLM_TEST_CONNECTION, { host, port }),
+    listModels: (host?: string, port?: number): Promise<string[]> =>
+      ipcRenderer.invoke(IPC.LLM_LIST_MODELS, { host, port }),
+  },
+
   // ─── Tasks ──────────────────────────────────────────────
   tasks: {
     list: (filter?: unknown) => ipcRenderer.invoke(IPC.TASKS_LIST, filter),

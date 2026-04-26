@@ -122,6 +122,7 @@ export class IpcHub {
     this.registerOrchestratorChannels()
     this.registerMpoChannels()
     this.registerBugreportChannels()
+    this.registerLlmChannels()
     this.registerVoiceChannels()
     this.registerTaskChannels()
     this.registerInputRequestChannels()
@@ -757,6 +758,19 @@ export class IpcHub {
         properties: ['openFile', 'multiSelections'],
       })
       return result.canceled ? [] : result.filePaths
+    })
+  }
+
+  // ─── LLM Provider ─────────────────────────────────────────
+  private registerLlmChannels(): void {
+    ipcMain.handle(IPC.LLM_TEST_CONNECTION, async (_e, { host, port }: { host?: string; port?: number } = {}) => {
+      const { testOllamaConnection } = await import('./bugreport/ollama-client')
+      return testOllamaConnection(host, port)
+    })
+
+    ipcMain.handle(IPC.LLM_LIST_MODELS, async (_e, { host, port }: { host?: string; port?: number } = {}) => {
+      const { listOllamaModels } = await import('./bugreport/ollama-client')
+      return listOllamaModels(host, port)
     })
   }
 

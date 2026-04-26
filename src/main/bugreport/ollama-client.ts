@@ -1,7 +1,5 @@
 import * as http from 'node:http'
 
-const OLLAMA_HOST = '127.0.0.1'
-const OLLAMA_PORT = 11433
 const TIMEOUT_MS = 120_000 // 2 minutes — local models can be slow
 
 const ENRICH_PROMPT = `You are a professional QA engineer. Given a raw bug description, produce a structured bug report in YAML format with these fields:
@@ -25,19 +23,35 @@ export interface EnrichedBugreport {
   summary: string
 }
 
+/** Read current LLM config from config-store (lazy import to avoid electron dep in tests). */
+function getLlmConfig() {
+  try {
+    const { configStore } = require('../config/config-store')
+    const llm = configStore.get('llm')
+    return {
+      host: llm?.ollamaHost ?? '127.0.0.1',
+      port: llm?.ollamaPort ?? 11434,
+      model: llm?.ollamaModel ?? 'gemma4:26b',
+    }
+  } catch {
+    return { host: '127.0.0.1', port: 11434, model: 'gemma4:26b' }
+  }
+}
+
 /**
  * POST JSON to Ollama via Node's http module.
  * Electron's main-process fetch() uses net.fetch (Chromium network stack)
  * which can fail for localhost due to system proxy settings.
  * Node's http module bypasses Chromium entirely.
  */
-function ollamaPost(path: string, body: string): Promise<string> {
+function ollamaPost(urlPath: string, body: string, host?: string, port?: number): Promise<string> {
+  const cfg = getLlmConfig()
   return new Promise((resolve, reject) => {
     const req = http.request(
       {
-        hostname: OLLAMA_HOST,
-        port: OLLAMA_PORT,
-        path,
+        hostname: host ?? cfg.host,
+        port: port ?? cfg.port,
+        path: urlPath,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -67,10 +81,46 @@ function ollamaPost(path: string, body: string): Promise<string> {
   })
 }
 
+/**
+ * GET request to Ollama via Node's http module.
+ */
+function ollamaGet(urlPath: string, host?: string, port?: number): Promise<string> {
+  const cfg = getLlmConfig()
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: host ?? cfg.host,
+        port: port ?? cfg.port,
+        path: urlPath,
+        method: 'GET',
+        timeout: 10_000,
+      },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (chunk: Buffer) => chunks.push(chunk))
+        res.on('end', () => {
+          if (res.statusCode !== 200) {
+            reject(new Error(`Ollama HTTP ${res.statusCode}`))
+            return
+          }
+          resolve(Buffer.concat(chunks).toString('utf-8'))
+        })
+      },
+    )
+    req.on('error', reject)
+    req.on('timeout', () => {
+      req.destroy()
+      reject(new Error('Ollama request timed out'))
+    })
+    req.end()
+  })
+}
+
 export async function enrichBugreport(description: string): Promise<EnrichedBugreport | null> {
   try {
+    const cfg = getLlmConfig()
     const body = JSON.stringify({
-      model: 'gemma4:26b',
+      model: cfg.model,
       prompt: `${ENRICH_PROMPT}\n\nBug description:\n${description}`,
       stream: false,
       keep_alive: -1,
@@ -85,6 +135,27 @@ export async function enrichBugreport(description: string): Promise<EnrichedBugr
   } catch {
     // Ollama not available or request failed — return null for fallback
     return null
+  }
+}
+
+/** Test connection to Ollama. Returns { ok, error? }. */
+export async function testOllamaConnection(host?: string, port?: number): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await ollamaGet('/api/tags', host, port)
+    return { ok: true }
+  } catch (err: any) {
+    return { ok: false, error: err?.message ?? 'Connection failed' }
+  }
+}
+
+/** List available models from Ollama. Returns model names. */
+export async function listOllamaModels(host?: string, port?: number): Promise<string[]> {
+  try {
+    const raw = await ollamaGet('/api/tags', host, port)
+    const data = JSON.parse(raw) as { models?: Array<{ name: string }> }
+    return (data.models ?? []).map(m => m.name)
+  } catch {
+    return []
   }
 }
 

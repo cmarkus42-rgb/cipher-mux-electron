@@ -24,7 +24,6 @@ interface StatusBarProps {
   gridRows: number
   focusedSessionId: string | null
   focusedSessionName: string | null
-  onBugreport: () => void
   onToggleTheme: () => void
   onToggleWorkspaces: () => void
   onInfo: () => void
@@ -35,7 +34,7 @@ interface StatusBarProps {
 export function StatusBar({
   theme, sidebarVisible, onToggleSidebar,
   gridCols, gridRows, focusedSessionId, focusedSessionName,
-  onBugreport, onToggleTheme, onInfo, onThemeSettings,
+  onToggleTheme, onInfo, onThemeSettings,
   onGridResize, workspacesPopupVisible, onToggleWorkspaces,
 }: StatusBarProps) {
   const { t } = useTranslation()
@@ -56,7 +55,6 @@ export function StatusBar({
         >
           {t('statusBar.workspaces')}
         </button>
-        <button class="status-bar__btn" onClick={onBugreport}>{t('statusBar.bugreport')}</button>
         <button
           class={`status-bar__btn${sidebarVisible ? ' status-bar__btn--active' : ''}`}
           onClick={onToggleSidebar}

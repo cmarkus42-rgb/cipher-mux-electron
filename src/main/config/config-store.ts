@@ -57,6 +57,11 @@ const defaults: AppConfig = {
   agent: {
     skipPermissions: false,
   },
+  llm: {
+    ollamaHost: '127.0.0.1',
+    ollamaPort: 11434,
+    ollamaModel: 'gemma4:26b',
+  },
   ui: {
     chatroomVisible: false,
     theme: 'cipher-ivory' as const,

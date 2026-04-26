@@ -204,6 +204,15 @@ export interface AppConfig {
     /** When true, launches Claude Code with --dangerously-skip-permissions. Default: false. */
     skipPermissions: boolean
   }
+  /** LLM provider configuration (Ollama, external APIs). */
+  llm: {
+    /** Ollama host (default 127.0.0.1). */
+    ollamaHost: string
+    /** Ollama port (default 11434). */
+    ollamaPort: number
+    /** Ollama model for enrichment/tagging (default gemma4:26b). */
+    ollamaModel: string
+  }
   windows: {
     main: { x: number; y: number; width: number; height: number }
   }

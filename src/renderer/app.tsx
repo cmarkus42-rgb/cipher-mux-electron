@@ -53,7 +53,7 @@ export function App() {
       combo: 'Cmd+B',
       label: t('app.shortcut.bugreport'),
       category: 'Aktionen' as const,
-      action: () => setBugreportVisible(true),
+      action: () => { setInfoInitialTab('settings'); setInfoVisible(true); setBugreportVisible(true) },
     },
     {
       combo: 'Cmd+N',
@@ -608,7 +608,6 @@ export function App() {
         gridRows={grid.config.rows}
         focusedSessionId={focusedSessionId}
         focusedSessionName={focusedSessionName}
-        onBugreport={() => setBugreportVisible(true)}
         onToggleTheme={toggleTheme}
         onToggleWorkspaces={handleToggleWorkspaces}
         onInfo={() => { setInfoInitialTab(undefined); setInfoVisible(true) }}
@@ -655,6 +654,7 @@ export function App() {
               onSelectCustomTheme={selectCustomTheme}
               onSaveCustomTheme={saveCustomTheme}
               onDeleteCustomTheme={deleteCustomTheme}
+              onOpenBugreport={() => setBugreportVisible(true)}
             />
           </div>
         </div>
