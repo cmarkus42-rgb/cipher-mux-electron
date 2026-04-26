@@ -253,9 +253,7 @@ export function WorkspacesTab() {
                 <span class="dim-val">{ws.rows}</span>
                 <button onClick={() => handleStepRows(1)}>+</button>
               </div>
-              <span class="dim-note">
-                {t('workspacesTab.gridHint')}
-              </span>
+              <span class="dim-note" dangerouslySetInnerHTML={{ __html: t('workspacesTab.gridHint') }} />
             </div>
 
             {/* Interactive grid */}

@@ -153,6 +153,8 @@
   "workspacePopup.personasBtn": "personas...",
   "workspacePopup.editBtn": "bearbeiten...",
   "workspacePopup.load": "laden",
+  "workspacePopup.setDefault": "als Standard setzen",
+  "workspacePopup.unsetDefault": "Standard entfernen",
 
   "personasTab.title": "Personas",
   "personasTab.addNew": "+ NEU",

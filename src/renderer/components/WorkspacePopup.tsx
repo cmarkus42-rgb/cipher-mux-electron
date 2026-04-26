@@ -71,6 +71,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
   const [saving, setSaving] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const [defaultWsId, setDefaultWsId] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -88,6 +89,11 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     api.workspaces.active().then((id: string | null) => {
       if (!mounted) return
       setActiveId(id ?? null)
+    }).catch(() => {})
+
+    api.config.get('defaultWorkspaceId').then((id: string | null) => {
+      if (!mounted) return
+      setDefaultWsId(id ?? null)
     }).catch(() => {})
     return () => { mounted = false }
   }, [visible])
@@ -112,6 +118,13 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
   const handleLoad = useCallback(() => {
     if (selectedId) onApply(selectedId)
   }, [selectedId, onApply])
+
+  const handleSetDefault = useCallback(async (wsId: string) => {
+    const api = (window as any).cipherMux
+    const nextId = defaultWsId === wsId ? null : wsId
+    await api.config.set('defaultWorkspaceId', nextId)
+    setDefaultWsId(nextId)
+  }, [defaultWsId])
 
   const handleSaveCurrentOpen = useCallback(() => {
     const now = new Date()
@@ -196,6 +209,13 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
               {activeId === ws.id && (
                 <span class="wp-badge">{t('workspacePopup.active')}</span>
               )}
+              <button
+                class={`wp-default-star${defaultWsId === ws.id ? ' wp-default-star--active' : ''}`}
+                onClick={(e) => { e.stopPropagation(); handleSetDefault(ws.id) }}
+                title={defaultWsId === ws.id ? t('workspacePopup.unsetDefault') : t('workspacePopup.setDefault')}
+              >
+                {defaultWsId === ws.id ? '★' : '☆'}
+              </button>
             </div>
           ))}
         </div>
