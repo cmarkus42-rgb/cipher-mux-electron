@@ -65,6 +65,8 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
         if (cols !== last.cols || rows !== last.rows) {
           lastSizeRef.current = { cols, rows }
           api().terminal.resize(sessionId, cols, rows)
+          // Force full re-render after resize to prevent line fragmentation
+          term.refresh(0, rows - 1)
         }
       } catch {
         // container may not be visible yet
