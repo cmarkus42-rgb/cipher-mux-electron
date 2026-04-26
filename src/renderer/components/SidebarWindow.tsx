@@ -52,7 +52,7 @@ export function SidebarWindow() {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div class="drag-region" style={{ height: 28, flexShrink: 0 }} />
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div class="sidebar-window__body">
         <SidebarPanel
           visible={true}
           orchestratorActive={orchestratorActive}

@@ -1368,6 +1368,21 @@
   overflow-y: auto;
 }
 
+/* Detached sidebar window: fill available space */
+.sidebar-window__body {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-window__body .sidebar-panel {
+  width: 100%;
+  max-width: 100%;
+  flex: 1;
+  border-left: none;
+}
+
 /* Level 1 (darkest): Header — matches session cell headers */
 .sidebar-panel__header {
   display: flex;
