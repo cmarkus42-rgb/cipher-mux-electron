@@ -13,6 +13,8 @@ interface SessionCellProps {
   theme: ThemeName
   rowSpan: number
   maxRows: number
+  slotCol?: number
+  slotRow?: number
   onFocus: (sessionId: string) => void
   onClose: (sessionId: string) => void
   onSwitchProject: (sessionId: string) => void
@@ -27,7 +29,7 @@ interface SessionCellProps {
 
 export function SessionCell({
   session, contextUsage, focused, isOrchestrator, theme,
-  rowSpan, maxRows,
+  rowSpan, maxRows, slotCol, slotRow,
   onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDragStart, onDragOver, onDrop,
 }: SessionCellProps) {
   const { t } = useTranslation()
@@ -96,12 +98,14 @@ export function SessionCell({
       onClick={handleClick}
       onDragOver={onDragOver}
       onDrop={onDrop}
+      data-highlight={slotCol != null && slotRow != null ? `cell-${slotCol}-${slotRow}` : undefined}
     >
       <div
         class="cell-header"
         draggable
         onDragStart={() => onDragStart(session.id)}
         style={entityColor ? { borderLeft: `3px solid ${entityColor}` } : undefined}
+        data-highlight={slotCol != null && slotRow != null ? `cell-head-${slotCol}-${slotRow}` : undefined}
       >
         <div class="cell-header__left">
           {entityColor

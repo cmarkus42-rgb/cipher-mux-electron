@@ -97,6 +97,8 @@ export function SessionGrid({
                 rowSpan={slot.rowSpan}
                 maxRows={rows}
                 activeWorkspaceId={activeWorkspaceId}
+                slotCol={idx % cols}
+                slotRow={Math.floor(idx / cols)}
                 onClose={() => onCloseNotes(idx)}
                 onToggleExpand={() => onToggleExpandSlot(idx)}
                 onDragStart={() => handleDragStart(idx)}
@@ -122,6 +124,8 @@ export function SessionGrid({
                 theme={theme}
                 rowSpan={slot.rowSpan}
                 maxRows={rows}
+                slotCol={idx % cols}
+                slotRow={Math.floor(idx / cols)}
                 onFocus={onFocusSession}
                 onClose={onCloseSession}
                 onSwitchProject={onSwitchProject}
@@ -140,6 +144,8 @@ export function SessionGrid({
             <LauncherCell
               key={`launcher-${idx}`}
               slotIndex={idx}
+              slotCol={idx % cols}
+              slotRow={Math.floor(idx / cols)}
               onStartEntity={(entityId) => onStartEntity(entityId, idx)}
               onFocusEntity={onFocusEntity}
               onStartPath={(path, opts) => onStartPath(path, opts, idx)}

@@ -401,6 +401,25 @@ const api = {
     },
   },
 
+  // ─── UI Control (Companion Demo Mode) ────────────────────
+  ui: {
+    onHighlight: (cb: (data: { target?: string; duration?: number; style?: string; clear?: boolean }) => void) => {
+      const handler = (_e: unknown, data: { target?: string; duration?: number; style?: string; clear?: boolean }) => cb(data)
+      ipcRenderer.on(IPC.UI_HIGHLIGHT, handler)
+      return () => ipcRenderer.removeListener(IPC.UI_HIGHLIGHT, handler)
+    },
+    onOpen: (cb: (data: { target: string; context?: Record<string, unknown> }) => void) => {
+      const handler = (_e: unknown, data: { target: string; context?: Record<string, unknown> }) => cb(data)
+      ipcRenderer.on(IPC.UI_OPEN, handler)
+      return () => ipcRenderer.removeListener(IPC.UI_OPEN, handler)
+    },
+    onThemeSet: (cb: (data: { theme: string }) => void) => {
+      const handler = (_e: unknown, data: { theme: string }) => cb(data)
+      ipcRenderer.on(IPC.THEME_SET, handler)
+      return () => ipcRenderer.removeListener(IPC.THEME_SET, handler)
+    },
+  },
+
   // ─── Companion Memory ────────────────────────────────────
   companion: {
     recall: (limit?: number) => ipcRenderer.invoke(IPC.COMPANION_RECALL, { limit }),

@@ -135,7 +135,7 @@ export function SidebarPanel({
       </div>
 
       {showMessages && (
-        <section class="sidebar-section">
+        <section class="sidebar-section" data-highlight="side-messages">
           <div class="sidebar-section__head" onClick={() => setMessagesExpanded(v => !v)}>
             <span>{messagesExpanded ? '▾' : '▸'} {t('sidebar.messages')} ({messages.length})</span>
           </div>
@@ -156,7 +156,7 @@ export function SidebarPanel({
       )}
 
       {showBackground && (
-        <section class="sidebar-section">
+        <section class="sidebar-section" data-highlight="side-background">
           <div class="sidebar-section__head" onClick={() => setBgExpanded(v => !v)}>
             <span>{bgExpanded ? '▾' : '▸'} {t('sidebar.backgroundSessions')} ({backgroundSessions.length})</span>
           </div>
@@ -209,7 +209,7 @@ export function SidebarPanel({
       )}
 
       {showRequests && (
-        <section class="sidebar-section">
+        <section class="sidebar-section" data-highlight="side-requests">
           <div class="sidebar-section__head" onClick={() => setRequestsExpanded(v => !v)}>
             <span>
               {requestsExpanded ? '▾' : '▸'} {t('sidebar.requests')}
@@ -227,7 +227,7 @@ export function SidebarPanel({
       )}
 
       {showNotes && (
-        <section class="sidebar-section">
+        <section class="sidebar-section" data-highlight="side-notes">
           <div class="sidebar-section__head" onClick={() => setNotesExpanded(v => !v)}>
             <span>
               {notesExpanded ? '▾' : '▸'} {t('sidebar.notes')} ({filteredNotes.length !== notes.length ? `${filteredNotes.length}/${notes.length}` : notes.length})

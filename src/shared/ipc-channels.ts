@@ -172,6 +172,11 @@ export const IPC = {
   LLM_TEST_CONNECTION: 'cipher-mux:llm:test-connection',
   LLM_LIST_MODELS: 'cipher-mux:llm:list-models',
 
+  // UI Control (Companion Demo Mode)
+  UI_HIGHLIGHT: 'cipher-mux:ui:highlight',
+  UI_OPEN: 'cipher-mux:ui:open',
+  THEME_SET: 'cipher-mux:theme:set',
+
   // Entity Framework
   ENTITY_START: 'cipher-mux:entity:start',
   ENTITY_STOP: 'cipher-mux:entity:stop',

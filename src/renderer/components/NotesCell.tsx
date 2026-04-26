@@ -18,6 +18,8 @@ interface NotesCellProps {
   rowSpan: number
   maxRows: number
   activeWorkspaceId: string | null
+  slotCol?: number
+  slotRow?: number
   onClose: () => void
   onToggleExpand: () => void
   onDragStart: () => void
@@ -29,6 +31,8 @@ export function NotesCell({
   rowSpan,
   maxRows,
   activeWorkspaceId,
+  slotCol,
+  slotRow,
   onClose,
   onToggleExpand,
   onDragStart,
@@ -150,6 +154,7 @@ export function NotesCell({
       style={cellStyle}
       onDragOver={onDragOver}
       onDrop={onDrop}
+      data-highlight={slotCol != null && slotRow != null ? `cell-${slotCol}-${slotRow}` : undefined}
     >
       <div class="cell-header" draggable onDragStart={onDragStart}>
         <div class="cell-header__left">
