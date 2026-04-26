@@ -19,7 +19,6 @@ interface EntityPreset {
 const ENTITY_PRESETS: EntityPreset[] = [
   { id: 'companion', nameKey: 'statusBar.companion', descKey: 'unified.desc.companion', color: '#ffb74d' },
   { id: 'refinement', nameKey: 'statusBar.refinement', descKey: 'unified.desc.refinement', color: '#ef5350' },
-  { id: 'voice-relay', nameKey: 'statusBar.voiceRelay', descKey: 'unified.desc.voice', color: '#9b59b6' },
   { id: 'audit', nameKey: 'statusBar.audit', descKey: 'unified.desc.audit', color: '#c0392b' },
   { id: 'orchestrator', nameKey: 'statusBar.orchestrator', descKey: 'unified.desc.orchestrator', color: '#4fc3f7' },
   { id: 'mpo', nameKey: 'statusBar.mpo', descKey: 'unified.desc.mpo', color: '#ab47bc' },
