@@ -25,7 +25,7 @@ export function App() {
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null)
   const [bugreportVisible, setBugreportVisible] = useState(false)
   const [infoVisible, setInfoVisible] = useState(false)
-  const [infoInitialTab, setInfoInitialTab] = useState<'shortcuts' | 'features' | 'settings' | undefined>(undefined)
+  const [infoInitialTab, setInfoInitialTab] = useState<'settings' | 'about' | 'shortcuts' | undefined>(undefined)
   const [themeEditorActive, setThemeEditorActive] = useState(false)
   const [workspacesPopupVisible, setWorkspacesPopupVisible] = useState(false)
   const [placementPopup, setPlacementPopup] = useState<{ sessionId: string } | null>(null)
