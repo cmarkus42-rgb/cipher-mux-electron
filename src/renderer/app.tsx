@@ -522,7 +522,8 @@ export function App() {
       } else if (data.entityId === 'refinement' && !refinementSessionId) {
         setRefinementSessionId(sid); placeEntity(sid)
       } else if (data.entityId === 'voice-relay' && !voiceRelaySessionId) {
-        setVoiceRelaySessionId(sid); placeEntity(sid)
+        // Voice-relay runs as background session only (no grid placement)
+        setVoiceRelaySessionId(sid)
       } else if (data.entityId === 'audit' && !auditSessionId) {
         setAuditSessionId(sid); placeEntity(sid)
       }
@@ -535,16 +536,19 @@ export function App() {
     let mounted = true
     const api = (window as any).cipherMux
     if (!api.entity?.status) return
-    const entities: Array<{ id: EntityId; setter: (sid: string) => void }> = [
+    const entities: Array<{ id: EntityId; setter: (sid: string) => void; background?: boolean }> = [
       { id: 'companion', setter: (sid) => setCompanionSessionId(sid) },
       { id: 'refinement', setter: (sid) => setRefinementSessionId(sid) },
-      { id: 'voice-relay', setter: (sid) => setVoiceRelaySessionId(sid) },
+      { id: 'voice-relay', setter: (sid) => setVoiceRelaySessionId(sid), background: true },
       { id: 'audit', setter: (sid) => setAuditSessionId(sid) },
     ]
-    for (const { id, setter } of entities) {
+    for (const { id, setter, background } of entities) {
       api.entity.status(id).then((s: { running: boolean; sessionId?: string }) => {
         if (!mounted) return
-        if (s.running && s.sessionId) { setter(s.sessionId); placeEntity(s.sessionId) }
+        if (s.running && s.sessionId) {
+          setter(s.sessionId)
+          if (!background) placeEntity(s.sessionId)
+        }
       })
     }
     return () => { mounted = false }

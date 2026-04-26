@@ -1031,10 +1031,17 @@ export class IpcHub {
           this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, data.message)
         })
 
-        // Start voice-relay entity as background session
+        // Start voice-relay entity as background session (no grid placement)
         if (!this.sessionManager.isEntityRunning('voice-relay')) {
           console.log('[Voice] Starting voice-relay entity...')
           await this.sessionManager.startEntity('voice-relay')
+          // Queue Claude launch + startup greeting for background entity
+          try {
+            this.sessionManager.queueEntityClaude('voice-relay')
+            this.sessionManager.scheduleStartupGreeting('voice-relay')
+          } catch (err) {
+            console.error('[Voice] Failed to queue voice-relay claude:', err)
+          }
           // Output routing is auto-started by entity-started event handler
         } else {
           // Already running — just start output routing
