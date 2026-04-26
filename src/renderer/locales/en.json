@@ -116,7 +116,6 @@
   "sessionDialog.selectDir": "select directory",
   "sessionDialog.cancel": "cancel",
   "sessionDialog.open": "open",
-  "sessionDialog.resumeLabel": "Resume previous session",
 
   "sessionCell.forkSession": "fork session",
   "sessionCell.forkNoId": "No Claude session ID available — cannot fork",
@@ -238,6 +237,7 @@
 
   "info.tabShortcuts": "shortcuts",
   "info.tabFeatures": "features",
+  "info.tabAbout": "about",
   "info.tabSettings": "settings",
 
   "info.shortcut.openBugreport": "open bugreport dialog",
@@ -400,7 +400,6 @@
   "unified.recentPaths": "Recent:",
   "unified.shellOnly": "Shell only (no Claude)",
   "unified.skipPermissions": "--dangerously-skip-permissions",
-  "unified.resume": "--resume (continue last session)",
   "unified.fork": "--fork (fork current session)",
   "unified.cancel": "Cancel",
   "unified.start": "Start",
