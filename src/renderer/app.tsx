@@ -482,7 +482,6 @@ export function App() {
       if (!opts.shellOnly) {
         const parts = ['clear; claude']
         if (opts.skipPermissions) parts.push('--dangerously-skip-permissions')
-        if (opts.resume) parts.push('--resume')
         if (opts.fork) parts.push('--fork')
         autoLaunch = parts.join(' ') + '\n'
       }
@@ -490,7 +489,6 @@ export function App() {
         name,
         projectPath: dirPath,
         autoLaunch,
-        resume: opts.resume,
       })
       setSessionAtSlot(slotIndex, session.id)
       setFocusedSessionId(session.id)
@@ -516,6 +514,9 @@ export function App() {
     const unsub = api.entity.onStarted((data: { entityId: string; session: any }) => {
       const sid = data.session?.id
       if (!sid) return
+      // Skip if session is already placed in the grid (started via LauncherCell)
+      const alreadyPlaced = grid.slots.some(s => s.sessionId === sid)
+      if (alreadyPlaced) return
       if (data.entityId === 'companion' && !companionSessionId) {
         setCompanionSessionId(sid); placeEntity(sid)
       } else if (data.entityId === 'refinement' && !refinementSessionId) {

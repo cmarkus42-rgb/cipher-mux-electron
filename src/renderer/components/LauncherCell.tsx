@@ -29,7 +29,6 @@ const ENTITY_PRESETS: EntityPreset[] = [
 
 export interface PathStartOpts {
   shellOnly?: boolean
-  resume?: boolean
   fork?: boolean
   skipPermissions?: boolean
 }
@@ -63,7 +62,6 @@ export function LauncherCell({
   const [path, setPath] = useState('')
   const [shellOnly, setShellOnly] = useState(false)
   const [skipPermissions, setSkipPermissions] = useState(true)
-  const [resume, setResume] = useState(false)
   const [fork, setFork] = useState(false)
   const [recentPaths, setRecentPaths] = useState<string[]>([])
 
@@ -92,10 +90,18 @@ export function LauncherCell({
     }).catch(() => {})
   }, [popupOpen])
 
-  // Reset state when popup opens
+  // Reset state when popup opens + Escape to close
   useEffect(() => {
     if (popupOpen) {
       setStarting(null)
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation()
+          setPopupOpen(false)
+        }
+      }
+      window.addEventListener('keydown', onKeyDown)
+      return () => window.removeEventListener('keydown', onKeyDown)
     }
   }, [popupOpen])
 
@@ -128,7 +134,7 @@ export function LauncherCell({
   const handlePathStart = useCallback(() => {
     const p = path.trim()
     if (!p) return
-    onStartPath(p, { shellOnly, resume, fork, skipPermissions: !shellOnly && skipPermissions })
+    onStartPath(p, { shellOnly, fork, skipPermissions: !shellOnly && skipPermissions })
     // Save to recent paths
     cipherApi().config.get('app').then((cfg: any) => {
       const existing: string[] = cfg?.recentPaths ?? []
@@ -137,7 +143,7 @@ export function LauncherCell({
     }).catch(() => {})
     setPath('')
     setPopupOpen(false)
-  }, [path, shellOnly, resume, fork, skipPermissions, onStartPath])
+  }, [path, shellOnly, fork, skipPermissions, onStartPath])
 
   const handlePathKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -268,12 +274,6 @@ export function LauncherCell({
                           setSkipPermissions((e.target as HTMLInputElement).checked)
                         }} />
                         <span>{t('unified.skipPermissions')}</span>
-                      </label>
-                      <label class="unified-dialog__option">
-                        <input type="checkbox" checked={resume} onChange={(e) => {
-                          setResume((e.target as HTMLInputElement).checked)
-                        }} />
-                        <span>{t('unified.resume')}</span>
                       </label>
                       <label class="unified-dialog__option">
                         <input type="checkbox" checked={fork} onChange={(e) => {
