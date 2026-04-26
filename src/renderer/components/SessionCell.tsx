@@ -67,12 +67,14 @@ export function SessionCell({
   const dotClass = pct >= 85 ? 'neon-dot--error' : pct >= 60 ? 'neon-dot--warn' : 'neon-dot--ok'
 
   // Entity color mapping — matches EntityConfig.color values
-  const ENTITY_COLORS: Partial<Record<EntityId, string>> = {
+  const ENTITY_COLORS: Record<EntityId, string> = {
     orchestrator: '#4fc3f7',
     mpo: '#ab47bc',
     companion: '#ffb74d',
     refinement: '#ef5350',
     launcher: '#66bb6a',
+    'voice-relay': '#9b59b6',
+    audit: '#c0392b',
   }
   const entityColor = session.entityId ? ENTITY_COLORS[session.entityId] : undefined
   const isEntity = !!session.entityId

@@ -8,12 +8,14 @@ interface PaneHeaderProps {
 }
 
 /** Entity color mapping — matches EntityConfig.color values. */
-const ENTITY_COLORS: Partial<Record<EntityId, string>> = {
+const ENTITY_COLORS: Record<EntityId, string> = {
   orchestrator: '#4fc3f7',
   mpo: '#ab47bc',
   companion: '#ffb74d',
   refinement: '#ef5350',
   launcher: '#66bb6a',
+  'voice-relay': '#9b59b6',
+  audit: '#c0392b',
 }
 
 function contextColorClass(pct: number): string {
