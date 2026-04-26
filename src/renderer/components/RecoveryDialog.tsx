@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'preact/hooks'
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { RecoveryResult, SessionInfo } from '../../shared/types'
 
@@ -16,23 +16,40 @@ export function RecoveryDialog({ onDone, onAdopt, onRecovered }: RecoveryDialogP
   const [orphans, setOrphans] = useState<SessionInfo[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [visible, setVisible] = useState(false)
+  const handledRef = useRef(false)
+
+  const handleResult = useCallback((result: RecoveryResult) => {
+    if (!result || handledRef.current) return
+    handledRef.current = true
+    // Notify parent about recovered sessions + grid state for placement
+    if (result.recovered.length > 0 && onRecovered) {
+      onRecovered(result)
+    }
+
+    if (result.orphaned.length > 0) {
+      setOrphans(result.orphaned)
+      // Default: all selected for grid adoption
+      setSelected(new Set(result.orphaned.map(o => o.id)))
+      setVisible(true)
+    }
+  }, [onRecovered])
 
   useEffect(() => {
+    // Push-based: listen for recovery result events
     const unsub = api().sessions.onRecoveryResult((result: RecoveryResult) => {
-      // Notify parent about recovered sessions + grid state for placement
-      if (result.recovered.length > 0 && onRecovered) {
-        onRecovered(result)
-      }
-
-      if (result.orphaned.length > 0) {
-        setOrphans(result.orphaned)
-        // Default: all selected for grid adoption
-        setSelected(new Set(result.orphaned.map(o => o.id)))
-        setVisible(true)
-      }
+      handleResult(result)
     })
+
+    // Pull-based: fetch cached recovery result in case the push event
+    // was sent before this component mounted (race condition on startup)
+    api().sessions.recover().then((result: RecoveryResult | null) => {
+      if (result && (result.recovered.length > 0 || result.orphaned.length > 0)) {
+        handleResult(result)
+      }
+    }).catch(() => {})
+
     return () => unsub()
-  }, [onRecovered])
+  }, [handleResult])
 
   const toggleOrphan = useCallback((id: string) => {
     setSelected(prev => {
