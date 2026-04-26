@@ -36,7 +36,7 @@ interface LlmConfig {
   ollamaModel: string
 }
 
-type TabId = 'shortcuts' | 'features' | 'settings'
+type TabId = 'settings' | 'about' | 'shortcuts'
 
 const SHORTCUT_KEYS = [
   { category: 'global', combo: 'Cmd+B', labelKey: 'info.shortcut.openBugreport' },
@@ -73,7 +73,7 @@ const THEME_TOKEN_GROUPS: Array<{ labelKey: string; tokens: string[] }> = [
 
 export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme, onOpenBugreport }: InfoSettingsViewProps) {
   const { t } = useTranslation()
-  const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'features')
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'settings')
   const [scanPaths, setScanPaths] = useState<string[]>([])
   const [scanDepth, setScanDepth] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -244,13 +244,13 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
   return (
     <div class="settings-view">
       <div class="info-tabs">
-        {(['shortcuts', 'features', 'settings'] as TabId[]).map((tab) => (
+        {(['settings', 'about', 'shortcuts'] as TabId[]).map((tab) => (
           <button
             key={tab}
             class={`info-tab ${activeTab === tab ? 'info-tab--active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === 'shortcuts' ? t('info.tabShortcuts') : tab === 'features' ? t('info.tabFeatures') : t('info.tabSettings')}
+            {tab === 'settings' ? t('info.tabSettings') : tab === 'about' ? t('info.tabAbout') : t('info.tabShortcuts')}
           </button>
         ))}
       </div>
@@ -278,7 +278,7 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
         </section>
       )}
 
-      {activeTab === 'features' && (
+      {activeTab === 'about' && (
         <section class="settings-section wiki-section">
           <div class="wiki-entry">
             <div class="settings-section__title">{t('info.feature.whatIs.title')}</div>
