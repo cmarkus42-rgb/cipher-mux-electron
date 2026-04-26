@@ -570,6 +570,17 @@ export class IpcHub {
 
     ipcMain.handle(IPC.CONFIG_SET, async (_e, { key, value }: { key: string; value: unknown }) => {
       configStore.set(key as any, value as any)
+      // Broadcast theme changes to all windows (sidebar, workspaces)
+      if (key === 'ui' && value && typeof value === 'object') {
+        const ui = value as Record<string, unknown>
+        if (ui.theme !== undefined) {
+          this.windowManager.sendToAllWindows(IPC.THEME_CHANGED, {
+            theme: ui.theme,
+            activeCustomThemeId: ui.activeCustomThemeId ?? null,
+            customThemeTokens: ui.customThemeTokens ?? null,
+          })
+        }
+      }
       return { ok: true }
     })
 

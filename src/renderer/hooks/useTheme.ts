@@ -62,6 +62,29 @@ export function useTheme() {
     return () => { mountedRef.current = false }
   }, [])
 
+  // Listen for theme changes from other windows
+  useEffect(() => {
+    const a = api()
+    if (!a?.config?.onThemeChanged) return
+    const unsub = a.config.onThemeChanged((data: any) => {
+      if (!data?.theme) return
+      const mapped = LEGACY_THEME_ALIASES[data.theme] ?? data.theme
+      const resolved: ThemeName = isValidTheme(mapped) ? mapped : DEFAULT_THEME
+      setThemeState(resolved)
+      clearCustomTokens()
+      applyTheme(resolved)
+      if (data.activeCustomThemeId) {
+        setActiveCustomThemeId(data.activeCustomThemeId)
+      } else {
+        setActiveCustomThemeId(null)
+      }
+      if (data.customThemeTokens && typeof data.customThemeTokens === 'object') {
+        applyCustomTokens(data.customThemeTokens)
+      }
+    })
+    return () => unsub()
+  }, [])
+
   const persistUi = useCallback(async (patch: Record<string, unknown>) => {
     const ui = await api().config.get('ui') ?? {}
     await api().config.set('ui', { ...ui, ...patch })

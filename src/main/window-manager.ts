@@ -98,6 +98,15 @@ export class WindowManager {
     }
   }
 
+  /** Send to all open windows (main, sidebar, workspaces). */
+  sendToAllWindows(channel: string, data: unknown): void {
+    for (const win of [this.mainWindow, this.sidebarWindow, this.workspacesWindow]) {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send(channel, data)
+      }
+    }
+  }
+
   openWorkspacesWindow(initialTab?: 'workspaces' | 'personas' | 'companion' | 'tags'): void {
     // Focus existing window if already open
     if (this.workspacesWindow && !this.workspacesWindow.isDestroyed()) {
