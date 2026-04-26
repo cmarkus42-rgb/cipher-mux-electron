@@ -40,3 +40,4 @@ src/renderer/public/vad-assets/
 
 # Private profile (never commit)
 profile.cipher.yaml
+.claude/worktrees/
