@@ -174,26 +174,15 @@ export class SessionManager extends EventEmitter {
     // reports the real terminal size, so TUIs start at the correct dims.
     if (opts.autoLaunch) {
       this.setPendingLaunch(id, opts.autoLaunch)
-    } else if (opts.resume || opts.forkFromClaudeSessionId) {
-      // Build auto-launch with resume/fork flags via adapter
+    } else if (opts.forkFromClaudeSessionId) {
+      // Build auto-launch with fork flag via adapter
       const launchCmd = adapter.buildLaunchCommand({
         projectPath: opts.projectPath || os.homedir(),
         sessionName: opts.name,
-        resume: opts.resume,
         forkFromClaudeSessionId: opts.forkFromClaudeSessionId,
       })
       const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
-      // When resuming, fall back to fresh start if no prior session exists
-      if (opts.resume && !opts.forkFromClaudeSessionId) {
-        const fallbackCmd = adapter.buildLaunchCommand({
-          projectPath: opts.projectPath || os.homedir(),
-          sessionName: opts.name,
-        })
-        const fallbackStr = [fallbackCmd.cmd, ...fallbackCmd.args].join(' ')
-        this.setPendingLaunch(id, `clear; ${cmdStr} || ${fallbackStr}\n`)
-      } else {
-        this.setPendingLaunch(id, `clear; ${cmdStr}\n`)
-      }
+      this.setPendingLaunch(id, `clear; ${cmdStr}\n`)
     }
 
     this.emit('session-changed', session)
@@ -644,28 +633,14 @@ export class SessionManager extends EventEmitter {
     if (!config) return
 
     const adapter = this.adapterRegistry.getDefault()
-    const useResume = config.autoResume ?? true
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: config.projectPath,
       sessionName: config.displayName,
       isOrchestrator: entityId === 'orchestrator',
       isMpo: entityId === 'mpo',
-      resume: useResume,
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
-    // When resuming, fall back to fresh start if no prior session exists
-    if (useResume) {
-      const fallbackCmd = adapter.buildLaunchCommand({
-        projectPath: config.projectPath,
-        sessionName: config.displayName,
-        isOrchestrator: entityId === 'orchestrator',
-        isMpo: entityId === 'mpo',
-      })
-      const fallbackStr = [fallbackCmd.cmd, ...fallbackCmd.args].join(' ')
-      this.setPendingLaunch(sessionId, `clear; ${cmdStr} || ${fallbackStr}\n`)
-    } else {
-      this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
-    }
+    this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
   }
 
   /**
@@ -814,7 +789,6 @@ export class SessionManager extends EventEmitter {
       projectPath: this.resolveOrchestratorDir(),
       sessionName: 'Orchestrator',
       isOrchestrator: true,
-      resume: true,
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
     this.setPendingLaunch(
@@ -924,7 +898,6 @@ export class SessionManager extends EventEmitter {
       projectPath: this.resolveMpoDir(),
       sessionName: 'MPO',
       isMpo: true,
-      resume: true,
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
     this.setPendingLaunch(this.mpoSessionId, `clear; ${cmdStr}\n`)
@@ -976,7 +949,7 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
-   * Fork an existing session: creates a new session with --fork-session --resume <id>.
+   * Fork an existing session: creates a new session with --fork-session <id>.
    */
   async forkSession(sourceSessionId: string): Promise<SessionInfo> {
     const source = this.sessions.get(sourceSessionId)

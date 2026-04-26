@@ -43,7 +43,6 @@ interface UnifiedSessionDialogProps {
 
 export interface PathStartOpts {
   shellOnly?: boolean
-  resume?: boolean
   fork?: boolean
   skipPermissions?: boolean
 }
@@ -56,7 +55,6 @@ export function UnifiedSessionDialog({
   const [path, setPath] = useState('')
   const [shellOnly, setShellOnly] = useState(false)
   const [skipPermissions, setSkipPermissions] = useState(true)
-  const [resume, setResume] = useState(false)
   const [fork, setFork] = useState(false)
   const [starting, setStarting] = useState<string | null>(null)
 
@@ -96,7 +94,7 @@ export function UnifiedSessionDialog({
   const handlePathStart = useCallback(() => {
     const p = path.trim()
     if (!p) return
-    onStartPath(p, { shellOnly, resume, fork, skipPermissions: !shellOnly && skipPermissions })
+    onStartPath(p, { shellOnly, fork, skipPermissions: !shellOnly && skipPermissions })
     // Save to recent paths
     api().config.get('app').then((cfg: any) => {
       const existing: string[] = cfg?.recentPaths ?? []
@@ -105,7 +103,7 @@ export function UnifiedSessionDialog({
     }).catch(() => {})
     setPath('')
     onClose()
-  }, [path, shellOnly, resume, fork, skipPermissions, onStartPath, onClose])
+  }, [path, shellOnly, fork, skipPermissions, onStartPath, onClose])
 
   const handlePathKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -214,12 +212,6 @@ export function UnifiedSessionDialog({
                       setSkipPermissions((e.target as HTMLInputElement).checked)
                     }} />
                     <span>{t('unified.skipPermissions')}</span>
-                  </label>
-                  <label class="unified-dialog__option">
-                    <input type="checkbox" checked={resume} onChange={(e) => {
-                      setResume((e.target as HTMLInputElement).checked)
-                    }} />
-                    <span>{t('unified.resume')}</span>
                   </label>
                   <label class="unified-dialog__option">
                     <input type="checkbox" checked={fork} onChange={(e) => {

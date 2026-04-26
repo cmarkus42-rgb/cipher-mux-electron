@@ -67,9 +67,7 @@ function mockAdapter() {
     buildLaunchCommand: (opts: any) => {
       const args: string[] = []
       if (opts.forkFromClaudeSessionId) {
-        args.push('--fork-session', opts.forkFromClaudeSessionId, '--resume')
-      } else if (opts.resume) {
-        args.push('--resume')
+        args.push('--fork-session', opts.forkFromClaudeSessionId)
       }
       return { cmd: 'claude', args }
     },
@@ -100,30 +98,16 @@ function createSessionManager(tmux: MockTmuxManager) {
   return new SessionManager(tmux as any, mockRegistry() as any)
 }
 
-// ─── Resume Tests ───────────────────────────────────────────
+// ─── Session Start Tests ────────────────────────────────────
 
-describe('SP-5: Session Resume', () => {
+describe('SP-5: Session Start (no resume)', () => {
   let tmux: MockTmuxManager
 
   beforeEach(() => {
     tmux = new MockTmuxManager()
   })
 
-  it('start with resume=true queues an autoLaunch with --resume', async () => {
-    const sm = createSessionManager(tmux)
-    const session = await sm.start({
-      name: 'Worker',
-      projectPath: '/tmp/test',
-      resume: true,
-    })
-    // Check pending launch was set
-    const pending = (sm as any).pendingLaunch as Map<string, any>
-    assert.ok(pending.has(session.id), 'should have a pending launch')
-    const cmd = pending.get(session.id).command
-    assert.ok(cmd.includes('--resume'), `launch command should include --resume, got: ${cmd}`)
-  })
-
-  it('start without resume does not queue autoLaunch', async () => {
+  it('start without autoLaunch does not queue pending launch', async () => {
     const sm = createSessionManager(tmux)
     const session = await sm.start({
       name: 'Worker',
@@ -133,13 +117,12 @@ describe('SP-5: Session Resume', () => {
     assert.ok(!pending.has(session.id), 'should not have a pending launch')
   })
 
-  it('start with explicit autoLaunch takes precedence over resume', async () => {
+  it('start with explicit autoLaunch queues it', async () => {
     const sm = createSessionManager(tmux)
     const session = await sm.start({
       name: 'Worker',
       projectPath: '/tmp/test',
       autoLaunch: 'custom-command\n',
-      resume: true,
     })
     const pending = (sm as any).pendingLaunch as Map<string, any>
     assert.ok(pending.has(session.id))
@@ -294,19 +277,7 @@ describe('SP-5: Orphan Detection', () => {
 // ─── ClaudeCodeAdapter Tests ─────────────────────────────────
 
 describe('SP-5: ClaudeCodeAdapter.buildLaunchCommand', () => {
-  it('adds --resume flag when resume is true', () => {
-    const { ClaudeCodeAdapter } = require('../../src/main/agent/adapters/claude-code')
-    const adapter = new ClaudeCodeAdapter({ getSkipPermissions: () => false })
-    const cmd = adapter.buildLaunchCommand({
-      projectPath: '/tmp',
-      sessionName: 'test',
-      resume: true,
-    })
-    assert.ok(cmd.args.includes('--resume'), `should include --resume, got: ${cmd.args}`)
-    assert.ok(!cmd.args.includes('--fork-session'), 'should not include --fork-session')
-  })
-
-  it('adds --fork-session and --resume when forkFromClaudeSessionId is set', () => {
+  it('adds --fork-session when forkFromClaudeSessionId is set', () => {
     const { ClaudeCodeAdapter } = require('../../src/main/agent/adapters/claude-code')
     const adapter = new ClaudeCodeAdapter({ getSkipPermissions: () => false })
     const cmd = adapter.buildLaunchCommand({
@@ -316,10 +287,10 @@ describe('SP-5: ClaudeCodeAdapter.buildLaunchCommand', () => {
     })
     assert.ok(cmd.args.includes('--fork-session'), 'should include --fork-session')
     assert.ok(cmd.args.includes('abc-123'), 'should include the session ID')
-    assert.ok(cmd.args.includes('--resume'), 'should include --resume after --fork-session')
+    assert.ok(!cmd.args.includes('--resume'), 'should not include --resume')
   })
 
-  it('does not add flags when neither resume nor fork is set', () => {
+  it('does not add flags when no fork is set', () => {
     const { ClaudeCodeAdapter } = require('../../src/main/agent/adapters/claude-code')
     const adapter = new ClaudeCodeAdapter({ getSkipPermissions: () => false })
     const cmd = adapter.buildLaunchCommand({
@@ -328,22 +299,5 @@ describe('SP-5: ClaudeCodeAdapter.buildLaunchCommand', () => {
     })
     assert.ok(!cmd.args.includes('--resume'))
     assert.ok(!cmd.args.includes('--fork-session'))
-  })
-
-  it('fork takes precedence over plain resume', () => {
-    const { ClaudeCodeAdapter } = require('../../src/main/agent/adapters/claude-code')
-    const adapter = new ClaudeCodeAdapter({ getSkipPermissions: () => false })
-    const cmd = adapter.buildLaunchCommand({
-      projectPath: '/tmp',
-      sessionName: 'test',
-      resume: true,
-      forkFromClaudeSessionId: 'xyz-789',
-    })
-    assert.ok(cmd.args.includes('--fork-session'), 'fork flag should be present')
-    assert.ok(cmd.args.includes('xyz-789'))
-    // --resume should be there for fork, not as a separate flag
-    const resumeIdx = cmd.args.indexOf('--resume')
-    const forkIdx = cmd.args.indexOf('--fork-session')
-    assert.ok(resumeIdx > forkIdx, '--resume should follow --fork-session')
   })
 })

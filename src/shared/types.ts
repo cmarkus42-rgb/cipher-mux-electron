@@ -39,12 +39,10 @@ export interface EntityConfig {
   templatePath?: string
   /** Pre-filled greeting message sent after session start. */
   startupGreeting?: string
-  /** Enabled feature flags: 'mcp', 'resume', 'memory', etc. */
+  /** Enabled feature flags: 'mcp', 'memory', etc. */
   features: string[]
   /** Whether this entity is visible in the grid (default true, false = background). */
   visible?: boolean
-  /** Whether to use --resume on start (default true for entities). */
-  autoResume?: boolean
 }
 
 // ─── Session ───────────────────────────────────────────────
@@ -81,9 +79,7 @@ export interface StartSessionOpts {
    * don't reflow after a late SIGWINCH.
    */
   autoLaunch?: string
-  /** When true, --resume is passed to the Claude CLI to continue the last session. */
-  resume?: boolean
-  /** Fork from an existing Claude Code session ID (--fork-session --resume <id>). */
+  /** Fork from an existing Claude Code session ID (--fork-session <id>). */
   forkFromClaudeSessionId?: string
 }
 

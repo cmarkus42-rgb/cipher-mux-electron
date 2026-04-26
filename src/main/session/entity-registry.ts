@@ -75,9 +75,8 @@ export function registerBuiltinEntities(
     icon: '🎯',
     color: '#4fc3f7',
     projectPath: expandHome(orchestratorDir),
-    features: ['mcp', 'resume'],
+    features: ['mcp'],
     visible: true,
-    autoResume: true,
   })
 
   registry.register({
@@ -86,9 +85,8 @@ export function registerBuiltinEntities(
     icon: '🔀',
     color: '#ab47bc',
     projectPath: expandHome(mpoDir),
-    features: ['mcp', 'resume'],
+    features: ['mcp'],
     visible: true,
-    autoResume: true,
   })
 
   registry.register({
@@ -99,7 +97,6 @@ export function registerBuiltinEntities(
     projectPath: expandHome('~/.config/cipher-mux/launcher'),
     features: ['mcp'],
     visible: true,
-    autoResume: false,
   })
 
   registry.register({
@@ -112,7 +109,6 @@ export function registerBuiltinEntities(
     startupGreeting: 'Wach auf. Lies dein Profil, check dein Gedaechtnis, und sag hallo.',
     features: ['mcp', 'memory'],
     visible: true,
-    autoResume: false,
   })
 
   registry.register({
@@ -124,7 +120,6 @@ export function registerBuiltinEntities(
     templatePath: 'the refinement session',
     features: ['mcp', 'memory'],
     visible: true,
-    autoResume: false,
   })
 
   registry.register({
@@ -136,7 +131,6 @@ export function registerBuiltinEntities(
     startupGreeting: 'Session gestartet. Warte auf Voice-Input.',
     features: ['mcp'],
     visible: true,
-    autoResume: false,
   })
 
   registry.register({
@@ -147,6 +141,5 @@ export function registerBuiltinEntities(
     projectPath: `${entitiesBase}/audit`,
     features: ['mcp'],
     visible: true,
-    autoResume: false,
   })
 }
