@@ -89,8 +89,10 @@ export class VoiceInputRouter extends EventEmitter {
   private async routeToVoiceRelay(sessionId: string, text: string, sessionName: string): Promise<void> {
     try {
       console.log('[VoiceRouter] routing to voice-relay:', JSON.stringify(text.slice(0, 60)))
-      // Send text followed by Enter — voice relay is conversational
-      await this.sessionManager.sendKeys(sessionId, text + '\r')
+      // Send text first, then Enter separately — tmux needs discrete CR
+      // to trigger submit in Claude Code's input buffer
+      await this.sessionManager.sendKeys(sessionId, text)
+      await this.sessionManager.sendKeys(sessionId, '\r')
       this.emit('dispatched', { sessionId, sessionName, text })
       console.log('[VoiceRouter] voice-relay dispatch OK')
     } catch (err) {
