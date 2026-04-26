@@ -374,6 +374,7 @@ interface RequestCardProps {
 }
 
 function RequestCard({ request, onAnswer, onOpenReview }: RequestCardProps) {
+  const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null!)
