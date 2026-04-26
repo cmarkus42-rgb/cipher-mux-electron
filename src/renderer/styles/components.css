@@ -1988,6 +1988,9 @@
   flex-wrap: wrap;
   gap: 4px;
   margin-bottom: var(--space-sm);
+  max-height: 64px;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .sidebar-notes__tag {

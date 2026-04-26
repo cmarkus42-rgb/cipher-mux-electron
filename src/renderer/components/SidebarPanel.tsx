@@ -229,7 +229,9 @@ export function SidebarPanel({
       {showNotes && (
         <section class="sidebar-section">
           <div class="sidebar-section__head" onClick={() => setNotesExpanded(v => !v)}>
-            <span>{notesExpanded ? '▾' : '▸'} {t('sidebar.notes')} ({filteredNotes.length})</span>
+            <span>
+              {notesExpanded ? '▾' : '▸'} {t('sidebar.notes')} ({filteredNotes.length !== notes.length ? `${filteredNotes.length}/${notes.length}` : notes.length})
+            </span>
           </div>
           {notesExpanded && (
             <div class="sidebar-section__feed">
