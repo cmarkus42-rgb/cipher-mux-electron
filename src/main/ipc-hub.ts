@@ -214,6 +214,7 @@ export class IpcHub {
         this.windowManager.sendToMainWindow(IPC.SESSIONS_RECOVERY_RESULT, result)
       }
       this.sessionManager.startOrphanDetection()
+      this.sessionManager.startExitDetection()
 
       // Only auto-start if no sessions were recovered
       if (result.recovered.length === 0) {

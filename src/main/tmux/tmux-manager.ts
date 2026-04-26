@@ -349,6 +349,22 @@ export class TmuxManager extends EventEmitter {
     return runCommand('tmux', args)
   }
 
+  /**
+   * Get the current command running in a tmux pane.
+   * Returns the pane's current command (e.g. 'claude', 'zsh').
+   * Returns empty string if the pane/session doesn't exist.
+   */
+  async getPaneCommand(target: string): Promise<string> {
+    try {
+      const result = await runCommand('tmux', [
+        'display-message', '-t', target, '-p', '#{pane_current_command}',
+      ])
+      return result.trim()
+    } catch {
+      return ''
+    }
+  }
+
   private handleEvent(event: TmuxEvent): void {
     switch (event.type) {
       case 'output':
