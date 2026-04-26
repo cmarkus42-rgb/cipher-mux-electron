@@ -28,7 +28,7 @@ import { EntityRegistry, registerBuiltinEntities } from './session/entity-regist
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
 import { BRAND } from '../shared/brand'
-import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest, EntityId, Character } from '../shared/types'
+import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest, EntityId, Character, RecoveryResult } from '../shared/types'
 import type { Persona, Workspace } from '../shared/persona-types'
 import { applyWorkspace } from './workspace/workspace-manager'
 
@@ -55,6 +55,7 @@ export class IpcHub {
   private noteTagging!: NoteTagging
   private memoryStore: MemoryStore | null = null
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
+  private cachedRecoveryResult: RecoveryResult | null = null
 
   private adapterRegistry: AdapterRegistry
 
@@ -210,6 +211,8 @@ export class IpcHub {
     }).then(() => {
       return this.sessionManager.recover()
     }).then((result) => {
+      // Cache for pull-based retrieval by the renderer
+      this.cachedRecoveryResult = result
       if (result.orphaned.length > 0 || result.recovered.length > 0) {
         this.windowManager.sendToMainWindow(IPC.SESSIONS_RECOVERY_RESULT, result)
       }
@@ -431,7 +434,9 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.SESSIONS_RECOVER, async () => {
-      return this.sessionManager.recover()
+      // Return cached recovery result (from startup) instead of re-running
+      // recover(), which would double-register sessions.
+      return this.cachedRecoveryResult
     })
 
     ipcMain.handle(IPC.SESSIONS_RECOVERY_ACTION, async (_e, { action, tmuxSession, displayName }: {
