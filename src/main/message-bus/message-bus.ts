@@ -165,6 +165,12 @@ export class MessageBus extends EventEmitter {
     return result.changes
   }
 
+  /** Delete all messages — used at app start for a clean bus per run */
+  clearAll(): number {
+    const result = this.db.prepare('DELETE FROM messages').run()
+    return result.changes
+  }
+
   /** Expose the underlying database for shared table access (tasks) */
   getDatabase(): Database.Database {
     return this.db

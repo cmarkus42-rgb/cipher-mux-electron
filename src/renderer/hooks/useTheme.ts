@@ -1,5 +1,5 @@
 // src/renderer/hooks/useTheme.ts
-import { useState, useEffect, useCallback } from 'preact/hooks'
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import type { ThemeName } from '../../shared/grid-types'
 import { LEGACY_THEME_ALIASES, DEFAULT_THEME } from '../../shared/grid-types'
 export { getTerminalTheme } from '../../shared/terminal-theme'
@@ -30,10 +30,13 @@ export function useTheme() {
   const [theme, setThemeState] = useState<ThemeName>(DEFAULT_THEME)
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([])
   const [activeCustomThemeId, setActiveCustomThemeId] = useState<string | null>(null)
+  const mountedRef = useRef(true)
 
   // Load persisted theme on mount
   useEffect(() => {
+    mountedRef.current = true
     api().config.get('ui').then((ui: any) => {
+      if (!mountedRef.current) return
       const raw: string = ui?.theme ?? 'ivory'
       const mapped = LEGACY_THEME_ALIASES[raw] ?? raw
       const resolved: ThemeName = isValidTheme(mapped) ? mapped : DEFAULT_THEME
@@ -56,6 +59,7 @@ export function useTheme() {
         applyCustomTokens(ui.customThemeTokens)
       }
     }).catch(() => {})
+    return () => { mountedRef.current = false }
   }, [])
 
   const persistUi = useCallback(async (patch: Record<string, unknown>) => {

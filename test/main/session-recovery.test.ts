@@ -172,23 +172,22 @@ describe('SessionManager.recover()', () => {
   it('recovers registered sessions and marks them active', async () => {
     const sm = createSessionManager(tmux)
 
-    // Simulate a pre-registered session (as if it was created before app restart
-    // but the registry somehow survived — e.g., in a manual recover() call)
+    // Simulate a pre-registered session persisted to the store (as if it was
+    // created before app restart and written to sessions.json).
     tmux.sessions = [
       { id: '$1', name: 'cmux-testtest', width: 80, height: 24, created: 1000, paneCwd: '/tmp' },
     ]
 
-    // Manually add session to registry
-    const sessions = (sm as any).sessions as Map<string, any>
-    sessions.set('test-id', {
+    // Populate the session store (recover() reads from SessionStore, not the in-memory Map)
+    const store = (sm as any).sessionStore
+    store.upsertSession({
       id: 'test-id',
       name: 'Worker-1',
-      projectPath: '/tmp',
       tmuxSession: 'cmux-testtest',
-      tmuxPane: '$1',
-      status: 'stopped',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      entityId: null,
+      projectPath: '/tmp',
+      gridSlot: 0,
+      status: 'active',
     })
 
     const result = await sm.recover()
@@ -199,27 +198,26 @@ describe('SessionManager.recover()', () => {
 
   it('restores orchestrator and MPO links from recovered sessions', async () => {
     const sm = createSessionManager(tmux)
-    const sessions = (sm as any).sessions as Map<string, any>
+    const store = (sm as any).sessionStore
 
-    sessions.set('orch-id', {
+    // Persist sessions to the store with entity IDs
+    store.upsertSession({
       id: 'orch-id',
       name: 'Orchestrator',
-      projectPath: '/tmp/orch',
       tmuxSession: 'cmux-orchorch',
-      tmuxPane: null,
-      status: 'stopped',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      entityId: 'orchestrator',
+      projectPath: '/tmp/orch',
+      gridSlot: 0,
+      status: 'active',
     })
-    sessions.set('mpo-id', {
+    store.upsertSession({
       id: 'mpo-id',
       name: 'MPO',
-      projectPath: '/tmp/mpo',
       tmuxSession: 'cmux-mpompo00',
-      tmuxPane: null,
-      status: 'stopped',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      entityId: 'mpo',
+      projectPath: '/tmp/mpo',
+      gridSlot: 1,
+      status: 'active',
     })
 
     tmux.sessions = [
@@ -245,17 +243,17 @@ describe('SessionManager.recover()', () => {
 
   it('handles mixed scenario: registered + orphaned + launcher + control', async () => {
     const sm = createSessionManager(tmux)
-    const sessions = (sm as any).sessions as Map<string, any>
+    const store = (sm as any).sessionStore
 
-    sessions.set('known-id', {
+    // Persist the known session to the store
+    store.upsertSession({
       id: 'known-id',
       name: 'Known Session',
-      projectPath: '/tmp/known',
       tmuxSession: 'cmux-known000',
-      tmuxPane: null,
+      entityId: null,
+      projectPath: '/tmp/known',
+      gridSlot: 0,
       status: 'active',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
     })
 
     tmux.sessions = [

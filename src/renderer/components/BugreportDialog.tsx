@@ -86,9 +86,12 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
 
   // Check voice availability on mount
   useEffect(() => {
+    let mounted = true
     api()?.voice?.available?.().then((res: { available: boolean }) => {
+      if (!mounted) return
       setVoiceAvailable(res?.available ?? false)
-    }).catch(() => setVoiceAvailable(false))
+    }).catch(() => { if (mounted) setVoiceAvailable(false) })
+    return () => { mounted = false }
   }, [])
 
   useEffect(() => {

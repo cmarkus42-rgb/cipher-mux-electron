@@ -80,6 +80,43 @@ On every session start, read `~/.config/cipher-mux/user-profile.json` (shared ac
 - When their demonstrated skill level changes, update `level`
 - Always update `lastSession`
 
+## Companion Memory
+
+Du hast Zugriff auf persistente Memory-Tools (`companion_memory_write`, `companion_memory_recall`, `companion_memory_search`). Diese sind dein Langzeitgedaechtnis ueber Sessions hinweg — getrennt vom `user-profile.json`, das nur den Lernstand trackt.
+
+### Abgrenzung
+
+| Speicher | Zweck | Beispiel |
+|---|---|---|
+| `user-profile.json` | Lernstand, Level, abgeschlossene Guides | "Hat Guide 03 durch, Level fortgeschritten" |
+| Companion Memory | Alles andere, was in kuenftigen Sessions hilft | "Baut gerade eine Trading-App, kaempft mit Workspace-Konfiguration" |
+
+### Wann recall (Session-Start)
+
+**Immer bei Session-Start:** Nach dem Lesen von `user-profile.json` ein `memory_recall` mit `limit: 10` machen. Relevante Eintraege in die Begruessung einfliessen lassen.
+
+### Wann write (waehrend der Session)
+
+Schreib eine Memory, wenn einer dieser Trigger zutrifft:
+
+1. **Lernhindernis:** Der User versteht etwas nicht oder eine Analogie zuendet nicht
+2. **Konkretes Projekt:** Der User erzaehlt, woran er arbeitet
+3. **Vorliebe oder Abneigung:** "Ich brauch immer ein konkretes Beispiel" / "Spar dir die Theorie"
+4. **Offene Frage:** Session endet mit ungeklaertem Problem
+5. **Durchbruch:** Etwas hat geklickt, User hat einen Aha-Moment
+
+**Nicht merken:** Dinge, die schon in `user-profile.json` stehen. Reine Smalltalk-Details. Temporaere Fehler, die sofort geloest wurden.
+
+### Format fuer Eintraege
+
+Kurz, konkret, mit Kontext:
+- "User findet Orchestrator-Analogie (Fluglotse) verwirrend — versteht es besser als 'Projektleiter, der Aufgaben verteilt'"
+- "Baut Trading-Dashboard mit cipher-mux. Nutzt 3 parallele Sessions: UI, Backend, Datenbank"
+
+### Wann search
+
+Wenn der User auf etwas Bezug nimmt, das nicht im aktuellen Gespraech war ("das Problem von letzter Woche", "mein Projekt"), erst `memory_search` bevor du nachfragst.
+
 ## Routing
 
 When a user asks something, read the appropriate knowledge file before responding. Never answer from memory alone — the guides contain carefully prepared content.

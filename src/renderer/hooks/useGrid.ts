@@ -31,7 +31,9 @@ export function useGrid(panelWidth = 0) {
 
   // Load persisted grid on mount
   useEffect(() => {
+    let mounted = true
     api().config.get('ui').then((ui: any) => {
+      if (!mounted) return
       if (ui?.grid?.config && ui.grid.slots) {
         setGrid(ui.grid)
         api().window.fitGrid(ui.grid.config.cols, ui.grid.config.rows, panelWidthRef.current).catch(() => {})
@@ -41,6 +43,7 @@ export function useGrid(panelWidth = 0) {
       }
     }).catch(() => {})
     return () => {
+      mounted = false
       if (saveTimer.current) clearTimeout(saveTimer.current)
     }
   }, [])
@@ -177,5 +180,12 @@ export function useGrid(panelWidth = 0) {
     })
   }, [persist])
 
-  return { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot }
+  /** Restore a full grid state (e.g. from session recovery). */
+  const restoreGrid = useCallback((state: GridState) => {
+    setGrid(state)
+    persist(state)
+    api().window.fitGrid(state.config.cols, state.config.rows, panelWidthRef.current).catch(() => {})
+  }, [persist])
+
+  return { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot, restoreGrid }
 }

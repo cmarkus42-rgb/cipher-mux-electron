@@ -46,11 +46,13 @@ export function SidebarPanel({
 
   // Orphan detection: listen for periodic events + initial scan
   useEffect(() => {
+    let mounted = true
     const api = (window as any).cipherMux
     if (!api?.sessions?.detectOrphans || !api?.sessions?.onOrphansDetected) return
 
     // Initial scan
     api.sessions.detectOrphans().then((result: any[]) => {
+      if (!mounted) return
       if (result?.length) setOrphans(result)
     }).catch(() => {})
 
@@ -58,7 +60,7 @@ export function SidebarPanel({
     const unsub = api.sessions.onOrphansDetected((detected: any[]) => {
       setOrphans(detected)
     })
-    return () => unsub()
+    return () => { mounted = false; unsub() }
   }, [])
 
   const handleOrphanAdopt = useCallback(async (tmuxSession: string) => {
@@ -280,8 +282,8 @@ export function SidebarPanel({
         onToggle={() => setMemoryExpanded(v => !v)}
       />
 
-      {!showMessages && !showBackground && !showRequests && !showNotes && orphans.length === 0 && !memoryExpanded && (
-        <div class="sidebar-panel__empty">{t('sidebar.noContent')}</div>
+      {!showMessages && !showBackground && !showRequests && orphans.length === 0 && filteredNotes.length === 0 && (
+        <div class="sidebar-panel__empty">{t('sidebar.emptyHint')}</div>
       )}
     </aside>
   )
@@ -299,17 +301,18 @@ function BackgroundSessionCard({ session, contextUsage, onClick, onKill }: Backg
   const [lastOutput, setLastOutput] = useState<string>('')
 
   useEffect(() => {
+    let mounted = true
     const api = (window as any).cipherMux
     if (!api?.sessions?.capture) return
 
     const fetchPreview = async () => {
       const content = await api.sessions.capture(session.id)
-      if (content) setLastOutput(content)
+      if (mounted && content) setLastOutput(content)
     }
 
     fetchPreview()
     const interval = setInterval(fetchPreview, 5000)
-    return () => clearInterval(interval)
+    return () => { mounted = false; clearInterval(interval) }
   }, [session.id])
 
   const handleKill = useCallback((e: Event) => {

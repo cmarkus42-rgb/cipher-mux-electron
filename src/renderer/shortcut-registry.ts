@@ -4,7 +4,8 @@ export interface ShortcutEntry {
   combo: string
   label: string
   category: 'Navigation' | 'Layout' | 'Aktionen'
-  action: () => void
+  /** Return false to let the event propagate (e.g. pass through to terminal). */
+  action: () => void | boolean
 }
 
 interface ParsedCombo {
@@ -43,9 +44,11 @@ export class ShortcutRegistry {
   handleKeyDown(e: KeyboardEvent): boolean {
     for (const entry of this.shortcuts.values()) {
       if (matchEvent(e, entry.parsed)) {
+        const result = entry.action()
+        // If action returns false, let the event propagate (e.g. to terminal)
+        if (result === false) return false
         e.preventDefault()
         e.stopPropagation()
-        entry.action()
         return true
       }
     }

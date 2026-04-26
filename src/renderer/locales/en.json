@@ -19,6 +19,7 @@
   "sessionCell.switchProject": "switch project",
   "sessionCell.openShell": "open shell",
   "sessionCell.closeSession": "close session",
+  "sessionCell.sendToBackground": "send to background",
 
   "notesCell.header": "NOTES",
   "notesCell.scopeGlobal": "global",
@@ -58,6 +59,7 @@
   "gridPlacement.empty": "(empty)",
   "gridPlacement.replaceTitle": "Replace: {{name}}",
   "gridPlacement.emptySlot": "Empty slot",
+  "gridPlacement.cancel": "Cancel",
 
   "kickoff.title": "New project from concept",
   "kickoff.projectDir": "Project directory",
@@ -105,6 +107,8 @@
   "recovery.adopt": "Adopt",
   "recovery.kill": "Terminate",
   "recovery.killAll": "Terminate all",
+  "recovery.ignoreAll": "Ignore all",
+  "recovery.confirm": "Add selected to grid",
 
   "sessionDialog.title": "open session",
   "sessionDialog.placeholder": "enter path or leave empty for home...",
@@ -131,6 +135,8 @@
   "sidebar.noteDelete": "Delete note",
   "sidebar.noNotes": "No notes found.",
   "sidebar.noContent": "No active background content.",
+  "sidebar.noBackgroundSessions": "No active background sessions.",
+  "sidebar.emptyHint": "Nothing here yet. Background sessions, messages and notes will appear here.",
   "sidebar.confirmDelete": "Really delete note \"{{title}}\"?",
   "sidebar.recommended": "(recommended)",
   "sidebar.send": "send",
@@ -342,5 +348,27 @@
   "companion.noResults": "No memories match your search.",
   "companion.empty": "No memories yet.",
   "companion.delete": "Delete memory",
-  "companion.confirmDelete": "Delete memory \"{{text}}\"?"
+  "companion.confirmDelete": "Delete memory \"{{text}}\"?",
+
+  "unified.title": "New Session",
+  "unified.tabPresets": "Presets",
+  "unified.tabPath": "Path",
+  "unified.desc.companion": "Interactive coding companion with memory",
+  "unified.desc.refinement": "Deep-dive analysis and refinement",
+  "unified.desc.orchestrator": "Session orchestrator with MCP control",
+  "unified.desc.mpo": "Multi-project orchestrator for parallel work",
+  "unified.desc.voice": "Voice conversation (background session)",
+  "unified.desc.audit": "Security and code quality audit",
+  "unified.running": "running",
+  "unified.starting": "starting...",
+  "unified.pathPlaceholder": "Project path or folder...",
+  "unified.recentPaths": "Recent:",
+  "unified.shellOnly": "Shell only (no Claude)",
+  "unified.skipPermissions": "--dangerously-skip-permissions",
+  "unified.resume": "--resume (continue last session)",
+  "unified.fork": "--fork (fork current session)",
+  "unified.cancel": "Cancel",
+  "unified.start": "Start",
+  "unified.focusEntity": "Focus",
+  "statusBar.newSession": "+"
 }

@@ -62,7 +62,13 @@ export class McpServerManager {
 
     // Start listening
     await new Promise<void>((resolve, reject) => {
-      this.httpServer!.once('error', reject)
+      this.httpServer!.once('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          reject(new Error(`Port ${this.port} is already in use — is another cipher-mux instance running?`))
+        } else {
+          reject(err)
+        }
+      })
       this.httpServer!.listen(this.port, this.host, () => {
         this.httpServer!.removeListener('error', reject)
         console.log(`[McpServer] listening on ${this.host}:${this.port}`)

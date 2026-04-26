@@ -73,8 +73,10 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
   const [showSaveDialog, setShowSaveDialog] = useState(false)
 
   useEffect(() => {
+    let mounted = true
     const api = (window as any).cipherMux
     api.workspaces.list().then((wsList: Workspace[]) => {
+      if (!mounted) return
       setWorkspaces(wsList ?? [])
       if (wsList?.length && selectedId === null) {
         setSelectedId(wsList[0].id)
@@ -84,8 +86,10 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     })
 
     api.workspaces.active().then((id: string | null) => {
+      if (!mounted) return
       setActiveId(id ?? null)
     }).catch(() => {})
+    return () => { mounted = false }
   }, [visible])
 
   const handleBackdropClick = useCallback(
