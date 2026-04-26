@@ -12,7 +12,7 @@ import { generateMpoClaudeMd } from './mpo-template'
 import { generateAuditClaudeMd } from './audit-template'
 import { generateVoiceRelayClaudeMd } from './voice-relay-template'
 import { EntityRegistry } from './entity-registry'
-import { deployEntityAssets } from './entity-assets'
+import { deployEntityAssets, ensureTemplateSettings } from './entity-assets'
 import { SessionStore } from './session-store'
 import type { PersistedSession, PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
@@ -579,6 +579,11 @@ export class SessionManager extends EventEmitter {
       }
     }
 
+    // Ensure template .claude/settings.local.json base settings (permissions,
+    // model, statusLine) are present BEFORE start() calls postLaunchInjection,
+    // so the merge preserves them alongside the injected mcpServers config.
+    ensureTemplateSettings(config, this.appRoot)
+
     // Write .mcp.json for MCP auto-discovery (if entity uses MCP)
     if (config.features.includes('mcp') && this.mcpConfig) {
       const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}/mcp`
@@ -1057,6 +1062,65 @@ export class SessionManager extends EventEmitter {
     return orphans
   }
 
+  // ─── Session Exit Detection ─────────────────────────────
+
+  private exitCheckTimer: NodeJS.Timeout | null = null
+
+  /**
+   * Start periodic check for ended Claude processes (every 5s).
+   * Detects when the Claude CLI exits within a tmux session and
+   * marks the session as stopped, freeing the grid cell.
+   */
+  startExitDetection(): void {
+    if (this.exitCheckTimer) return
+    this.exitCheckTimer = setInterval(() => {
+      this.checkSessionExits().catch((err) => {
+        console.error('[SessionManager] exit detection error:', err)
+      })
+    }, 5_000)
+  }
+
+  /**
+   * Stop periodic exit detection.
+   */
+  stopExitDetection(): void {
+    if (this.exitCheckTimer) {
+      clearInterval(this.exitCheckTimer)
+      this.exitCheckTimer = null
+    }
+  }
+
+  /**
+   * Check all active sessions for exited Claude processes.
+   * When the pane command is a shell (zsh, bash, fish, sh) instead of
+   * 'claude', the Claude process has ended and the session is marked stopped.
+   */
+  private async checkSessionExits(): Promise<void> {
+    const shellCommands = new Set(['zsh', 'bash', 'fish', 'sh', 'dash'])
+    const checks: Promise<void>[] = []
+
+    for (const [sessionId, session] of this.sessions) {
+      if (session.status !== 'active') continue
+      // Skip sessions that have a pending launch (Claude hasn't started yet)
+      if ((this as any).pendingLaunch?.has(sessionId)) continue
+
+      checks.push(
+        this.tmux.getPaneCommand(session.tmuxSession).then((cmd) => {
+          if (!cmd) return // pane doesn't exist or couldn't be queried
+          if (shellCommands.has(cmd)) {
+            console.log(`[SessionManager] session ${session.name} (${sessionId}): Claude exited (pane command: ${cmd})`)
+            session.status = 'stopped'
+            session.updatedAt = Date.now()
+            this.emit('session-stopped', session)
+            this.emit('session-changed', session)
+          }
+        }),
+      )
+    }
+
+    await Promise.allSettled(checks)
+  }
+
   // ─── Session Persistence ──────────────────────────────
 
   /**
@@ -1098,6 +1162,7 @@ export class SessionManager extends EventEmitter {
    */
   async destroy(): Promise<void> {
     this.stopOrphanDetection()
+    this.stopExitDetection()
     this.sessions.clear()
     this.tmux.disconnect()
   }
