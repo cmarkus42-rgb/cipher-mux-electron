@@ -131,6 +131,10 @@ export interface ContextUsage {
   totalInputTokens: number
   totalOutputTokens: number
   contextWindowSize: number
+  /** Estimated current context window tokens used (for UI display). */
+  used?: number
+  /** Context window capacity in tokens (alias for contextWindowSize). */
+  total?: number
   modelId: string
   updatedAt: number
 }

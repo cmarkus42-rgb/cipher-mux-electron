@@ -191,12 +191,27 @@ export class StatusLineMonitor extends EventEmitter {
       : typeof d.modelId === 'string' ? d.modelId
       : (d.model_id as string) ?? ''
 
+    // Compute actual context window usage from current_usage (if available)
+    const currentUsage = cw && typeof cw.current_usage === 'object' ? cw.current_usage as Record<string, unknown> : null
+    let used: number | undefined
+    if (currentUsage) {
+      const inputTokens = typeof currentUsage.input_tokens === 'number' ? currentUsage.input_tokens : 0
+      const outputTokens = typeof currentUsage.output_tokens === 'number' ? currentUsage.output_tokens : 0
+      const cacheCreation = typeof currentUsage.cache_creation_input_tokens === 'number' ? currentUsage.cache_creation_input_tokens : 0
+      const cacheRead = typeof currentUsage.cache_read_input_tokens === 'number' ? currentUsage.cache_read_input_tokens : 0
+      used = inputTokens + outputTokens + cacheCreation + cacheRead
+    } else if (contextWindowSize > 0 && usedPercentage > 0) {
+      used = Math.round(contextWindowSize * usedPercentage / 100)
+    }
+
     return {
       usedPercentage,
       remainingPercentage,
       totalInputTokens,
       totalOutputTokens,
       contextWindowSize,
+      used,
+      total: contextWindowSize > 0 ? contextWindowSize : undefined,
       modelId,
       updatedAt: Date.now(),
     }
