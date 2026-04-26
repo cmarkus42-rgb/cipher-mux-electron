@@ -567,10 +567,30 @@ export class SessionManager extends EventEmitter {
     // Ensure entity directory exists
     fs.mkdirSync(config.projectPath, { recursive: true })
 
-    // Write CLAUDE.md for entities without asset templates
+    // Write CLAUDE.md for entities without asset templates.
+    // Each entity gets a role-specific CLAUDE.md so it overrides the global
+    // Mimir persona from ~/.claude/CLAUDE.md (fixes B07 persona distribution).
     if (!config.templatePath) {
       const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
-      if (config.id === 'audit') {
+      if (config.id === 'orchestrator' && this.mcpConfig) {
+        const adapter = this.adapterRegistry.getDefault()
+        fs.writeFileSync(claudeMdPath, generateOrchestratorClaudeMd({
+          mcpHost: this.mcpConfig.mcpHost,
+          mcpPort: this.mcpConfig.mcpPort,
+          mcpApiKey: this.mcpConfig.mcpApiKey,
+          maxRetries: ORCHESTRATOR_MAX_RETRIES,
+          adapterFragment: adapter.buildOrchestratorPromptFragment('de'),
+        }), 'utf-8')
+      } else if (config.id === 'mpo' && this.mcpConfig) {
+        const adapter = this.adapterRegistry.getDefault()
+        fs.writeFileSync(claudeMdPath, generateMpoClaudeMd({
+          mcpHost: this.mcpConfig.mcpHost,
+          mcpPort: this.mcpConfig.mcpPort,
+          mcpApiKey: this.mcpConfig.mcpApiKey,
+          maxRetries: MPO_MAX_RETRIES,
+          adapterFragment: adapter.buildMpoPromptFragment('de'),
+        }), 'utf-8')
+      } else if (config.id === 'audit') {
         fs.writeFileSync(claudeMdPath, generateAuditClaudeMd(), 'utf-8')
       } else if (config.id === 'voice-relay') {
         fs.writeFileSync(claudeMdPath, generateVoiceRelayClaudeMd(), 'utf-8')
@@ -1093,7 +1113,8 @@ export class SessionManager extends EventEmitter {
   /**
    * Check all active sessions for exited Claude processes.
    * When the pane command is a shell (zsh, bash, fish, sh) instead of
-   * 'claude', the Claude process has ended and the session is marked stopped.
+   * 'claude', the Claude process has ended. The session is removed from
+   * the registry (freeing the grid cell) and the tmux session is killed.
    */
   private async checkSessionExits(): Promise<void> {
     const shellCommands = new Set(['zsh', 'bash', 'fish', 'sh', 'dash'])
@@ -1102,17 +1123,21 @@ export class SessionManager extends EventEmitter {
     for (const [sessionId, session] of this.sessions) {
       if (session.status !== 'active') continue
       // Skip sessions that have a pending launch (Claude hasn't started yet)
-      if ((this as any).pendingLaunch?.has(sessionId)) continue
+      if (this.pendingLaunch.has(sessionId)) continue
 
       checks.push(
-        this.tmux.getPaneCommand(session.tmuxSession).then((cmd) => {
+        this.tmux.getPaneCommand(session.tmuxSession).then(async (cmd) => {
           if (!cmd) return // pane doesn't exist or couldn't be queried
           if (shellCommands.has(cmd)) {
             console.log(`[SessionManager] session ${session.name} (${sessionId}): Claude exited (pane command: ${cmd})`)
             session.status = 'stopped'
             session.updatedAt = Date.now()
+            this.tmux.unwatchSession(session.tmuxSession)
+            try { await this.tmux.killSession(session.tmuxSession) } catch { /* already gone */ }
             this.emit('session-stopped', session)
-            this.emit('session-changed', session)
+            this.sessions.delete(sessionId)
+            this.sessionAdapters.delete(sessionId)
+            this.sessionStore.removeSession(sessionId)
           }
         }),
       )
