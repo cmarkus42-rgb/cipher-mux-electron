@@ -1,7 +1,7 @@
 // src/renderer/app.tsx
 import { useState, useCallback, useEffect, useMemo, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
-import type { ProjectInfo } from '../shared/types'
+import type { RecoveryResult, EntityId } from '../shared/types'
 import { useSessions } from './hooks/useSessions'
 import { useContextUsage } from './hooks/useContextUsage'
 import { useProjects } from './hooks/useProjects'
@@ -10,12 +10,12 @@ import { useTheme } from './hooks/useTheme'
 import { useShortcuts } from './hooks/useShortcuts'
 import { SessionGrid } from './components/SessionGrid'
 import { SidebarPanel } from './components/SidebarPanel'
-import { ProjectPopup } from './components/ProjectPopup'
 import { RecoveryDialog } from './components/RecoveryDialog'
 import { BugreportDialog } from './components/BugreportDialog'
 import { InfoSettingsView } from './components/InfoSettingsView'
 import { StatusBar } from './components/StatusBar'
-import { SessionDialog } from './components/SessionDialog'
+import { UnifiedSessionDialog } from './components/UnifiedSessionDialog'
+import type { PathStartOpts } from './components/UnifiedSessionDialog'
 import { WorkspacePopup } from './components/WorkspacePopup'
 import { GridPlacementPopup } from './components/GridPlacementPopup'
 
@@ -31,18 +31,15 @@ export function App() {
   const [workspacesPopupVisible, setWorkspacesPopupVisible] = useState(false)
   const [placementPopup, setPlacementPopup] = useState<{ sessionId: string } | null>(null)
 
-  // Project popup state
-  const [popupVisible, setPopupVisible] = useState(false)
-  const [popupTargetSessionId, setPopupTargetSessionId] = useState<string | null>(null)
-  const [popupTargetSlotIndex, setPopupTargetSlotIndex] = useState<number | null>(null)
+  // Unified session dialog
+  const [unifiedDialogVisible, setUnifiedDialogVisible] = useState(false)
+  const [unifiedDialogSlotIndex, setUnifiedDialogSlotIndex] = useState<number | null>(null)
 
   const { sessions, startSession, stopSession, refresh: refreshSessions } = useSessions()
   const contextUsages = useContextUsage()
-  const { projects, scanning, rescan } = useProjects()
-  // panelWidth needs a ref so useGrid callbacks can access the latest value
-  // without circular dependency (sidebarHasContent depends on grid which depends on useGrid)
+  const { scanning, rescan } = useProjects()
   const panelWidthRef = useRef(0)
-  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot } = useGrid(panelWidthRef.current)
+  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot, restoreGrid } = useGrid(panelWidthRef.current)
   const { theme, setTheme, toggleTheme, customThemes, activeCustomThemeId, selectCustomTheme, saveCustomTheme, deleteCustomTheme } = useTheme()
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
 
@@ -55,19 +52,27 @@ export function App() {
       action: () => setBugreportVisible(true),
     },
     {
+      combo: 'Cmd+N',
+      label: t('unified.title'),
+      category: 'Aktionen' as const,
+      action: () => { setUnifiedDialogSlotIndex(null); setUnifiedDialogVisible(true) },
+    },
+    {
       combo: 'Escape',
       label: t('app.shortcut.closeOverlay'),
       category: 'Navigation' as const,
       action: () => {
+        const anyOverlayOpen = bugreportVisible || infoVisible ||
+          unifiedDialogVisible || workspacesPopupVisible || !!placementPopup
+        if (!anyOverlayOpen) return false
         setBugreportVisible(false)
         setInfoVisible(false)
-        setPopupVisible(false)
-        setSessionDialogVisible(false)
+        setUnifiedDialogVisible(false)
         setWorkspacesPopupVisible(false)
         setPlacementPopup(null)
       },
     },
-  ], [t])
+  ], [t, bugreportVisible, infoVisible, unifiedDialogVisible, workspacesPopupVisible, placementPopup])
   useShortcuts(shortcutEntries)
 
   const focusedSessionName = useMemo(() => {
@@ -83,79 +88,78 @@ export function App() {
   const [voiceRelaySessionId, setVoiceRelaySessionId] = useState<string | null>(null)
   const [auditSessionId, setAuditSessionId] = useState<string | null>(null)
 
-  // Compute grid session IDs for sidebar
   const gridSessionIds = grid.slots.filter(s => s.sessionId).map(s => s.sessionId!)
 
-  // Check if sidebar has content (for LED indicator)
   const sidebarHasContent = !!orchestratorSessionId || !!mpoSessionId ||
     sessions.some(s => s.status === 'active' && !gridSessionIds.includes(s.id)) ||
     grid.slots.some(s => s.type === 'notes')
 
-  // Keep panelWidth ref in sync for useGrid callbacks
-  const computedPanelWidth = sidebarVisible && sidebarHasContent && !sidebarDetached ? 280 : 0
+  const computedPanelWidth = sidebarVisible && !sidebarDetached ? 280 : 0
   panelWidthRef.current = computedPanelWidth
 
-  // Resize window when panels open/close so sessions don't compress
   useEffect(() => {
-    const pw = sidebarVisible && sidebarHasContent && !sidebarDetached ? 280 : 0
+    const pw = sidebarVisible && !sidebarDetached ? 280 : 0
     const api = (window as any).cipherMux
     api.window.fitGrid(grid.config.cols, grid.config.rows, pw)
-  }, [sidebarVisible, sidebarHasContent, sidebarDetached, grid.config.cols, grid.config.rows])
+  }, [sidebarVisible, sidebarDetached, grid.config.cols, grid.config.rows])
 
-  // Place orchestrator in grid slot 0
+  // Entity status map for unified dialog
+  const entityStatus = useMemo<Record<string, boolean>>(() => ({
+    orchestrator: !!orchestratorSessionId,
+    mpo: !!mpoSessionId,
+    companion: !!companionSessionId,
+    refinement: !!refinementSessionId,
+    'voice-relay': !!voiceRelaySessionId,
+    audit: !!auditSessionId,
+  }), [orchestratorSessionId, mpoSessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
+
   const placeOrchestrator = useCallback((sessionId: string) => {
     setOrchestratorSessionId(sessionId)
-    // Always put orchestrator in slot 0 (top-left)
     setSessionAtSlot(0, sessionId)
   }, [setSessionAtSlot])
 
   const placeMpo = useCallback((sessionId: string) => {
     setMpoSessionId((prev) => {
-      if (prev === sessionId) return prev // already placed
-      const freeIdx = grid.slots.findIndex(s => !s.sessionId && s.type !== 'notes')
-      if (freeIdx >= 0) {
-        addSession(sessionId)
-      } else {
-        // Grid full — open placement popup so user can pick a slot
-        setPlacementPopup({ sessionId })
-      }
+      if (prev === sessionId) return prev
+      setPlacementPopup({ sessionId })
       return sessionId
     })
   }, [addSession, grid.slots])
 
+  const placeEntity = useCallback((sessionId: string) => {
+    setPlacementPopup({ sessionId })
+  }, [])
+
   // Check orchestrator status on mount
   useEffect(() => {
+    let mounted = true
     const api = (window as any).cipherMux
     api.orchestrator.status().then((s: { running: boolean; sessionId?: string }) => {
+      if (!mounted) return
       if (s.running && s.sessionId) placeOrchestrator(s.sessionId)
     })
     const unsub = api.orchestrator.onStarted((data: any) => {
       const sid = data?.sessionId ?? data?.id
       if (sid) placeOrchestrator(sid)
     })
-    return () => unsub()
+    return () => { mounted = false; unsub() }
   }, [placeOrchestrator])
 
   // Check MPO status on mount
   useEffect(() => {
+    let mounted = true
     const api = (window as any).cipherMux
     api.mpo.status().then((s: { running: boolean; sessionId?: string }) => {
+      if (!mounted) return
       if (s.running && s.sessionId) placeMpo(s.sessionId)
     })
     const unsub = api.mpo.onStarted((data: any) => {
       const sid = data?.sessionId ?? data?.id
       if (sid) placeMpo(sid)
     })
-    return () => unsub()
+    return () => { mounted = false; unsub() }
   }, [placeMpo])
 
-  // Handle kickoff started — add launcher session to grid
-  const handleKickoffStarted = useCallback((launcherSessionId: string) => {
-    addSession(launcherSessionId)
-    setFocusedSessionId(launcherSessionId)
-  }, [addSession])
-
-  // Listen for kickoff completion
   useEffect(() => {
     const api = (window as any).cipherMux
     const unsub = api.projects.onCompleted((data: any) => {
@@ -172,20 +176,16 @@ export function App() {
     return () => unsub()
   }, [addSession, rescan])
 
-  // Handle visible-add from MCP mux_create_session with visible:true
   useEffect(() => {
     const api = (window as any).cipherMux
     if (!api.sessions?.onVisibleAdd) return
     const unsub = api.sessions.onVisibleAdd(async (data: { sessionId: string }) => {
-      // Wait for session to appear in sessions list (race condition with IPC)
       let retries = 0
       while (retries < 10) {
         const sessions = await api.sessions.list()
         if (sessions.some((s: any) => s.id === data.sessionId)) {
           addSession(data.sessionId)
           setFocusedSessionId(data.sessionId)
-          // Ensure useSessions state is current so sidebar shows background sessions
-          // even if SESSION_CHANGED refresh hasn't completed yet
           refreshSessions()
           return
         }
@@ -197,20 +197,14 @@ export function App() {
     return () => unsub()
   }, [addSession, refreshSessions])
 
-  // Open project popup from launcher cell
   const handleLaunch = useCallback((slotIndex: number) => {
-    setPopupTargetSessionId(null)
-    setPopupTargetSlotIndex(slotIndex)
-    setPopupVisible(true)
+    setUnifiedDialogSlotIndex(slotIndex)
+    setUnifiedDialogVisible(true)
   }, [])
 
-  // Session dialog state
-  const [sessionDialogVisible, setSessionDialogVisible] = useState(false)
-  const [sessionDialogSlotIndex, setSessionDialogSlotIndex] = useState<number | null>(null)
-
   const handleOpenSession = useCallback((slotIndex: number) => {
-    setSessionDialogSlotIndex(slotIndex)
-    setSessionDialogVisible(true)
+    setUnifiedDialogSlotIndex(slotIndex)
+    setUnifiedDialogVisible(true)
   }, [])
 
   const handleOpenNotes = useCallback((slotIndex: number) => {
@@ -222,83 +216,11 @@ export function App() {
     clearSlotType(slotIndex)
   }, [clearSlotType])
 
-  const handleSessionStart = useCallback(async (dirPath: string, opts?: { resume?: boolean }) => {
-    setSessionDialogVisible(false)
-    try {
-      const name = dirPath ? dirPath.split('/').filter(Boolean).pop() ?? 'session' : 'session'
-      const session = await startSession({
-        name,
-        projectPath: dirPath,
-        resume: opts?.resume,
-      })
-      if (sessionDialogSlotIndex !== null) {
-        setSessionAtSlot(sessionDialogSlotIndex, session.id)
-      } else {
-        addSession(session.id)
-      }
-      setFocusedSessionId(session.id)
-    } catch (err) {
-      console.error('[App] Failed to open session:', err)
-    }
-  }, [startSession, setSessionAtSlot, addSession, sessionDialogSlotIndex])
-
-  // Open project popup for switching existing session's project
   const handleSwitchProject = useCallback((sessionId: string) => {
-    setPopupTargetSessionId(sessionId)
-    setPopupTargetSlotIndex(null)
-    setPopupVisible(true)
-  }, [])
-
-  // Handle project selection from popup
-  const handleProjectSelect = useCallback(async (project: ProjectInfo, targetSessionId: string | null) => {
-    setPopupVisible(false)
-    try {
-      if (targetSessionId) {
-        // Switching project for existing session — stop old, start new in same slot
-        const slotIdx = grid.slots.findIndex((s) => s.sessionId === targetSessionId)
-        await stopSession(targetSessionId)
-        const session = await startSession({
-          name: project.name,
-          projectPath: project.path,
-          autoLaunch: 'clear; claude --dangerously-skip-permissions\n',
-        })
-        if (slotIdx >= 0) {
-          setSessionAtSlot(slotIdx, session.id)
-        } else {
-          addSession(session.id)
-        }
-        setFocusedSessionId(session.id)
-      } else {
-        // New session from launcher cell
-        const session = await startSession({
-          name: project.name,
-          projectPath: project.path,
-          autoLaunch: 'clear; claude --dangerously-skip-permissions\n',
-        })
-        if (popupTargetSlotIndex !== null) {
-          setSessionAtSlot(popupTargetSlotIndex, session.id)
-        } else {
-          addSession(session.id)
-        }
-        setFocusedSessionId(session.id)
-      }
-      // Ensure the project's parent dir is in scan paths so it appears in future listings
-      const parentDir = project.path.replace(/\/[^/]+\/?$/, '')
-      if (parentDir) {
-        const appCfg = await (window as any).cipherMux.config.get('app') ?? {}
-        const scanPaths: string[] = appCfg.scanPaths ?? []
-        if (!scanPaths.includes(parentDir)) {
-          await (window as any).cipherMux.config.set('app', {
-            ...appCfg,
-            scanPaths: [...scanPaths, parentDir],
-          })
-          rescan().catch(() => {})
-        }
-      }
-    } catch (err) {
-      console.error('[App] Failed to start/switch session:', err)
-    }
-  }, [grid.slots, startSession, stopSession, addSession, setSessionAtSlot, popupTargetSlotIndex, rescan])
+    const slotIdx = grid.slots.findIndex(s => s.sessionId === sessionId)
+    setUnifiedDialogSlotIndex(slotIdx >= 0 ? slotIdx : null)
+    setUnifiedDialogVisible(true)
+  }, [grid.slots])
 
   const handleCloseSession = useCallback(async (sessionId: string) => {
     await stopSession(sessionId)
@@ -312,10 +234,7 @@ export function App() {
   const handleShell = useCallback(async (_sessionId: string, projectPath: string | null) => {
     if (!projectPath) return
     try {
-      const session = await startSession({
-        name: 'Shell',
-        projectPath,
-      })
+      const session = await startSession({ name: 'Shell', projectPath })
       addSession(session.id)
       setFocusedSessionId(session.id)
     } catch (err) {
@@ -327,12 +246,7 @@ export function App() {
     const api = (window as any).cipherMux
     try {
       const newSession = await api.sessions.fork(sessionId)
-      const freeIdx = grid.slots.findIndex(s => !s.sessionId)
-      if (freeIdx >= 0) {
-        addSession(newSession.id)
-      } else {
-        setPlacementPopup({ sessionId: newSession.id })
-      }
+      setPlacementPopup({ sessionId: newSession.id })
       setFocusedSessionId(newSession.id)
     } catch (err: any) {
       console.error('[App] Fork failed:', err?.message || err)
@@ -340,15 +254,29 @@ export function App() {
   }, [grid.slots, addSession])
 
   const handleAddToGrid = useCallback((sessionId: string) => {
-    const freeIdx = grid.slots.findIndex(s => !s.sessionId)
-    if (freeIdx >= 0) {
-      addSession(sessionId)
-      setFocusedSessionId(sessionId)
+    setPlacementPopup({ sessionId })
+  }, [])
+
+  const handleRecovered = useCallback((result: RecoveryResult) => {
+    if (result.gridState) {
+      restoreGrid(result.gridState as any)
     } else {
-      // Grid full — open placement popup so user can pick a slot to replace
-      setPlacementPopup({ sessionId })
+      for (const session of result.recovered) {
+        addSession(session.id)
+      }
     }
-  }, [grid.slots, addSession])
+    for (const session of result.recovered) {
+      if (session.entityId === 'orchestrator') setOrchestratorSessionId(session.id)
+      if (session.entityId === 'mpo') setMpoSessionId(session.id)
+      if (session.entityId === 'companion') setCompanionSessionId(session.id)
+      if (session.entityId === 'refinement') setRefinementSessionId(session.id)
+      if (session.entityId === 'voice-relay') setVoiceRelaySessionId(session.id)
+      if (session.entityId === 'audit') setAuditSessionId(session.id)
+    }
+    if (result.recovered.length > 0) {
+      setFocusedSessionId(result.recovered[0].id)
+    }
+  }, [restoreGrid, addSession])
 
   const handlePlacementSelect = useCallback((slotIndex: number) => {
     if (!placementPopup) return
@@ -367,33 +295,31 @@ export function App() {
     setSidebarDetached(true)
   }, [])
 
-  // Restore persisted sidebar detach state on mount
   useEffect(() => {
+    let mounted = true
     const api = (window as any).cipherMux
     api.sidebar?.isDetached?.().then((detached: boolean) => {
-      if (detached) {
-        setSidebarDetached(true)
-        api.sidebar.detach()
-      }
+      if (!mounted) return
+      if (detached) { setSidebarDetached(true); api.sidebar.detach() }
     })
+    return () => { mounted = false }
   }, [])
 
-  // Listen for sidebar reattach (sidebar window closed)
   useEffect(() => {
     const api = (window as any).cipherMux
     if (!api.sidebar?.onReattached) return
-    const unsub = api.sidebar.onReattached(() => {
-      setSidebarDetached(false)
-    })
+    const unsub = api.sidebar.onReattached(() => { setSidebarDetached(false) })
     return () => unsub()
   }, [])
 
-  // Load active workspace ID on mount
   useEffect(() => {
+    let mounted = true
     const api = (window as any).cipherMux
     api.workspaces.active().then((id: string | null) => {
+      if (!mounted) return
       setActiveWorkspaceId(id)
     })
+    return () => { mounted = false }
   }, [])
 
   const handleToggleWorkspaces = useCallback(() => {
@@ -403,29 +329,23 @@ export function App() {
   const handleWorkspaceApply = useCallback(async (workspaceId: string) => {
     try {
       const api = (window as any).cipherMux
-      // Load workspace to get grid dimensions + merges
       const workspaces = await api.workspaces.list()
       const ws = workspaces.find((w: any) => w.id === workspaceId)
       if (ws) {
-        // Resize grid first (renderer-side)
         resize({ cols: ws.cols, rows: ws.rows })
-        // Apply workspace merges as rowSpans
         if (ws.merges && Object.keys(ws.merges).length > 0) {
           applyMerges(ws.cols, ws.rows, ws.merges)
         }
       }
-      // Apply workspace (spawns sessions in main process)
       const result = await api.workspaces.apply(workspaceId)
       setActiveWorkspaceId(workspaceId)
       if (result?.warnings?.length) {
         console.warn('[App] Workspace apply warnings:', result.warnings)
       }
-      // Place spawned sessions into their grid slots
       if (result?.sessions?.length) {
         for (const { cellIndex, sessionId } of result.sessions) {
           setSessionAtSlot(cellIndex, sessionId)
         }
-        // Focus the first spawned session
         setFocusedSessionId(result.sessions[0].sessionId)
       }
     } catch (err) {
@@ -439,170 +359,86 @@ export function App() {
     ;(window as any).cipherMux.window.openWorkspaces(tab)
   }, [])
 
-  const handleOrchestratorToggle = useCallback(async () => {
-    const api = (window as any).cipherMux
-    try {
-      const status = await api.orchestrator.status()
-      if (status.running && status.sessionId) {
-        // Running — stop it
-        await api.orchestrator.stop()
-        removeSession(status.sessionId)
-        setOrchestratorSessionId(null)
-      } else {
-        // Not running — clear stale state and start fresh
-        if (orchestratorSessionId) {
-          removeSession(orchestratorSessionId)
-          setOrchestratorSessionId(null)
-        }
-        const session = await api.orchestrator.start()
-        const sid = session?.sessionId ?? session?.id
-        if (sid) placeOrchestrator(sid)
-      }
-    } catch (err) {
-      console.error('[App] orchestrator toggle failed:', err)
-      setOrchestratorSessionId(null)
-    }
-  }, [orchestratorSessionId, removeSession, placeOrchestrator])
+  // ─── Unified Dialog: Entity Start/Focus ───���─────────────
 
-  const handleMpoToggle = useCallback(async () => {
-    const api = (window as any).cipherMux
-    try {
-      const status = await api.mpo.status()
-      if (status.running && status.sessionId) {
-        // Running — stop it
-        await api.mpo.stop()
-        removeSession(status.sessionId)
-        setMpoSessionId(null)
-      } else {
-        // Not running — clear stale state and start fresh
-        if (mpoSessionId) {
-          removeSession(mpoSessionId)
-          setMpoSessionId(null)
-        }
-        await api.mpo.start()
-        // placement handled by onStarted listener
-      }
-    } catch (err) {
-      console.error('[App] MPO toggle failed:', err)
-      setMpoSessionId(null)
+  const getEntitySessionId = useCallback((entityId: EntityId): string | null => {
+    switch (entityId) {
+      case 'orchestrator': return orchestratorSessionId
+      case 'mpo': return mpoSessionId
+      case 'companion': return companionSessionId
+      case 'refinement': return refinementSessionId
+      case 'voice-relay': return voiceRelaySessionId
+      case 'audit': return auditSessionId
+      default: return null
     }
-  }, [mpoSessionId, removeSession])
+  }, [orchestratorSessionId, mpoSessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
 
-  // Generic entity placement — finds a free slot or opens placement popup
-  const placeEntity = useCallback((sessionId: string) => {
-    const freeIdx = grid.slots.findIndex(s => !s.sessionId && s.type !== 'notes')
-    if (freeIdx >= 0) {
-      addSession(sessionId)
+  const handleStartEntity = useCallback(async (entityId: EntityId) => {
+    const api = (window as any).cipherMux
+    if (entityId === 'orchestrator') {
+      const session = await api.orchestrator.start()
+      const sid = session?.sessionId ?? session?.id
+      if (sid) placeOrchestrator(sid)
+      return
+    }
+    if (entityId === 'mpo') {
+      await api.mpo.start()
+      return
+    }
+    const session = await api.entity.start(entityId)
+    const sid = session?.id
+    if (sid) {
+      switch (entityId) {
+        case 'companion': setCompanionSessionId(sid); break
+        case 'refinement': setRefinementSessionId(sid); break
+        case 'voice-relay': setVoiceRelaySessionId(sid); break
+        case 'audit': setAuditSessionId(sid); break
+      }
+      placeEntity(sid)
+    }
+  }, [placeOrchestrator, placeEntity])
+
+  const handleFocusEntity = useCallback((entityId: EntityId) => {
+    const sid = getEntitySessionId(entityId)
+    if (!sid) return
+    const inGrid = grid.slots.some(s => s.sessionId === sid)
+    if (inGrid) {
+      setFocusedSessionId(sid)
     } else {
-      setPlacementPopup({ sessionId })
+      placeEntity(sid)
+      setFocusedSessionId(sid)
     }
-  }, [addSession, grid.slots])
+  }, [getEntitySessionId, grid.slots, placeEntity])
 
-  const handleCompanionToggle = useCallback(async () => {
-    const api = (window as any).cipherMux
+  const handleUnifiedPathStart = useCallback(async (dirPath: string, opts: PathStartOpts) => {
     try {
-      const status = await api.entity.status('companion')
-      if (status.running && status.sessionId) {
-        await api.entity.stop('companion')
-        removeSession(status.sessionId)
-        setCompanionSessionId(null)
-      } else {
-        if (companionSessionId) {
-          removeSession(companionSessionId)
-          setCompanionSessionId(null)
-        }
-        const session = await api.entity.start('companion')
-        const sid = session?.id
-        if (sid) {
-          setCompanionSessionId(sid)
-          placeEntity(sid)
-        }
+      const name = dirPath.split('/').filter(Boolean).pop() ?? 'session'
+      let autoLaunch: string | undefined
+      if (!opts.shellOnly) {
+        const parts = ['clear; claude']
+        if (opts.skipPermissions) parts.push('--dangerously-skip-permissions')
+        if (opts.resume) parts.push('--resume')
+        if (opts.fork) parts.push('--fork')
+        autoLaunch = parts.join(' ') + '\n'
       }
-    } catch (err) {
-      console.error('[App] Companion toggle failed:', err)
-      setCompanionSessionId(null)
-    }
-  }, [companionSessionId, removeSession, placeEntity])
-
-  const handleRefinementToggle = useCallback(async () => {
-    const api = (window as any).cipherMux
-    try {
-      const status = await api.entity.status('refinement')
-      if (status.running && status.sessionId) {
-        await api.entity.stop('refinement')
-        removeSession(status.sessionId)
-        setRefinementSessionId(null)
+      const session = await startSession({
+        name,
+        projectPath: dirPath,
+        autoLaunch,
+        resume: opts.resume,
+      })
+      if (unifiedDialogSlotIndex !== null) {
+        setSessionAtSlot(unifiedDialogSlotIndex, session.id)
       } else {
-        if (refinementSessionId) {
-          removeSession(refinementSessionId)
-          setRefinementSessionId(null)
-        }
-        const session = await api.entity.start('refinement')
-        const sid = session?.id
-        if (sid) {
-          setRefinementSessionId(sid)
-          placeEntity(sid)
-        }
+        setPlacementPopup({ sessionId: session.id })
       }
+      setFocusedSessionId(session.id)
     } catch (err) {
-      console.error('[App] Refinement toggle failed:', err)
-      setRefinementSessionId(null)
+      console.error('[App] Failed to start session:', err)
     }
-  }, [refinementSessionId, removeSession, placeEntity])
+  }, [startSession, addSession, setSessionAtSlot, unifiedDialogSlotIndex])
 
-  const handleAuditToggle = useCallback(async () => {
-    const api = (window as any).cipherMux
-    try {
-      const status = await api.entity.status('audit')
-      if (status.running && status.sessionId) {
-        await api.entity.stop('audit')
-        removeSession(status.sessionId)
-        setAuditSessionId(null)
-      } else {
-        if (auditSessionId) {
-          removeSession(auditSessionId)
-          setAuditSessionId(null)
-        }
-        const session = await api.entity.start('audit')
-        const sid = session?.id
-        if (sid) {
-          setAuditSessionId(sid)
-          placeEntity(sid)
-        }
-      }
-    } catch (err) {
-      console.error('[App] Audit toggle failed:', err)
-      setAuditSessionId(null)
-    }
-  }, [auditSessionId, removeSession, placeEntity])
-
-  const handleVoiceRelayToggle = useCallback(async () => {
-    const api = (window as any).cipherMux
-    try {
-      const status = await api.entity.status('voice-relay')
-      if (status.running && status.sessionId) {
-        await api.entity.stop('voice-relay')
-        removeSession(status.sessionId)
-        setVoiceRelaySessionId(null)
-      } else {
-        if (voiceRelaySessionId) {
-          removeSession(voiceRelaySessionId)
-          setVoiceRelaySessionId(null)
-        }
-        const session = await api.entity.start('voice-relay')
-        const sid = session?.id
-        if (sid) {
-          setVoiceRelaySessionId(sid)
-          placeEntity(sid)
-        }
-      }
-    } catch (err) {
-      console.error('[App] Voice Relay toggle failed:', err)
-      setVoiceRelaySessionId(null)
-    }
-  }, [voiceRelaySessionId, removeSession, placeEntity])
-
-  // Listen for entity-started events (e.g. from other sources)
+  // Listen for entity-started events
   useEffect(() => {
     const api = (window as any).cipherMux
     if (!api.entity?.onStarted) return
@@ -610,54 +446,44 @@ export function App() {
       const sid = data.session?.id
       if (!sid) return
       if (data.entityId === 'companion' && !companionSessionId) {
-        setCompanionSessionId(sid)
-        placeEntity(sid)
+        setCompanionSessionId(sid); placeEntity(sid)
       } else if (data.entityId === 'refinement' && !refinementSessionId) {
-        setRefinementSessionId(sid)
-        placeEntity(sid)
+        setRefinementSessionId(sid); placeEntity(sid)
       } else if (data.entityId === 'voice-relay' && !voiceRelaySessionId) {
-        setVoiceRelaySessionId(sid)
-        placeEntity(sid)
+        setVoiceRelaySessionId(sid); placeEntity(sid)
       } else if (data.entityId === 'audit' && !auditSessionId) {
-        setAuditSessionId(sid)
-        placeEntity(sid)
+        setAuditSessionId(sid); placeEntity(sid)
       }
     })
     return () => unsub()
   }, [companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId, placeEntity])
 
-  // Check companion/refinement/voice-relay status on mount
+  // Check entity status on mount
   useEffect(() => {
+    let mounted = true
     const api = (window as any).cipherMux
     if (!api.entity?.status) return
-    api.entity.status('companion').then((s: { running: boolean; sessionId?: string }) => {
-      if (s.running && s.sessionId) {
-        setCompanionSessionId(s.sessionId)
-        placeEntity(s.sessionId)
-      }
-    })
-    api.entity.status('refinement').then((s: { running: boolean; sessionId?: string }) => {
-      if (s.running && s.sessionId) {
-        setRefinementSessionId(s.sessionId)
-        placeEntity(s.sessionId)
-      }
-    })
-    api.entity.status('voice-relay').then((s: { running: boolean; sessionId?: string }) => {
-      if (s.running && s.sessionId) {
-        setVoiceRelaySessionId(s.sessionId)
-        placeEntity(s.sessionId)
-      }
-    })
+    const entities: Array<{ id: EntityId; setter: (sid: string) => void }> = [
+      { id: 'companion', setter: (sid) => setCompanionSessionId(sid) },
+      { id: 'refinement', setter: (sid) => setRefinementSessionId(sid) },
+      { id: 'voice-relay', setter: (sid) => setVoiceRelaySessionId(sid) },
+      { id: 'audit', setter: (sid) => setAuditSessionId(sid) },
+    ]
+    for (const { id, setter } of entities) {
+      api.entity.status(id).then((s: { running: boolean; sessionId?: string }) => {
+        if (!mounted) return
+        if (s.running && s.sessionId) { setter(s.sessionId); placeEntity(s.sessionId) }
+      })
+    }
+    return () => { mounted = false }
   }, [placeEntity])
 
   return (
     <div class="app-shell">
-      {/* drag region */}
       <div class="drag-region">
         <span class="title">cipher-mux</span>
       </div>
 
-      {/* body: grid + chatroom */}
       <div class="app-body">
         <SessionGrid
           grid={grid}
@@ -682,7 +508,7 @@ export function App() {
         />
         {!sidebarDetached && (
           <SidebarPanel
-            visible={sidebarVisible && sidebarHasContent}
+            visible={sidebarVisible}
             orchestratorActive={!!orchestratorSessionId}
             mpoActive={!!mpoSessionId}
             sessions={sessions}
@@ -697,29 +523,16 @@ export function App() {
         )}
       </div>
 
-      {/* statusbar */}
       <StatusBar
         theme={theme}
         sidebarVisible={sidebarVisible}
-        sidebarHasContent={sidebarHasContent}
         onToggleSidebar={() => setSidebarVisible(v => !v)}
-        orchestratorRunning={!!orchestratorSessionId}
-        mpoRunning={!!mpoSessionId}
-        companionRunning={!!companionSessionId}
-        refinementRunning={!!refinementSessionId}
-        voiceRelayRunning={!!voiceRelaySessionId}
-        auditRunning={!!auditSessionId}
         workspacesPopupVisible={workspacesPopupVisible}
-        onMpo={handleMpoToggle}
-        onCompanion={handleCompanionToggle}
-        onRefinement={handleRefinementToggle}
-        onVoiceRelay={handleVoiceRelayToggle}
-        onAudit={handleAuditToggle}
         gridCols={grid.config.cols}
         gridRows={grid.config.rows}
         focusedSessionId={focusedSessionId}
         focusedSessionName={focusedSessionName}
-        onOrchestrator={handleOrchestratorToggle}
+        onNewSession={() => { setUnifiedDialogSlotIndex(null); setUnifiedDialogVisible(true) }}
         onBugreport={() => setBugreportVisible(true)}
         onToggleTheme={toggleTheme}
         onToggleWorkspaces={handleToggleWorkspaces}
@@ -728,7 +541,6 @@ export function App() {
         onGridResize={handleResize}
       />
 
-      {/* workspace popup */}
       <WorkspacePopup
         visible={workspacesPopupVisible}
         onClose={() => setWorkspacesPopupVisible(false)}
@@ -738,17 +550,6 @@ export function App() {
         sessions={sessions}
       />
 
-      {/* dialogs */}
-      <ProjectPopup
-        visible={popupVisible}
-        projects={projects}
-        scanning={scanning}
-        targetSessionId={popupTargetSessionId}
-        onSelect={handleProjectSelect}
-        onKickoffStarted={handleKickoffStarted}
-        onRescan={rescan}
-        onClose={() => setPopupVisible(false)}
-      />
       <GridPlacementPopup
         visible={!!placementPopup}
         gridSlots={grid.slots}
@@ -757,12 +558,16 @@ export function App() {
         sessions={sessions}
         onSelect={handlePlacementSelect}
         onCancel={() => setPlacementPopup(null)}
+        onResize={handleResize}
       />
-      <RecoveryDialog onDone={() => {}} onAdopt={addSession} />
-      <SessionDialog
-        visible={sessionDialogVisible}
-        onStart={handleSessionStart}
-        onClose={() => setSessionDialogVisible(false)}
+      <RecoveryDialog onDone={() => {}} onAdopt={addSession} onRecovered={handleRecovered} />
+      <UnifiedSessionDialog
+        visible={unifiedDialogVisible}
+        onClose={() => setUnifiedDialogVisible(false)}
+        onStartEntity={handleStartEntity}
+        onFocusEntity={handleFocusEntity}
+        onStartPath={handleUnifiedPathStart}
+        entityStatus={entityStatus}
       />
       <BugreportDialog
         visible={bugreportVisible}

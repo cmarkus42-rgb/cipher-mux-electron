@@ -38,10 +38,10 @@ describe('generateMpoClaudeMd', () => {
     }
   })
 
-  it('contains persona section with Wayne Szalinski', () => {
+  it('does not contain hardcoded persona section (D2: persona via companionPrompt)', () => {
     const md = generateMpoClaudeMd(defaultOpts)
-    assert.ok(md.includes('Wayne Szalinski'))
-    assert.ok(md.includes('## Persona'))
+    assert.ok(!md.includes('Wayne Szalinski'))
+    assert.ok(!md.includes('## Persona'))
   })
 
   it('contains 10-phase lifecycle', () => {

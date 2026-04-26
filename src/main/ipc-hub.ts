@@ -168,41 +168,24 @@ export class IpcHub {
       }
     }
 
-    // Connect tmux control mode, THEN recover sessions.
-    // Recovery must wait for connect() so the tmux server is fully
-    // available before we enumerate sessions.
-    this.tmux.connect().then(() => {
-      return this.sessionManager.recover()
-    }).then((result) => {
-      if (result.orphaned.length > 0 || result.recovered.length > 0) {
-        this.windowManager.sendToMainWindow(IPC.SESSIONS_RECOVERY_RESULT, result)
-      }
-      // Start periodic orphan detection after initial recovery
-      this.sessionManager.startOrphanDetection()
-    }).catch((err) => {
-      console.error('[IpcHub] tmux connect or session recovery failed:', err)
-    })
-
     // Forward orphan detection events to renderer
     this.sessionManager.on('orphans-detected', (orphans: any[]) => {
       this.windowManager.sendToMainWindow(IPC.SESSION_ORPHANS_DETECTED, orphans)
     })
 
-    // Initial cleanup
+    // Clear all messages from previous runs — each app start begins with a clean bus
     if (this.messageBus) {
-      this.messageBus.cleanup()
+      this.messageBus.clearAll()
     }
 
-    // Start MCP server
+    // Start MCP server first — sessions need MCP config injected.
     const mcpConfig = configStore.get('mcp')
     const port = mcpConfig?.port ?? MCP_DEFAULT_PORT
     const host = mcpConfig?.host ?? MCP_DEFAULT_HOST
     const apiKey = mcpConfig?.apiKey || generateApiKey()
-    // Persist generated key
     if (!mcpConfig?.apiKey) {
       configStore.set('mcp', { ...mcpConfig, port, host, apiKey })
     }
-    // Inject MCP config into SessionManager for auto-injection into new sessions
     this.sessionManager.setMcpConfig({
       mcpHost: host,
       mcpPort: port,
@@ -220,36 +203,68 @@ export class IpcHub {
       noteManager: this.noteManager,
       memoryStore: this.memoryStore,
     }).then(() => {
-      // Auto-start orchestrator after MCP server is ready
-      this.autoStartOrchestrator()
+      // MCP ready → connect tmux, recover sessions, then auto-start defaults
+      return this.tmux.connect()
+    }).then(() => {
+      return this.sessionManager.recover()
+    }).then((result) => {
+      if (result.orphaned.length > 0 || result.recovered.length > 0) {
+        this.windowManager.sendToMainWindow(IPC.SESSIONS_RECOVERY_RESULT, result)
+      }
+      this.sessionManager.startOrphanDetection()
+
+      // Only auto-start if no sessions were recovered
+      if (result.recovered.length === 0) {
+        this.autoStartDefault()
+      }
     }).catch((err) => {
-      console.error('[IpcHub] MCP server start failed:', err)
+      console.error('[IpcHub] startup failed:', err)
+      const msg = err?.message ?? String(err)
+      if (msg.includes('EADDRINUSE') || msg.includes('already in use')) {
+        dialog.showErrorBox(
+          'Port Conflict',
+          `MCP server could not start: Port ${port} is already in use.\n\nIs another cipher-mux instance running?\n\nThe app will continue without MCP server.`,
+        )
+      }
     })
   }
 
   /**
-   * Auto-start the Orchestrator session after MCP server is ready.
-   * The Claude launch is queued; it fires only after the renderer opens
-   * the terminal and reports its real size (TERMINAL_READY).
+   * Auto-start default sessions when no sessions were recovered.
+   *
+   * Without default workspace → start only Companion.
+   * With default workspace → workspace loading is handled by the renderer
+   * (the active workspace ID is persisted in config and loaded on mount).
+   *
+   * Orchestrator does NOT auto-start — it must be in a workspace or
+   * started manually via the StatusBar button.
    */
-  private autoStartOrchestrator(): void {
-    const mcpConfig = configStore.get('mcp')
-    this.sessionManager.startOrchestrator({
-      mcpHost: mcpConfig?.host ?? MCP_DEFAULT_HOST,
-      mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
-      mcpApiKey: mcpConfig?.apiKey ?? '',
-    }).then((session) => {
-      console.log(`[IpcHub] Orchestrator auto-started: ${session.id}`)
-      // Notify renderer about orchestrator state
-      this.windowManager.sendToMainWindow(IPC.ORCHESTRATOR_STARTED, session)
-      // Queue Claude launch — fires when renderer reports real size
+  private autoStartDefault(): void {
+    const activeWorkspaceId = configStore.get('activeWorkspaceId')
+
+    if (activeWorkspaceId) {
+      // Workspace is set — renderer will load it via useEffect on mount.
+      // Don't auto-start anything here; the workspace apply flow handles it.
+      console.log(`[IpcHub] Default workspace "${activeWorkspaceId}" set — renderer will apply it`)
+      return
+    }
+
+    // No workspace → start Companion only
+    console.log('[IpcHub] No default workspace — auto-starting Companion')
+    this.sessionManager.startEntity('companion').then((session) => {
+      console.log(`[IpcHub] Companion auto-started: ${session.id}`)
+      this.windowManager.sendToMainWindow(IPC.ENTITY_STARTED, {
+        entityId: 'companion',
+        session,
+      })
       try {
-        this.sessionManager.queueOrchestratorClaude()
+        this.sessionManager.queueEntityClaude('companion')
+        this.sessionManager.scheduleStartupGreeting('companion')
       } catch (err) {
-        console.error('[IpcHub] Failed to queue orchestrator claude:', err)
+        console.error('[IpcHub] Failed to queue companion claude:', err)
       }
     }).catch((err) => {
-      console.error('[IpcHub] Orchestrator auto-start failed:', err)
+      console.error('[IpcHub] Companion auto-start failed:', err)
     })
   }
 
@@ -559,6 +574,13 @@ export class IpcHub {
     ipcMain.handle(IPC.CONFIG_SAVE_GRID, (_event, grid) => {
       const ui = configStore.get('ui')
       configStore.set('ui', { ...ui, grid })
+      // Also persist grid state + slot assignments to SessionStore for recovery
+      if (grid?.config && grid?.slots) {
+        this.sessionManager.persistGridState({
+          config: grid.config,
+          slots: grid.slots,
+        })
+      }
     })
 
     ipcMain.handle('cipher-mux:config:get-skip-permissions', () => {
@@ -1239,6 +1261,7 @@ export class IpcHub {
       // Queue Claude launch for entity
       try {
         this.sessionManager.queueEntityClaude(entityId)
+        this.sessionManager.scheduleStartupGreeting(entityId)
       } catch (err) {
         console.error(`[IpcHub] Failed to queue ${entityId} claude:`, err)
       }

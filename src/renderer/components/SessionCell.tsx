@@ -19,6 +19,7 @@ interface SessionCellProps {
   onToggleExpand: (sessionId: string) => void
   onShell: (sessionId: string, projectPath: string | null) => void
   onFork: (sessionId: string) => void
+  onSendToBackground: (sessionId: string) => void
   onDragStart: (sessionId: string) => void
   onDragOver: (e: DragEvent) => void
   onDrop: (e: DragEvent) => void
@@ -27,7 +28,7 @@ interface SessionCellProps {
 export function SessionCell({
   session, contextUsage, focused, isOrchestrator, theme,
   rowSpan, maxRows,
-  onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onDragStart, onDragOver, onDrop,
+  onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDragStart, onDragOver, onDrop,
 }: SessionCellProps) {
   const { t } = useTranslation()
   const { terminalRef } = useTerminal(session.id, theme, session.createdAt)
@@ -54,6 +55,10 @@ export function SessionCell({
     e.stopPropagation()
     onFork(session.id)
   }, [session.id, onFork])
+  const handleSendToBackground = useCallback((e: Event) => {
+    e.stopPropagation()
+    onSendToBackground(session.id)
+  }, [session.id, onSendToBackground])
 
   // Fork only available for Claude Code sessions (have adapter capabilities)
   const isClaudeSession = session.capabilities?.['status-line'] === true
@@ -118,6 +123,7 @@ export function SessionCell({
           {!isOrchestrator && (
             <button class="cell-btn" onClick={handleSwitch} title={t('sessionCell.switchProject')}>⇄</button>
           )}
+          <button class="cell-btn" onClick={handleSendToBackground} title={t('sessionCell.sendToBackground')}>⏏</button>
           <button class="cell-btn" onClick={handleShell} title={t('sessionCell.openShell')}>$</button>
           <button class="cell-btn" onClick={handleClose} title={t('sessionCell.closeSession')}>✕</button>
         </div>

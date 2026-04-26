@@ -91,6 +91,11 @@ export interface RecoveryResult {
   recovered: SessionInfo[]
   orphaned: SessionInfo[]
   killed: SessionInfo[]
+  /** Grid state from sessions.json — used to restore sessions to their slots. */
+  gridState?: {
+    config: { cols: number; rows: number }
+    slots: Array<{ sessionId: string | null; rowSpan: number; type: 'session' | 'notes' }>
+  } | null
 }
 
 // ─── Messages ──────────────────────────────────────────────

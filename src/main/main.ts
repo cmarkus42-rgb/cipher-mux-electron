@@ -9,13 +9,11 @@ import { patchEnvPath } from './util/exec-util'
 // before any child_process spawns (tmux, claude, etc.)
 patchEnvPath()
 
-// Single instance lock — skip in dev mode so dev and production can run side-by-side
-const isDev = !app.isPackaged
-if (!isDev) {
-  const gotLock = app.requestSingleInstanceLock()
-  if (!gotLock) {
-    app.quit()
-  }
+// Single instance lock — always enforce, only one cipher-mux instance at a time
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  console.warn('[main] Another cipher-mux instance is already running — quitting.')
+  app.quit()
 }
 
 let windowManager: WindowManager

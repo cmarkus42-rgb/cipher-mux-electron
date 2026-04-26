@@ -228,7 +228,7 @@ Minimalistischer Markdown-Editor als dritte Grid-Cell-Option (neben Session und 
 - **Single-Writer SQLite:** Nur Main Process schreibt — kein Concurrent-Write-Problem
 - **xterm.js Streaming:** High-frequency tmux-Output erfordert Batching/Throttling der IPC-Bridge. Terminal-Fit mit 150ms Debounce und Min-Size-Guard
 - **StatusLine 2.x:** Parser unterstuetzt Claude Code 2.x `context_window` nested Format zusaetzlich zum 1.x Flat-Format
-- **Preact statt React:** ~3KB, React-API-kompatibel, aber einige React-Ecosystem-Libs brauchen Aliasing
+- **Preact statt React:** ~3KB, React-API-kompatibel, aber einige React-Ecosystem-Libs brauchen Aliasing. **Overlay-Dismiss:** KEIN `stopPropagation()` auf Popup-Container verwenden — bricht Child-Klicks in preact/compat. Stattdessen `e.target === e.currentTarget` auf dem Overlay pruefen
 - **Whisper Model-Pfad:** Muss `~/.config/cipher-mux/` sein, NICHT `app.getPath('userData')` (dev/prod Divergenz)
 - **better-sqlite3 ABI-Mismatch:** `npm run test` rebuilt für Node.js, `npm start` rebuilt für Electron. App immer mit `npm start` starten (prestart-Hook garantiert Electron-ABI). Direktes `electron .` nach Tests → MessageBus/TaskManager nicht verfügbar.
 

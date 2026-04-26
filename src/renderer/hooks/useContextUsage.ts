@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'preact/hooks'
+import { useState, useEffect, useRef } from 'preact/hooks'
 import type { ContextUsage } from '../../shared/types'
 
 const api = () => (window as any).cipherMux
 
 export function useContextUsage() {
   const [usages, setUsages] = useState<Record<string, ContextUsage>>({})
+  const mountedRef = useRef(true)
 
   useEffect(() => {
+    mountedRef.current = true
     // Load initial data
     api().context.all().then((data: Record<string, ContextUsage>) => {
+      if (!mountedRef.current) return
       if (data) setUsages(data)
     })
 
@@ -27,7 +30,7 @@ export function useContextUsage() {
       }
     )
 
-    return () => { unsubUpdated(); unsubWarning() }
+    return () => { mountedRef.current = false; unsubUpdated(); unsubWarning() }
   }, [])
 
   return usages

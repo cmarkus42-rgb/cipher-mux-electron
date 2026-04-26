@@ -96,7 +96,13 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       const webgl = new WebglAddon()
       webgl.onContextLoss(() => {
         webgl.dispose()
-        term.loadAddon(new CanvasAddon())
+        try {
+          term.loadAddon(new CanvasAddon())
+        } catch {
+          // basic renderer fallback
+        }
+        // Re-render content after renderer swap to avoid black screen
+        try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
       })
       term.loadAddon(webgl)
     } catch {
@@ -166,6 +172,33 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
     })
     resizeObserver.observe(container)
 
+    // IntersectionObserver: when terminal becomes visible (e.g. after grid
+    // switch or un-hiding), trigger fit() to avoid black/unsized terminals.
+    const intersectionObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          if (!reported) {
+            immediateFit()
+          } else {
+            // Immediate fit when becoming visible — no debounce needed
+            const { clientWidth, clientHeight } = container
+            if (clientWidth >= MIN_FIT_DIMENSION && clientHeight >= MIN_FIT_DIMENSION) {
+              try {
+                fitAddon.fit()
+                const { cols, rows } = term
+                const last = lastSizeRef.current
+                if (cols !== last.cols || rows !== last.rows) {
+                  lastSizeRef.current = { cols, rows }
+                  api().terminal.resize(sessionId, cols, rows)
+                }
+              } catch { /* container may be transitioning */ }
+            }
+          }
+        }
+      }
+    }, { threshold: 0.1 })
+    intersectionObserver.observe(container)
+
     // Initial fit after layout settles
     requestAnimationFrame(() => {
       immediateFit()
@@ -228,6 +261,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       if (restoreTimer) clearTimeout(restoreTimer)
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current)
       resizeObserver.disconnect()
+      intersectionObserver.disconnect()
       inputDisposable.dispose()
       unsubscribe()
       term.dispose()

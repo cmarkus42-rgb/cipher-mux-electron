@@ -17,25 +17,14 @@ function themeDisplayName(id: ThemeName): string {
 interface StatusBarProps {
   theme: ThemeName
   sidebarVisible: boolean
-  sidebarHasContent: boolean
+
   onToggleSidebar: () => void
-  orchestratorRunning: boolean
-  mpoRunning: boolean
-  companionRunning: boolean
-  refinementRunning: boolean
-  voiceRelayRunning: boolean
-  auditRunning: boolean
   workspacesPopupVisible: boolean
   gridCols: number
   gridRows: number
   focusedSessionId: string | null
   focusedSessionName: string | null
-  onOrchestrator: () => void
-  onMpo: () => void
-  onCompanion: () => void
-  onRefinement: () => void
-  onVoiceRelay: () => void
-  onAudit: () => void
+  onNewSession: () => void
   onBugreport: () => void
   onToggleTheme: () => void
   onToggleWorkspaces: () => void
@@ -45,10 +34,10 @@ interface StatusBarProps {
 }
 
 export function StatusBar({
-  theme, sidebarVisible, sidebarHasContent, onToggleSidebar, orchestratorRunning,
+  theme, sidebarVisible, onToggleSidebar,
   gridCols, gridRows, focusedSessionId, focusedSessionName,
-  onOrchestrator, onMpo, onCompanion, onRefinement, onVoiceRelay, onAudit, onBugreport, onToggleTheme, onInfo, onThemeSettings,
-  onGridResize, mpoRunning, companionRunning, refinementRunning, voiceRelayRunning, auditRunning, workspacesPopupVisible, onToggleWorkspaces,
+  onNewSession, onBugreport, onToggleTheme, onInfo, onThemeSettings,
+  onGridResize, workspacesPopupVisible, onToggleWorkspaces,
 }: StatusBarProps) {
   const { t } = useTranslation()
   return (
@@ -69,40 +58,11 @@ export function StatusBar({
           {t('statusBar.workspaces')}
         </button>
         <button
-          class={`status-bar__btn status-bar__btn--session${companionRunning ? ' status-bar__btn--active' : ''}`}
-          onClick={onCompanion}
+          class="status-bar__btn status-bar__btn--add"
+          onClick={onNewSession}
+          title={t('unified.title')}
         >
-          <span class="status-bar__dot status-bar__dot--companion" />{t('statusBar.companion')}
-        </button>
-        <button
-          class={`status-bar__btn status-bar__btn--session${refinementRunning ? ' status-bar__btn--active' : ''}`}
-          onClick={onRefinement}
-        >
-          <span class="status-bar__dot status-bar__dot--refinement" />{t('statusBar.refinement')}
-        </button>
-        <button
-          class={`status-bar__btn status-bar__btn--session${orchestratorRunning ? ' status-bar__btn--active' : ''}`}
-          onClick={onOrchestrator}
-        >
-          <span class="status-bar__dot status-bar__dot--orchestrator" />{t('statusBar.orchestrator')}
-        </button>
-        <button
-          class={`status-bar__btn status-bar__btn--session${mpoRunning ? ' status-bar__btn--active' : ''}`}
-          onClick={onMpo}
-        >
-          <span class="status-bar__dot status-bar__dot--mpo" />{t('statusBar.mpo')}
-        </button>
-        <button
-          class={`status-bar__btn status-bar__btn--session${voiceRelayRunning ? ' status-bar__btn--active' : ''}`}
-          onClick={onVoiceRelay}
-        >
-          <span class="status-bar__dot status-bar__dot--voice-relay" />{t('statusBar.voiceRelay')}
-        </button>
-        <button
-          class={`status-bar__btn status-bar__btn--session${auditRunning ? ' status-bar__btn--active' : ''}`}
-          onClick={onAudit}
-        >
-          <span class="status-bar__dot status-bar__dot--audit" />{t('statusBar.audit')}
+          {t('statusBar.newSession')}
         </button>
         <button class="status-bar__btn" onClick={onBugreport}>{t('statusBar.bugreport')}</button>
         <button
@@ -110,7 +70,6 @@ export function StatusBar({
           onClick={onToggleSidebar}
           title={t('statusBar.sidebarToggle')}
         >
-          {sidebarHasContent && <span class="status-bar__led" />}
           {t('statusBar.sidebar')}
         </button>
         <button class="status-bar__btn status-bar__btn--active" onClick={onThemeSettings}>

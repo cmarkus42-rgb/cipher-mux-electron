@@ -13,6 +13,8 @@ import { generateAuditClaudeMd } from './audit-template'
 import { generateVoiceRelayClaudeMd } from './voice-relay-template'
 import { EntityRegistry } from './entity-registry'
 import { deployEntityAssets } from './entity-assets'
+import { SessionStore } from './session-store'
+import type { PersistedSession, PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
 import { configStore } from '../config/config-store'
@@ -41,6 +43,8 @@ export class SessionManager extends EventEmitter {
   private entityRegistry: EntityRegistry
   /** Maps entity IDs to their active session IDs. */
   private entitySessionIds: Map<EntityId, string> = new Map()
+  /** Mutex: entities currently being started (prevents double-start race). */
+  private startingEntities: Set<EntityId> = new Set()
   /** App root for resolving template paths during asset deployment. */
   private appRoot: string
   /**
@@ -49,6 +53,8 @@ export class SessionManager extends EventEmitter {
    * like Claude at the default 80x24 before xterm has fitted.
    */
   private pendingLaunch: Map<string, { command: string; timer: NodeJS.Timeout }> = new Map()
+  /** Persistent session store — survives app restarts. */
+  private sessionStore: SessionStore
 
   constructor(tmux: TmuxManager, adapterRegistry: AdapterRegistry, entityRegistry?: EntityRegistry, appRoot?: string) {
     super()
@@ -56,6 +62,12 @@ export class SessionManager extends EventEmitter {
     this.adapterRegistry = adapterRegistry
     this.entityRegistry = entityRegistry ?? new EntityRegistry()
     this.appRoot = appRoot ?? process.cwd()
+    this.sessionStore = new SessionStore()
+  }
+
+  /** Get the session store for external grid-state persistence. */
+  getSessionStore(): SessionStore {
+    return this.sessionStore
   }
 
   /** Get the entity registry. */
@@ -152,6 +164,9 @@ export class SessionManager extends EventEmitter {
     this.sessions.set(id, session)
     this.sessionAdapters.set(id, adapter)
 
+    // Persist to disk
+    this.persistSession(session)
+
     // Start output watcher — emits terminal data with session ULID as ID
     this.tmux.watchSession(tmuxName, id)
 
@@ -208,13 +223,21 @@ export class SessionManager extends EventEmitter {
     this.emit('session-stopped', session)
     this.sessions.delete(sessionId)
     this.sessionAdapters.delete(sessionId)
+
+    // Remove from persistent store
+    this.sessionStore.removeSession(sessionId)
   }
 
   /**
-   * Recover sessions by scanning existing tmux sessions.
-   * - Launcher/kickoff sessions (name contains "launcher" or "kickoff") are auto-killed → killed[]
-   * - Unknown sessions are presented to the user for adopt/kill → orphaned[]
-   * - Known sessions are restored → recovered[]
+   * Recover sessions by cross-referencing sessions.json with live tmux sessions.
+   *
+   * Flow:
+   * 1. Load sessions.json → for each entry, check if tmux session is still alive
+   *    - alive → recovered (entity links restored from file)
+   *    - gone  → cleaned up (removed from store)
+   * 2. Scan tmux for cmux-* sessions NOT in sessions.json → orphaned
+   * 3. Auto-kill launcher/kickoff orphans
+   * 4. If no sessions.json: fall back to tmux-only enumeration with entityNameMap
    */
   async recover(): Promise<RecoveryResult> {
     // Retry up to 3 times with a short delay — tmux may still be
@@ -233,90 +256,118 @@ export class SessionManager extends EventEmitter {
     const orphaned: SessionInfo[] = []
     const killed: SessionInfo[] = []
 
-    console.log(`[SessionManager] recover: ${tmuxSessions.length} tmux sessions found, ${this.sessions.size} in registry`)
-    console.log(`[SessionManager] recover: session names: ${tmuxSessions.map(s => s.name).join(', ')}`)
+    console.log(`[SessionManager] recover: ${tmuxSessions.length} tmux sessions found`)
 
+    // Build a set of live tmux session names for quick lookup
+    const liveTmuxNames = new Set(tmuxSessions.map(s => s.name))
+    // Track which tmux sessions are claimed by sessions.json
+    const claimedTmuxNames = new Set<string>()
+
+    // ── Step 1: Try sessions.json-based recovery ──
+    const hasStore = this.sessionStore.load()
+
+    if (hasStore) {
+      const persisted = this.sessionStore.getSessions()
+      console.log(`[SessionManager] recover: sessions.json has ${persisted.length} entries`)
+
+      for (const ps of persisted) {
+        if (liveTmuxNames.has(ps.tmuxSession)) {
+          // tmux session still alive → recover
+          const session: SessionInfo = {
+            id: ps.id,
+            name: ps.name,
+            projectPath: ps.projectPath,
+            tmuxSession: ps.tmuxSession,
+            tmuxPane: null,
+            status: 'active',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            entityId: ps.entityId ?? undefined,
+          }
+          this.sessions.set(session.id, session)
+          this.tmux.watchSession(ps.tmuxSession, session.id)
+          recovered.push(session)
+          claimedTmuxNames.add(ps.tmuxSession)
+
+          // Restore entity links
+          if (ps.entityId) {
+            this.entitySessionIds.set(ps.entityId, session.id)
+            this.entityRegistry.linkSession(session.id, ps.entityId)
+            if (ps.entityId === 'orchestrator') this.orchestratorSessionId = session.id
+            if (ps.entityId === 'mpo') this.mpoSessionId = session.id
+          }
+        } else {
+          // tmux session gone → clean up from store
+          console.log(`[SessionManager] recover: tmux session "${ps.tmuxSession}" gone, removing from store`)
+          this.sessionStore.removeSession(ps.id)
+        }
+      }
+    }
+
+    // ── Step 2: Find orphaned tmux sessions (not in sessions.json) ──
     for (const tmuxSession of tmuxSessions) {
-      // Skip the cipher-mux control session — it's infrastructure, not a user session
-      if (tmuxSession.name === 'cipher-mux-control') {
-        continue
-      }
+      if (tmuxSession.name === 'cipher-mux-control') continue
+      if (!tmuxSession.name.startsWith('cmux-')) continue
+      if (claimedTmuxNames.has(tmuxSession.name)) continue
 
-      // Check if this is one of our sessions (prefix cmux-)
-      if (!tmuxSession.name.startsWith('cmux-')) {
-        console.log(`[SessionManager] recover: skipping non-cmux session "${tmuxSession.name}"`)
-        continue
-      }
-
-      // Try to find in our registry
-      let found = false
+      // Also check in-memory registry (sessions already known this run)
+      let alreadyKnown = false
       for (const session of this.sessions.values()) {
         if (session.tmuxSession === tmuxSession.name) {
-          session.status = 'active'
-          session.updatedAt = Date.now()
-          recovered.push(session)
-          found = true
+          alreadyKnown = true
           break
         }
       }
+      if (alreadyKnown) continue
 
-      if (!found) {
-        const lowerName = tmuxSession.name.toLowerCase()
-        const isLauncher = lowerName.includes('launcher') || lowerName.includes('kickoff')
+      const lowerName = tmuxSession.name.toLowerCase()
+      const isLauncher = lowerName.includes('launcher') || lowerName.includes('kickoff')
+      const projectPath = tmuxSession.paneCwd || null
 
-        // Use pane cwd as projectPath when available — gives the user
-        // context about what directory the session was working in.
-        const projectPath = tmuxSession.paneCwd || null
+      const sessionInfo: SessionInfo = {
+        id: ulid(),
+        name: tmuxSession.name,
+        projectPath,
+        tmuxSession: tmuxSession.name,
+        tmuxPane: null,
+        status: 'orphaned',
+        createdAt: tmuxSession.created * 1000,
+        updatedAt: Date.now(),
+      }
 
-        const sessionInfo: SessionInfo = {
-          id: ulid(),
-          name: tmuxSession.name,
-          projectPath,
-          tmuxSession: tmuxSession.name,
-          tmuxPane: null,
-          status: 'orphaned',
-          createdAt: tmuxSession.created * 1000,
-          updatedAt: Date.now(),
-        }
-
-        if (isLauncher) {
-          // Auto-kill launcher/kickoff sessions — they are transient
-          console.log(`[SessionManager] auto-killing launcher/kickoff session: ${tmuxSession.name}`)
-          try {
-            await this.tmux.killSession(tmuxSession.name)
-          } catch {
-            // may already be gone
-          }
-          killed.push(sessionInfo)
-        } else {
-          // Present unknown sessions to the user for adopt/kill decision
-          console.log(`[SessionManager] orphaned session queued for user decision: ${tmuxSession.name} (cwd: ${projectPath ?? 'unknown'})`)
-          orphaned.push(sessionInfo)
-        }
+      if (isLauncher) {
+        console.log(`[SessionManager] auto-killing launcher/kickoff session: ${tmuxSession.name}`)
+        try { await this.tmux.killSession(tmuxSession.name) } catch { /* ok */ }
+        killed.push(sessionInfo)
+      } else {
+        console.log(`[SessionManager] orphaned session: ${tmuxSession.name} (cwd: ${projectPath ?? 'unknown'})`)
+        orphaned.push(sessionInfo)
       }
     }
 
-    // Restore entity links from recovered sessions
-    const entityNameMap: Record<string, EntityId> = {
-      'Orchestrator': 'orchestrator',
-      'MPO': 'mpo',
-      'Coding Companion': 'companion',
-      'Refinement': 'refinement',
-      'Voice': 'voice-relay',
-    }
-    for (const session of recovered) {
-      const entityId = entityNameMap[session.name]
-      if (entityId) {
-        session.entityId = entityId
-        this.entitySessionIds.set(entityId, session.id)
-        this.entityRegistry.linkSession(session.id, entityId)
-        if (entityId === 'orchestrator') this.orchestratorSessionId = session.id
-        if (entityId === 'mpo') this.mpoSessionId = session.id
+    // ── Step 3: Fallback entity name matching for sessions recovered without store ──
+    if (!hasStore) {
+      const entityNameMap: Record<string, EntityId> = {
+        'Orchestrator': 'orchestrator',
+        'MPO': 'mpo',
+        'Coding Companion': 'companion',
+        'Refinement': 'refinement',
+        'Voice': 'voice-relay',
+      }
+      for (const session of recovered) {
+        const entityId = entityNameMap[session.name]
+        if (entityId) {
+          session.entityId = entityId
+          this.entitySessionIds.set(entityId, session.id)
+          this.entityRegistry.linkSession(session.id, entityId)
+          if (entityId === 'orchestrator') this.orchestratorSessionId = session.id
+          if (entityId === 'mpo') this.mpoSessionId = session.id
+        }
       }
     }
 
     console.log(`[SessionManager] recover result: ${recovered.length} recovered, ${orphaned.length} orphaned, ${killed.length} killed`)
-    return { recovered, orphaned, killed }
+    return { recovered, orphaned, killed, gridState: hasStore ? this.sessionStore.getGridState() : null }
   }
 
   /**
@@ -489,6 +540,13 @@ export class SessionManager extends EventEmitter {
       throw new Error(`Unknown entity: ${entityId}`)
     }
 
+    // Mutex: prevent concurrent starts of the same entity
+    if (this.startingEntities.has(entityId)) {
+      throw new Error(`${config.displayName} is already starting`)
+    }
+    this.startingEntities.add(entityId)
+
+    try {
     // Check if already running
     const existingId = this.entitySessionIds.get(entityId)
     if (existingId) {
@@ -503,6 +561,18 @@ export class SessionManager extends EventEmitter {
     // Deploy assets if this entity has a template
     if (config.templatePath) {
       deployEntityAssets(config, this.appRoot)
+    }
+
+    // Inject active companion character prompt into Companion CLAUDE.md
+    if (config.id === 'companion' && config.templatePath) {
+      const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
+      const templateSource = path.join(this.appRoot, config.templatePath, 'CLAUDE.md')
+      if (fs.existsSync(templateSource)) {
+        const templateContent = fs.readFileSync(templateSource, 'utf-8')
+        const companionPrompt = this.getActiveCompanionPrompt()
+        const personaSection = companionPrompt ? `\n\n## Companion-Persona\n\n${companionPrompt}` : ''
+        fs.writeFileSync(claudeMdPath, templateContent + personaSection, 'utf-8')
+      }
     }
 
     // Ensure entity directory exists
@@ -553,8 +623,14 @@ export class SessionManager extends EventEmitter {
     if (entityId === 'orchestrator') this.orchestratorSessionId = session.id
     if (entityId === 'mpo') this.mpoSessionId = session.id
 
+    // Re-persist with entity ID
+    this.persistSession(session)
+
     this.emit('entity-started', { entityId, session })
     return session
+    } finally {
+      this.startingEntities.delete(entityId)
+    }
   }
 
   /**
@@ -591,6 +667,28 @@ export class SessionManager extends EventEmitter {
     } else {
       this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
     }
+  }
+
+  /**
+   * Schedule a startup greeting to be sent after Claude is ready.
+   * Waits ~12s for Claude CLI to boot, then sends the greeting via tmux.
+   */
+  scheduleStartupGreeting(entityId: EntityId): void {
+    const config = this.entityRegistry.get(entityId)
+    if (!config?.startupGreeting) return
+
+    const sessionId = this.entitySessionIds.get(entityId)
+    if (!sessionId) return
+
+    setTimeout(async () => {
+      try {
+        const session = this.sessions.get(sessionId)
+        if (!session || session.status !== 'active') return
+        await this.sendKeys(sessionId, config.startupGreeting + '\r')
+      } catch (err) {
+        console.warn(`[SessionManager] startup greeting failed for ${entityId}:`, err)
+      }
+    }, 12_000)
   }
 
   /**
@@ -987,6 +1085,41 @@ export class SessionManager extends EventEmitter {
       this.emit('orphans-detected', orphans)
     }
     return orphans
+  }
+
+  // ─── Session Persistence ──────────────────────────────
+
+  /**
+   * Persist a session to the SessionStore.
+   * Grid slot is set to null (background) by default — the renderer
+   * calls persistGridState() to update slot assignments.
+   */
+  private persistSession(session: SessionInfo): void {
+    this.sessionStore.upsertSession({
+      id: session.id,
+      name: session.name,
+      tmuxSession: session.tmuxSession,
+      entityId: (session.entityId as EntityId) ?? null,
+      projectPath: session.projectPath,
+      gridSlot: null, // updated by renderer via persistGridState()
+      status: 'active',
+    })
+  }
+
+  /**
+   * Save the current grid state to the session store.
+   * Called by IpcHub whenever the grid changes so recovery
+   * can restore sessions to their correct slots.
+   */
+  persistGridState(gridState: PersistedGridState): void {
+    // Also update gridSlot on each persisted session
+    const sessions = this.sessionStore.getSessions()
+    for (const ps of sessions) {
+      const slotIdx = gridState.slots.findIndex(s => s.sessionId === ps.id)
+      ps.gridSlot = slotIdx >= 0 ? slotIdx : null
+      ps.status = slotIdx >= 0 ? 'active' : 'background'
+    }
+    this.sessionStore.saveSessions(sessions, gridState)
   }
 
   /**

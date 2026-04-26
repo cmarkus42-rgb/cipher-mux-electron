@@ -21,6 +21,7 @@ interface SessionGridProps {
   onToggleExpand: (sessionId: string) => void
   onShell: (sessionId: string, projectPath: string | null) => void
   onFork: (sessionId: string) => void
+  onSendToBackground: (sessionId: string) => void
   onLaunch: (slotIndex: number) => void
   onOpenSession: (slotIndex: number) => void
   onOpenNotes: (slotIndex: number) => void
@@ -51,7 +52,7 @@ function getCoveredSlots(slots: GridState['slots'], cols: number, rows: number):
 export function SessionGrid({
   grid, sessions, contextUsages, focusedSessionId, theme,
   orchestratorSessionId, activeWorkspaceId, onFocusSession, onCloseSession,
-  onSwitchProject, onToggleExpand, onShell, onFork, onLaunch, onOpenSession,
+  onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onLaunch, onOpenSession,
   onOpenNotes, onCloseNotes, onToggleExpandSlot, onSwap,
 }: SessionGridProps) {
   const [dragSourceIdx, setDragSourceIdx] = useState<number | null>(null)
@@ -122,6 +123,7 @@ export function SessionGrid({
                 onToggleExpand={onToggleExpand}
                 onShell={onShell}
                 onFork={onFork}
+                onSendToBackground={onSendToBackground}
                 onDragStart={() => handleDragStart(idx)}
                 onDragOver={handleDragOver}
                 onDrop={() => handleDrop(idx)}

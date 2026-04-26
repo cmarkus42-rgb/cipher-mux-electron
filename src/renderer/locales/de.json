@@ -19,6 +19,7 @@
   "sessionCell.switchProject": "projekt wechseln",
   "sessionCell.openShell": "shell öffnen",
   "sessionCell.closeSession": "session schließen",
+  "sessionCell.sendToBackground": "in hintergrund",
 
   "notesCell.header": "NOTES",
   "notesCell.scopeGlobal": "global",
@@ -58,6 +59,7 @@
   "gridPlacement.empty": "(leer)",
   "gridPlacement.replaceTitle": "Ersetzen: {{name}}",
   "gridPlacement.emptySlot": "Leerer Slot",
+  "gridPlacement.cancel": "Abbrechen",
 
   "kickoff.title": "Neues Projekt aus Konzept",
   "kickoff.projectDir": "Projekt-Verzeichnis",
@@ -105,6 +107,8 @@
   "recovery.adopt": "Übernehmen",
   "recovery.kill": "Beenden",
   "recovery.killAll": "Alle beenden",
+  "recovery.ignoreAll": "Alle ignorieren",
+  "recovery.confirm": "Ausgewählte ins Grid",
 
   "sessionDialog.title": "session öffnen",
   "sessionDialog.placeholder": "pfad eingeben oder leer für home...",
@@ -131,6 +135,8 @@
   "sidebar.noteDelete": "Note löschen",
   "sidebar.noNotes": "Keine Notes gefunden.",
   "sidebar.noContent": "Kein aktiver Hintergrund-Inhalt.",
+  "sidebar.noBackgroundSessions": "Keine aktiven Hintergrund-Sessions.",
+  "sidebar.emptyHint": "Keine Inhalte. Sessions im Hintergrund, Nachrichten und Notes erscheinen hier.",
   "sidebar.confirmDelete": "Note \"{{title}}\" wirklich löschen?",
   "sidebar.recommended": "(empfohlen)",
   "sidebar.send": "senden",
@@ -342,5 +348,27 @@
   "companion.noResults": "Keine Erinnerungen gefunden.",
   "companion.empty": "Noch keine Erinnerungen.",
   "companion.delete": "Erinnerung loeschen",
-  "companion.confirmDelete": "Erinnerung \"{{text}}\" loeschen?"
+  "companion.confirmDelete": "Erinnerung \"{{text}}\" loeschen?",
+
+  "unified.title": "Neue Session",
+  "unified.tabPresets": "Presets",
+  "unified.tabPath": "Pfad",
+  "unified.desc.companion": "Interaktiver Coding-Companion mit Gedaechtnis",
+  "unified.desc.refinement": "Tiefenanalyse und Verfeinerung",
+  "unified.desc.orchestrator": "Session-Orchestrator mit MCP-Steuerung",
+  "unified.desc.mpo": "Multi-Projekt-Orchestrator fuer parallele Arbeit",
+  "unified.desc.voice": "Sprach-Konversation (Hintergrund-Session)",
+  "unified.desc.audit": "Sicherheits- und Code-Qualitaets-Audit",
+  "unified.running": "laeuft",
+  "unified.starting": "startet...",
+  "unified.pathPlaceholder": "Projektpfad oder Ordner...",
+  "unified.recentPaths": "Zuletzt:",
+  "unified.shellOnly": "Nur Shell (kein Claude)",
+  "unified.skipPermissions": "--dangerously-skip-permissions",
+  "unified.resume": "--resume (letzte Session fortsetzen)",
+  "unified.fork": "--fork (Session forken)",
+  "unified.cancel": "Abbrechen",
+  "unified.start": "Starten",
+  "unified.focusEntity": "Fokussieren",
+  "statusBar.newSession": "+"
 }
