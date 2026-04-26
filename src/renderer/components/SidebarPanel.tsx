@@ -18,6 +18,7 @@ interface SidebarPanelProps {
   onDetach?: () => void
   activeWorkspaceId: string | null
   hasNotesCell: boolean
+  voiceComState?: string
 }
 
 function formatTime(ts: string | number): string {
@@ -27,6 +28,7 @@ function formatTime(ts: string | number): string {
 export function SidebarPanel({
   visible, orchestratorActive, mpoActive, sessions, gridSessionIds,
   contextUsages, onAddToGrid, onKillSession, onDetach, activeWorkspaceId, hasNotesCell,
+  voiceComState,
 }: SidebarPanelProps) {
   const { t } = useTranslation()
   const { messages } = useMessages()
@@ -108,7 +110,7 @@ export function SidebarPanel({
     (s) => s.status === 'active' && !gridSessionIds.includes(s.id)
   )
 
-  const showMessages = orchestratorActive && messages.length > 0
+  const showMessages = (orchestratorActive || mpoActive) && messages.length > 0
   const showBackground = backgroundSessions.length > 0
   const showRequests = mpoActive && requests.length > 0
 
@@ -156,6 +158,7 @@ export function SidebarPanel({
               contextUsage={contextUsages[s.id]}
               onClick={() => onAddToGrid(s.id)}
               onKill={() => onKillSession(s.id)}
+              voiceGlow={s.name === 'Voice' ? voiceComState : undefined}
             />
           ))}
         </section>
@@ -294,9 +297,10 @@ interface BackgroundSessionCardProps {
   contextUsage?: { usedPercentage: number; used?: number; total?: number }
   onClick: () => void
   onKill: () => void
+  voiceGlow?: string
 }
 
-function BackgroundSessionCard({ session, contextUsage, onClick, onKill }: BackgroundSessionCardProps) {
+function BackgroundSessionCard({ session, contextUsage, onClick, onKill, voiceGlow }: BackgroundSessionCardProps) {
   const { t } = useTranslation()
   const [lastOutput, setLastOutput] = useState<string>('')
 
@@ -322,7 +326,7 @@ function BackgroundSessionCard({ session, contextUsage, onClick, onKill }: Backg
   }, [onKill, session.name, t])
 
   return (
-    <div class="bg-card" onClick={onClick} title={t('sidebar.clickToPlace')}>
+    <div class={`bg-card${voiceGlow ? ` bg-card--voice-${voiceGlow}` : ''}`} onClick={onClick} title={t('sidebar.clickToPlace')}>
       <div class="bg-card__head">
         <span class="bg-card__name">{session.name}</span>
         <button

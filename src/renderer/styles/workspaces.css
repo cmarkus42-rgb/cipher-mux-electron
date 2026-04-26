@@ -1487,3 +1487,226 @@
   overflow-y: auto;
   padding: 16px;
 }
+
+/* ================================================================
+   Tag Manager
+   ================================================================ */
+
+.tag-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tag-manager__header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.tag-manager__search {
+  flex: 1;
+  background: var(--color-bg-sunken);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 7px 10px;
+  letter-spacing: 0.02em;
+}
+
+.tag-manager__search:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.tag-manager__add-btn {
+  background: var(--color-text);
+  color: var(--color-bg);
+  border: 1px solid var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 7px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tag-manager__add-btn:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.tag-manager__create {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+}
+
+.tag-manager__input {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 8px;
+  width: 140px;
+}
+
+.tag-manager__input--wide {
+  flex: 1;
+}
+
+.tag-manager__input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.tag-manager__btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.tag-manager__btn--primary {
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border-color: var(--color-accent);
+}
+
+.tag-manager__btn--primary:hover {
+  background: var(--color-text);
+  border-color: var(--color-text);
+}
+
+.tag-manager__empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--color-text-dim);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.tag-manager__table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.tag-manager__table thead {
+  background: var(--color-bg-elevated);
+}
+
+.tag-manager__table th {
+  padding: 8px 10px;
+  text-align: left;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tag-manager__table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.tag-manager__row:hover {
+  background: var(--color-bg-elevated);
+}
+
+.tag-manager__col-count {
+  width: 60px;
+  text-align: center;
+}
+
+.tag-manager__col-actions {
+  width: 70px;
+  text-align: right;
+}
+
+.tag-manager__name-cell {
+  white-space: nowrap;
+}
+
+.tag-manager__tag-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tag-manager__badge {
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+  background: var(--color-bg-sunken);
+  border: 1px solid var(--color-border);
+  padding: 1px 4px;
+}
+
+.tag-manager__desc {
+  cursor: pointer;
+  color: var(--color-text-dim);
+}
+
+.tag-manager__desc:hover {
+  color: var(--color-text);
+}
+
+.tag-manager__inline-input {
+  background: var(--color-bg);
+  border: 1px solid var(--color-accent);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 3px 6px;
+  width: 120px;
+}
+
+.tag-manager__inline-input--wide {
+  width: 100%;
+}
+
+.tag-manager__inline-input:focus {
+  outline: none;
+}
+
+.tag-manager__action {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  cursor: pointer;
+  margin-left: 2px;
+}
+
+.tag-manager__action:hover {
+  background: var(--color-bg-sunken);
+  color: var(--color-text);
+  border-color: var(--color-text-dim);
+}
+
+.tag-manager__action--danger:hover {
+  color: var(--color-neon-red);
+  border-color: var(--color-neon-red);
+  background: transparent;
+}

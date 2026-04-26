@@ -14,8 +14,6 @@ export interface OrchestratorTemplateOpts {
   maxRetries: number
   /** Agent-specific orchestrator instructions from adapter */
   adapterFragment?: string
-  /** Active companion character prompt to inject */
-  companionPrompt?: string
 }
 
 export function generateOrchestratorClaudeMd(opts: OrchestratorTemplateOpts): string {
@@ -124,6 +122,5 @@ Sessions werden automatisch ueberwacht. Wenn ein Worker >5 Minuten keinen Output
 wird er als "stalled" markiert und automatisch retried (bis max_retries erreicht).
 Du musst NICHT manuell pollen. Bei Eskalation (max retries ueberschritten) wirst du benachrichtigt.
 ${opts.adapterFragment ? `\n## Agent-spezifische Hinweise\n\n${opts.adapterFragment}` : ''}
-${opts.companionPrompt ? `\n## Companion-Persona\n\n${opts.companionPrompt}` : ''}
 `
 }

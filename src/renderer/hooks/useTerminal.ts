@@ -234,7 +234,20 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
               term.reset()
               term.write(content.replace(/\n/g, '\r\n'), () => {
                 term.scrollToBottom()
+                // Force visual repaint after recovery — xterm.js may have
+                // attached to an unsized or hidden container and needs an
+                // explicit refresh + reflow to render content visibly.
+                try {
+                  term.refresh(0, term.rows - 1)
+                  fitAddon.fit()
+                } catch { /* ignore if container not ready */ }
               })
+            } else {
+              // Even with no content, trigger refresh so the cursor renders
+              try {
+                term.refresh(0, term.rows - 1)
+                fitAddon.fit()
+              } catch { /* ignore */ }
             }
           }).catch(() => {
             // session may not be ready yet

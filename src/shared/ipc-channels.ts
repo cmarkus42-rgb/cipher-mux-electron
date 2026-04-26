@@ -99,9 +99,12 @@ export const IPC = {
 
   // Voice Session Input
   VOICE_START_SESSION: 'cipher-mux:voice:start-session',
+  VOICE_START_COM: 'cipher-mux:voice:start-com',
+  VOICE_STOP_COM: 'cipher-mux:voice:stop-com',
   VOICE_SET_ROUTING_MODE: 'cipher-mux:voice:set-routing-mode',
   VOICE_SESSION_TARGET: 'cipher-mux:voice:session-target',
   VOICE_DISPATCHED: 'cipher-mux:voice:dispatched',
+  VOICE_COM_STATE: 'cipher-mux:voice:com-state',
 
   // Personas
   PERSONAS_LIST: 'cipher-mux:personas:list',
@@ -135,7 +138,19 @@ export const IPC = {
   NOTES_CREATE: 'cipher-mux:notes:create',
   NOTES_DELETE: 'cipher-mux:notes:delete',
   NOTES_TAGS: 'cipher-mux:notes:tags',
+  NOTES_TAG_LIST: 'cipher-mux:notes:tag-list',
+  NOTES_TAG_CREATE: 'cipher-mux:notes:tag-create',
+  NOTES_TAG_RENAME: 'cipher-mux:notes:tag-rename',
+  NOTES_TAG_UPDATE: 'cipher-mux:notes:tag-update',
+  NOTES_TAG_DELETE: 'cipher-mux:notes:tag-delete',
   NOTES_CHANGED: 'cipher-mux:notes:changed',
+
+  // Grid Control (MCP App-Control)
+  GRID_RESIZE: 'cipher-mux:grid:resize',
+  GRID_PLACE: 'cipher-mux:grid:place',
+  SESSION_FOCUS: 'cipher-mux:session:focus',
+  SESSION_EJECT: 'cipher-mux:session:eject',
+  SIDEBAR_TOGGLE: 'cipher-mux:sidebar:toggle',
 
   // Companion Memory
   COMPANION_RECALL: 'cipher-mux:companion:recall',

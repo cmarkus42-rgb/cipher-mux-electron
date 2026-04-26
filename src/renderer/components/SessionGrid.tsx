@@ -1,10 +1,11 @@
 // src/renderer/components/SessionGrid.tsx
 import { useState, useCallback } from 'preact/hooks'
-import type { SessionInfo, ContextUsage } from '../../shared/types'
+import type { SessionInfo, ContextUsage, EntityId } from '../../shared/types'
 import { computeGridStyle } from '../../shared/grid-types'
 import type { GridState, ThemeName } from '../../shared/grid-types'
 import { SessionCell } from './SessionCell'
 import { LauncherCell } from './LauncherCell'
+import type { PathStartOpts } from './LauncherCell'
 import { NotesCell } from './NotesCell'
 
 interface SessionGridProps {
@@ -15,6 +16,7 @@ interface SessionGridProps {
   theme: ThemeName
   orchestratorSessionId: string | null
   activeWorkspaceId: string | null
+  entityStatus: Record<string, boolean>
   onFocusSession: (sessionId: string) => void
   onCloseSession: (sessionId: string) => void
   onSwitchProject: (sessionId: string) => void
@@ -22,9 +24,11 @@ interface SessionGridProps {
   onShell: (sessionId: string, projectPath: string | null) => void
   onFork: (sessionId: string) => void
   onSendToBackground: (sessionId: string) => void
-  onLaunch: (slotIndex: number) => void
-  onOpenSession: (slotIndex: number) => void
+  onStartEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
+  onFocusEntity: (entityId: EntityId) => void
+  onStartPath: (path: string, opts: PathStartOpts, slotIndex: number) => void
   onOpenNotes: (slotIndex: number) => void
+  onOpenNote: (note: any, slotIndex: number) => void
   onCloseNotes: (slotIndex: number) => void
   onToggleExpandSlot: (slotIndex: number) => void
   onSwap: (idxA: number, idxB: number) => void
@@ -51,9 +55,10 @@ function getCoveredSlots(slots: GridState['slots'], cols: number, rows: number):
 
 export function SessionGrid({
   grid, sessions, contextUsages, focusedSessionId, theme,
-  orchestratorSessionId, activeWorkspaceId, onFocusSession, onCloseSession,
-  onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onLaunch, onOpenSession,
-  onOpenNotes, onCloseNotes, onToggleExpandSlot, onSwap,
+  orchestratorSessionId, activeWorkspaceId, entityStatus, onFocusSession, onCloseSession,
+  onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground,
+  onStartEntity, onFocusEntity, onStartPath,
+  onOpenNotes, onOpenNote, onCloseNotes, onToggleExpandSlot, onSwap,
 }: SessionGridProps) {
   const [dragSourceIdx, setDragSourceIdx] = useState<number | null>(null)
   const { cols, rows } = grid.config
@@ -134,9 +139,14 @@ export function SessionGrid({
           return (
             <LauncherCell
               key={`launcher-${idx}`}
-              onLaunch={() => onLaunch(idx)}
-              onOpenSession={() => onOpenSession(idx)}
+              slotIndex={idx}
+              onStartEntity={(entityId) => onStartEntity(entityId, idx)}
+              onFocusEntity={onFocusEntity}
+              onStartPath={(path, opts) => onStartPath(path, opts, idx)}
               onOpenNotes={() => onOpenNotes(idx)}
+              onOpenNote={(note) => onOpenNote(note, idx)}
+              entityStatus={entityStatus}
+              activeWorkspaceId={activeWorkspaceId}
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(idx)}
             />

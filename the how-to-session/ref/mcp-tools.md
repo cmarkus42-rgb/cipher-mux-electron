@@ -213,3 +213,63 @@ Signal that project scaffolding is finished.
 
 **Use case:** The /launch skill calling this after completing scaffold. Triggers the transition from launcher session to interview session.
 **Fallback:** If this tool is unavailable, writing an empty `.kickoff-complete` file in the project directory achieves the same effect.
+
+---
+
+## App Control
+
+These tools let sessions control the cipher-mux UI — grid layout, session placement, sidebar visibility. Useful for the Voice Relay ("Zeig mir drei Fenster") and Companion ("Ich raeume das Grid auf").
+
+### mux_grid_resize
+
+Change the grid dimensions.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| cols | number | yes | Number of columns (1-7) |
+| rows | number | yes | Number of rows (1-3) |
+
+**Use case:** "Mach das Grid 2x2" → `mux_grid_resize(cols: 2, rows: 2)`.
+**Note:** Sessions that no longer fit in the resized grid move to background.
+
+### mux_grid_place
+
+Place a session in a specific grid cell.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| sessionId | string | yes | Session ID (ULID) |
+| col | number | yes | Column index (0-based) |
+| row | number | yes | Row index (0-based) |
+
+**Use case:** "Pack die Auth-Session nach links oben" → `mux_grid_place(sessionId, col: 0, row: 0)`.
+
+### mux_session_focus
+
+Focus a session in the grid.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| sessionId | string | yes | Session ID (ULID) |
+
+**Use case:** "Zeig mir die Payment-Session" → brings session into grid if in background, then focuses.
+
+### mux_session_eject
+
+Eject a session to background.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| sessionId | string | yes | Session ID (ULID) |
+
+**Use case:** "Schieb die Session in den Hintergrund" → session continues running, moves to sidebar.
+
+### mux_sidebar_toggle
+
+Toggle sidebar visibility.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| visible | boolean | no | Force visible (true) or hidden (false). Omit to toggle. |
+
+**Use case:** "Sidebar weg" → `mux_sidebar_toggle(visible: false)`.

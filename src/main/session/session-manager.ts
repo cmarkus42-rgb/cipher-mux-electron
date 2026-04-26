@@ -582,8 +582,7 @@ export class SessionManager extends EventEmitter {
     if (!config.templatePath) {
       const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
       if (config.id === 'audit') {
-        const companionPrompt = this.getActiveCompanionPrompt()
-        fs.writeFileSync(claudeMdPath, generateAuditClaudeMd({ companionPrompt }), 'utf-8')
+        fs.writeFileSync(claudeMdPath, generateAuditClaudeMd(), 'utf-8')
       } else if (config.id === 'voice-relay') {
         fs.writeFileSync(claudeMdPath, generateVoiceRelayClaudeMd(), 'utf-8')
       } else if (!fs.existsSync(claudeMdPath)) {
@@ -766,7 +765,6 @@ export class SessionManager extends EventEmitter {
       mcpApiKey: config.mcpApiKey,
       maxRetries: ORCHESTRATOR_MAX_RETRIES,
       adapterFragment: adapter.buildOrchestratorPromptFragment('de'),
-      companionPrompt: this.getActiveCompanionPrompt(),
     })
     fs.writeFileSync(path.join(orchestratorDir, 'CLAUDE.md'), claudeMd, 'utf-8')
 
@@ -887,7 +885,6 @@ export class SessionManager extends EventEmitter {
       mcpApiKey: config.mcpApiKey,
       maxRetries: MPO_MAX_RETRIES,
       adapterFragment: adapter.buildMpoPromptFragment('de'),
-      companionPrompt: this.getActiveCompanionPrompt(),
     })
     fs.writeFileSync(path.join(mpoDir, 'CLAUDE.md'), claudeMd, 'utf-8')
 

@@ -58,8 +58,11 @@ describe('BugreportTaskSource', () => {
     const filePath = path.join(tmpDir, 'new-bug.md')
     fs.writeFileSync(filePath, 'A new bug report')
 
-    // Wait for fs.watch event + 100ms delay + generous buffer (macOS fs.watch can be slow)
-    await waitFor(1500)
+    // Poll for the emitted event — macOS fs.watch in tmpdir can be very slow
+    const deadline = Date.now() + 5000
+    while (emitted.length === 0 && Date.now() < deadline) {
+      await waitFor(200)
+    }
     source.stop()
 
     assert.equal(emitted.length, 1)
