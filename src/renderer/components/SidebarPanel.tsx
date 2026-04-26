@@ -25,6 +25,15 @@ function formatTime(ts: string | number): string {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+/** Derive a human-readable display name from a session or orphan entry. */
+function displayName(name: string, projectPath?: string | null): string {
+  if (projectPath) {
+    const parts = projectPath.replace(/\/+$/, '').split('/')
+    return parts[parts.length - 1] || name
+  }
+  return name
+}
+
 export function SidebarPanel({
   visible, orchestratorActive, mpoActive, sessions, gridSessionIds,
   contextUsages, onAddToGrid, onKillSession, onDetach, activeWorkspaceId, hasNotesCell,
@@ -177,7 +186,7 @@ export function SidebarPanel({
               {orphans.map(o => (
                 <div key={o.tmuxSession} class="bg-card">
                   <div class="bg-card__head">
-                    <span class="bg-card__name">{o.tmuxSession}</span>
+                    <span class="bg-card__name">{displayName(o.name || o.tmuxSession, o.projectPath)}</span>
                   </div>
                   {o.projectPath && (
                     <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)', opacity: 0.6 }}>
@@ -328,7 +337,7 @@ function BackgroundSessionCard({ session, contextUsage, onClick, onKill, voiceGl
   return (
     <div class={`bg-card${voiceGlow ? ` bg-card--voice-${voiceGlow}` : ''}`} onClick={onClick} title={t('sidebar.clickToPlace')}>
       <div class="bg-card__head">
-        <span class="bg-card__name">{session.name}</span>
+        <span class="bg-card__name">{displayName(session.name, session.projectPath)}</span>
         <button
           class="bg-card__kill"
           onClick={handleKill}
