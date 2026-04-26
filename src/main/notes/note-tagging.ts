@@ -3,12 +3,22 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { TagRepository, TagEntry } from '../../shared/types'
 
-// ─── Ollama Config ────────────────────────────────────────
-
-const OLLAMA_HOST = '127.0.0.1'
-const OLLAMA_PORT = 11433
-const OLLAMA_MODEL = 'gemma4:26b'
 const TIMEOUT_MS = 60_000
+
+/** Read LLM config lazily (avoids electron dep in test context). */
+function getLlmConfig() {
+  try {
+    const { configStore } = require('../config/config-store')
+    const llm = configStore.get('llm')
+    return {
+      host: llm?.ollamaHost ?? '127.0.0.1',
+      port: llm?.ollamaPort ?? 11434,
+      model: llm?.ollamaModel ?? 'gemma4:26b',
+    }
+  } catch {
+    return { host: '127.0.0.1', port: 11434, model: 'gemma4:26b' }
+  }
+}
 
 // ─── Seed Tags ────────────────────────────────────────────
 
@@ -112,11 +122,12 @@ export function parseTagResponse(text: string): string[] {
 // ─── Ollama HTTP ──────────────────────────────────────────
 
 function ollamaPost(body: string): Promise<string> {
+  const cfg = getLlmConfig()
   return new Promise((resolve, reject) => {
     const req = http.request(
       {
-        hostname: OLLAMA_HOST,
-        port: OLLAMA_PORT,
+        hostname: cfg.host,
+        port: cfg.port,
         path: '/api/generate',
         method: 'POST',
         headers: {
@@ -368,8 +379,9 @@ export class NoteTagging {
   async autoTag(content: string): Promise<string[] | null> {
     try {
       const prompt = buildTaggingPrompt(content, this.repo)
+      const cfg = getLlmConfig()
       const body = JSON.stringify({
-        model: OLLAMA_MODEL,
+        model: cfg.model,
         prompt,
         stream: false,
         keep_alive: -1,

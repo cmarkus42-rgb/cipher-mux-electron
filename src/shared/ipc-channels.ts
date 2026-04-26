@@ -165,6 +165,10 @@ export const IPC = {
   CHARACTERS_SWITCH: 'cipher-mux:characters:switch',
   CHARACTERS_ACTIVE: 'cipher-mux:characters:active',
 
+  // LLM Provider
+  LLM_TEST_CONNECTION: 'cipher-mux:llm:test-connection',
+  LLM_LIST_MODELS: 'cipher-mux:llm:list-models',
+
   // Entity Framework
   ENTITY_START: 'cipher-mux:entity:start',
   ENTITY_STOP: 'cipher-mux:entity:stop',
