@@ -94,6 +94,24 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
     return () => { mounted = false }
   }, [])
 
+  // Pause app-level STT when BugReport opens, resume on close (B12)
+  const sttWasPausedRef = useRef(false)
+  useEffect(() => {
+    const w = window as any
+    if (visible && w.__cipherMuxSessionVoiceActive) {
+      console.log('[BugreportDialog] Pausing app STT while BugReport open')
+      api()?.voice?.setRoutingMode?.('off')
+      sttWasPausedRef.current = true
+    }
+    return () => {
+      if (sttWasPausedRef.current) {
+        console.log('[BugreportDialog] Resuming app STT after BugReport close')
+        api()?.voice?.setRoutingMode?.('session')
+        sttWasPausedRef.current = false
+      }
+    }
+  }, [visible])
+
   useEffect(() => {
     if (report && !description && voiceState === 'complete') {
       setDescription(report)
