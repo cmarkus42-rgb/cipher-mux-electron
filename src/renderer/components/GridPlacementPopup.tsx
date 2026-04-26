@@ -20,6 +20,19 @@ export function GridPlacementPopup({
   const { t } = useTranslation()
   if (!visible) return null
 
+  // Compute covered slots (hidden behind rowSpan > 1 cells)
+  const covered = new Set<number>()
+  for (let idx = 0; idx < gridSlots.length; idx++) {
+    const span = gridSlots[idx].rowSpan
+    if (span > 1) {
+      const col = idx % cols
+      const row = Math.floor(idx / cols)
+      for (let r = 1; r < span && row + r < rows; r++) {
+        covered.add((row + r) * cols + col)
+      }
+    }
+  }
+
   const getSlotLabel = (slot: GridSlot): string => {
     if (slot.type === 'notes') return 'Notes'
     if (!slot.sessionId) return t('gridPlacement.empty')
@@ -96,9 +109,13 @@ export function GridPlacementPopup({
           </div>
         )}
 
-        <div class="grid-placement-grid" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+        <div class="grid-placement-grid" style={{
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gridTemplateRows: `repeat(${rows}, 1fr)`,
+        }}>
           {gridSlots.map((slot, idx) => {
-            if (slot.rowSpan === 0) return null
+            // Skip cells covered by a rowSpan above
+            if (covered.has(idx)) return null
             const empty = isEmpty(slot)
             const isNotes = slot.type === 'notes'
             return (
