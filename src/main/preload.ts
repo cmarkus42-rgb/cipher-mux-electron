@@ -112,6 +112,11 @@ const api = {
     saveGrid: (grid: unknown) => ipcRenderer.invoke(IPC.CONFIG_SAVE_GRID, grid),
     getSkipPermissions: (): Promise<boolean> => ipcRenderer.invoke('cipher-mux:config:get-skip-permissions'),
     setSkipPermissions: (v: boolean): Promise<{ ok: boolean }> => ipcRenderer.invoke('cipher-mux:config:set-skip-permissions', v),
+    onThemeChanged: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.THEME_CHANGED, handler)
+      return () => ipcRenderer.removeListener(IPC.THEME_CHANGED, handler)
+    },
   },
 
   // ─── Dialogs ──────────────────────────────────────────────

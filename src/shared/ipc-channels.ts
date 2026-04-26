@@ -118,6 +118,9 @@ export const IPC = {
   WORKSPACES_APPLY: 'cipher-mux:workspaces:apply',
   WORKSPACES_ACTIVE: 'cipher-mux:workspaces:active',
 
+  // Theme
+  THEME_CHANGED: 'cipher-mux:theme:changed',
+
   // Sidebar
   SIDEBAR_DETACH: 'cipher-mux:sidebar:detach',
   SIDEBAR_REATTACH: 'cipher-mux:sidebar:reattach',
