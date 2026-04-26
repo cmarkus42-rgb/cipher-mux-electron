@@ -199,6 +199,156 @@ export class NoteTagging {
     return this.repo
   }
 
+  /** Check if a tag is a built-in seed tag. */
+  isSeedTag(tag: string): boolean {
+    return tag in SEED_TAGS
+  }
+
+  /** Create a new tag manually. Returns false if it already exists. */
+  createTag(name: string, description: string): boolean {
+    const normalized = name.toLowerCase().trim()
+    if (!normalized || this.repo.tags[normalized]) return false
+    this.repo.tags[normalized] = { count: 0, description }
+    this.saveRepository()
+    return true
+  }
+
+  /** Rename a tag. Returns the list of affected note files (relative paths). */
+  renameTag(oldName: string, newName: string): string[] {
+    const oldNorm = oldName.toLowerCase().trim()
+    const newNorm = newName.toLowerCase().trim()
+    if (!oldNorm || !newNorm || oldNorm === newNorm) return []
+    if (!this.repo.tags[oldNorm]) return []
+    if (this.repo.tags[newNorm]) return [] // target already exists
+
+    // Move tag entry
+    this.repo.tags[newNorm] = { ...this.repo.tags[oldNorm] }
+    delete this.repo.tags[oldNorm]
+    this.saveRepository()
+
+    // Propagate rename in note frontmatter
+    return this.propagateTagChange(oldNorm, newNorm)
+  }
+
+  /** Update tag description. */
+  updateTagDescription(name: string, description: string): boolean {
+    const normalized = name.toLowerCase().trim()
+    if (!this.repo.tags[normalized]) return false
+    this.repo.tags[normalized] = { ...this.repo.tags[normalized], description }
+    this.saveRepository()
+    return true
+  }
+
+  /** Delete a tag. Returns the list of affected note files. */
+  deleteTag(name: string): string[] {
+    const normalized = name.toLowerCase().trim()
+    if (!this.repo.tags[normalized]) return []
+    delete this.repo.tags[normalized]
+    this.saveRepository()
+    return this.propagateTagChange(normalized, null)
+  }
+
+  /**
+   * Propagate a tag rename or deletion across all note files.
+   * If newTag is null, the tag is removed. Returns affected file paths.
+   */
+  private propagateTagChange(oldTag: string, newTag: string | null): string[] {
+    const affected: string[] = []
+    const matter = require('gray-matter')
+
+    // Scan all scope dirs
+    let scopeDirs: string[]
+    try {
+      scopeDirs = fs.readdirSync(this.notesDir, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => d.name)
+    } catch {
+      return affected
+    }
+
+    for (const scope of scopeDirs) {
+      const dir = path.join(this.notesDir, scope)
+      let files: string[]
+      try {
+        files = fs.readdirSync(dir).filter(f => f.endsWith('.md'))
+      } catch {
+        continue
+      }
+      for (const file of files) {
+        const filePath = path.join(dir, file)
+        try {
+          const raw = fs.readFileSync(filePath, 'utf-8')
+          const parsed = matter(raw)
+          const tags: string[] = parsed.data.tags ?? []
+          const idx = tags.findIndex((t: string) => t.toLowerCase() === oldTag)
+          if (idx === -1) continue
+
+          if (newTag) {
+            tags[idx] = newTag
+          } else {
+            tags.splice(idx, 1)
+          }
+          parsed.data.tags = tags
+          parsed.data.modified = new Date().toISOString()
+          const updated = matter.stringify(parsed.content, parsed.data)
+          fs.writeFileSync(filePath, updated, 'utf-8')
+          affected.push(path.join(scope, file))
+        } catch {
+          // Skip files that can't be parsed
+        }
+      }
+    }
+
+    return affected
+  }
+
+  /** Recount tag occurrences from all note files. */
+  recountTags(): void {
+    // Reset all counts to 0
+    for (const key of Object.keys(this.repo.tags)) {
+      this.repo.tags[key] = { ...this.repo.tags[key], count: 0 }
+    }
+
+    let scopeDirs: string[]
+    try {
+      scopeDirs = fs.readdirSync(this.notesDir, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => d.name)
+    } catch {
+      return
+    }
+
+    const matter = require('gray-matter')
+    for (const scope of scopeDirs) {
+      const dir = path.join(this.notesDir, scope)
+      let files: string[]
+      try {
+        files = fs.readdirSync(dir).filter(f => f.endsWith('.md'))
+      } catch {
+        continue
+      }
+      for (const file of files) {
+        try {
+          const raw = fs.readFileSync(path.join(dir, file), 'utf-8')
+          const parsed = matter(raw)
+          const tags: string[] = parsed.data.tags ?? []
+          for (const tag of tags) {
+            const norm = tag.toLowerCase().trim()
+            if (this.repo.tags[norm]) {
+              this.repo.tags[norm] = {
+                ...this.repo.tags[norm],
+                count: this.repo.tags[norm].count + 1,
+              }
+            }
+          }
+        } catch {
+          // Skip
+        }
+      }
+    }
+    this.saveRepository()
+  }
+
   updateRepository(tags: string[]): void {
     for (const tag of tags) {
       const normalized = tag.toLowerCase().trim()

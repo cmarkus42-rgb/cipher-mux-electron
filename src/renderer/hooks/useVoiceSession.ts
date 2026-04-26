@@ -1,12 +1,15 @@
 /**
- * useVoiceSession — Preact hook for PTT voice input into focused sessions.
+ * useVoiceSession — Preact hook for 3-state voice mode: OFF / STT / COM.
  *
- * Manages the push-to-talk lifecycle (Ctrl+Shift+Space), VAD initialization,
- * and toast state for transcription preview and dispatch feedback.
+ * OFF: No voice active.
+ * STT: VAD + Whisper → keystrokes to focused session (existing behavior).
+ * COM: Voice-relay entity as background session, STT→relay, relay→TTS.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import type { MicVADInstance } from '../voice/vad-loader'
+
+export type VoiceMode = 'off' | 'stt' | 'com'
 
 const PTT_COMBO = { ctrlKey: true, shiftKey: true, code: 'Space' }
 
@@ -16,10 +19,11 @@ interface Toast {
 }
 
 export function useVoiceSession(focusedSessionId: string | null, _focusedSessionName: string | null) {
-  const [active, setActive] = useState(false)
+  const [mode, setMode] = useState<VoiceMode>('off')
   const [recording, setRecording] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [voiceState, setVoiceState] = useState('idle')
+  const [comState, setComState] = useState('idle')
   const [toast, setToast] = useState<Toast | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,114 +32,142 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
   const streamRef = useRef<MediaStream | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
 
+  // Derived: active means STT or COM
+  const active = mode !== 'off'
+
   const showToast = useCallback((t: Toast) => {
     setToast(t)
     if (toastTimer.current) clearTimeout(toastTimer.current)
     toastTimer.current = setTimeout(() => setToast(null), 2000)
   }, [])
 
-  // Push focused session to main process whenever it changes
+  // Push focused session to main process whenever it changes (STT mode only)
   useEffect(() => {
-    if (!active) return
+    if (mode !== 'stt') return
     const api = (window as any).cipherMux
     api.voice.setSessionTarget(focusedSessionId)
-  }, [focusedSessionId, active])
+  }, [focusedSessionId, mode])
 
-  // Toggle voice session mode
-  const toggle = useCallback(async () => {
+  /** Teardown VAD + mic stream + AudioContext */
+  const teardownVAD = useCallback(() => {
+    if (vadRef.current) {
+      vadRef.current.destroy()
+      vadRef.current = null
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t: MediaStreamTrack) => t.stop())
+      streamRef.current = null
+    }
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {})
+      audioCtxRef.current = null
+    }
+  }, [])
+
+  /** Initialize VAD + mic stream for STT pipeline */
+  const initVAD = useCallback(async () => {
     const api = (window as any).cipherMux
-    if (active) {
-      // Deactivate
-      console.log('[VoiceSession] Deactivating voice session')
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
+    })
+    streamRef.current = stream
+
+    const audioCtx = new AudioContext({ sampleRate: 16000 })
+    audioCtxRef.current = audioCtx
+
+    const { initVAD: loadVAD } = await import('../voice/vad-loader')
+    vadRef.current = await loadVAD(stream, audioCtx, {
+      onSpeechStart: () => {
+        api.voice.vadSpeechStart()
+      },
+      onSpeechEnd: (audio: Float32Array) => {
+        api.voice.vadSpeechEnd(Array.from(audio))
+      },
+      onVADMisfire: () => {
+        api.voice.vadMisfire()
+      },
+    })
+    vadRef.current.start()
+  }, [])
+
+  /** Switch to a new voice mode */
+  const switchMode = useCallback(async (newMode: VoiceMode) => {
+    if (newMode === mode) return
+    const api = (window as any).cipherMux
+
+    // Deactivate current mode
+    if (mode === 'stt') {
       api.voice.setRoutingMode('off')
-      if (vadRef.current) {
-        vadRef.current.destroy()
-        vadRef.current = null
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t: MediaStreamTrack) => t.stop())
-        streamRef.current = null
-      }
-      if (audioCtxRef.current) {
-        audioCtxRef.current.close().catch(() => {})
-        audioCtxRef.current = null
-      }
-      setActive(false)
-      ;(window as any).__cipherMuxSessionVoiceActive = false
+      teardownVAD()
       setRecording(false)
       setProcessing(false)
       setVoiceState('idle')
+      ;(window as any).__cipherMuxSessionVoiceActive = false
+    } else if (mode === 'com') {
+      teardownVAD()
+      try { await api.voice.stopCom() } catch { /* ignore */ }
+      setRecording(false)
+      setProcessing(false)
+      setVoiceState('idle')
+      setComState('idle')
+      ;(window as any).__cipherMuxSessionVoiceActive = false
+    }
+
+    if (newMode === 'off') {
+      setMode('off')
+      setError(null)
       return
     }
 
-    // Activate
+    // Activate new mode
     try {
-      console.log('[VoiceSession] Checking voice availability...')
       const availResult = await api.voice.available()
-      console.log('[VoiceSession] voice.available() =>', availResult)
       if (!availResult.available) {
         const reason = availResult.reason ?? 'native modules missing'
-        const msg = `Voice not available — ${reason}`
-        console.log('[VoiceSession] BLOCKED:', msg, '(full reason:', reason, ')')
-        setError(msg)
+        setError(`Voice not available — ${reason}`)
+        setMode('off')
         return
       }
 
-      console.log('[VoiceSession] Starting voice session mode...')
-      const result = await api.voice.startSession()
-      console.log('[VoiceSession] voice.startSession() =>', result)
-      if (!result.ok) {
-        setError(result.error ?? 'Failed to start voice session mode')
-        return
+      if (newMode === 'stt') {
+        const result = await api.voice.startSession()
+        if (!result.ok) {
+          setError(result.error ?? 'Failed to start STT mode')
+          setMode('off')
+          return
+        }
+        await initVAD()
+        api.voice.setSessionTarget(focusedSessionId)
+        api.voice.setRoutingMode('session')
+        setMode('stt')
+        ;(window as any).__cipherMuxSessionVoiceActive = true
+        setVoiceState('ready')
+        setError(null)
+      } else if (newMode === 'com') {
+        const result = await api.voice.startCom()
+        if (!result.ok) {
+          setError(result.error ?? 'Failed to start COM mode')
+          setMode('off')
+          return
+        }
+        await initVAD()
+        setMode('com')
+        ;(window as any).__cipherMuxSessionVoiceActive = true
+        setVoiceState('ready')
+        setError(null)
       }
-
-      // Get mic access
-      console.log('[VoiceSession] Requesting microphone access...')
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
-      })
-      streamRef.current = stream
-      console.log('[VoiceSession] Microphone access granted, tracks:', stream.getAudioTracks().length)
-
-      const audioCtx = new AudioContext({ sampleRate: 16000 })
-      audioCtxRef.current = audioCtx
-      console.log('[VoiceSession] AudioContext created, sampleRate:', audioCtx.sampleRate)
-
-      // Initialize VAD
-      console.log('[VoiceSession] Initializing VAD...')
-      const { initVAD } = await import('../voice/vad-loader')
-      vadRef.current = await initVAD(stream, audioCtx, {
-        onSpeechStart: () => {
-          console.log('[VoiceSession] VAD: speech start detected')
-          api.voice.vadSpeechStart()
-        },
-        onSpeechEnd: (audio: Float32Array) => {
-          console.log('[VoiceSession] VAD: speech end, samples:', audio.length)
-          api.voice.vadSpeechEnd(Array.from(audio))
-        },
-        onVADMisfire: () => {
-          console.log('[VoiceSession] VAD: misfire')
-          api.voice.vadMisfire()
-        },
-      })
-      console.log('[VoiceSession] VAD initialized, starting...')
-      vadRef.current.start()
-      console.log('[VoiceSession] VAD started')
-
-      // Target MUST be set before routing mode — otherwise first utterance
-      // hits "No session focused" because the router has no target yet.
-      api.voice.setSessionTarget(focusedSessionId)
-      api.voice.setRoutingMode('session')
-      setActive(true)
-      ;(window as any).__cipherMuxSessionVoiceActive = true
-      setVoiceState('ready')
-      setError(null)
-      console.log('[VoiceSession] Voice session ACTIVE, focusedSession:', focusedSessionId)
     } catch (err) {
       console.error('[VoiceSession] Activation error:', err)
       setError((err as Error).message)
+      setMode('off')
     }
-  }, [active, focusedSessionId])
+  }, [mode, focusedSessionId, teardownVAD, initVAD])
+
+  // Legacy toggle for backwards compat (toggles STT)
+  const toggle = useCallback(async () => {
+    await switchMode(mode === 'off' ? 'stt' : 'off')
+  }, [mode, switchMode])
 
   // Listen for voice events from main
   useEffect(() => {
@@ -162,13 +194,14 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
       showToast({ text: msg, type: 'error' })
     }))
 
+    unsubs.push(api.voice.onComState((state: string) => {
+      setComState(state)
+    }))
+
     return () => unsubs.forEach(fn => fn())
   }, [active, showToast])
 
   // PTT hotkey handler (Ctrl+Shift+Space)
-  // In session mode, VAD handles speech detection automatically.
-  // PTT serves as a manual override: keydown forces speech-start,
-  // keyup is a no-op (VAD's onSpeechEnd delivers the audio).
   useEffect(() => {
     if (!active) return
 
@@ -180,7 +213,6 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
         e.preventDefault()
         if (!pttDown) {
           pttDown = true
-          console.log('[VoiceSession] PTT keydown — sending vadSpeechStart')
           api.voice.vadSpeechStart()
         }
       }
@@ -189,9 +221,6 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === PTT_COMBO.code && pttDown) {
         pttDown = false
-        console.log('[VoiceSession] PTT keyup — VAD handles speech end automatically')
-        // No action needed: VAD's onSpeechEnd callback delivers the audio
-        // to the main process for STT processing.
       }
     }
 
@@ -204,12 +233,15 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
   }, [active])
 
   return {
+    mode,
     active,
     recording,
     processing,
     voiceState,
+    comState,
     toast,
     error,
     toggle,
+    switchMode,
   }
 }

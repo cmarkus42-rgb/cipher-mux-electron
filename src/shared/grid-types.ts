@@ -97,14 +97,25 @@ export function computeGridStyle(cols: number, rows: number): { gridTemplateColu
   }
 }
 
-/** Resize grid. Sessions that fall off go to background (no shuffle). */
+/** Resize grid. Sessions stay at their (row, col) position. Overflow goes to background. */
 export function resizeGrid(state: GridState, newConfig: GridConfig): GridState {
   const newTotal = newConfig.cols * newConfig.rows
-  const newSlots: GridSlot[] = Array.from({ length: newTotal }, (_, i) => {
-    if (i < state.slots.length) return { ...state.slots[i] }
-    return { sessionId: null, rowSpan: 1, type: 'session' as const }
-  })
-  // Overflow sessions are NOT redistributed — they go to background
-  // (still alive in tmux, visible in sidebar as background sessions)
+  const oldCols = state.config.cols
+  const newSlots: GridSlot[] = Array.from({ length: newTotal }, () => ({
+    sessionId: null,
+    rowSpan: 1,
+    type: 'session' as const,
+  }))
+  // Map slots by grid position (row, col) — not linear index.
+  // Sessions outside the new bounds silently become background sessions.
+  for (let row = 0; row < newConfig.rows; row++) {
+    for (let col = 0; col < newConfig.cols; col++) {
+      if (row < state.config.rows && col < oldCols) {
+        const oldIdx = row * oldCols + col
+        const newIdx = row * newConfig.cols + col
+        newSlots[newIdx] = { ...state.slots[oldIdx] }
+      }
+    }
+  }
   return { config: newConfig, slots: newSlots }
 }

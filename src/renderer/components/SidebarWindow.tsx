@@ -1,5 +1,5 @@
 import { h } from 'preact'
-import { useCallback, useEffect } from 'preact/hooks'
+import { useState, useCallback, useEffect } from 'preact/hooks'
 import { useSessions } from '../hooks/useSessions'
 import { useContextUsage } from '../hooks/useContextUsage'
 import { useTheme } from '../hooks/useTheme'
@@ -16,6 +16,14 @@ export function SidebarWindow() {
 
   const orchestratorActive = sessions.some(s => s.name === 'Orchestrator' && s.status === 'active')
   const mpoActive = sessions.some(s => s.name === 'MPO' && s.status === 'active')
+  const [voiceComState, setVoiceComState] = useState('idle')
+
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.voice?.onComState) return
+    const unsub = api.voice.onComState((state: string) => setVoiceComState(state))
+    return () => unsub()
+  }, [])
 
   // Auto-close the detached window when there are no active sessions to display.
   // 3-second delay prevents flicker during brief session transitions.
@@ -56,6 +64,7 @@ export function SidebarWindow() {
           onKillSession={handleKillSession}
           activeWorkspaceId={null}
           hasNotesCell={false}
+          voiceComState={voiceComState}
         />
       </div>
     </div>

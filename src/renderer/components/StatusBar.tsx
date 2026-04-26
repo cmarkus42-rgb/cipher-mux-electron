@@ -24,7 +24,6 @@ interface StatusBarProps {
   gridRows: number
   focusedSessionId: string | null
   focusedSessionName: string | null
-  onNewSession: () => void
   onBugreport: () => void
   onToggleTheme: () => void
   onToggleWorkspaces: () => void
@@ -36,7 +35,7 @@ interface StatusBarProps {
 export function StatusBar({
   theme, sidebarVisible, onToggleSidebar,
   gridCols, gridRows, focusedSessionId, focusedSessionName,
-  onNewSession, onBugreport, onToggleTheme, onInfo, onThemeSettings,
+  onBugreport, onToggleTheme, onInfo, onThemeSettings,
   onGridResize, workspacesPopupVisible, onToggleWorkspaces,
 }: StatusBarProps) {
   const { t } = useTranslation()
@@ -56,13 +55,6 @@ export function StatusBar({
           onClick={onToggleWorkspaces}
         >
           {t('statusBar.workspaces')}
-        </button>
-        <button
-          class="status-bar__btn status-bar__btn--add"
-          onClick={onNewSession}
-          title={t('unified.title')}
-        >
-          {t('statusBar.newSession')}
         </button>
         <button class="status-bar__btn" onClick={onBugreport}>{t('statusBar.bugreport')}</button>
         <button

@@ -1069,4 +1069,122 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       }
     }
   )
+
+  // ─── App-Control Tools ─────────────────────────────────
+
+  // 27. mux_grid_resize — Resize the grid
+  ;(server.registerTool as any)(
+    'mux_grid_resize',
+    {
+      description:
+        'Resize the cipher-mux grid layout. Changes the number of columns and rows. '
+        + 'Max 7 cols, 3 rows. Sessions that no longer fit move to background.',
+      inputSchema: {
+        cols: z.number().min(1).max(7).describe('Number of columns (1-7)'),
+        rows: z.number().min(1).max(3).describe('Number of rows (1-3)'),
+      },
+    },
+    async (args: { cols: number; rows: number }) => {
+      if (!ctx.windowManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'WindowManager not available' }) }], isError: true }
+      }
+      ctx.windowManager.sendToMainWindow(IPC.GRID_RESIZE, { cols: args.cols, rows: args.rows })
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, cols: args.cols, rows: args.rows }) }],
+      }
+    }
+  )
+
+  // 28. mux_grid_place — Place a session in a specific grid cell
+  ;(server.registerTool as any)(
+    'mux_grid_place',
+    {
+      description:
+        'Place a session in a specific grid cell (col/row, 0-indexed). '
+        + 'The session must exist. If the cell is occupied, sessions swap positions.',
+      inputSchema: {
+        sessionId: z.string().describe('Session ID (ULID) to place'),
+        col: z.number().min(0).describe('Column index (0-based)'),
+        row: z.number().min(0).describe('Row index (0-based)'),
+      },
+    },
+    async (args: { sessionId: string; col: number; row: number }) => {
+      if (!ctx.windowManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'WindowManager not available' }) }], isError: true }
+      }
+      ctx.windowManager.sendToMainWindow(IPC.GRID_PLACE, {
+        sessionId: args.sessionId,
+        col: args.col,
+        row: args.row,
+      })
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }],
+      }
+    }
+  )
+
+  // 29. mux_session_focus — Focus a session in the grid
+  ;(server.registerTool as any)(
+    'mux_session_focus',
+    {
+      description:
+        'Focus a session in the cipher-mux grid. If the session is in the background, '
+        + 'it will be brought into the grid first.',
+      inputSchema: {
+        sessionId: z.string().describe('Session ID (ULID) to focus'),
+      },
+    },
+    async (args: { sessionId: string }) => {
+      if (!ctx.windowManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'WindowManager not available' }) }], isError: true }
+      }
+      ctx.windowManager.sendToMainWindow(IPC.SESSION_FOCUS, { sessionId: args.sessionId })
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }],
+      }
+    }
+  )
+
+  // 30. mux_session_eject — Eject a session to background
+  ;(server.registerTool as any)(
+    'mux_session_eject',
+    {
+      description:
+        'Eject a session from the grid to the background (sidebar). '
+        + 'The session continues running but is no longer visible in the grid.',
+      inputSchema: {
+        sessionId: z.string().describe('Session ID (ULID) to eject'),
+      },
+    },
+    async (args: { sessionId: string }) => {
+      if (!ctx.windowManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'WindowManager not available' }) }], isError: true }
+      }
+      ctx.windowManager.sendToMainWindow(IPC.SESSION_EJECT, { sessionId: args.sessionId })
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }],
+      }
+    }
+  )
+
+  // 31. mux_sidebar_toggle — Toggle sidebar visibility
+  ;(server.registerTool as any)(
+    'mux_sidebar_toggle',
+    {
+      description:
+        'Toggle the cipher-mux sidebar visibility. Optionally force a specific state.',
+      inputSchema: {
+        visible: z.boolean().optional().describe('Force visible (true) or hidden (false). Omit to toggle.'),
+      },
+    },
+    async (args: { visible?: boolean }) => {
+      if (!ctx.windowManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'WindowManager not available' }) }], isError: true }
+      }
+      ctx.windowManager.sendToMainWindow(IPC.SIDEBAR_TOGGLE, { visible: args.visible })
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }],
+      }
+    }
+  )
 }

@@ -14,8 +14,7 @@ import { RecoveryDialog } from './components/RecoveryDialog'
 import { BugreportDialog } from './components/BugreportDialog'
 import { InfoSettingsView } from './components/InfoSettingsView'
 import { StatusBar } from './components/StatusBar'
-import { UnifiedSessionDialog } from './components/UnifiedSessionDialog'
-import type { PathStartOpts } from './components/UnifiedSessionDialog'
+import type { PathStartOpts } from './components/LauncherCell'
 import { WorkspacePopup } from './components/WorkspacePopup'
 import { GridPlacementPopup } from './components/GridPlacementPopup'
 
@@ -31,10 +30,6 @@ export function App() {
   const [workspacesPopupVisible, setWorkspacesPopupVisible] = useState(false)
   const [placementPopup, setPlacementPopup] = useState<{ sessionId: string } | null>(null)
 
-  // Unified session dialog
-  const [unifiedDialogVisible, setUnifiedDialogVisible] = useState(false)
-  const [unifiedDialogSlotIndex, setUnifiedDialogSlotIndex] = useState<number | null>(null)
-
   const { sessions, startSession, stopSession, refresh: refreshSessions } = useSessions()
   const contextUsages = useContextUsage()
   const { scanning, rescan } = useProjects()
@@ -42,6 +37,15 @@ export function App() {
   const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot, restoreGrid } = useGrid(panelWidthRef.current)
   const { theme, setTheme, toggleTheme, customThemes, activeCustomThemeId, selectCustomTheme, saveCustomTheme, deleteCustomTheme } = useTheme()
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
+  const [voiceComState, setVoiceComState] = useState('idle')
+
+  // Listen for voice COM state changes
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.voice?.onComState) return
+    const unsub = api.voice.onComState((state: string) => setVoiceComState(state))
+    return () => unsub()
+  }, [])
 
   // Global keyboard shortcuts
   const shortcutEntries = useMemo(() => [
@@ -55,7 +59,13 @@ export function App() {
       combo: 'Cmd+N',
       label: t('unified.title'),
       category: 'Aktionen' as const,
-      action: () => { setUnifiedDialogSlotIndex(null); setUnifiedDialogVisible(true) },
+      action: () => {
+        // Find first empty launcher cell and trigger its popup via custom event
+        const firstEmpty = grid.slots.findIndex(s => !s.sessionId && s.type !== 'notes')
+        if (firstEmpty >= 0) {
+          window.dispatchEvent(new CustomEvent('launcher-open', { detail: { slotIndex: firstEmpty } }))
+        }
+      },
     },
     {
       combo: 'Escape',
@@ -63,16 +73,15 @@ export function App() {
       category: 'Navigation' as const,
       action: () => {
         const anyOverlayOpen = bugreportVisible || infoVisible ||
-          unifiedDialogVisible || workspacesPopupVisible || !!placementPopup
+          workspacesPopupVisible || !!placementPopup
         if (!anyOverlayOpen) return false
         setBugreportVisible(false)
         setInfoVisible(false)
-        setUnifiedDialogVisible(false)
         setWorkspacesPopupVisible(false)
         setPlacementPopup(null)
       },
     },
-  ], [t, bugreportVisible, infoVisible, unifiedDialogVisible, workspacesPopupVisible, placementPopup])
+  ], [t, bugreportVisible, infoVisible, workspacesPopupVisible, placementPopup, grid.slots])
   useShortcuts(shortcutEntries)
 
   const focusedSessionName = useMemo(() => {
@@ -197,15 +206,50 @@ export function App() {
     return () => unsub()
   }, [addSession, refreshSessions])
 
-  const handleLaunch = useCallback((slotIndex: number) => {
-    setUnifiedDialogSlotIndex(slotIndex)
-    setUnifiedDialogVisible(true)
-  }, [])
+  // ── Grid Control (MCP App-Control) ──
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api.gridControl) return
+    const unsubs: Array<() => void> = []
 
-  const handleOpenSession = useCallback((slotIndex: number) => {
-    setUnifiedDialogSlotIndex(slotIndex)
-    setUnifiedDialogVisible(true)
-  }, [])
+    if (api.gridControl.onGridResize) {
+      unsubs.push(api.gridControl.onGridResize((data: { cols: number; rows: number }) => {
+        resize(data.cols, data.rows)
+      }))
+    }
+    if (api.gridControl.onGridPlace) {
+      unsubs.push(api.gridControl.onGridPlace((data: { sessionId: string; col: number; row: number }) => {
+        const targetIdx = data.row * grid.config.cols + data.col
+        setSessionAtSlot(targetIdx, data.sessionId)
+      }))
+    }
+    if (api.gridControl.onSessionFocus) {
+      unsubs.push(api.gridControl.onSessionFocus((data: { sessionId: string }) => {
+        // If session is in background, bring it to grid
+        const inGrid = grid.slots.some(s => s.sessionId === data.sessionId)
+        if (!inGrid) {
+          addSession(data.sessionId)
+        }
+        setFocusedSessionId(data.sessionId)
+      }))
+    }
+    if (api.gridControl.onSessionEject) {
+      unsubs.push(api.gridControl.onSessionEject((data: { sessionId: string }) => {
+        removeSession(data.sessionId)
+      }))
+    }
+    if (api.gridControl.onSidebarToggle) {
+      unsubs.push(api.gridControl.onSidebarToggle((data: { visible?: boolean }) => {
+        if (data.visible !== undefined) {
+          setSidebarVisible(data.visible)
+        } else {
+          setSidebarVisible(v => !v)
+        }
+      }))
+    }
+
+    return () => unsubs.forEach(fn => fn())
+  }, [resize, setSessionAtSlot, addSession, removeSession, grid.config.cols, grid.slots])
 
   const handleOpenNotes = useCallback((slotIndex: number) => {
     setSlotType(slotIndex, 'notes')
@@ -218,9 +262,19 @@ export function App() {
 
   const handleSwitchProject = useCallback((sessionId: string) => {
     const slotIdx = grid.slots.findIndex(s => s.sessionId === sessionId)
-    setUnifiedDialogSlotIndex(slotIdx >= 0 ? slotIdx : null)
-    setUnifiedDialogVisible(true)
-  }, [grid.slots])
+    if (slotIdx >= 0) {
+      // Remove session from slot to show launcher, which user can interact with
+      removeSession(sessionId)
+    }
+  }, [grid.slots, removeSession])
+
+  const handleSendToBackground = useCallback((sessionId: string) => {
+    removeSession(sessionId)
+    if (focusedSessionId === sessionId) {
+      const remaining = grid.slots.find((s) => s.sessionId && s.sessionId !== sessionId)
+      setFocusedSessionId(remaining?.sessionId ?? null)
+    }
+  }, [removeSession, focusedSessionId, grid.slots])
 
   const handleCloseSession = useCallback(async (sessionId: string) => {
     await stopSession(sessionId)
@@ -373,16 +427,26 @@ export function App() {
     }
   }, [orchestratorSessionId, mpoSessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
 
-  const handleStartEntity = useCallback(async (entityId: EntityId) => {
+  const handleStartEntity = useCallback(async (entityId: EntityId, slotIndex: number) => {
     const api = (window as any).cipherMux
     if (entityId === 'orchestrator') {
       const session = await api.orchestrator.start()
       const sid = session?.sessionId ?? session?.id
-      if (sid) placeOrchestrator(sid)
+      if (sid) {
+        setOrchestratorSessionId(sid)
+        setSessionAtSlot(slotIndex, sid)
+        setFocusedSessionId(sid)
+      }
       return
     }
     if (entityId === 'mpo') {
-      await api.mpo.start()
+      const session = await api.mpo.start()
+      const sid = session?.sessionId ?? session?.id
+      if (sid) {
+        setMpoSessionId(sid)
+        setSessionAtSlot(slotIndex, sid)
+        setFocusedSessionId(sid)
+      }
       return
     }
     const session = await api.entity.start(entityId)
@@ -394,9 +458,10 @@ export function App() {
         case 'voice-relay': setVoiceRelaySessionId(sid); break
         case 'audit': setAuditSessionId(sid); break
       }
-      placeEntity(sid)
+      setSessionAtSlot(slotIndex, sid)
+      setFocusedSessionId(sid)
     }
-  }, [placeOrchestrator, placeEntity])
+  }, [setSessionAtSlot])
 
   const handleFocusEntity = useCallback((entityId: EntityId) => {
     const sid = getEntitySessionId(entityId)
@@ -410,7 +475,7 @@ export function App() {
     }
   }, [getEntitySessionId, grid.slots, placeEntity])
 
-  const handleUnifiedPathStart = useCallback(async (dirPath: string, opts: PathStartOpts) => {
+  const handlePathStart = useCallback(async (dirPath: string, opts: PathStartOpts, slotIndex: number) => {
     try {
       const name = dirPath.split('/').filter(Boolean).pop() ?? 'session'
       let autoLaunch: string | undefined
@@ -427,16 +492,22 @@ export function App() {
         autoLaunch,
         resume: opts.resume,
       })
-      if (unifiedDialogSlotIndex !== null) {
-        setSessionAtSlot(unifiedDialogSlotIndex, session.id)
-      } else {
-        setPlacementPopup({ sessionId: session.id })
-      }
+      setSessionAtSlot(slotIndex, session.id)
       setFocusedSessionId(session.id)
     } catch (err) {
       console.error('[App] Failed to start session:', err)
     }
-  }, [startSession, addSession, setSessionAtSlot, unifiedDialogSlotIndex])
+  }, [startSession, setSessionAtSlot])
+
+  const handleOpenNote = useCallback((note: any, slotIndex: number) => {
+    setSlotType(slotIndex, 'notes')
+    setSidebarVisible(true)
+    // After a small delay, trigger the note to open in the NotesCell
+    setTimeout(() => {
+      const openFn = (window as any).__notesCell_openNote
+      if (openFn) openFn(note)
+    }, 100)
+  }, [setSlotType])
 
   // Listen for entity-started events
   useEffect(() => {
@@ -493,15 +564,19 @@ export function App() {
           theme={theme}
           orchestratorSessionId={orchestratorSessionId}
           activeWorkspaceId={activeWorkspaceId}
+          entityStatus={entityStatus}
           onFocusSession={setFocusedSessionId}
           onCloseSession={handleCloseSession}
           onSwitchProject={handleSwitchProject}
           onToggleExpand={toggleExpand}
           onShell={handleShell}
           onFork={handleFork}
-          onLaunch={handleLaunch}
-          onOpenSession={handleOpenSession}
+          onSendToBackground={handleSendToBackground}
+          onStartEntity={handleStartEntity}
+          onFocusEntity={handleFocusEntity}
+          onStartPath={handlePathStart}
           onOpenNotes={handleOpenNotes}
+          onOpenNote={handleOpenNote}
           onCloseNotes={handleCloseNotes}
           onToggleExpandSlot={toggleExpandSlot}
           onSwap={swap}
@@ -519,6 +594,7 @@ export function App() {
             onDetach={handleSidebarDetach}
             activeWorkspaceId={activeWorkspaceId}
             hasNotesCell={grid.slots.some(s => s.type === 'notes')}
+            voiceComState={voiceComState}
           />
         )}
       </div>
@@ -532,7 +608,6 @@ export function App() {
         gridRows={grid.config.rows}
         focusedSessionId={focusedSessionId}
         focusedSessionName={focusedSessionName}
-        onNewSession={() => { setUnifiedDialogSlotIndex(null); setUnifiedDialogVisible(true) }}
         onBugreport={() => setBugreportVisible(true)}
         onToggleTheme={toggleTheme}
         onToggleWorkspaces={handleToggleWorkspaces}
@@ -561,14 +636,6 @@ export function App() {
         onResize={handleResize}
       />
       <RecoveryDialog onDone={() => {}} onAdopt={addSession} onRecovered={handleRecovered} />
-      <UnifiedSessionDialog
-        visible={unifiedDialogVisible}
-        onClose={() => setUnifiedDialogVisible(false)}
-        onStartEntity={handleStartEntity}
-        onFocusEntity={handleFocusEntity}
-        onStartPath={handleUnifiedPathStart}
-        entityStatus={entityStatus}
-      />
       <BugreportDialog
         visible={bugreportVisible}
         onClose={() => setBugreportVisible(false)}

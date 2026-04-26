@@ -41,7 +41,12 @@ export class NoteManager {
       return null
     }
 
-    const parsed = matter(raw)
+    let parsed: matter.GrayMatterFile<string>
+    try {
+      parsed = matter(raw)
+    } catch {
+      return null
+    }
     const fm = parsed.data as {
       title?: string
       tags?: string[]

@@ -64,19 +64,47 @@ export class ClaudeCodeAdapter implements AgentAdapter {
   /**
    * Post-launch injection: register MCP server in Claude Code's settings.
    *
-   * Uses TWO paths to work around BUG-mcp-tools-not-loaded:
-   * 1. `claude mcp add-json` CLI command (official API)
-   * 2. Direct write to `~/.claude/projects/<hash>/settings.json` (caching bug workaround)
+   * Uses THREE paths to ensure MCP tools are always available:
+   * 1. Direct write to `<project>/.claude/settings.local.json` (most reliable — we control this file)
+   * 2. `claude mcp add-json` CLI command (official API)
+   * 3. Direct write to `~/.claude/projects/<hash>/settings.json` (project-scoped fallback)
    */
   async postLaunchInjection(ctx: AdapterContext): Promise<void> {
-    const serverJson = JSON.stringify({
+    const mcpServerConfig = {
       type: 'http',
       url: ctx.mcpUrl,
       headers: { Authorization: `Bearer ${ctx.mcpApiKey}` },
-    })
+    }
 
-    // Path 1: CLI command
+    // Path 1: Direct write to local settings.local.json (most reliable)
+    // This is the same file used by statusLine hook — Claude Code always reads it.
     try {
+      const claudeDir = path.join(ctx.projectPath, '.claude')
+      const localSettingsPath = path.join(claudeDir, 'settings.local.json')
+
+      fs.mkdirSync(claudeDir, { recursive: true })
+
+      let settings: Record<string, unknown> = {}
+      try {
+        settings = JSON.parse(fs.readFileSync(localSettingsPath, 'utf-8'))
+      } catch {
+        // File doesn't exist or invalid JSON — start fresh
+      }
+
+      if (!settings.mcpServers || typeof settings.mcpServers !== 'object') {
+        settings.mcpServers = {}
+      }
+      ;(settings.mcpServers as Record<string, unknown>)['cipher-mux'] = mcpServerConfig
+
+      fs.writeFileSync(localSettingsPath, JSON.stringify(settings, null, 2), 'utf-8')
+    } catch (err) {
+      console.warn('[ClaudeCodeAdapter] Local settings.local.json write failed:', err)
+    }
+
+    // Path 2: CLI command
+    try {
+      const serverJson = JSON.stringify(mcpServerConfig)
+
       await runCommand('claude', [
         'mcp', 'remove', '-s', 'local', 'cipher-mux',
       ], { cwd: ctx.projectPath, timeout: 10_000 }).catch(() => {})
@@ -88,9 +116,14 @@ export class ClaudeCodeAdapter implements AgentAdapter {
       console.warn('[ClaudeCodeAdapter] CLI MCP registration failed:', err)
     }
 
-    // Path 2: Direct settings.json manipulation (BUG-mcp-tools-not-loaded fix)
+    // Path 3: Direct settings.json in ~/.claude/projects/<hash>/
+    // Claude Code hashes paths by replacing / with - AND stripping leading
+    // dots from path components (e.g. /.config/ → --config- not -.config-).
     try {
-      const projectHash = ctx.projectPath.replace(/\//g, '-')
+      const projectHash = ctx.projectPath
+        .split('/')
+        .map(seg => seg.replace(/^\./g, ''))
+        .join('-')
       const settingsDir = path.join(os.homedir(), '.claude', 'projects', projectHash)
       const settingsPath = path.join(settingsDir, 'settings.json')
 
@@ -106,11 +139,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
       if (!settings.mcpServers || typeof settings.mcpServers !== 'object') {
         settings.mcpServers = {}
       }
-      ;(settings.mcpServers as Record<string, unknown>)['cipher-mux'] = {
-        type: 'http',
-        url: ctx.mcpUrl,
-        headers: { Authorization: `Bearer ${ctx.mcpApiKey}` },
-      }
+      ;(settings.mcpServers as Record<string, unknown>)['cipher-mux'] = mcpServerConfig
 
       fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
     } catch (err) {

@@ -129,6 +129,7 @@ export class IpcHub {
     this.registerCharacterChannels()
     this.registerWorkspaceChannels()
     this.registerNoteChannels()
+    this.registerGridControlChannels()
     this.registerEntityChannels()
     this.registerCompanionChannels()
     this.setupEventForwarding()
@@ -622,7 +623,7 @@ export class IpcHub {
     ipcMain.handle(IPC.WINDOW_OPEN_WORKSPACES, (_e, initialTab?: string) => {
       // Map legacy 'personas' tab to 'companion'
       const tab = initialTab === 'personas' ? 'companion' : initialTab
-      this.windowManager.openWorkspacesWindow(tab as 'workspaces' | 'companion' | undefined)
+      this.windowManager.openWorkspacesWindow(tab as 'workspaces' | 'companion' | 'tags' | undefined)
     })
 
     ipcMain.handle(IPC.SIDEBAR_DETACH, () => {
@@ -962,6 +963,93 @@ export class IpcHub {
       }
     })
 
+    // ── COM Mode (Voice Companion) ──
+
+    ipcMain.handle(IPC.VOICE_START_COM, async () => {
+      console.log('[Voice] VOICE_START_COM handler invoked')
+      try {
+        // Shut down any existing voice manager
+        if (this.voiceManager) {
+          this.voiceManager.shutdown()
+          this.voiceManager = null as any
+        }
+
+        // Create VoiceManager WITH TTS for COM mode
+        console.log('[Voice] Creating VoiceManager for COM mode (with TTS)')
+        this.voiceManager = new VoiceManager({ skipTTS: false })
+        const transport: ConversationTransport = {
+          sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
+          sendStopCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'processing'),
+          sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
+          sendAudioPlayback: () => this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'speaking'),
+          sendStateChange: (state) => {
+            this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state)
+            this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, state)
+          },
+          sendStopPlayback: () => this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'idle'),
+          sendGenerationDone: () => this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'idle'),
+          dispatchStatus: (text: string, level: string) => console.log(`[Voice:${level}] ${text}`),
+          cancelStream: () => {},
+        }
+        this.voiceManager.setTransport(transport)
+        await this.voiceManager.init()
+
+        // Start session mode (which wires input/output routers)
+        console.log('[Voice] Starting session mode for COM...')
+        const inputRouter = this.voiceManager.startSessionMode(this.sessionManager)
+        inputRouter.on('dispatched', (data: { sessionId: string; sessionName: string; text: string }) => {
+          console.log('[Voice] COM dispatched to:', data.sessionName, 'text:', data.text.slice(0, 80))
+          this.windowManager.sendToMainWindow(IPC.VOICE_DISPATCHED, data)
+        })
+        inputRouter.on('error', (data: { code: string; message: string }) => {
+          this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, data.message)
+        })
+
+        // Start voice-relay entity as background session
+        if (!this.sessionManager.isEntityRunning('voice-relay')) {
+          console.log('[Voice] Starting voice-relay entity...')
+          await this.sessionManager.startEntity('voice-relay')
+          // Output routing is auto-started by entity-started event handler
+        } else {
+          // Already running — just start output routing
+          this.voiceManager.startOutputRouting()
+        }
+
+        this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'idle')
+        console.log('[Voice] VOICE_START_COM => ok')
+        return { ok: true }
+      } catch (err) {
+        const msg = (err as Error).message
+        console.error('[Voice] VOICE_START_COM error:', msg)
+        if (this.voiceManager && !this.voiceManager.isInitialized()) {
+          this.voiceManager.shutdown()
+          this.voiceManager = null
+        }
+        this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, msg)
+        return { ok: false, error: msg }
+      }
+    })
+
+    ipcMain.handle(IPC.VOICE_STOP_COM, async () => {
+      console.log('[Voice] VOICE_STOP_COM handler invoked')
+      try {
+        // Stop output routing
+        if (this.voiceManager) {
+          this.voiceManager.stopOutputRouting()
+          this.voiceManager.shutdown()
+          this.voiceManager = null
+        }
+        // Stop voice-relay entity
+        if (this.sessionManager.isEntityRunning('voice-relay')) {
+          await this.sessionManager.stopEntity('voice-relay')
+        }
+        this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'idle')
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: (err as Error).message }
+      }
+    })
+
     ipcMain.on(IPC.VOICE_SET_ROUTING_MODE, (_event, { mode }: { mode: 'session' | 'off' }) => {
       this.voiceManager?.getInputRouter()?.setMode(mode)
     })
@@ -1196,7 +1284,8 @@ export class IpcHub {
   private registerNoteChannels(): void {
     ipcMain.handle(IPC.NOTES_LIST, async (_e, { scope }: { scope?: string }) => {
       try {
-        if (scope) return await this.noteManager.list(scope)
+        // Always list all notes — global + workspace-scoped.
+        // Scope-specific listing missed global notes when a workspace was active.
         return await this.noteManager.listAll()
       } catch (err) {
         console.error('[IpcHub] NOTES_LIST failed:', err)
@@ -1244,6 +1333,72 @@ export class IpcHub {
 
     ipcMain.handle(IPC.NOTES_TAGS, async () => {
       return this.noteTagging.getTagRepository()
+    })
+
+    ipcMain.handle(IPC.NOTES_TAG_LIST, async () => {
+      this.noteTagging.recountTags()
+      const repo = this.noteTagging.getTagRepository()
+      const tags = Object.entries(repo.tags).map(([name, entry]) => ({
+        name,
+        count: entry.count,
+        description: entry.description,
+        isSeed: this.noteTagging.isSeedTag(name),
+      }))
+      return tags
+    })
+
+    ipcMain.handle(IPC.NOTES_TAG_CREATE, async (_e, { name, description }: { name: string; description: string }) => {
+      const ok = this.noteTagging.createTag(name, description)
+      return { ok }
+    })
+
+    ipcMain.handle(IPC.NOTES_TAG_RENAME, async (_e, { oldName, newName }: { oldName: string; newName: string }) => {
+      const affected = this.noteTagging.renameTag(oldName, newName)
+      if (affected.length > 0) {
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+      }
+      return { ok: affected.length >= 0, affected: affected.length }
+    })
+
+    ipcMain.handle(IPC.NOTES_TAG_UPDATE, async (_e, { name, description }: { name: string; description: string }) => {
+      const ok = this.noteTagging.updateTagDescription(name, description)
+      return { ok }
+    })
+
+    ipcMain.handle(IPC.NOTES_TAG_DELETE, async (_e, { name }: { name: string }) => {
+      const affected = this.noteTagging.deleteTag(name)
+      if (affected.length > 0) {
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+      }
+      return { ok: true, affected: affected.length }
+    })
+  }
+
+  // ─── Grid Control (MCP App-Control) ─────────────────────
+  private registerGridControlChannels(): void {
+    ipcMain.handle(IPC.GRID_RESIZE, (_e, { cols, rows }: { cols: number; rows: number }) => {
+      this.windowManager.sendToMainWindow(IPC.GRID_RESIZE, { cols, rows })
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.GRID_PLACE, (_e, { sessionId, col, row }: { sessionId: string; col: number; row: number }) => {
+      this.windowManager.sendToMainWindow(IPC.GRID_PLACE, { sessionId, col, row })
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.SESSION_FOCUS, (_e, { sessionId }: { sessionId: string }) => {
+      this.windowManager.sendToMainWindow(IPC.SESSION_FOCUS, { sessionId })
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.SESSION_EJECT, (_e, { sessionId }: { sessionId: string }) => {
+      this.windowManager.sendToMainWindow(IPC.SESSION_EJECT, { sessionId })
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.SIDEBAR_TOGGLE, (_e, { visible }: { visible?: boolean }) => {
+      this.windowManager.sendToMainWindow(IPC.SIDEBAR_TOGGLE, { visible })
+      return { ok: true }
     })
   }
 

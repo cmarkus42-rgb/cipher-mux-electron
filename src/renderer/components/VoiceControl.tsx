@@ -1,13 +1,12 @@
 /**
- * VoiceControl — Floating Pill for voice-to-session input.
+ * VoiceControl — 3-state radio selector for voice modes: OFF / STT / COM.
  *
- * Sits bottom-left of the app. Shows a cyberpunk CSS toggle switch
- * with LED indicator. Expanded (when active): LED + mode badge + hint.
- * Toast overlays for transcription preview and dispatch feedback.
+ * Sits in the StatusBar. Three square radio buttons with LED indicator
+ * and session target display.
  */
 
 import { useTranslation } from 'react-i18next'
-import { useVoiceSession } from '../hooks/useVoiceSession'
+import { useVoiceSession, type VoiceMode } from '../hooks/useVoiceSession'
 
 interface VoiceControlProps {
   focusedSessionId: string | null
@@ -15,15 +14,23 @@ interface VoiceControlProps {
   inline?: boolean
 }
 
+const MODES: VoiceMode[] = ['off', 'stt', 'com']
+const MODE_LABELS: Record<VoiceMode, string> = {
+  off: 'OFF',
+  stt: 'STT',
+  com: 'COM',
+}
+
 export function VoiceControl({ focusedSessionId, focusedSessionName, inline }: VoiceControlProps) {
   const { t } = useTranslation()
   const {
+    mode,
     active,
     recording,
     processing,
     toast,
     error,
-    toggle,
+    switchMode,
   } = useVoiceSession(focusedSessionId, focusedSessionName)
 
   const ledClass = recording
@@ -43,30 +50,36 @@ export function VoiceControl({ focusedSessionId, focusedSessionName, inline }: V
         </div>
       )}
 
-      {/* Error display — full message in title for tooltip on hover */}
+      {/* Error display */}
       {error && !active && (
         <div class="voice-toast voice-toast--error" title={error}>
           {error.length > 60 ? error.slice(0, 60) + '...' : error}
         </div>
       )}
 
-      {/* Toggle switch + LED */}
-      <label
-        class="voice-switch"
-        title={active ? t('voiceControl.disable') : t('voiceControl.enable')}
-      >
-        <input
-          type="checkbox"
-          checked={active}
-          onChange={toggle}
-        />
-        <span class="voice-switch__track" />
-      </label>
+      {/* 3-state radio buttons */}
+      <div class="voice-radio-group">
+        {MODES.map(m => (
+          <button
+            key={m}
+            class={`voice-radio${mode === m ? ' voice-radio--active' : ''}${m !== 'off' && mode === m ? ` voice-radio--${m}` : ''}`}
+            onClick={() => switchMode(m)}
+            title={t(`voiceControl.mode_${m}`, MODE_LABELS[m])}
+          >
+            {MODE_LABELS[m]}
+          </button>
+        ))}
+      </div>
       <span class={ledClass} />
 
-      {/* Inline: compact session target hint */}
-      {inline && active && focusedSessionName && (
+      {/* Session target hint (STT mode, inline) */}
+      {inline && active && focusedSessionName && mode === 'stt' && (
         <span class="voice-pill__target">{focusedSessionName}</span>
+      )}
+
+      {/* COM mode indicator */}
+      {inline && mode === 'com' && (
+        <span class="voice-pill__target">Voice Relay</span>
       )}
     </div>
   )

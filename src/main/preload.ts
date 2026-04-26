@@ -204,10 +204,59 @@ const api = {
     delete: (id: string, scope: string) =>
       ipcRenderer.invoke(IPC.NOTES_DELETE, { id, scope }),
     tags: () => ipcRenderer.invoke(IPC.NOTES_TAGS),
+    tagList: (): Promise<Array<{ name: string; count: number; description: string; isSeed: boolean }>> =>
+      ipcRenderer.invoke(IPC.NOTES_TAG_LIST),
+    tagCreate: (name: string, description: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.NOTES_TAG_CREATE, { name, description }),
+    tagRename: (oldName: string, newName: string): Promise<{ ok: boolean; affected: number }> =>
+      ipcRenderer.invoke(IPC.NOTES_TAG_RENAME, { oldName, newName }),
+    tagUpdate: (name: string, description: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.NOTES_TAG_UPDATE, { name, description }),
+    tagDelete: (name: string): Promise<{ ok: boolean; affected: number }> =>
+      ipcRenderer.invoke(IPC.NOTES_TAG_DELETE, { name }),
     onChanged: (cb: (data: unknown) => void) => {
       const handler = (_e: unknown, data: unknown) => cb(data)
       ipcRenderer.on(IPC.NOTES_CHANGED, handler)
       return () => ipcRenderer.removeListener(IPC.NOTES_CHANGED, handler)
+    },
+  },
+
+  // ─── Grid Control ───────��──────────────────────────────
+  gridControl: {
+    resize: (cols: number, rows: number): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.GRID_RESIZE, { cols, rows }),
+    place: (sessionId: string, col: number, row: number): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.GRID_PLACE, { sessionId, col, row }),
+    focus: (sessionId: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.SESSION_FOCUS, { sessionId }),
+    eject: (sessionId: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.SESSION_EJECT, { sessionId }),
+    sidebarToggle: (visible?: boolean): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.SIDEBAR_TOGGLE, { visible }),
+    onGridResize: (cb: (data: { cols: number; rows: number }) => void) => {
+      const handler = (_e: unknown, data: { cols: number; rows: number }) => cb(data)
+      ipcRenderer.on(IPC.GRID_RESIZE, handler)
+      return () => ipcRenderer.removeListener(IPC.GRID_RESIZE, handler)
+    },
+    onGridPlace: (cb: (data: { sessionId: string; col: number; row: number }) => void) => {
+      const handler = (_e: unknown, data: { sessionId: string; col: number; row: number }) => cb(data)
+      ipcRenderer.on(IPC.GRID_PLACE, handler)
+      return () => ipcRenderer.removeListener(IPC.GRID_PLACE, handler)
+    },
+    onSessionFocus: (cb: (data: { sessionId: string }) => void) => {
+      const handler = (_e: unknown, data: { sessionId: string }) => cb(data)
+      ipcRenderer.on(IPC.SESSION_FOCUS, handler)
+      return () => ipcRenderer.removeListener(IPC.SESSION_FOCUS, handler)
+    },
+    onSessionEject: (cb: (data: { sessionId: string }) => void) => {
+      const handler = (_e: unknown, data: { sessionId: string }) => cb(data)
+      ipcRenderer.on(IPC.SESSION_EJECT, handler)
+      return () => ipcRenderer.removeListener(IPC.SESSION_EJECT, handler)
+    },
+    onSidebarToggle: (cb: (data: { visible?: boolean }) => void) => {
+      const handler = (_e: unknown, data: { visible?: boolean }) => cb(data)
+      ipcRenderer.on(IPC.SIDEBAR_TOGGLE, handler)
+      return () => ipcRenderer.removeListener(IPC.SIDEBAR_TOGGLE, handler)
     },
   },
 
@@ -321,6 +370,8 @@ const api = {
     },
     // Session voice input
     startSession: () => ipcRenderer.invoke(IPC.VOICE_START_SESSION),
+    startCom: () => ipcRenderer.invoke(IPC.VOICE_START_COM),
+    stopCom: () => ipcRenderer.invoke(IPC.VOICE_STOP_COM),
     setRoutingMode: (mode: 'session' | 'off') =>
       ipcRenderer.send(IPC.VOICE_SET_ROUTING_MODE, { mode }),
     setSessionTarget: (sessionId: string | null) =>
@@ -329,6 +380,11 @@ const api = {
       const handler = (_e: unknown, data: { sessionId: string; sessionName: string; text: string }) => cb(data)
       ipcRenderer.on(IPC.VOICE_DISPATCHED, handler)
       return () => ipcRenderer.removeListener(IPC.VOICE_DISPATCHED, handler)
+    },
+    onComState: (cb: (state: string) => void) => {
+      const handler = (_e: unknown, state: string) => cb(state)
+      ipcRenderer.on(IPC.VOICE_COM_STATE, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_COM_STATE, handler)
     },
   },
 

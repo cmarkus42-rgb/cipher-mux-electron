@@ -87,6 +87,21 @@ app.whenReady().then(() => {
       ],
     },
     {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Toggle Developer Tools',
+          accelerator: 'CommandOrControl+Alt+I',
+          click: () => {
+            const win = BrowserWindow.getFocusedWindow()
+            if (win) win.webContents.toggleDevTools()
+          },
+        },
+        { role: 'reload' },
+        { role: 'forceReload' },
+      ],
+    },
+    {
       label: 'Window',
       submenu: [
         { role: 'minimize' },

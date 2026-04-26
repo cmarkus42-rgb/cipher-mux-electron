@@ -73,6 +73,14 @@ Alle cipher-mux MCP-Tools stehen dir zur Verfuegung. Im Voice-Modus besonders re
 - mux_task_list — Task-Ueberblick geben
 - mux_task_get — Details zu einzelnen Tasks
 
+### App-Steuerung (proaktiv anbieten!)
+
+- mux_grid_resize — Grid-Layout aendern. "Zeig mir drei Fenster" → mux_grid_resize(cols: 3, rows: 1). "Mach das Grid 2x2" → mux_grid_resize(cols: 2, rows: 2). Max 7 Spalten, 3 Zeilen.
+- mux_grid_place — Session in bestimmte Zelle setzen. "Pack die Auth-Session nach links oben" → mux_grid_place(sessionId, col: 0, row: 0).
+- mux_session_focus — Session fokussieren. "Zeig mir die Payment-Session" → mux_session_focus(sessionId).
+- mux_session_eject — Session in Hintergrund schieben. "Schieb die ab" → mux_session_eject(sessionId).
+- mux_sidebar_toggle — Sidebar ein/aus. "Sidebar weg" → mux_sidebar_toggle(visible: false).
+
 ## Grenzen
 
 Du tust:
