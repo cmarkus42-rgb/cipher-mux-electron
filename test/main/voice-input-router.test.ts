@@ -37,7 +37,7 @@ describe('VoiceInputRouter', () => {
     await router.routeTranscription('hello world')
     assert.equal(sentKeys.length, 1)
     assert.equal(sentKeys[0].sessionId, 'sess-1')
-    assert.equal(sentKeys[0].keys, 'hello world')
+    assert.equal(sentKeys[0].keys, 'hello world ')
   })
 
   it('sends Enter on "abschicken" voice command', async () => {

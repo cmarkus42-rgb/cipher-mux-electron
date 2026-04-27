@@ -34,6 +34,7 @@
   "notesCell.newNoteButton": "+ neue note",
   "notesCell.confirmDelete": "Note \"{{title}}\" wirklich löschen?",
   "notesCell.newTitle": "(new)",
+  "notesCell.untitled": "Ohne Titel",
 
   "paneHeader.ctxDisabled": "CTX —",
 
