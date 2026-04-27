@@ -30,6 +30,7 @@ export function App() {
   const [themeEditorActive, setThemeEditorActive] = useState(false)
   const [workspacesPopupVisible, setWorkspacesPopupVisible] = useState(false)
   const [placementPopup, setPlacementPopup] = useState<{ sessionId: string } | { note: any } | null>(null)
+  const [pendingLauncherSlot, setPendingLauncherSlot] = useState<number | null>(null)
 
   const { sessions, startSession, stopSession, refresh: refreshSessions } = useSessions()
   const contextUsages = useContextUsage()
@@ -47,6 +48,14 @@ export function App() {
     const unsub = api.voice.onComState((state: string) => setVoiceComState(state))
     return () => unsub()
   }, [])
+
+  // After grid re-render from project switch, dispatch launcher-open to the now-mounted LauncherCell
+  useEffect(() => {
+    if (pendingLauncherSlot !== null) {
+      window.dispatchEvent(new CustomEvent('launcher-open', { detail: { slotIndex: pendingLauncherSlot } }))
+      setPendingLauncherSlot(null)
+    }
+  }, [pendingLauncherSlot])
 
   // Global keyboard shortcuts
   const shortcutEntries = useMemo(() => [
@@ -264,12 +273,9 @@ export function App() {
   const handleSwitchProject = useCallback((sessionId: string) => {
     const slotIdx = grid.slots.findIndex(s => s.sessionId === sessionId)
     if (slotIdx >= 0) {
-      // Remove session from slot to show launcher, which user can interact with
+      // Remove session from slot to show launcher, then open its popup after re-render
       removeSession(sessionId)
-      // After next render (LauncherCell mounts), open its popup automatically
-      requestAnimationFrame(() => {
-        window.dispatchEvent(new CustomEvent('launcher-open', { detail: { slotIndex: slotIdx } }))
-      })
+      setPendingLauncherSlot(slotIdx)
     }
   }, [grid.slots, removeSession])
 
