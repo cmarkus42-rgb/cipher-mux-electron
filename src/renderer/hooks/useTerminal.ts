@@ -36,8 +36,35 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
   const termRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const fitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Timer for post-resize capture-pane re-sync with tmux. */
+  const resyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   /** Last cols/rows sent to tmux — skip IPC if unchanged. */
   const lastSizeRef = useRef<{ cols: number; rows: number }>({ cols: 0, rows: 0 })
+
+  /**
+   * Re-sync xterm.js buffer with tmux's actual pane content via capture-pane.
+   * Called after resize to fix reflow mismatch: xterm.js reflows its buffer
+   * internally when cols change, but tmux reflows differently. Without re-sync,
+   * lines fragment and text appears garbled (T-LC.7).
+   */
+  const scheduleResync = useCallback(() => {
+    if (resyncTimerRef.current) clearTimeout(resyncTimerRef.current)
+    resyncTimerRef.current = setTimeout(() => {
+      resyncTimerRef.current = null
+      const term = termRef.current
+      if (!term) return
+      api().terminal.capture(sessionId).then((content: string) => {
+        if (!term || !termRef.current) return
+        if (content?.trim()) {
+          term.reset()
+          term.write(content.replace(/\n/g, '\r\n'), () => {
+            term.scrollToBottom()
+            try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
+          })
+        }
+      }).catch(() => { /* session may not be ready */ })
+    }, 200)
+  }, [sessionId])
 
   /**
    * Debounced fit: coalesces all resize triggers into a single fit() call
@@ -65,14 +92,14 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
         if (cols !== last.cols || rows !== last.rows) {
           lastSizeRef.current = { cols, rows }
           api().terminal.resize(sessionId, cols, rows)
-          // Force full re-render after resize to prevent line fragmentation
-          term.refresh(0, rows - 1)
+          // Re-sync with tmux after resize to fix xterm.js/tmux reflow mismatch
+          scheduleResync()
         }
       } catch {
         // container may not be visible yet
       }
     }, FIT_DEBOUNCE_MS)
-  }, [sessionId])
+  }, [sessionId, scheduleResync])
 
   useEffect(() => {
     const container = terminalRef.current
@@ -275,6 +302,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       clearTimeout(scrollTimeout)
       if (restoreTimer) clearTimeout(restoreTimer)
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current)
+      if (resyncTimerRef.current) clearTimeout(resyncTimerRef.current)
       resizeObserver.disconnect()
       intersectionObserver.disconnect()
       inputDisposable.dispose()
