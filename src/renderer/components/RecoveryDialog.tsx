@@ -4,6 +4,11 @@ import type { RecoveryResult, SessionInfo } from '../../shared/types'
 
 const api = () => (window as any).cipherMux
 
+/** Max time (ms) to poll for recovery result before giving up. */
+const POLL_TIMEOUT_MS = 15_000
+/** Interval between poll attempts. */
+const POLL_INTERVAL_MS = 500
+
 interface RecoveryDialogProps {
   onDone: () => void
   onAdopt?: (sessionId: string) => void
@@ -21,61 +26,96 @@ export function RecoveryDialog({ onDone, onAdopt, onRecovered }: RecoveryDialogP
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const handledRef = useRef(false)
 
-  const proceedToOrphans = useCallback((result: RecoveryResult) => {
-    if (result.orphaned.length > 0) {
+  // Store latest callback refs so the effect doesn't need to re-run on prop changes
+  const onDoneRef = useRef(onDone)
+  const onRecoveredRef = useRef(onRecovered)
+  const onAdoptRef = useRef(onAdopt)
+  onDoneRef.current = onDone
+  onRecoveredRef.current = onRecovered
+  onAdoptRef.current = onAdopt
+
+  const processResult = useCallback((result: RecoveryResult) => {
+    if (!result || handledRef.current) return
+    handledRef.current = true
+    console.log(`[RecoveryDialog] processing result: ${result.recovered.length} recovered, ${result.orphaned.length} orphaned`)
+    setRecoveryResult(result)
+
+    if (result.recovered.length > 0) {
+      setPhase('restore')
+    } else if (result.orphaned.length > 0) {
       setOrphans(result.orphaned)
       setSelected(new Set(result.orphaned.map(o => o.id)))
       setPhase('orphans')
     } else {
-      setPhase('idle')
-      onDone()
+      onDoneRef.current()
     }
-  }, [onDone])
+  }, [])
 
-  const handleResult = useCallback((result: RecoveryResult) => {
-    if (!result || handledRef.current) return
-    handledRef.current = true
-    setRecoveryResult(result)
-
-    if (result.recovered.length > 0) {
-      // Show restore dialog — ask user before placing sessions
-      setPhase('restore')
-    } else {
-      // No recovered sessions — go directly to orphan handling
-      proceedToOrphans(result)
-    }
-  }, [proceedToOrphans])
-
+  // Single stable effect — runs once on mount, never re-runs
   useEffect(() => {
     // Push-based: listen for recovery result events
     const unsub = api().sessions.onRecoveryResult((result: RecoveryResult) => {
-      handleResult(result)
+      processResult(result)
     })
 
-    // Pull-based: fetch cached recovery result in case the push event
-    // was sent before this component mounted (race condition on startup)
-    api().sessions.recover().then((result: RecoveryResult | null) => {
-      if (result && (result.recovered.length > 0 || result.orphaned.length > 0)) {
-        handleResult(result)
-      }
-    }).catch(() => {})
+    // Poll-based: retry until we get a result or timeout.
+    // The push event may fire before this component mounts, and the
+    // first pull may return null if the main process init hasn't finished.
+    let pollTimer: ReturnType<typeof setTimeout> | null = null
+    const startTime = Date.now()
 
-    return () => unsub()
-  }, [handleResult])
+    const poll = () => {
+      if (handledRef.current) return // already processed
+      api().sessions.recover().then((result: RecoveryResult | null) => {
+        if (handledRef.current) return
+        if (result && (result.recovered.length > 0 || result.orphaned.length > 0)) {
+          processResult(result)
+        } else if (Date.now() - startTime < POLL_TIMEOUT_MS) {
+          pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
+        }
+      }).catch(() => {
+        // Retry on error too (IPC might not be ready yet)
+        if (!handledRef.current && Date.now() - startTime < POLL_TIMEOUT_MS) {
+          pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
+        }
+      })
+    }
+    poll()
+
+    return () => {
+      unsub()
+      if (pollTimer) clearTimeout(pollTimer)
+    }
+  }, [processResult])
 
   // ─── Restore Phase Handlers ─────────────────────────────
 
   const handleRestoreConfirm = useCallback(() => {
     if (!recoveryResult) return
-    if (onRecovered) onRecovered(recoveryResult)
-    proceedToOrphans(recoveryResult)
-  }, [recoveryResult, onRecovered, proceedToOrphans])
+    if (onRecoveredRef.current) onRecoveredRef.current(recoveryResult)
+    // Proceed to orphans or finish
+    if (recoveryResult.orphaned.length > 0) {
+      setOrphans(recoveryResult.orphaned)
+      setSelected(new Set(recoveryResult.orphaned.map(o => o.id)))
+      setPhase('orphans')
+    } else {
+      setPhase('idle')
+      onDoneRef.current()
+    }
+  }, [recoveryResult])
 
   const handleRestoreDecline = useCallback(async () => {
     if (!recoveryResult) return
     await api().sessions.recoveryDecline()
-    proceedToOrphans(recoveryResult)
-  }, [recoveryResult, proceedToOrphans])
+    if (recoveryResult.orphaned.length > 0) {
+      setOrphans(recoveryResult.orphaned)
+      setSelected(new Set(recoveryResult.orphaned.map(o => o.id)))
+      setPhase('orphans')
+    } else {
+      setPhase('idle')
+      onDoneRef.current()
+    }
+  }, [recoveryResult])
 
   // ─── Orphan Phase Handlers ──────────────────────────────
 
@@ -91,17 +131,15 @@ export function RecoveryDialog({ onDone, onAdopt, onRecovered }: RecoveryDialogP
   const handleConfirm = useCallback(async () => {
     for (const orphan of orphans) {
       if (selected.has(orphan.id)) {
-        // Adopt into grid
         const adopted = await api().sessions.recoveryAction('adopt', orphan.tmuxSession, orphan.name)
         const adoptedId = adopted?.id
-        if (adoptedId && onAdopt) onAdopt(adoptedId)
+        if (adoptedId && onAdoptRef.current) onAdoptRef.current(adoptedId)
       }
-      // Unselected orphans stay in background — don't kill, don't adopt
     }
     setOrphans([])
     setPhase('idle')
-    onDone()
-  }, [orphans, selected, onAdopt, onDone])
+    onDoneRef.current()
+  }, [orphans, selected])
 
   const handleKillAll = useCallback(async () => {
     for (const orphan of orphans) {
@@ -109,15 +147,14 @@ export function RecoveryDialog({ onDone, onAdopt, onRecovered }: RecoveryDialogP
     }
     setOrphans([])
     setPhase('idle')
-    onDone()
-  }, [orphans, onDone])
+    onDoneRef.current()
+  }, [orphans])
 
   const handleIgnoreAll = useCallback(() => {
-    // Leave all orphans running in background (don't adopt, don't kill)
     setOrphans([])
     setPhase('idle')
-    onDone()
-  }, [onDone])
+    onDoneRef.current()
+  }, [])
 
   if (phase === 'idle') return null
 

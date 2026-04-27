@@ -36,6 +36,7 @@ export function App() {
   const contextUsages = useContextUsage()
   const { scanning, rescan } = useProjects()
   const panelWidthRef = useRef(0)
+  const noopRef = useRef(() => {})
   const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot, restoreGrid } = useGrid(panelWidthRef.current)
   const { theme, setTheme, toggleTheme, customThemes, activeCustomThemeId, selectCustomTheme, saveCustomTheme, deleteCustomTheme } = useTheme()
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
@@ -713,7 +714,7 @@ export function App() {
         onCancel={() => setPlacementPopup(null)}
         onResize={handleResize}
       />
-      <RecoveryDialog onDone={() => {}} onAdopt={addSession} onRecovered={handleRecovered} />
+      <RecoveryDialog onDone={noopRef.current} onAdopt={addSession} onRecovered={handleRecovered} />
       <BugreportDialog
         visible={bugreportVisible}
         onClose={() => setBugreportVisible(false)}
