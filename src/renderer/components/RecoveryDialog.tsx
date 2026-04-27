@@ -11,28 +11,40 @@ interface RecoveryDialogProps {
   onRecovered?: (result: RecoveryResult) => void
 }
 
+type Phase = 'idle' | 'restore' | 'orphans'
+
 export function RecoveryDialog({ onDone, onAdopt, onRecovered }: RecoveryDialogProps) {
   const { t } = useTranslation()
+  const [phase, setPhase] = useState<Phase>('idle')
+  const [recoveryResult, setRecoveryResult] = useState<RecoveryResult | null>(null)
   const [orphans, setOrphans] = useState<SessionInfo[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [visible, setVisible] = useState(false)
   const handledRef = useRef(false)
+
+  const proceedToOrphans = useCallback((result: RecoveryResult) => {
+    if (result.orphaned.length > 0) {
+      setOrphans(result.orphaned)
+      setSelected(new Set(result.orphaned.map(o => o.id)))
+      setPhase('orphans')
+    } else {
+      setPhase('idle')
+      onDone()
+    }
+  }, [onDone])
 
   const handleResult = useCallback((result: RecoveryResult) => {
     if (!result || handledRef.current) return
     handledRef.current = true
-    // Notify parent about recovered sessions + grid state for placement
-    if (result.recovered.length > 0 && onRecovered) {
-      onRecovered(result)
-    }
+    setRecoveryResult(result)
 
-    if (result.orphaned.length > 0) {
-      setOrphans(result.orphaned)
-      // Default: all selected for grid adoption
-      setSelected(new Set(result.orphaned.map(o => o.id)))
-      setVisible(true)
+    if (result.recovered.length > 0) {
+      // Show restore dialog — ask user before placing sessions
+      setPhase('restore')
+    } else {
+      // No recovered sessions — go directly to orphan handling
+      proceedToOrphans(result)
     }
-  }, [onRecovered])
+  }, [proceedToOrphans])
 
   useEffect(() => {
     // Push-based: listen for recovery result events
@@ -50,6 +62,22 @@ export function RecoveryDialog({ onDone, onAdopt, onRecovered }: RecoveryDialogP
 
     return () => unsub()
   }, [handleResult])
+
+  // ─── Restore Phase Handlers ─────────────────────────────
+
+  const handleRestoreConfirm = useCallback(() => {
+    if (!recoveryResult) return
+    if (onRecovered) onRecovered(recoveryResult)
+    proceedToOrphans(recoveryResult)
+  }, [recoveryResult, onRecovered, proceedToOrphans])
+
+  const handleRestoreDecline = useCallback(async () => {
+    if (!recoveryResult) return
+    await api().sessions.recoveryDecline()
+    proceedToOrphans(recoveryResult)
+  }, [recoveryResult, proceedToOrphans])
+
+  // ─── Orphan Phase Handlers ──────────────────────────────
 
   const toggleOrphan = useCallback((id: string) => {
     setSelected(prev => {
@@ -71,7 +99,7 @@ export function RecoveryDialog({ onDone, onAdopt, onRecovered }: RecoveryDialogP
       // Unselected orphans stay in background — don't kill, don't adopt
     }
     setOrphans([])
-    setVisible(false)
+    setPhase('idle')
     onDone()
   }, [orphans, selected, onAdopt, onDone])
 
@@ -80,66 +108,105 @@ export function RecoveryDialog({ onDone, onAdopt, onRecovered }: RecoveryDialogP
       await api().sessions.recoveryAction('kill', orphan.tmuxSession)
     }
     setOrphans([])
-    setVisible(false)
+    setPhase('idle')
     onDone()
   }, [orphans, onDone])
 
   const handleIgnoreAll = useCallback(() => {
     // Leave all orphans running in background (don't adopt, don't kill)
     setOrphans([])
-    setVisible(false)
+    setPhase('idle')
     onDone()
   }, [onDone])
 
-  useEffect(() => {
-    if (visible && orphans.length === 0) {
-      setVisible(false)
-      onDone()
-    }
-  }, [visible, orphans.length, onDone])
+  if (phase === 'idle') return null
 
-  if (!visible) return null
+  // ─── Restore Dialog (Phase 1) ──────────────────────────
 
-  return (
-    <div class="modal-overlay">
-      <div class="dialog recovery-dialog">
-        <h3 class="dialog__title">{t('recovery.title')}</h3>
-        <p class="dialog__text">
-          {t('recovery.orphansFound', { count: orphans.length })}
-        </p>
-        <ul class="recovery-list">
-          {orphans.map((o) => (
-            <li key={o.id} class="recovery-list__item" onClick={() => toggleOrphan(o.id)} style={{ cursor: 'pointer' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', width: '100%' }}>
-                <input
-                  type="checkbox"
-                  checked={selected.has(o.id)}
-                  onChange={() => toggleOrphan(o.id)}
-                />
-                <div style={{ flex: 1 }}>
-                  <span class="font-mono text-sm">{o.name || o.tmuxSession}</span>
-                  {o.projectPath && (
-                    <div class="text-xs text-dim" style={{ marginTop: '2px' }}>
-                      {o.projectPath}
-                    </div>
-                  )}
+  if (phase === 'restore' && recoveryResult) {
+    const sessions = recoveryResult.recovered
+    return (
+      <div class="modal-overlay">
+        <div class="dialog recovery-dialog">
+          <h3 class="dialog__title">{t('recovery.restoreTitle')}</h3>
+          <p class="dialog__text">
+            {t('recovery.restoreMessage', { count: sessions.length })}
+          </p>
+          <ul class="recovery-list">
+            {sessions.map((s) => (
+              <li key={s.id} class="recovery-list__item">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', width: '100%' }}>
+                  <div style={{ flex: 1 }}>
+                    <span class="font-mono text-sm">{s.name || s.tmuxSession}</span>
+                    {s.projectPath && (
+                      <div class="text-xs text-dim" style={{ marginTop: '2px' }}>
+                        {s.projectPath}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </label>
-            </li>
-          ))}
-        </ul>
-        <div class="dialog__footer" style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end' }}>
-          <button class="btn btn--sm" onClick={handleKillAll}>
-            {t('recovery.killAll')}
-          </button>
-          <button class="btn btn--sm" onClick={handleIgnoreAll}>
-            {t('recovery.ignoreAll')}
-          </button>
-          <button class="btn btn--sm btn--primary" onClick={handleConfirm}>
-            {t('recovery.confirm')}
-          </button>
+              </li>
+            ))}
+          </ul>
+          <div class="dialog__footer" style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end' }}>
+            <button class="btn btn--sm" onClick={handleRestoreDecline}>
+              {t('recovery.restoreNo')}
+            </button>
+            <button class="btn btn--sm btn--primary" onClick={handleRestoreConfirm}>
+              {t('recovery.restoreYes')}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  // ─── Orphan Dialog (Phase 2) ───────────────────────────
+
+  if (phase === 'orphans' && orphans.length > 0) {
+    return (
+      <div class="modal-overlay">
+        <div class="dialog recovery-dialog">
+          <h3 class="dialog__title">{t('recovery.title')}</h3>
+          <p class="dialog__text">
+            {t('recovery.orphansFound', { count: orphans.length })}
+          </p>
+          <ul class="recovery-list">
+            {orphans.map((o) => (
+              <li key={o.id} class="recovery-list__item" onClick={() => toggleOrphan(o.id)} style={{ cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', width: '100%' }}>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(o.id)}
+                    onChange={() => toggleOrphan(o.id)}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <span class="font-mono text-sm">{o.name || o.tmuxSession}</span>
+                    {o.projectPath && (
+                      <div class="text-xs text-dim" style={{ marginTop: '2px' }}>
+                        {o.projectPath}
+                      </div>
+                    )}
+                  </div>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <div class="dialog__footer" style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end' }}>
+            <button class="btn btn--sm" onClick={handleKillAll}>
+              {t('recovery.killAll')}
+            </button>
+            <button class="btn btn--sm" onClick={handleIgnoreAll}>
+              {t('recovery.ignoreAll')}
+            </button>
+            <button class="btn btn--sm btn--primary" onClick={handleConfirm}>
+              {t('recovery.confirm')}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }

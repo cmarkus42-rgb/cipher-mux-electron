@@ -29,6 +29,7 @@ const api = {
     },
     recoveryAction: (action: string, tmuxSession: string, displayName?: string) =>
       ipcRenderer.invoke(IPC.SESSIONS_RECOVERY_ACTION, { action, tmuxSession, displayName }),
+    recoveryDecline: () => ipcRenderer.invoke(IPC.SESSIONS_RECOVERY_DECLINE),
     onVisibleAdd: (cb: (data: { sessionId: string }) => void) => {
       const handler = (_e: unknown, data: { sessionId: string }) => cb(data)
       ipcRenderer.on(IPC.SESSION_VISIBLE_ADD, handler)
