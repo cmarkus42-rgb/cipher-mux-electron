@@ -692,7 +692,14 @@ export function App() {
       <StatusBar
         theme={theme}
         sidebarVisible={sidebarVisible}
-        onToggleSidebar={() => setSidebarVisible(v => !v)}
+        onToggleSidebar={() => {
+          if (sidebarDetached) {
+            const api = (window as any).cipherMux
+            api.sidebar.toggleWindow()
+          } else {
+            setSidebarVisible(v => !v)
+          }
+        }}
         workspacesPopupVisible={workspacesPopupVisible}
         gridCols={grid.config.cols}
         gridRows={grid.config.rows}

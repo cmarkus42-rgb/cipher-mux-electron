@@ -72,6 +72,8 @@ const defaults: AppConfig = {
     main: { x: 0, y: 0, width: DEFAULT_WINDOW_WIDTH, height: DEFAULT_WINDOW_HEIGHT },
   },
   sidebarDetached: false,
+  sidebarWindowBounds: null as { x: number; y: number; width: number; height: number } | null,
+  sidebarCollapsed: {} as Record<string, boolean>,
 }
 
 function getConfigPath(): string {

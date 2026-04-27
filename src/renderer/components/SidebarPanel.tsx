@@ -16,6 +16,7 @@ interface SidebarPanelProps {
   onAddToGrid: (sessionId: string) => void
   onKillSession: (sessionId: string) => void
   onDetach?: () => void
+  onReattach?: () => void
   activeWorkspaceId: string | null
   hasNotesCell: boolean
   onOpenNoteInGrid?: (note: any) => void
@@ -37,18 +38,43 @@ function displayName(name: string, projectPath?: string | null): string {
 
 export function SidebarPanel({
   visible, orchestratorActive, mpoActive, sessions, gridSessionIds,
-  contextUsages, onAddToGrid, onKillSession, onDetach, activeWorkspaceId, hasNotesCell,
+  contextUsages, onAddToGrid, onKillSession, onDetach, onReattach, activeWorkspaceId, hasNotesCell,
   onOpenNoteInGrid, voiceComState,
 }: SidebarPanelProps) {
   const { t } = useTranslation()
   const { messages } = useMessages()
   const { requests, openCount, answerRequest, openReview } = useInputRequests()
-  const [messagesExpanded, setMessagesExpanded] = useState(true)
-  const [bgExpanded, setBgExpanded] = useState(true)
-  const [requestsExpanded, setRequestsExpanded] = useState(true)
-  const [notesExpanded, setNotesExpanded] = useState(true)
-  const [memoryExpanded, setMemoryExpanded] = useState(false)
-  const [orphansExpanded, setOrphansExpanded] = useState(true)
+
+  // Collapse states — loaded from configStore on mount, persisted on change
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
+    notes: false,
+    background: false,
+    orphans: false,
+    requests: false,
+    memory: true,
+    messages: false,
+  })
+  const collapsedLoaded = useRef(false)
+
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    api?.config?.get?.('sidebarCollapsed')?.then((saved: Record<string, boolean> | null) => {
+      if (saved && typeof saved === 'object') {
+        setCollapsed(prev => ({ ...prev, ...saved }))
+      }
+      collapsedLoaded.current = true
+    }).catch(() => { collapsedLoaded.current = true })
+  }, [])
+
+  const toggleSection = useCallback((key: string) => {
+    setCollapsed(prev => {
+      const next = { ...prev, [key]: !prev[key] }
+      const api = (window as any).cipherMux
+      api?.config?.set?.('sidebarCollapsed', next).catch(() => {})
+      return next
+    })
+  }, [])
+
   const [orphans, setOrphans] = useState<Array<{ id: string; name: string; tmuxSession: string; projectPath?: string | null }>>([])
   const [tagFilter, setTagFilter] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -87,8 +113,6 @@ export function SidebarPanel({
     setOrphans(prev => prev.filter(o => o.tmuxSession !== tmuxSession))
   }, [])
 
-  const showNotes = true
-
   // Filter notes
   const filteredNotes = notes.filter(n => {
     if (tagFilter.length > 0 && !tagFilter.every(t => n.tags.includes(t))) return false
@@ -124,9 +148,11 @@ export function SidebarPanel({
     (s) => s.status === 'active' && !gridSessionIds.includes(s.id)
   )
 
-  const showMessages = messages.length > 0
-  const showBackground = backgroundSessions.length > 0
-  const showRequests = mpoActive && requests.length > 0
+  const hasNotes = notes.length > 0
+  const hasBackground = backgroundSessions.length > 0
+  const hasOrphans = orphans.length > 0
+  const hasRequests = mpoActive && requests.length > 0
+  const hasMessages = messages.length > 0
 
   if (!visible) return null
 
@@ -134,59 +160,113 @@ export function SidebarPanel({
     <aside class="sidebar-panel">
       <div class="sidebar-panel__header">
         <span class="sidebar-panel__title">{t('sidebar.title')}</span>
-        {onDetach && (
-          <button class="sidebar-panel__detach" onClick={onDetach} title={t('sidebar.detach')}>⧉</button>
-        )}
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {onReattach && (
+            <button class="sidebar-panel__detach" onClick={onReattach} title={t('sidebar.reattach', 'Dock')}>⇤</button>
+          )}
+          {onDetach && (
+            <button class="sidebar-panel__detach" onClick={onDetach} title={t('sidebar.detach')}>⧉</button>
+          )}
+        </div>
       </div>
 
-      {showMessages && (
-        <section class="sidebar-section" data-highlight="side-messages">
-          <div class="sidebar-section__head" onClick={() => setMessagesExpanded(v => !v)}>
-            <span>{messagesExpanded ? '▾' : '▸'} {t('sidebar.messages')} ({messages.length})</span>
-          </div>
-          {messagesExpanded && (
-            <div class="sidebar-section__feed">
-              {messages.map((m) => (
-                <div key={m.id} class={`sidebar-msg ${m.sender === 'system' ? 'sidebar-msg--system' : ''}`}>
-                  <div class="sidebar-msg__head">
-                    <span class="sidebar-msg__sender">{m.sender}</span>
-                    <span class="sidebar-msg__time">{formatTime(m.createdAt)}</span>
-                  </div>
-                  <div class="sidebar-msg__text">{m.payload.text as string}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+      {/* Section order: Notes → Background → Memory → Messages */}
 
-      {showBackground && (
-        <section class="sidebar-section" data-highlight="side-background">
-          <div class="sidebar-section__head" onClick={() => setBgExpanded(v => !v)}>
-            <span>{bgExpanded ? '▾' : '▸'} {t('sidebar.backgroundSessions')} ({backgroundSessions.length})</span>
-          </div>
-          {bgExpanded && backgroundSessions.map(s => (
-            <BackgroundSessionCard
-              key={s.id}
-              session={s}
-              contextUsage={contextUsages[s.id]}
-              onClick={() => onAddToGrid(s.id)}
-              onKill={() => onKillSession(s.id)}
-              voiceGlow={s.name === 'Voice' ? voiceComState : undefined}
+      {/* ─── Notes ─── */}
+      <section class="sidebar-section sidebar-section--grow" data-highlight="side-notes">
+        <div
+          class={`sidebar-section__head${!hasNotes ? ' sidebar-section__head--empty' : ''}`}
+          onClick={() => toggleSection('notes')}
+        >
+          <span>{collapsed.notes ? '▸' : '▾'} {t('sidebar.notes')}</span>
+        </div>
+        {!collapsed.notes && (
+          <div class="sidebar-section__feed sidebar-section__feed--flex">
+            {/* Search */}
+            <input
+              type="text"
+              class="sidebar-notes__search"
+              placeholder={t('sidebar.notesSearch')}
+              value={searchTerm}
+              onInput={(e) => setSearchTerm((e.target as HTMLInputElement).value)}
             />
-          ))}
-        </section>
-      )}
+            {/* Tag chips */}
+            {availableTags.length > 0 && (
+              <div class="sidebar-notes__tags">
+                {availableTags.map(tag => (
+                  <span
+                    key={tag}
+                    class={`sidebar-notes__tag ${tagFilter.includes(tag) ? 'sidebar-notes__tag--active' : ''}`}
+                    onClick={() => toggleTag(tag)}
+                  >#{tag}</span>
+                ))}
+              </div>
+            )}
+            {/* Note list */}
+            {filteredNotes.map(note => (
+              <div
+                key={note.id}
+                class="bg-card"
+                onDblClick={() => handleNoteDoubleClick(note)}
+                title={t('sidebar.noteDoubleClick')}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer?.setData('text/plain', JSON.stringify(note))
+                }}
+              >
+                <div class="bg-card__head">
+                  <span class="bg-card__name">{note.title && note.title !== 'Untitled' ? note.title : t('notesCell.untitled')}</span>
+                  <button
+                    class="bg-card__delete"
+                    onClick={(e) => handleNoteDelete(note, e)}
+                    title={t('sidebar.noteDelete')}
+                  >✕</button>
+                </div>
+                <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)' }}>
+                  {note.tags.map(t => `#${t}`).join(' ')}
+                </div>
+                <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)', opacity: 0.5 }}>
+                  {note.modifiedAt ? new Date(note.modifiedAt).toLocaleDateString() : ''}
+                </div>
+              </div>
+            ))}
+            {filteredNotes.length === 0 && (
+              <div class="sidebar-panel__empty" style={{ padding: 'var(--space-sm)' }}>{t('sidebar.noNotes')}</div>
+            )}
+          </div>
+        )}
+      </section>
 
-      {orphans.length > 0 && (
+      {/* ─── Background Sessions ─── */}
+      <section class="sidebar-section" data-highlight="side-background">
+        <div
+          class={`sidebar-section__head${!hasBackground ? ' sidebar-section__head--empty' : ''}`}
+          onClick={() => toggleSection('background')}
+        >
+          <span>{collapsed.background ? '▸' : '▾'} {t('sidebar.backgroundSessions')}</span>
+        </div>
+        {!collapsed.background && hasBackground && backgroundSessions.map(s => (
+          <BackgroundSessionCard
+            key={s.id}
+            session={s}
+            contextUsage={contextUsages[s.id]}
+            onClick={() => onAddToGrid(s.id)}
+            onKill={() => onKillSession(s.id)}
+            voiceGlow={s.name === 'Voice' ? voiceComState : undefined}
+          />
+        ))}
+      </section>
+
+      {/* ─── Orphaned Sessions (conditional) ─── */}
+      {hasOrphans && (
         <section class="sidebar-section">
-          <div class="sidebar-section__head" onClick={() => setOrphansExpanded(v => !v)}>
+          <div class="sidebar-section__head" onClick={() => toggleSection('orphans')}>
             <span>
-              {orphansExpanded ? '▾' : '▸'} {t('sidebar.orphanedSessions')}
+              {collapsed.orphans ? '▸' : '▾'} {t('sidebar.orphanedSessions')}
               <span class="sidebar-section__badge">{orphans.length}</span>
             </span>
           </div>
-          {orphansExpanded && (
+          {!collapsed.orphans && (
             <div class="sidebar-section__feed">
               {orphans.map(o => (
                 <div key={o.tmuxSession} class="bg-card">
@@ -213,15 +293,16 @@ export function SidebarPanel({
         </section>
       )}
 
-      {showRequests && (
+      {/* ─── Requests (conditional) ─── */}
+      {hasRequests && (
         <section class="sidebar-section" data-highlight="side-requests">
-          <div class="sidebar-section__head" onClick={() => setRequestsExpanded(v => !v)}>
+          <div class="sidebar-section__head" onClick={() => toggleSection('requests')}>
             <span>
-              {requestsExpanded ? '▾' : '▸'} {t('sidebar.requests')}
+              {collapsed.requests ? '▸' : '▾'} {t('sidebar.requests')}
               {openCount > 0 && <span class="sidebar-section__badge">{openCount}</span>}
             </span>
           </div>
-          {requestsExpanded && (
+          {!collapsed.requests && (
             <div class="sidebar-section__feed">
               {requests.map((req: any) => (
                 <RequestCard key={req.id} request={req} onAnswer={answerRequest} onOpenReview={openReview} />
@@ -231,79 +312,34 @@ export function SidebarPanel({
         </section>
       )}
 
-      {showNotes && (
-        <section class="sidebar-section" data-highlight="side-notes">
-          <div class="sidebar-section__head" onClick={() => setNotesExpanded(v => !v)}>
-            <span>
-              {notesExpanded ? '▾' : '▸'} {t('sidebar.notes')} ({filteredNotes.length !== notes.length ? `${filteredNotes.length}/${notes.length}` : notes.length})
-            </span>
-          </div>
-          {notesExpanded && (
-            <div class="sidebar-section__feed">
-              {/* Search */}
-              <input
-                type="text"
-                class="sidebar-notes__search"
-                placeholder={t('sidebar.notesSearch')}
-                value={searchTerm}
-                onInput={(e) => setSearchTerm((e.target as HTMLInputElement).value)}
-              />
-              {/* Tag chips */}
-              {availableTags.length > 0 && (
-                <div class="sidebar-notes__tags">
-                  {availableTags.map(tag => (
-                    <span
-                      key={tag}
-                      class={`sidebar-notes__tag ${tagFilter.includes(tag) ? 'sidebar-notes__tag--active' : ''}`}
-                      onClick={() => toggleTag(tag)}
-                    >#{tag}</span>
-                  ))}
-                </div>
-              )}
-              {/* Note list */}
-              {filteredNotes.map(note => (
-                <div
-                  key={note.id}
-                  class="bg-card"
-                  onDblClick={() => handleNoteDoubleClick(note)}
-                  title={t('sidebar.noteDoubleClick')}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer?.setData('text/plain', JSON.stringify(note))
-                  }}
-                >
-                  <div class="bg-card__head">
-                    <span class="bg-card__name">{note.title && note.title !== 'Untitled' ? note.title : t('notesCell.untitled')}</span>
-                    <button
-                      class="bg-card__delete"
-                      onClick={(e) => handleNoteDelete(note, e)}
-                      title={t('sidebar.noteDelete')}
-                    >✕</button>
-                  </div>
-                  <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)' }}>
-                    {note.tags.map(t => `#${t}`).join(' ')}
-                  </div>
-                  <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)', opacity: 0.5 }}>
-                    {note.modifiedAt ? new Date(note.modifiedAt).toLocaleDateString() : ''}
-                  </div>
-                </div>
-              ))}
-              {filteredNotes.length === 0 && (
-                <div class="sidebar-panel__empty" style={{ padding: 'var(--space-sm)' }}>{t('sidebar.noNotes')}</div>
-              )}
-            </div>
-          )}
-        </section>
-      )}
-
+      {/* ─── Memory ─── */}
       <CompanionMemoryView
-        expanded={memoryExpanded}
-        onToggle={() => setMemoryExpanded(v => !v)}
+        expanded={!collapsed.memory}
+        onToggle={() => toggleSection('memory')}
       />
 
-      {!showMessages && !showBackground && !showRequests && orphans.length === 0 && filteredNotes.length === 0 && (
-        <div class="sidebar-panel__empty">{t('sidebar.emptyHint')}</div>
-      )}
+      {/* ─── Messages ─── */}
+      <section class="sidebar-section" data-highlight="side-messages">
+        <div
+          class={`sidebar-section__head${!hasMessages ? ' sidebar-section__head--empty' : ''}`}
+          onClick={() => toggleSection('messages')}
+        >
+          <span>{collapsed.messages ? '▸' : '▾'} {t('sidebar.messages')}</span>
+        </div>
+        {!collapsed.messages && hasMessages && (
+          <div class="sidebar-section__feed">
+            {messages.map((m) => (
+              <div key={m.id} class={`sidebar-msg ${m.sender === 'system' ? 'sidebar-msg--system' : ''}`}>
+                <div class="sidebar-msg__head">
+                  <span class="sidebar-msg__sender">{m.sender}</span>
+                  <span class="sidebar-msg__time">{formatTime(m.createdAt)}</span>
+                </div>
+                <div class="sidebar-msg__text">{m.payload.text as string}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </aside>
   )
 }

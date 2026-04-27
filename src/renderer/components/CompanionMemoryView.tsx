@@ -74,8 +74,8 @@ export function CompanionMemoryView({ expanded, onToggle }: CompanionMemoryViewP
 
   return (
     <section class="sidebar-section" data-highlight="side-memory">
-      <div class="sidebar-section__head" onClick={onToggle}>
-        <span>{expanded ? '\u25BE' : '\u25B8'} {t('companion.title')} ({memories.length})</span>
+      <div class={`sidebar-section__head${memories.length === 0 && !loading ? ' sidebar-section__head--empty' : ''}`} onClick={onToggle}>
+        <span>{expanded ? '\u25BE' : '\u25B8'} {t('companion.title')}</span>
       </div>
       {expanded && (
         <div class="sidebar-section__feed">

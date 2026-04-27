@@ -676,6 +676,11 @@ export class IpcHub {
     ipcMain.handle('cipher-mux:sidebar:is-detached', () => {
       return configStore.get('sidebarDetached') ?? false
     })
+
+    ipcMain.handle(IPC.SIDEBAR_TOGGLE_WINDOW, () => {
+      const visible = this.windowManager.toggleSidebarWindow()
+      return { visible }
+    })
   }
 
   // ─── Dialogs ────────────────────────────────────────────

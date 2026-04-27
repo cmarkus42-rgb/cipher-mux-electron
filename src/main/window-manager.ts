@@ -149,13 +149,19 @@ export class WindowManager {
   openSidebarWindow(): void {
     // Focus existing window if already open
     if (this.sidebarWindow && !this.sidebarWindow.isDestroyed()) {
+      this.sidebarWindow.show()
       this.sidebarWindow.focus()
       return
     }
 
-    this.sidebarWindow = new BrowserWindow({
-      width: 320,
-      height: 600,
+    // Restore saved bounds or use defaults
+    const saved = configStore.get('sidebarWindowBounds') as { x?: number; y?: number; width?: number; height?: number } | undefined
+    const width = saved?.width && saved.width >= 250 ? saved.width : 320
+    const height = saved?.height && saved.height >= 300 ? saved.height : 600
+
+    const opts: Electron.BrowserWindowConstructorOptions = {
+      width,
+      height,
       minWidth: 250,
       minHeight: 300,
       title: 'cipher-mux · Sidebar',
@@ -167,7 +173,13 @@ export class WindowManager {
         nodeIntegration: false,
         sandbox: false,
       },
-    })
+    }
+    if (saved?.x != null && saved?.y != null) {
+      opts.x = saved.x
+      opts.y = saved.y
+    }
+
+    this.sidebarWindow = new BrowserWindow(opts)
 
     if (process.env.VITE_DEV_SERVER_URL) {
       this.sidebarWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}?view=sidebar`)
@@ -178,13 +190,40 @@ export class WindowManager {
       )
     }
 
-    this.sidebarWindow.on('closed', () => {
-      this.sidebarWindow = null
-      // Clear persisted detach state so next restart opens sidebar inline
+    // Save bounds on move/resize
+    const saveBounds = () => {
+      if (this.sidebarWindow && !this.sidebarWindow.isDestroyed()) {
+        configStore.set('sidebarWindowBounds', this.sidebarWindow.getBounds())
+      }
+    }
+    this.sidebarWindow.on('resized', saveBounds)
+    this.sidebarWindow.on('moved', saveBounds)
+
+    // X-button = reintegrate sidebar back into main window
+    this.sidebarWindow.on('close', (e) => {
+      // Save bounds before closing
+      saveBounds()
+      // Reattach: clear detach state and notify main window
       configStore.set('sidebarDetached', false)
-      // Notify main window that sidebar reattached
       this.sendToMainWindow(IPC.SIDEBAR_REATTACHED, {})
     })
+
+    this.sidebarWindow.on('closed', () => {
+      this.sidebarWindow = null
+    })
+  }
+
+  /** Toggle sidebar window visibility (show/hide without destroying). */
+  toggleSidebarWindow(): boolean {
+    if (!this.sidebarWindow || this.sidebarWindow.isDestroyed()) return false
+    if (this.sidebarWindow.isVisible()) {
+      this.sidebarWindow.hide()
+      return false
+    } else {
+      this.sidebarWindow.show()
+      this.sidebarWindow.focus()
+      return true
+    }
   }
 
   closeSidebarWindow(): void {
