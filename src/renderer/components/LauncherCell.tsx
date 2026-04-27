@@ -300,7 +300,7 @@ export function LauncherCell({
                     class="launcher-popup__note-item"
                     onClick={() => handleNoteClick(note)}
                   >
-                    <span class="launcher-popup__note-title">{note.title || note.id}</span>
+                    <span class="launcher-popup__note-title">{note.title && note.title !== 'Untitled' ? note.title : t('notesCell.untitled')}</span>
                     {note.tags.length > 0 && (
                       <span class="launcher-popup__note-tags">
                         {note.tags.map((tag: string) => `#${tag}`).join(' ')}

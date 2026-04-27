@@ -112,7 +112,7 @@ export function SidebarPanel({
 
   const handleNoteDelete = useCallback(async (note: any, e: Event) => {
     e.stopPropagation()
-    if (!confirm(t('sidebar.confirmDelete', { title: note.title || note.id }))) return
+    if (!confirm(t('sidebar.confirmDelete', { title: note.title || t('notesCell.untitled') }))) return
     await deleteNote(note.id, note.scope)
   }, [deleteNote])
 
@@ -273,7 +273,7 @@ export function SidebarPanel({
                   }}
                 >
                   <div class="bg-card__head">
-                    <span class="bg-card__name">{note.title || note.id}</span>
+                    <span class="bg-card__name">{note.title && note.title !== 'Untitled' ? note.title : t('notesCell.untitled')}</span>
                     <button
                       class="bg-card__delete"
                       onClick={(e) => handleNoteDelete(note, e)}

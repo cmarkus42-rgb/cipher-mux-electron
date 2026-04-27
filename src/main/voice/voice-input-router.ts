@@ -142,7 +142,7 @@ export class VoiceInputRouter extends EventEmitter {
       } else {
         // Send text WITHOUT Enter �� user submits via "abschicken" voice command
         console.log('[VoiceRouter] sendKeys to', this.focusedSessionId, ':', JSON.stringify(text.slice(0, 60)))
-        await this.sessionManager.sendKeys(this.focusedSessionId, text)
+        await this.sessionManager.sendKeys(this.focusedSessionId, text + ' ')
         this.emit('dispatched', {
           sessionId: this.focusedSessionId,
           sessionName: session?.name ?? this.focusedSessionId,

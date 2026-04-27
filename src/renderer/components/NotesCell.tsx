@@ -199,7 +199,7 @@ export function NotesCell({
             class={`notes-tab ${tab.id === activeTabId ? 'notes-tab--active' : ''}`}
             onClick={() => setActiveTabId(tab.id)}
           >
-            <span class="notes-tab__title">{tab.title || t('notesCell.newTitle')}</span>
+            <span class="notes-tab__title">{(tab.title && tab.title !== 'Untitled') ? tab.title : t('notesCell.untitled')}</span>
             {tab.id === activeTabId && (
               <button
                 class="notes-tab__delete"
@@ -209,7 +209,7 @@ export function NotesCell({
                 }}
                 title={t('notesCell.deleteNote')}
               >
-                🗑
+                <span class="icon-trash" />
               </button>
             )}
             <button
