@@ -218,6 +218,10 @@ export interface AppConfig {
   }
   /** Whether the sidebar is detached into its own window. Persisted across restarts. */
   sidebarDetached?: boolean
+  /** Saved sidebar window bounds for size/position persistence. */
+  sidebarWindowBounds?: { x: number; y: number; width: number; height: number } | null
+  /** Persisted collapse states for sidebar sections. */
+  sidebarCollapsed?: Record<string, boolean>
 }
 
 // ─── Kickoff ───────────────────────────────────────────────

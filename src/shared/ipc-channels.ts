@@ -126,6 +126,7 @@ export const IPC = {
   SIDEBAR_DETACH: 'cipher-mux:sidebar:detach',
   SIDEBAR_REATTACH: 'cipher-mux:sidebar:reattach',
   SIDEBAR_REATTACHED: 'cipher-mux:sidebar:reattached',
+  SIDEBAR_TOGGLE_WINDOW: 'cipher-mux:sidebar:toggle-window',
 
   // Tasks
   TASKS_LIST: 'cipher-mux:tasks:list',

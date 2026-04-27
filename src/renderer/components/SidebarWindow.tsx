@@ -49,6 +49,11 @@ export function SidebarWindow() {
     await api.sessions.stop(sessionId)
   }, [])
 
+  const handleReattach = useCallback(async () => {
+    const api = (window as any).cipherMux
+    await api.sidebar.reattach()
+  }, [])
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div class="drag-region" style={{ height: 28, flexShrink: 0 }} />
@@ -62,6 +67,7 @@ export function SidebarWindow() {
           contextUsages={contextUsages}
           onAddToGrid={handleAddToGrid}
           onKillSession={handleKillSession}
+          onReattach={handleReattach}
           activeWorkspaceId={null}
           hasNotesCell={false}
           voiceComState={voiceComState}
