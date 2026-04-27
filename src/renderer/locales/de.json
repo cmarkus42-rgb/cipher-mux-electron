@@ -103,6 +103,10 @@
   "projectCard.active": "Aktiv",
   "projectCard.startSession": "Session starten",
 
+  "recovery.restoreTitle": "Sessions wiederherstellen?",
+  "recovery.restoreMessage": "{{count}} Session(s) aus der letzten Sitzung gefunden:",
+  "recovery.restoreYes": "Wiederherstellen",
+  "recovery.restoreNo": "Verwerfen",
   "recovery.title": "Session-Recovery",
   "recovery.orphansFound": "{{count}} verwaiste Session(s) gefunden:",
   "recovery.adopt": "Übernehmen",

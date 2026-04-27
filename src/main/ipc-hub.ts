@@ -452,6 +452,22 @@ export class IpcHub {
       }
     })
 
+    ipcMain.handle(IPC.SESSIONS_RECOVERY_DECLINE, async () => {
+      // User declined session restore — kill all recovered sessions and auto-start defaults
+      if (this.cachedRecoveryResult) {
+        for (const session of this.cachedRecoveryResult.recovered) {
+          try {
+            await this.sessionManager.stop(session.id)
+          } catch {
+            // Session may already be gone
+          }
+        }
+        this.cachedRecoveryResult = null
+      }
+      this.autoStartDefault()
+      return { ok: true }
+    })
+
     ipcMain.handle('cipher-mux:sessions:capture', async (_e: any, sessionId: string) => {
       try {
         const content = await this.sessionManager.capture(sessionId)

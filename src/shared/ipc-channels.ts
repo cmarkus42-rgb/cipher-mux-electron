@@ -8,6 +8,7 @@ export const IPC = {
   SESSIONS_RECOVER: 'cipher-mux:sessions:recover',
   SESSIONS_RECOVERY_RESULT: 'cipher-mux:sessions:recovery-result',
   SESSIONS_RECOVERY_ACTION: 'cipher-mux:sessions:recovery-action',
+  SESSIONS_RECOVERY_DECLINE: 'cipher-mux:sessions:recovery-decline',
   SESSION_CHANGED: 'cipher-mux:session-changed',
   SESSION_STOPPED: 'cipher-mux:session-stopped',
   SESSION_VISIBLE_ADD: 'cipher-mux:session:visible-add',

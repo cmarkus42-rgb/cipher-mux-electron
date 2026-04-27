@@ -103,6 +103,10 @@
   "projectCard.active": "Active",
   "projectCard.startSession": "Start Session",
 
+  "recovery.restoreTitle": "Restore sessions?",
+  "recovery.restoreMessage": "{{count}} session(s) from last run found:",
+  "recovery.restoreYes": "Restore",
+  "recovery.restoreNo": "Discard",
   "recovery.title": "Session Recovery",
   "recovery.orphansFound": "{{count}} orphaned session(s) found:",
   "recovery.adopt": "Adopt",
