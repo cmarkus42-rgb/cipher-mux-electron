@@ -67,39 +67,50 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
   }, [sessionId])
 
   /**
+   * Core fit-and-sync: runs fitAddon.fit(), syncs tmux resize-pane if
+   * dimensions changed, and schedules a capture-pane resync.
+   * Returns true if fit succeeded, false if skipped/failed.
+   * All callers should use this instead of raw fitAddon.fit().
+   */
+  const fitAndSync = useCallback((): boolean => {
+    const fitAddon = fitAddonRef.current
+    const term = termRef.current
+    const container = terminalRef.current
+    if (!fitAddon || !term || !container) return false
+
+    // Visibility-gate: skip fit on collapsed / zero-size containers
+    const { clientWidth, clientHeight } = container
+    if (clientWidth < MIN_FIT_DIMENSION || clientHeight < MIN_FIT_DIMENSION) return false
+
+    try {
+      fitAddon.fit()
+      // Only send resize IPC if dimensions actually changed
+      const { cols, rows } = term
+      const last = lastSizeRef.current
+      if (cols !== last.cols || rows !== last.rows) {
+        lastSizeRef.current = { cols, rows }
+        api().terminal.resize(sessionId, cols, rows)
+        // Re-sync with tmux after resize to fix xterm.js/tmux reflow mismatch
+        scheduleResync()
+      }
+      return true
+    } catch {
+      // container may not be visible yet
+      return false
+    }
+  }, [sessionId, scheduleResync])
+
+  /**
    * Debounced fit: coalesces all resize triggers into a single fit() call
    * that only fires after the layout has settled (FIT_DEBOUNCE_MS).
-   * Guards against zero-size containers during CSS transitions / grid reflow.
    */
   const fit = useCallback(() => {
     if (fitTimerRef.current) clearTimeout(fitTimerRef.current)
     fitTimerRef.current = setTimeout(() => {
       fitTimerRef.current = null
-      const fitAddon = fitAddonRef.current
-      const term = termRef.current
-      const container = terminalRef.current
-      if (!fitAddon || !term || !container) return
-
-      // Guard: skip fit when container is collapsed or mid-transition
-      const { clientWidth, clientHeight } = container
-      if (clientWidth < MIN_FIT_DIMENSION || clientHeight < MIN_FIT_DIMENSION) return
-
-      try {
-        fitAddon.fit()
-        // Only send resize IPC if dimensions actually changed
-        const { cols, rows } = term
-        const last = lastSizeRef.current
-        if (cols !== last.cols || rows !== last.rows) {
-          lastSizeRef.current = { cols, rows }
-          api().terminal.resize(sessionId, cols, rows)
-          // Re-sync with tmux after resize to fix xterm.js/tmux reflow mismatch
-          scheduleResync()
-        }
-      } catch {
-        // container may not be visible yet
-      }
+      fitAndSync()
     }, FIT_DEBOUNCE_MS)
-  }, [sessionId, scheduleResync])
+  }, [fitAndSync])
 
   useEffect(() => {
     const container = terminalRef.current
@@ -172,19 +183,8 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
      * debounced `fit()` to avoid rapid-fire IPC during grid reflows.
      */
     const immediateFit = () => {
-      const { clientWidth, clientHeight } = container
-      if (clientWidth < MIN_FIT_DIMENSION || clientHeight < MIN_FIT_DIMENSION) return
-      try {
-        fitAddon.fit()
-        const { cols, rows } = term
-        const last = lastSizeRef.current
-        if (cols !== last.cols || rows !== last.rows) {
-          lastSizeRef.current = { cols, rows }
-          api().terminal.resize(sessionId, cols, rows)
-        }
+      if (fitAndSync()) {
         reportReady()
-      } catch {
-        // container may not be visible yet
       }
     }
 
@@ -202,26 +202,16 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
     resizeObserver.observe(container)
 
     // IntersectionObserver: when terminal becomes visible (e.g. after grid
-    // switch or un-hiding), trigger fit() to avoid black/unsized terminals.
+    // switch or un-hiding), trigger double-fit to avoid black/unsized terminals.
     const intersectionObserver = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (entry.isIntersecting) {
           if (!reported) {
             immediateFit()
           } else {
-            // Immediate fit when becoming visible — no debounce needed
-            const { clientWidth, clientHeight } = container
-            if (clientWidth >= MIN_FIT_DIMENSION && clientHeight >= MIN_FIT_DIMENSION) {
-              try {
-                fitAddon.fit()
-                const { cols, rows } = term
-                const last = lastSizeRef.current
-                if (cols !== last.cols || rows !== last.rows) {
-                  lastSizeRef.current = { cols, rows }
-                  api().terminal.resize(sessionId, cols, rows)
-                }
-              } catch { /* container may be transitioning */ }
-            }
+            // Double-fit on visibility: immediate + rAF follow-up (T-LC.7)
+            fitAndSync()
+            requestAnimationFrame(() => fitAndSync())
           }
         }
       }
@@ -263,20 +253,17 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
               term.reset()
               term.write(content.replace(/\n/g, '\r\n'), () => {
                 term.scrollToBottom()
-                // Force visual repaint after recovery — xterm.js may have
-                // attached to an unsized or hidden container and needs an
-                // explicit refresh + reflow to render content visibly.
-                try {
-                  term.refresh(0, term.rows - 1)
-                  fitAddon.fit()
-                } catch { /* ignore if container not ready */ }
+                // Double-fit after restore: immediate + rAF follow-up (T-LC.7).
+                // fitAndSync includes visibility-gate and tmux resize sync.
+                try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
+                fitAndSync()
+                requestAnimationFrame(() => fitAndSync())
               })
             } else {
               // Even with no content, trigger refresh so the cursor renders
-              try {
-                term.refresh(0, term.rows - 1)
-                fitAddon.fit()
-              } catch { /* ignore */ }
+              try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
+              fitAndSync()
+              requestAnimationFrame(() => fitAndSync())
             }
           }).catch(() => {
             // session may not be ready yet
