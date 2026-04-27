@@ -37,6 +37,8 @@ export function App() {
   const { scanning, rescan } = useProjects()
   const panelWidthRef = useRef(0)
   const noopRef = useRef(() => {})
+  // Track session IDs being placed by handleStartEntity to prevent race with onStarted events
+  const inFlightPlacements = useRef(new Set<string>())
   const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot, restoreGrid } = useGrid(panelWidthRef.current)
   const { theme, setTheme, toggleTheme, customThemes, activeCustomThemeId, selectCustomTheme, saveCustomTheme, deleteCustomTheme } = useTheme()
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
@@ -455,6 +457,7 @@ export function App() {
       const session = await api.orchestrator.start()
       const sid = session?.sessionId ?? session?.id
       if (sid) {
+        inFlightPlacements.current.add(sid)
         setOrchestratorSessionId(sid)
         setSessionAtSlot(slotIndex, sid)
         setFocusedSessionId(sid)
@@ -465,6 +468,7 @@ export function App() {
       const session = await api.mpo.start()
       const sid = session?.sessionId ?? session?.id
       if (sid) {
+        inFlightPlacements.current.add(sid)
         setMpoSessionId(sid)
         setSessionAtSlot(slotIndex, sid)
         setFocusedSessionId(sid)
@@ -474,6 +478,7 @@ export function App() {
     const session = await api.entity.start(entityId)
     const sid = session?.id
     if (sid) {
+      inFlightPlacements.current.add(sid)
       switch (entityId) {
         case 'companion': setCompanionSessionId(sid); break
         case 'refinement': setRefinementSessionId(sid); break
@@ -549,7 +554,12 @@ export function App() {
     const unsub = api.entity.onStarted((data: { entityId: string; session: any }) => {
       const sid = data.session?.id
       if (!sid) return
-      // Skip if session is already placed in the grid (started via LauncherCell)
+      // Skip if session was placed directly via handleStartEntity (RT-X2 race condition fix)
+      if (inFlightPlacements.current.has(sid)) {
+        inFlightPlacements.current.delete(sid)
+        return
+      }
+      // Skip if session is already placed in the grid
       const alreadyPlaced = grid.slots.some(s => s.sessionId === sid)
       if (alreadyPlaced) return
       if (data.entityId === 'companion' && !companionSessionId) {
