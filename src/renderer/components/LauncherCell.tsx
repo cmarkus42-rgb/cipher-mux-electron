@@ -1,5 +1,6 @@
 // src/renderer/components/LauncherCell.tsx
 import { useState, useCallback, useEffect } from 'preact/hooks'
+import { createPortal } from 'preact/compat'
 import { useTranslation } from 'react-i18next'
 import { FolderPickerInput } from './FolderPickerInput'
 import { useNotes } from '../hooks/useNotes'
@@ -163,6 +164,161 @@ export function LauncherCell({
     setPopupOpen(false)
   }, [onOpenNotes])
 
+  const popupContent = popupOpen ? createPortal(
+    <div class="launcher-popup-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}>
+      <div class="launcher-popup" data-highlight="popup-launcher">
+        <div class="launcher-popup__header">
+          <span class="launcher-popup__title">{t('unified.title')}</span>
+          <button class="cell-btn" onClick={handleClose}>&times;</button>
+        </div>
+
+        {/* Tab bar */}
+        <div class="launcher-popup__tabs">
+          <button
+            class={`launcher-popup__tab${tab === 'presets' ? ' launcher-popup__tab--active' : ''}`}
+            onClick={() => setTab('presets')}
+          >
+            {t('unified.tabPresets')}
+          </button>
+          <button
+            class={`launcher-popup__tab${tab === 'path' ? ' launcher-popup__tab--active' : ''}`}
+            onClick={() => setTab('path')}
+          >
+            {t('unified.tabPath')}
+          </button>
+          <button
+            class={`launcher-popup__tab${tab === 'notes' ? ' launcher-popup__tab--active' : ''}`}
+            onClick={() => setTab('notes')}
+          >
+            {t('launcher.notes')}
+          </button>
+        </div>
+
+        {/* Presets tab */}
+        {tab === 'presets' && (
+          <div class="launcher-popup__body">
+            <div class="launcher-popup__presets">
+              {ENTITY_PRESETS.map(preset => {
+                const running = entityStatus[preset.id]
+                const isStarting = starting === preset.id
+                return (
+                  <button
+                    key={preset.id}
+                    class={`unified-dialog__card${running ? ' unified-dialog__card--running' : ''}`}
+                    onClick={() => handleEntityClick(preset.id)}
+                    disabled={isStarting}
+                    style={{ '--entity-color': preset.color } as any}
+                  >
+                    <div class="unified-dialog__card-info">
+                      <span class="unified-dialog__card-name">{t(preset.nameKey)}</span>
+                      <span class="unified-dialog__card-desc">{t(preset.descKey)}</span>
+                    </div>
+                    {running && (
+                      <span class="unified-dialog__card-status">{t('unified.running')}</span>
+                    )}
+                    {isStarting && (
+                      <span class="unified-dialog__card-status">{t('unified.starting')}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Path tab */}
+        {tab === 'path' && (
+          <div class="launcher-popup__body">
+            <FolderPickerInput
+              value={path}
+              onChange={setPath}
+              placeholder={t('unified.pathPlaceholder')}
+              onKeyDown={handlePathKeyDown}
+              autofocus
+            />
+
+            {recentPaths.length > 0 && (
+              <div class="unified-dialog__recents">
+                <span class="unified-dialog__recents-label">{t('unified.recentPaths')}</span>
+                {recentPaths.map(rp => (
+                  <button
+                    key={rp}
+                    class="unified-dialog__recent-item"
+                    onClick={() => setPath(rp)}
+                  >
+                    {rp.split('/').filter(Boolean).pop()} <span class="unified-dialog__recent-path">{rp}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div class="unified-dialog__options">
+              <label class="unified-dialog__option">
+                <input type="checkbox" checked={shellOnly} onChange={(e) => {
+                  setShellOnly((e.target as HTMLInputElement).checked)
+                }} />
+                <span>{t('unified.shellOnly')}</span>
+              </label>
+              {!shellOnly && (
+                <>
+                  <label class="unified-dialog__option">
+                    <input type="checkbox" checked={skipPermissions} onChange={(e) => {
+                      setSkipPermissions((e.target as HTMLInputElement).checked)
+                    }} />
+                    <span>{t('unified.skipPermissions')}</span>
+                  </label>
+                  <label class="unified-dialog__option">
+                    <input type="checkbox" checked={fork} onChange={(e) => {
+                      setFork((e.target as HTMLInputElement).checked)
+                    }} />
+                    <span>{t('unified.fork')}</span>
+                  </label>
+                </>
+              )}
+            </div>
+
+            <div class="unified-dialog__footer">
+              <button class="btn btn--sm" onClick={handleClose}>{t('unified.cancel')}</button>
+              <button class="btn btn--sm btn--primary" onClick={handlePathStart} disabled={!path.trim()}>
+                {t('unified.start')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Notes tab */}
+        {tab === 'notes' && (
+          <div class="launcher-popup__body">
+            <button class="btn btn--sm btn--primary" onClick={handleNewNote} style={{ marginBottom: '8px' }}>
+              {t('launcher.newNote')}
+            </button>
+            {notes.length > 0 ? (
+              <div class="launcher-popup__notes-list">
+                {notes.map(note => (
+                  <button
+                    key={note.id}
+                    class="launcher-popup__note-item"
+                    onClick={() => handleNoteClick(note)}
+                  >
+                    <span class="launcher-popup__note-title">{note.title || note.id}</span>
+                    {note.tags.length > 0 && (
+                      <span class="launcher-popup__note-tags">
+                        {note.tags.map((tag: string) => `#${tag}`).join(' ')}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div class="sidebar-panel__empty">{t('sidebar.noNotes')}</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  ) : null
+
   return (
     <div
       class="launcher-cell"
@@ -173,160 +329,7 @@ export function LauncherCell({
       <div class="launcher-cell__trigger" onClick={handleOpen}>
         <div class="launcher-circle"><span>+</span></div>
       </div>
-
-      {popupOpen && (
-        <div class="launcher-popup-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}>
-          <div class="launcher-popup" data-highlight="popup-launcher">
-            <div class="launcher-popup__header">
-              <span class="launcher-popup__title">{t('unified.title')}</span>
-              <button class="cell-btn" onClick={handleClose}>&times;</button>
-            </div>
-
-            {/* Tab bar */}
-            <div class="launcher-popup__tabs">
-              <button
-                class={`launcher-popup__tab${tab === 'presets' ? ' launcher-popup__tab--active' : ''}`}
-                onClick={() => setTab('presets')}
-              >
-                {t('unified.tabPresets')}
-              </button>
-              <button
-                class={`launcher-popup__tab${tab === 'path' ? ' launcher-popup__tab--active' : ''}`}
-                onClick={() => setTab('path')}
-              >
-                {t('unified.tabPath')}
-              </button>
-              <button
-                class={`launcher-popup__tab${tab === 'notes' ? ' launcher-popup__tab--active' : ''}`}
-                onClick={() => setTab('notes')}
-              >
-                {t('launcher.notes')}
-              </button>
-            </div>
-
-            {/* Presets tab */}
-            {tab === 'presets' && (
-              <div class="launcher-popup__body">
-                <div class="launcher-popup__presets">
-                  {ENTITY_PRESETS.map(preset => {
-                    const running = entityStatus[preset.id]
-                    const isStarting = starting === preset.id
-                    return (
-                      <button
-                        key={preset.id}
-                        class={`unified-dialog__card${running ? ' unified-dialog__card--running' : ''}`}
-                        onClick={() => handleEntityClick(preset.id)}
-                        disabled={isStarting}
-                        style={{ '--entity-color': preset.color } as any}
-                      >
-                        <div class="unified-dialog__card-info">
-                          <span class="unified-dialog__card-name">{t(preset.nameKey)}</span>
-                          <span class="unified-dialog__card-desc">{t(preset.descKey)}</span>
-                        </div>
-                        {running && (
-                          <span class="unified-dialog__card-status">{t('unified.running')}</span>
-                        )}
-                        {isStarting && (
-                          <span class="unified-dialog__card-status">{t('unified.starting')}</span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Path tab */}
-            {tab === 'path' && (
-              <div class="launcher-popup__body">
-                <FolderPickerInput
-                  value={path}
-                  onChange={setPath}
-                  placeholder={t('unified.pathPlaceholder')}
-                  onKeyDown={handlePathKeyDown}
-                  autofocus
-                />
-
-                {recentPaths.length > 0 && (
-                  <div class="unified-dialog__recents">
-                    <span class="unified-dialog__recents-label">{t('unified.recentPaths')}</span>
-                    {recentPaths.map(rp => (
-                      <button
-                        key={rp}
-                        class="unified-dialog__recent-item"
-                        onClick={() => setPath(rp)}
-                      >
-                        {rp.split('/').filter(Boolean).pop()} <span class="unified-dialog__recent-path">{rp}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div class="unified-dialog__options">
-                  <label class="unified-dialog__option">
-                    <input type="checkbox" checked={shellOnly} onChange={(e) => {
-                      setShellOnly((e.target as HTMLInputElement).checked)
-                    }} />
-                    <span>{t('unified.shellOnly')}</span>
-                  </label>
-                  {!shellOnly && (
-                    <>
-                      <label class="unified-dialog__option">
-                        <input type="checkbox" checked={skipPermissions} onChange={(e) => {
-                          setSkipPermissions((e.target as HTMLInputElement).checked)
-                        }} />
-                        <span>{t('unified.skipPermissions')}</span>
-                      </label>
-                      <label class="unified-dialog__option">
-                        <input type="checkbox" checked={fork} onChange={(e) => {
-                          setFork((e.target as HTMLInputElement).checked)
-                        }} />
-                        <span>{t('unified.fork')}</span>
-                      </label>
-                    </>
-                  )}
-                </div>
-
-                <div class="unified-dialog__footer">
-                  <button class="btn btn--sm" onClick={handleClose}>{t('unified.cancel')}</button>
-                  <button class="btn btn--sm btn--primary" onClick={handlePathStart} disabled={!path.trim()}>
-                    {t('unified.start')}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Notes tab */}
-            {tab === 'notes' && (
-              <div class="launcher-popup__body">
-                <button class="btn btn--sm btn--primary" onClick={handleNewNote} style={{ marginBottom: '8px' }}>
-                  {t('launcher.newNote')}
-                </button>
-                {notes.length > 0 ? (
-                  <div class="launcher-popup__notes-list">
-                    {notes.map(note => (
-                      <button
-                        key={note.id}
-                        class="launcher-popup__note-item"
-                        onClick={() => handleNoteClick(note)}
-                      >
-                        <span class="launcher-popup__note-title">{note.title || note.id}</span>
-                        {note.tags.length > 0 && (
-                          <span class="launcher-popup__note-tags">
-                            {note.tags.map((tag: string) => `#${tag}`).join(' ')}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div class="sidebar-panel__empty">{t('sidebar.noNotes')}</div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {popupContent}
     </div>
   )
 }

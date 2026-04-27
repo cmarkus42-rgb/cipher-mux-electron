@@ -266,6 +266,10 @@ export function App() {
     if (slotIdx >= 0) {
       // Remove session from slot to show launcher, which user can interact with
       removeSession(sessionId)
+      // After next render (LauncherCell mounts), open its popup automatically
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new CustomEvent('launcher-open', { detail: { slotIndex: slotIdx } }))
+      })
     }
   }, [grid.slots, removeSession])
 
