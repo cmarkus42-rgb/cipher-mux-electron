@@ -20,10 +20,16 @@ export function GridPlacementPopup({
   const { t } = useTranslation()
   if (!visible) return null
 
+  // Normalize slots to match grid dimensions (RT-X3 fix)
+  const expected = cols * rows
+  const normalizedSlots: GridSlot[] = Array.from({ length: expected }, (_, i) =>
+    gridSlots[i] ?? { sessionId: null, rowSpan: 1, type: 'session' as const },
+  )
+
   // Compute covered slots (hidden behind rowSpan > 1 cells)
   const covered = new Set<number>()
-  for (let idx = 0; idx < gridSlots.length; idx++) {
-    const span = gridSlots[idx].rowSpan
+  for (let idx = 0; idx < normalizedSlots.length; idx++) {
+    const span = normalizedSlots[idx].rowSpan
     if (span > 1) {
       const col = idx % cols
       const row = Math.floor(idx / cols)
@@ -113,7 +119,7 @@ export function GridPlacementPopup({
           gridTemplateColumns: `repeat(${cols}, 1fr)`,
           gridTemplateRows: `repeat(${rows}, 1fr)`,
         }}>
-          {gridSlots.map((slot, idx) => {
+          {normalizedSlots.map((slot, idx) => {
             // Skip cells covered by a rowSpan above
             if (covered.has(idx)) return null
             const empty = isEmpty(slot)

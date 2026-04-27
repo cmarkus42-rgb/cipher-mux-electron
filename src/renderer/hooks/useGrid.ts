@@ -35,8 +35,18 @@ export function useGrid(panelWidth = 0) {
     api().config.get('ui').then((ui: any) => {
       if (!mounted) return
       if (ui?.grid?.config && ui.grid.slots) {
-        setGrid(ui.grid)
-        api().window.fitGrid(ui.grid.config.cols, ui.grid.config.rows, panelWidthRef.current).catch(() => {})
+        const expected = ui.grid.config.cols * ui.grid.config.rows
+        let loadedGrid = ui.grid as GridState
+        // Fix RT-X1: Rebuild slots if count doesn't match config dimensions
+        if (loadedGrid.slots.length !== expected) {
+          const rebuilt: GridState['slots'] = Array.from({ length: expected }, (_, i) =>
+            loadedGrid.slots[i] ?? { sessionId: null, rowSpan: 1, type: 'session' as const },
+          )
+          loadedGrid = { config: loadedGrid.config, slots: rebuilt }
+          console.warn(`[useGrid] slots.length (${ui.grid.slots.length}) != expected (${expected}), rebuilt`)
+        }
+        setGrid(loadedGrid)
+        api().window.fitGrid(loadedGrid.config.cols, loadedGrid.config.rows, panelWidthRef.current).catch(() => {})
       } else {
         // Fit window to default grid
         api().window.fitGrid(grid.config.cols, grid.config.rows, panelWidthRef.current).catch(() => {})
