@@ -213,6 +213,7 @@ export class IpcHub {
     }).then((result) => {
       // Cache for pull-based retrieval by the renderer
       this.cachedRecoveryResult = result
+      console.log(`[IpcHub] recovery complete: ${result.recovered.length} recovered, ${result.orphaned.length} orphaned, gridState=${!!result.gridState}`)
       if (result.orphaned.length > 0 || result.recovered.length > 0) {
         this.windowManager.sendToMainWindow(IPC.SESSIONS_RECOVERY_RESULT, result)
       }
