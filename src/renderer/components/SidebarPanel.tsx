@@ -18,6 +18,7 @@ interface SidebarPanelProps {
   onDetach?: () => void
   activeWorkspaceId: string | null
   hasNotesCell: boolean
+  onOpenNoteInGrid?: (note: any) => void
   voiceComState?: string
 }
 
@@ -37,7 +38,7 @@ function displayName(name: string, projectPath?: string | null): string {
 export function SidebarPanel({
   visible, orchestratorActive, mpoActive, sessions, gridSessionIds,
   contextUsages, onAddToGrid, onKillSession, onDetach, activeWorkspaceId, hasNotesCell,
-  voiceComState,
+  onOpenNoteInGrid, voiceComState,
 }: SidebarPanelProps) {
   const { t } = useTranslation()
   const { messages } = useMessages()
@@ -101,9 +102,13 @@ export function SidebarPanel({
   const availableTags = [...new Set(notes.flatMap(n => n.tags))].sort()
 
   const handleNoteDoubleClick = useCallback((note: any) => {
-    const openFn = (window as any).__notesCell_openNote
-    if (openFn) openFn(note)
-  }, [])
+    if (onOpenNoteInGrid) {
+      onOpenNoteInGrid(note)
+    } else {
+      const openFn = (window as any).__notesCell_openNote
+      if (openFn) openFn(note)
+    }
+  }, [onOpenNoteInGrid])
 
   const handleNoteDelete = useCallback(async (note: any, e: Event) => {
     e.stopPropagation()

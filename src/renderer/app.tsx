@@ -29,7 +29,7 @@ export function App() {
   const [infoInitialTab, setInfoInitialTab] = useState<'settings' | 'about' | 'shortcuts' | undefined>(undefined)
   const [themeEditorActive, setThemeEditorActive] = useState(false)
   const [workspacesPopupVisible, setWorkspacesPopupVisible] = useState(false)
-  const [placementPopup, setPlacementPopup] = useState<{ sessionId: string } | null>(null)
+  const [placementPopup, setPlacementPopup] = useState<{ sessionId: string } | { note: any } | null>(null)
 
   const { sessions, startSession, stopSession, refresh: refreshSessions } = useSessions()
   const contextUsages = useContextUsage()
@@ -339,10 +339,20 @@ export function App() {
 
   const handlePlacementSelect = useCallback((slotIndex: number) => {
     if (!placementPopup) return
-    setSessionAtSlot(slotIndex, placementPopup.sessionId)
-    setFocusedSessionId(placementPopup.sessionId)
-    setPlacementPopup(null)
-  }, [placementPopup, setSessionAtSlot])
+    if ('note' in placementPopup) {
+      // Note placement: open NotesCell at chosen slot, then load the note
+      setSlotType(slotIndex, 'notes')
+      setPlacementPopup(null)
+      setTimeout(() => {
+        const openFn = (window as any).__notesCell_openNote
+        if (openFn) openFn(placementPopup.note)
+      }, 100)
+    } else {
+      setSessionAtSlot(slotIndex, placementPopup.sessionId)
+      setFocusedSessionId(placementPopup.sessionId)
+      setPlacementPopup(null)
+    }
+  }, [placementPopup, setSessionAtSlot, setSlotType])
 
   const handleResize = useCallback((cols: number, rows: number) => {
     resize({ cols, rows })
@@ -512,6 +522,19 @@ export function App() {
     }, 100)
   }, [setSlotType])
 
+  const handleOpenNoteInGrid = useCallback((note: any) => {
+    // Find existing NotesCell slot
+    const existingIdx = grid.slots.findIndex(s => s.type === 'notes')
+    if (existingIdx >= 0) {
+      // Already have a NotesCell — open note there
+      const openFn = (window as any).__notesCell_openNote
+      if (openFn) openFn(note)
+    } else {
+      // No NotesCell — show GridPlacementPopup for user to pick a slot
+      setPlacementPopup({ note })
+    }
+  }, [grid.slots])
+
   // Listen for entity-started events
   useEffect(() => {
     const api = (window as any).cipherMux
@@ -643,6 +666,7 @@ export function App() {
             onDetach={handleSidebarDetach}
             activeWorkspaceId={activeWorkspaceId}
             hasNotesCell={grid.slots.some(s => s.type === 'notes')}
+            onOpenNoteInGrid={handleOpenNoteInGrid}
             voiceComState={voiceComState}
           />
         )}
