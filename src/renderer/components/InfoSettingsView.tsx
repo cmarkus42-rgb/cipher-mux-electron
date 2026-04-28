@@ -34,8 +34,17 @@ type TabId = 'general' | 'themes' | 'models' | 'shortcuts' | 'about'
 type LegacyTabId = 'settings' | TabId
 
 const SHORTCUT_KEYS = [
-  { category: 'global', combo: 'Cmd+B', labelKey: 'info.shortcut.openBugreport' },
-  { category: 'global', combo: 'Escape', labelKey: 'info.shortcut.closeDialog' },
+  // Navigation
+  { category: 'navigation', combo: 'Cmd+1–5', labelKey: 'info.shortcut.focusSession' },
+  { category: 'navigation', combo: 'Escape', labelKey: 'info.shortcut.closeDialog' },
+  // Layout
+  { category: 'layout', combo: 'Cmd+←/→', labelKey: 'info.shortcut.gridCols' },
+  { category: 'layout', combo: 'Cmd+↑/↓', labelKey: 'info.shortcut.gridRows' },
+  // Actions
+  { category: 'actions', combo: 'Cmd+N', labelKey: 'info.shortcut.newSession' },
+  { category: 'actions', combo: 'Cmd+B', labelKey: 'info.shortcut.openBugreport' },
+  { category: 'actions', combo: 'Cmd+S', labelKey: 'info.shortcut.saveNote' },
+  // Terminal
   { category: 'terminal', combo: 'Cmd+C', labelKey: 'info.shortcut.copy' },
   { category: 'terminal', combo: 'Cmd+V', labelKey: 'info.shortcut.paste' },
 ]
