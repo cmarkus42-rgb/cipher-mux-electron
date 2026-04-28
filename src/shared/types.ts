@@ -419,6 +419,8 @@ export interface NoteInfo {
   relativePath: string
   createdAt: string
   modifiedAt: string
+  /** Note type from frontmatter (e.g. 'testcase'). Undefined for regular notes. */
+  noteType?: string
   /** Session name that created this handoff note */
   fromSession?: string
   /** Target entity ID or "any" */

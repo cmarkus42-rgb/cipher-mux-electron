@@ -132,6 +132,7 @@ export class NoteManager {
     const fm = parsed.data as {
       title?: string
       tags?: string[]
+      type?: string
       created?: string
       modified?: string
       from_session?: string
@@ -146,6 +147,7 @@ export class NoteManager {
       tags: fm.tags ?? [],
       scope: 'global',
       relativePath: `${id}.md`,
+      ...(fm.type ? { noteType: fm.type } : {}),
       createdAt: fm.created ?? new Date().toISOString(),
       modifiedAt: fm.modified ?? new Date().toISOString(),
       ...(fm.from_session ? { fromSession: fm.from_session } : {}),

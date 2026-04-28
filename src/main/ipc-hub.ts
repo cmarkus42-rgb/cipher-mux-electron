@@ -1444,6 +1444,27 @@ export class IpcHub {
       return { ok }
     })
 
+    // Screenshot capture for testcase items (macOS screencapture -i)
+    ipcMain.handle(IPC.NOTES_SCREENSHOT, async (_e, { noteId, itemId }: { noteId: string; itemId: string }) => {
+      const { execFileSync } = require('child_process')
+      const fsNode = require('fs')
+      const pathNode = require('path')
+      const screenshotDir = pathNode.join(this.noteManager['notesDir'], 'screenshots', noteId)
+      fsNode.mkdirSync(screenshotDir, { recursive: true })
+      const timestamp = Date.now()
+      const filePath = pathNode.join(screenshotDir, `${itemId}-${timestamp}.png`)
+      try {
+        // Interactive region selection → file (no clipboard permission needed)
+        execFileSync('screencapture', ['-i', filePath], { timeout: 30000 })
+        if (fsNode.existsSync(filePath)) {
+          return { path: filePath }
+        }
+        return null
+      } catch {
+        return null
+      }
+    })
+
     ipcMain.handle(IPC.NOTES_TAGS, async () => {
       return this.noteTagging.getTagRepository()
     })

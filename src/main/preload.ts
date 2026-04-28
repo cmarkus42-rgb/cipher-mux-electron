@@ -218,6 +218,8 @@ const api = {
       ipcRenderer.invoke(IPC.NOTES_CREATE, { title, body, tags }),
     delete: (id: string) =>
       ipcRenderer.invoke(IPC.NOTES_DELETE, { id }),
+    screenshot: (noteId: string, itemId: string): Promise<{ path: string } | null> =>
+      ipcRenderer.invoke(IPC.NOTES_SCREENSHOT, { noteId, itemId }),
     tags: () => ipcRenderer.invoke(IPC.NOTES_TAGS),
     tagList: (): Promise<Array<{ name: string; count: number; description: string; isSeed: boolean }>> =>
       ipcRenderer.invoke(IPC.NOTES_TAG_LIST),
