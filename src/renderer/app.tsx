@@ -151,6 +151,19 @@ export function App() {
     api.window.fitGrid(grid.config.cols, grid.config.rows, pw)
   }, [sidebarVisible, sidebarDetached, grid.config.cols, grid.config.rows])
 
+  // A.3 fix: clear entity session IDs when their sessions no longer exist.
+  // This prevents orphaned entities from blocking preset starts.
+  useEffect(() => {
+    if (!initialCleanupDone.current) return
+    const activeIds = new Set(sessions.map(s => s.id))
+    if (orchestratorSessionId && !activeIds.has(orchestratorSessionId)) setOrchestratorSessionId(null)
+    if (mpoSessionId && !activeIds.has(mpoSessionId)) setMpoSessionId(null)
+    if (companionSessionId && !activeIds.has(companionSessionId)) setCompanionSessionId(null)
+    if (refinementSessionId && !activeIds.has(refinementSessionId)) setRefinementSessionId(null)
+    if (voiceRelaySessionId && !activeIds.has(voiceRelaySessionId)) setVoiceRelaySessionId(null)
+    if (auditSessionId && !activeIds.has(auditSessionId)) setAuditSessionId(null)
+  }, [sessions, orchestratorSessionId, mpoSessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
+
   // Entity status map for unified dialog
   const entityStatus = useMemo<Record<string, boolean>>(() => ({
     orchestrator: !!orchestratorSessionId,
