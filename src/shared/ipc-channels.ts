@@ -131,6 +131,8 @@ export const IPC = {
   SIDEBAR_DETACH: 'cipher-mux:sidebar:detach',
   SIDEBAR_REATTACH: 'cipher-mux:sidebar:reattach',
   SIDEBAR_REATTACHED: 'cipher-mux:sidebar:reattached',
+  SIDEBAR_CLOSED: 'cipher-mux:sidebar:closed',
+  SIDEBAR_DOCK: 'cipher-mux:sidebar:dock',
   SIDEBAR_TOGGLE_WINDOW: 'cipher-mux:sidebar:toggle-window',
 
   // Tasks

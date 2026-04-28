@@ -162,12 +162,18 @@ const api = {
   sidebar: {
     detach: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.SIDEBAR_DETACH),
     reattach: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.SIDEBAR_REATTACH),
+    dock: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.SIDEBAR_DOCK),
     isDetached: (): Promise<boolean> => ipcRenderer.invoke('cipher-mux:sidebar:is-detached'),
     toggleWindow: (): Promise<{ visible: boolean }> => ipcRenderer.invoke(IPC.SIDEBAR_TOGGLE_WINDOW),
     onReattached: (cb: () => void) => {
       const handler = () => cb()
       ipcRenderer.on(IPC.SIDEBAR_REATTACHED, handler)
       return () => ipcRenderer.removeListener(IPC.SIDEBAR_REATTACHED, handler)
+    },
+    onClosed: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on(IPC.SIDEBAR_CLOSED, handler)
+      return () => ipcRenderer.removeListener(IPC.SIDEBAR_CLOSED, handler)
     },
   },
 

@@ -450,6 +450,17 @@ export function App() {
     return () => unsub()
   }, [])
 
+  // Sidebar window X-button = close completely (sidebar hidden, not docked)
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api.sidebar?.onClosed) return
+    const unsub = api.sidebar.onClosed(() => {
+      setSidebarDetached(false)
+      setSidebarVisible(false)
+    })
+    return () => unsub()
+  }, [])
+
   useEffect(() => {
     let mounted = true
     const api = (window as any).cipherMux
