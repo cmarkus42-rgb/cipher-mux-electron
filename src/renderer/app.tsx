@@ -26,7 +26,7 @@ export function App() {
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null)
   const [bugreportVisible, setBugreportVisible] = useState(false)
   const [infoVisible, setInfoVisible] = useState(false)
-  const [infoInitialTab, setInfoInitialTab] = useState<'settings' | 'about' | 'shortcuts' | undefined>(undefined)
+  const [infoInitialTab, setInfoInitialTab] = useState<string | undefined>(undefined)
   const [themeEditorActive, setThemeEditorActive] = useState(false)
   const [workspacesPopupVisible, setWorkspacesPopupVisible] = useState(false)
   const [placementPopup, setPlacementPopup] = useState<{ sessionId: string } | { note: any } | null>(null)
@@ -118,13 +118,23 @@ export function App() {
   // Runs once after a short delay to let recovery/restore complete first.
   const sessionsRef = useRef(sessions)
   sessionsRef.current = sessions
+  const initialCleanupDone = useRef(false)
   useEffect(() => {
     const timer = setTimeout(() => {
+      initialCleanupDone.current = true
       const activeIds = new Set(sessionsRef.current.map(s => s.id))
       cleanupDeadSessions(activeIds)
     }, 3000) // Wait 3s for recovery dialog and session restore to complete
     return () => clearTimeout(timer)
   }, [cleanupDeadSessions])
+
+  // A.2 fix: reactively clean up grid slots when sessions die during runtime.
+  // Only runs after the initial 3s grace period to avoid interfering with recovery.
+  useEffect(() => {
+    if (!initialCleanupDone.current) return
+    const activeIds = new Set(sessions.map(s => s.id))
+    cleanupDeadSessions(activeIds)
+  }, [sessions, cleanupDeadSessions])
 
   const gridSessionIds = grid.slots.filter(s => s.sessionId).map(s => s.sessionId!)
 
@@ -667,8 +677,7 @@ export function App() {
           else setWorkspacesPopupVisible(prev => !prev)
           break
         case 'info-dialog': {
-          type InfoTab = 'settings' | 'about' | 'shortcuts' | undefined
-          const tab = data.context?.tab as InfoTab
+          const tab = data.context?.tab as string | undefined
           if (action === 'close') {
             setInfoVisible(false)
           } else if (action === 'open') {
