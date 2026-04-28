@@ -8,7 +8,6 @@ import type { NoteInfo } from '../../shared/types'
 
 interface NoteTab {
   id: string
-  scope: string
   title: string
   content: string
   dirty: boolean
@@ -40,8 +39,7 @@ export function NotesCell({
   onDrop,
 }: NotesCellProps) {
   const { t } = useTranslation()
-  const scope = activeWorkspaceId ? `workspace-${activeWorkspaceId}` : 'global'
-  const { saveNote, deleteNote } = useNotes(scope)
+  const { saveNote, deleteNote } = useNotes()
   const [tabs, setTabs] = useState<NoteTab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
 
@@ -57,12 +55,11 @@ export function NotesCell({
       }
       // Read content
       const apiObj = (window as any).cipherMux
-      const result = await apiObj.notes.read(info.id, info.scope)
+      const result = await apiObj.notes.read(info.id)
       if (!result) return
 
       const tab: NoteTab = {
         id: info.id,
-        scope: info.scope,
         title: info.title,
         content: result.body,
         dirty: false,
@@ -91,7 +88,7 @@ export function NotesCell({
       const tab = tabs.find((t) => t.id === tabId)
       if (!tab) return
       if (!confirm(t('notesCell.confirmDelete', { title: tab.title || tab.id }))) return
-      await deleteNote(tab.id, tab.scope)
+      await deleteNote(tab.id)
       closeTab(tabId)
     },
     [tabs, deleteNote, closeTab],
@@ -99,22 +96,21 @@ export function NotesCell({
 
   const handleCreateNote = useCallback(async () => {
     const apiObj = (window as any).cipherMux
-    const note = await apiObj.notes.create(scope, '', '# ')
+    const note = await apiObj.notes.create('', '# ')
     const tab: NoteTab = {
       id: note.id,
-      scope: note.scope,
       title: t('notesCell.newTitle'),
       content: '# ',
       dirty: false,
     }
     setTabs((prev) => [...prev, tab])
     setActiveTabId(note.id)
-  }, [scope])
+  }, [])
 
   const handleSave = useCallback(
     async (content: string) => {
       if (!activeTab) return
-      const result = await saveNote(activeTab.id, activeTab.scope, content)
+      const result = await saveNote(activeTab.id, content)
       const title = result?.title || activeTab.title
       setTabs((prev) =>
         prev.map((t) => (t.id === activeTab.id ? { ...t, content, title, dirty: false } : t)),
@@ -128,7 +124,7 @@ export function NotesCell({
       if (!activeTab) return
       const apiObj = (window as any).cipherMux
       // Auto-save writes file but doesn't trigger tagging
-      const result = await apiObj.notes.save(activeTab.id, activeTab.scope, content, undefined, true)
+      const result = await apiObj.notes.save(activeTab.id, content, undefined, true)
       const title = result?.title || activeTab.title
       setTabs((prev) =>
         prev.map((t) => (t.id === activeTab.id ? { ...t, content, title, dirty: false } : t)),
@@ -160,10 +156,12 @@ export function NotesCell({
         <div class="cell-header__left">
           <span class="neon-dot neon-dot--info" />
           <span class="cell-name">{t('notesCell.header')}</span>
-          <span class="cell-sep">·</span>
-          <span class="cell-ctx ctx-ok">
-            {scope === 'global' ? t('notesCell.scopeGlobal') : activeWorkspaceId}
-          </span>
+          {activeWorkspaceId && (
+            <>
+              <span class="cell-sep">·</span>
+              <span class="cell-ctx ctx-ok">{activeWorkspaceId}</span>
+            </>
+          )}
         </div>
         <div class="cell-header__right">
           {maxRows > 1 && (

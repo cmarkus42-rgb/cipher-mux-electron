@@ -5,25 +5,22 @@ import { ulid } from 'ulidx'
 import type { NoteInfo, NoteContent, HandoffStatus } from '../../shared/types'
 
 // ─── NoteManager ────────────────────────────────────────────
+// All notes stored in a flat directory: {notesDir}/{id}.md
+// Scope-based subdirectories (global/, workspace-*/) are deprecated.
+// Categorization is purely tag-based. See P.3 for migration logic.
 
 export class NoteManager {
   private notesDir: string
 
   constructor(notesDir: string) {
     this.notesDir = notesDir
-    // Ensure global/ directory exists synchronously-ish via async call
-    // (caller should await ensureReady() or rely on lazy creation in create())
-    void fs.mkdir(path.join(this.notesDir, 'global'), { recursive: true })
+    void fs.mkdir(this.notesDir, { recursive: true })
   }
 
   // ─── Helpers ──────────────────────────────────────────────
 
-  private scopeDir(scope: string): string {
-    return path.join(this.notesDir, scope)
-  }
-
-  private filePath(id: string, scope: string): string {
-    return path.join(this.scopeDir(scope), `${id}.md`)
+  private filePath(id: string): string {
+    return path.join(this.notesDir, `${id}.md`)
   }
 
   /** Extract title from first # heading in body, fallback to 'Untitled' */
@@ -33,7 +30,7 @@ export class NoteManager {
   }
 
   /** Parse a .md file into NoteInfo + body */
-  private async parseFile(filePath: string, scope: string): Promise<NoteContent | null> {
+  private async parseFile(filePath: string): Promise<NoteContent | null> {
     let raw: string
     try {
       raw = await fs.readFile(filePath, 'utf-8')
@@ -62,8 +59,8 @@ export class NoteManager {
       id,
       title: fm.title ?? 'Untitled',
       tags: fm.tags ?? [],
-      scope,
-      relativePath: path.join(scope, `${id}.md`),
+      scope: 'global',
+      relativePath: `${id}.md`,
       createdAt: fm.created ?? new Date().toISOString(),
       modifiedAt: fm.modified ?? new Date().toISOString(),
       ...(fm.from_session ? { fromSession: fm.from_session } : {}),
@@ -86,38 +83,36 @@ export class NoteManager {
 
   // ─── Public API ───────────────────────────────────────────
 
-  async create(scope: string, title: string, body: string): Promise<NoteInfo> {
+  async create(title: string, body: string, tags?: string[]): Promise<NoteInfo> {
     const id = ulid()
     const now = new Date().toISOString()
-    const dir = this.scopeDir(scope)
-    await fs.mkdir(dir, { recursive: true })
+    await fs.mkdir(this.notesDir, { recursive: true })
 
     const fm = {
       title,
-      tags: [] as string[],
+      tags: tags ?? ([] as string[]),
       created: now,
       modified: now,
     }
 
     const content = this.stringify(fm, body)
-    await fs.writeFile(this.filePath(id, scope), content, 'utf-8')
+    await fs.writeFile(this.filePath(id), content, 'utf-8')
 
     return {
       id,
       title,
-      tags: [],
-      scope,
-      relativePath: path.join(scope, `${id}.md`),
+      tags: fm.tags,
+      scope: 'global',
+      relativePath: `${id}.md`,
       createdAt: now,
       modifiedAt: now,
     }
   }
 
-  async list(scope: string): Promise<NoteInfo[]> {
-    const dir = this.scopeDir(scope)
+  async list(filterTags?: string[]): Promise<NoteInfo[]> {
     let entries: string[]
     try {
-      entries = await fs.readdir(dir)
+      entries = await fs.readdir(this.notesDir)
     } catch {
       return []
     }
@@ -125,36 +120,37 @@ export class NoteManager {
     const mdFiles = entries.filter(e => e.endsWith('.md'))
     const notes = await Promise.all(
       mdFiles.map(async f => {
-        const result = await this.parseFile(path.join(dir, f), scope)
+        const result = await this.parseFile(path.join(this.notesDir, f))
         return result?.info ?? null
       })
     )
 
-    return (notes.filter(Boolean) as NoteInfo[]).sort(
+    let filtered = notes.filter(Boolean) as NoteInfo[]
+
+    // Filter by tags if provided (note must have at least one matching tag)
+    if (filterTags && filterTags.length > 0) {
+      const tagSet = new Set(filterTags.map(t => t.toLowerCase()))
+      filtered = filtered.filter(n =>
+        n.tags.some(t => tagSet.has(t.toLowerCase()))
+      )
+    }
+
+    return filtered.sort(
       (a, b) => b.modifiedAt.localeCompare(a.modifiedAt)
     )
   }
 
+  /** @deprecated Use list() — kept for backward compat, same behavior. */
   async listAll(): Promise<NoteInfo[]> {
-    let scopes: string[]
-    try {
-      const entries = await fs.readdir(this.notesDir, { withFileTypes: true })
-      scopes = entries.filter(e => e.isDirectory()).map(e => e.name)
-    } catch {
-      return []
-    }
-
-    const results = await Promise.all(scopes.map(s => this.list(s)))
-    const all = results.flat()
-    return all.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt))
+    return this.list()
   }
 
-  async read(id: string, scope: string): Promise<NoteContent | null> {
-    return this.parseFile(this.filePath(id, scope), scope)
+  async read(id: string): Promise<NoteContent | null> {
+    return this.parseFile(this.filePath(id))
   }
 
-  async save(id: string, scope: string, body: string, tags?: string[]): Promise<NoteInfo> {
-    const existing = await this.parseFile(this.filePath(id, scope), scope)
+  async save(id: string, body: string, tags?: string[]): Promise<NoteInfo> {
+    const existing = await this.parseFile(this.filePath(id))
     const now = new Date().toISOString()
     const title = this.extractTitle(body)
 
@@ -165,18 +161,17 @@ export class NoteManager {
       modified: now,
     }
 
-    const dir = this.scopeDir(scope)
-    await fs.mkdir(dir, { recursive: true })
+    await fs.mkdir(this.notesDir, { recursive: true })
 
     const content = this.stringify(fm, body)
-    await fs.writeFile(this.filePath(id, scope), content, 'utf-8')
+    await fs.writeFile(this.filePath(id), content, 'utf-8')
 
     return {
       id,
       title,
       tags: fm.tags,
-      scope,
-      relativePath: path.join(scope, `${id}.md`),
+      scope: 'global',
+      relativePath: `${id}.md`,
       createdAt: fm.created,
       modifiedAt: now,
     }
@@ -191,9 +186,7 @@ export class NoteManager {
   ): Promise<NoteInfo> {
     const id = ulid()
     const now = new Date().toISOString()
-    const scope = 'global'
-    const dir = this.scopeDir(scope)
-    await fs.mkdir(dir, { recursive: true })
+    await fs.mkdir(this.notesDir, { recursive: true })
 
     const fm = {
       title,
@@ -206,14 +199,14 @@ export class NoteManager {
     }
 
     const content = matter.stringify('\n' + body, fm)
-    await fs.writeFile(this.filePath(id, scope), content, 'utf-8')
+    await fs.writeFile(this.filePath(id), content, 'utf-8')
 
     return {
       id,
       title,
       tags: ['handoff'],
-      scope,
-      relativePath: path.join(scope, `${id}.md`),
+      scope: 'global',
+      relativePath: `${id}.md`,
       createdAt: now,
       modifiedAt: now,
       fromSession,
@@ -223,42 +216,26 @@ export class NoteManager {
   }
 
   /**
-   * Full-text search over notes with optional scope and tag filters.
+   * Full-text search over notes with optional tag filters.
    * Returns up to 50 results, title matches first, then by modifiedAt desc.
    */
   async search(query: string, opts?: {
-    scope?: string
     tags?: string[]
   }): Promise<NoteContent[]> {
-    // Collect all notes (scope-filtered or all scopes)
-    let scopes: string[]
-    if (opts?.scope) {
-      scopes = [opts.scope]
-    } else {
-      try {
-        const entries = await fs.readdir(this.notesDir, { withFileTypes: true })
-        scopes = entries.filter(e => e.isDirectory()).map(e => e.name)
-      } catch {
-        return []
-      }
+    let entries: string[]
+    try {
+      entries = await fs.readdir(this.notesDir)
+    } catch {
+      return []
     }
 
+    const mdFiles = entries.filter(e => e.endsWith('.md'))
     const allNotes: NoteContent[] = []
-    for (const scope of scopes) {
-      const dir = this.scopeDir(scope)
-      let entries: string[]
-      try {
-        entries = await fs.readdir(dir)
-      } catch {
-        continue
-      }
-      const mdFiles = entries.filter(e => e.endsWith('.md'))
-      const parsed = await Promise.all(
-        mdFiles.map(f => this.parseFile(path.join(dir, f), scope))
-      )
-      for (const p of parsed) {
-        if (p) allNotes.push(p)
-      }
+    const parsed = await Promise.all(
+      mdFiles.map(f => this.parseFile(path.join(this.notesDir, f)))
+    )
+    for (const p of parsed) {
+      if (p) allNotes.push(p)
     }
 
     const lowerQuery = query.toLowerCase()
@@ -288,9 +265,9 @@ export class NoteManager {
     return results.slice(0, 50)
   }
 
-  async delete(id: string, scope: string): Promise<boolean> {
+  async delete(id: string): Promise<boolean> {
     try {
-      await fs.unlink(this.filePath(id, scope))
+      await fs.unlink(this.filePath(id))
       return true
     } catch {
       return false

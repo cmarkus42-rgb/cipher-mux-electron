@@ -267,46 +267,35 @@ export class NoteTagging {
     const affected: string[] = []
     const matter = require('gray-matter')
 
-    // Scan all scope dirs
-    let scopeDirs: string[]
+    // Scan flat notes directory
+    let files: string[]
     try {
-      scopeDirs = fs.readdirSync(this.notesDir, { withFileTypes: true })
-        .filter(d => d.isDirectory())
-        .map(d => d.name)
+      files = fs.readdirSync(this.notesDir).filter(f => f.endsWith('.md'))
     } catch {
       return affected
     }
 
-    for (const scope of scopeDirs) {
-      const dir = path.join(this.notesDir, scope)
-      let files: string[]
+    for (const file of files) {
+      const filePath = path.join(this.notesDir, file)
       try {
-        files = fs.readdirSync(dir).filter(f => f.endsWith('.md'))
-      } catch {
-        continue
-      }
-      for (const file of files) {
-        const filePath = path.join(dir, file)
-        try {
-          const raw = fs.readFileSync(filePath, 'utf-8')
-          const parsed = matter(raw)
-          const tags: string[] = parsed.data.tags ?? []
-          const idx = tags.findIndex((t: string) => t.toLowerCase() === oldTag)
-          if (idx === -1) continue
+        const raw = fs.readFileSync(filePath, 'utf-8')
+        const parsed = matter(raw)
+        const tags: string[] = parsed.data.tags ?? []
+        const idx = tags.findIndex((t: string) => t.toLowerCase() === oldTag)
+        if (idx === -1) continue
 
-          if (newTag) {
-            tags[idx] = newTag
-          } else {
-            tags.splice(idx, 1)
-          }
-          parsed.data.tags = tags
-          parsed.data.modified = new Date().toISOString()
-          const updated = matter.stringify(parsed.content, parsed.data)
-          fs.writeFileSync(filePath, updated, 'utf-8')
-          affected.push(path.join(scope, file))
-        } catch {
-          // Skip files that can't be parsed
+        if (newTag) {
+          tags[idx] = newTag
+        } else {
+          tags.splice(idx, 1)
         }
+        parsed.data.tags = tags
+        parsed.data.modified = new Date().toISOString()
+        const updated = matter.stringify(parsed.content, parsed.data)
+        fs.writeFileSync(filePath, updated, 'utf-8')
+        affected.push(file)
+      } catch {
+        // Skip files that can't be parsed
       }
     }
 
@@ -320,41 +309,30 @@ export class NoteTagging {
       this.repo.tags[key] = { ...this.repo.tags[key], count: 0 }
     }
 
-    let scopeDirs: string[]
+    let files: string[]
     try {
-      scopeDirs = fs.readdirSync(this.notesDir, { withFileTypes: true })
-        .filter(d => d.isDirectory())
-        .map(d => d.name)
+      files = fs.readdirSync(this.notesDir).filter(f => f.endsWith('.md'))
     } catch {
       return
     }
 
     const matter = require('gray-matter')
-    for (const scope of scopeDirs) {
-      const dir = path.join(this.notesDir, scope)
-      let files: string[]
+    for (const file of files) {
       try {
-        files = fs.readdirSync(dir).filter(f => f.endsWith('.md'))
-      } catch {
-        continue
-      }
-      for (const file of files) {
-        try {
-          const raw = fs.readFileSync(path.join(dir, file), 'utf-8')
-          const parsed = matter(raw)
-          const tags: string[] = parsed.data.tags ?? []
-          for (const tag of tags) {
-            const norm = tag.toLowerCase().trim()
-            if (this.repo.tags[norm]) {
-              this.repo.tags[norm] = {
-                ...this.repo.tags[norm],
-                count: this.repo.tags[norm].count + 1,
-              }
+        const raw = fs.readFileSync(path.join(this.notesDir, file), 'utf-8')
+        const parsed = matter(raw)
+        const tags: string[] = parsed.data.tags ?? []
+        for (const tag of tags) {
+          const norm = tag.toLowerCase().trim()
+          if (this.repo.tags[norm]) {
+            this.repo.tags[norm] = {
+              ...this.repo.tags[norm],
+              count: this.repo.tags[norm].count + 1,
             }
           }
-        } catch {
-          // Skip
         }
+      } catch {
+        // Skip
       }
     }
     this.saveRepository()

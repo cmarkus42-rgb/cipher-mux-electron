@@ -210,14 +210,14 @@ const api = {
 
   // ─── Notes ──────────────────────────────────────────────
   notes: {
-    list: (scope?: string) => ipcRenderer.invoke(IPC.NOTES_LIST, { scope }),
-    read: (id: string, scope: string) => ipcRenderer.invoke(IPC.NOTES_READ, { id, scope }),
-    save: (id: string, scope: string, body: string, tags?: string[], skipTagging?: boolean) =>
-      ipcRenderer.invoke(IPC.NOTES_SAVE, { id, scope, body, tags, skipTagging }),
-    create: (scope: string, title: string, body: string) =>
-      ipcRenderer.invoke(IPC.NOTES_CREATE, { scope, title, body }),
-    delete: (id: string, scope: string) =>
-      ipcRenderer.invoke(IPC.NOTES_DELETE, { id, scope }),
+    list: () => ipcRenderer.invoke(IPC.NOTES_LIST),
+    read: (id: string) => ipcRenderer.invoke(IPC.NOTES_READ, { id }),
+    save: (id: string, body: string, tags?: string[], skipTagging?: boolean) =>
+      ipcRenderer.invoke(IPC.NOTES_SAVE, { id, body, tags, skipTagging }),
+    create: (title: string, body: string, tags?: string[]) =>
+      ipcRenderer.invoke(IPC.NOTES_CREATE, { title, body, tags }),
+    delete: (id: string) =>
+      ipcRenderer.invoke(IPC.NOTES_DELETE, { id }),
     tags: () => ipcRenderer.invoke(IPC.NOTES_TAGS),
     tagList: (): Promise<Array<{ name: string; count: number; description: string; isSeed: boolean }>> =>
       ipcRenderer.invoke(IPC.NOTES_TAG_LIST),
@@ -400,6 +400,18 @@ const api = {
       const handler = (_e: unknown, state: string) => cb(state)
       ipcRenderer.on(IPC.VOICE_COM_STATE, handler)
       return () => ipcRenderer.removeListener(IPC.VOICE_COM_STATE, handler)
+    },
+    pinSession: (sessionId: string | null) =>
+      ipcRenderer.send(IPC.VOICE_PIN, { sessionId }),
+    onPinStatus: (cb: (data: { pinned: boolean; sessionId: string | null }) => void) => {
+      const handler = (_e: unknown, data: { pinned: boolean; sessionId: string | null }) => cb(data)
+      ipcRenderer.on(IPC.VOICE_PIN_STATUS, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_PIN_STATUS, handler)
+    },
+    onActiveSession: (cb: (data: { sessionId: string | null }) => void) => {
+      const handler = (_e: unknown, data: { sessionId: string | null }) => cb(data)
+      ipcRenderer.on(IPC.VOICE_ACTIVE_SESSION, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_ACTIVE_SESSION, handler)
     },
   },
 
