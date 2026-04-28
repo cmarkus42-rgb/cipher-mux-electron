@@ -276,6 +276,14 @@ export function App() {
     if (api.gridControl.onSessionEject) {
       unsubs.push(api.gridControl.onSessionEject((data: { sessionId: string }) => {
         removeSession(data.sessionId)
+        // Clear focus if ejected session was focused (prevents STT routing to background)
+        setFocusedSessionId((prev: string | null) => {
+          if (prev === data.sessionId) {
+            const remaining = grid.slots.find(s => s.sessionId && s.sessionId !== data.sessionId)
+            return remaining?.sessionId ?? null
+          }
+          return prev
+        })
       }))
     }
     if (api.gridControl.onSidebarToggle) {
@@ -664,7 +672,7 @@ export function App() {
           const cell = (data.context?.cell as string) ?? '0-0'
           const [col, row] = cell.split('-').map(Number)
           const slotIndex = (row || 0) * grid.config.cols + (col || 0)
-          window.dispatchEvent(new CustomEvent('cipher-mux:launcher-open', { detail: { slotIndex } }))
+          window.dispatchEvent(new CustomEvent('launcher-open', { detail: { slotIndex } }))
           break
         }
       }
