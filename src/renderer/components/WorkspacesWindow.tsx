@@ -18,7 +18,7 @@ const TAB_LABELS: Record<TabId, string> = {
 
 export function WorkspacesWindow() {
   const { t } = useTranslation()
-  const { theme } = useTheme()
+  useTheme() // sets body[data-theme] so CSS custom properties resolve correctly
   const [activeTab, setActiveTab] = useState<TabId>('workspaces')
 
   // Read initial tab from URL hash
@@ -34,7 +34,7 @@ export function WorkspacesWindow() {
   }, [])
 
   return (
-    <div class="ws-window" data-theme={theme}>
+    <div class="ws-window">
       <div class="ws-window__head">
         <div class="ws-window__tabs">
           {(['workspaces', 'companion', 'tags'] as TabId[]).map((tab) => (
