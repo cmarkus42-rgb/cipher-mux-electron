@@ -260,10 +260,8 @@ export class IpcHub {
     console.log('[IpcHub] No default workspace — auto-starting Companion')
     this.sessionManager.startEntity('companion').then((session) => {
       console.log(`[IpcHub] Companion auto-started: ${session.id}`)
-      this.windowManager.sendToMainWindow(IPC.ENTITY_STARTED, {
-        entityId: 'companion',
-        session,
-      })
+      // Note: ENTITY_STARTED is already sent by setupEventForwarding when
+      // startEntity emits 'entity-started'. No manual send here (RT-X2 double-event fix).
       try {
         this.sessionManager.queueEntityClaude('companion')
         this.sessionManager.scheduleStartupGreeting('companion')
