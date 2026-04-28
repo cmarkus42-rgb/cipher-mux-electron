@@ -4,26 +4,10 @@ import { createPortal } from 'preact/compat'
 import { useTranslation } from 'react-i18next'
 import { FolderPickerInput } from './FolderPickerInput'
 import { useNotes } from '../hooks/useNotes'
+import { useEntityPresets } from '../hooks/useEntityPresets'
 import type { EntityId } from '../../shared/types'
 
 const cipherApi = () => (window as any).cipherMux
-
-// ─── Entity preset definitions ───────────────────────────
-
-interface EntityPreset {
-  id: EntityId
-  nameKey: string
-  descKey: string
-  color: string
-}
-
-const ENTITY_PRESETS: EntityPreset[] = [
-  { id: 'companion', nameKey: 'statusBar.companion', descKey: 'unified.desc.companion', color: '#ffb74d' },
-  { id: 'refinement', nameKey: 'statusBar.refinement', descKey: 'unified.desc.refinement', color: '#ef5350' },
-  { id: 'audit', nameKey: 'statusBar.audit', descKey: 'unified.desc.audit', color: '#c0392b' },
-  { id: 'orchestrator', nameKey: 'statusBar.orchestrator', descKey: 'unified.desc.orchestrator', color: '#4fc3f7' },
-  { id: 'mpo', nameKey: 'statusBar.mpo', descKey: 'unified.desc.mpo', color: '#ab47bc' },
-]
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -68,8 +52,10 @@ export function LauncherCell({
   const [recentPaths, setRecentPaths] = useState<string[]>([])
 
   // Notes
-  const scope = activeWorkspaceId ? `workspace-${activeWorkspaceId}` : 'global'
-  const { notes } = useNotes(scope)
+  const { notes } = useNotes()
+
+  // Entity presets (dynamic from registry)
+  const entityPresets = useEntityPresets()
 
   // Listen for Cmd+N launcher-open event
   useEffect(() => {
@@ -198,20 +184,19 @@ export function LauncherCell({
         {tab === 'presets' && (
           <div class="launcher-popup__body">
             <div class="launcher-popup__presets">
-              {ENTITY_PRESETS.map(preset => {
+              {entityPresets.map(preset => {
                 const running = entityStatus[preset.id]
                 const isStarting = starting === preset.id
                 return (
                   <button
                     key={preset.id}
                     class={`unified-dialog__card${running ? ' unified-dialog__card--running' : ''}`}
-                    onClick={() => handleEntityClick(preset.id)}
+                    onClick={() => handleEntityClick(preset.id as EntityId)}
                     disabled={isStarting}
                     style={{ '--entity-color': preset.color } as any}
                   >
                     <div class="unified-dialog__card-info">
-                      <span class="unified-dialog__card-name">{t(preset.nameKey)}</span>
-                      <span class="unified-dialog__card-desc">{t(preset.descKey)}</span>
+                      <span class="unified-dialog__card-name">{preset.displayName}</span>
                     </div>
                     {running && (
                       <span class="unified-dialog__card-status">{t('unified.running')}</span>

@@ -2,27 +2,10 @@
 import { useState, useCallback, useEffect } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { FolderPickerInput } from './FolderPickerInput'
+import { useEntityPresets } from '../hooks/useEntityPresets'
 import type { EntityId } from '../../shared/types'
 
 const api = () => (window as any).cipherMux
-
-// ─── Entity preset definitions ───────────────────────────
-
-interface EntityPreset {
-  id: EntityId
-  nameKey: string // i18n key for display name
-  descKey: string // i18n key for description
-  color: string
-}
-
-const ENTITY_PRESETS: EntityPreset[] = [
-  { id: 'orchestrator', nameKey: 'statusBar.orchestrator', descKey: 'unified.desc.orchestrator', color: '#4fc3f7' },
-  { id: 'mpo', nameKey: 'statusBar.mpo', descKey: 'unified.desc.mpo', color: '#ab47bc' },
-  { id: 'companion', nameKey: 'statusBar.companion', descKey: 'unified.desc.companion', color: '#ffb74d' },
-  { id: 'refinement', nameKey: 'statusBar.refinement', descKey: 'unified.desc.refinement', color: '#ef5350' },
-  { id: 'voice-relay', nameKey: 'statusBar.voiceRelay', descKey: 'unified.desc.voice', color: '#9b59b6' },
-  { id: 'audit', nameKey: 'statusBar.audit', descKey: 'unified.desc.audit', color: '#c0392b' },
-]
 
 // ─── Component ───────────────────────────────────────────
 
@@ -57,6 +40,9 @@ export function UnifiedSessionDialog({
   const [skipPermissions, setSkipPermissions] = useState(true)
   const [fork, setFork] = useState(false)
   const [starting, setStarting] = useState<string | null>(null)
+
+  // Entity presets (dynamic from registry)
+  const entityPresets = useEntityPresets()
 
   // Recent paths from config
   const [recentPaths, setRecentPaths] = useState<string[]>([])
@@ -142,20 +128,19 @@ export function UnifiedSessionDialog({
         {tab === 'presets' && (
           <div class="unified-dialog__body">
             <div class="unified-dialog__presets">
-              {ENTITY_PRESETS.map(preset => {
+              {entityPresets.map(preset => {
                 const running = entityStatus[preset.id]
                 const isStarting = starting === preset.id
                 return (
                   <button
                     key={preset.id}
                     class={`unified-dialog__card${running ? ' unified-dialog__card--running' : ''}`}
-                    onClick={() => handleEntityClick(preset.id)}
+                    onClick={() => handleEntityClick(preset.id as EntityId)}
                     disabled={isStarting}
                     style={{ '--entity-color': preset.color } as any}
                   >
                     <div class="unified-dialog__card-info">
-                      <span class="unified-dialog__card-name">{t(preset.nameKey)}</span>
-                      <span class="unified-dialog__card-desc">{t(preset.descKey)}</span>
+                      <span class="unified-dialog__card-name">{preset.displayName}</span>
                     </div>
                     {running && (
                       <span class="unified-dialog__card-status">{t('unified.running')}</span>
