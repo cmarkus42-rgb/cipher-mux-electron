@@ -1420,7 +1420,18 @@ export class IpcHub {
     ipcMain.handle(IPC.NOTES_CREATE, async (_e, { title, body, tags }: {
       title: string; body: string; tags?: string[]
     }) => {
-      const note = await this.noteManager.create(title, body, tags)
+      // P.2: auto-apply workspace defaultTags when workspace is active
+      let mergedTags = tags ?? []
+      const activeWsId = configStore.get('activeWorkspaceId')
+      if (activeWsId) {
+        const workspaces = configStore.get('workspaces') ?? []
+        const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
+        if (ws?.defaultTags?.length) {
+          const tagSet = new Set([...mergedTags, ...ws.defaultTags])
+          mergedTags = [...tagSet]
+        }
+      }
+      const note = await this.noteManager.create(title, body, mergedTags.length > 0 ? mergedTags : undefined)
       this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created', note })
       return note
     })

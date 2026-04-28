@@ -627,8 +627,21 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       }
       try {
         const fullBody = `# ${args.title}\n\n${args.body}`
-        const tags = args.tags ? args.tags.slice(0, 5) : undefined
-        const note = await ctx.noteManager.create(args.title, fullBody, tags)
+        let tags = args.tags ? args.tags.slice(0, 5) : ([] as string[])
+        // P.2: auto-apply workspace defaultTags
+        try {
+          const { configStore } = require('../config/config-store')
+          const activeWsId = configStore.get('activeWorkspaceId')
+          if (activeWsId) {
+            const workspaces = configStore.get('workspaces') ?? []
+            const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
+            if (ws?.defaultTags?.length) {
+              const tagSet = new Set([...tags, ...ws.defaultTags])
+              tags = [...tagSet]
+            }
+          }
+        } catch { /* configStore not available */ }
+        const note = await ctx.noteManager.create(args.title, fullBody, tags.length > 0 ? tags : undefined)
 
         // Notify UI
         if (ctx.windowManager) {
