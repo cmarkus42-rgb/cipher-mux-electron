@@ -34,11 +34,12 @@ export function App() {
 
   const { sessions, startSession, stopSession, refresh: refreshSessions } = useSessions()
   const contextUsages = useContextUsage()
-  const { scanning, rescan } = useProjects()
+  const { rescan } = useProjects()
   const panelWidthRef = useRef(0)
-  const noopRef = useRef(() => {})
-  // Track session IDs being placed by handleStartEntity to prevent race with onStarted events
-  const inFlightPlacements = useRef(new Set<string>())
+  // Track entityIds being started by handleStartEntity to prevent race with onStarted events.
+  // Uses entityId (known BEFORE the await) instead of sessionId (known only AFTER) — this
+  // closes the race window where the IPC event arrives before the await resolves (RT-X2).
+  const inFlightEntityStarts = useRef(new Set<string>())
   const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot, restoreGrid } = useGrid(panelWidthRef.current)
   const { theme, setTheme, toggleTheme, customThemes, activeCustomThemeId, selectCustomTheme, saveCustomTheme, deleteCustomTheme } = useTheme()
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
@@ -432,6 +433,19 @@ export function App() {
     setWorkspacesPopupVisible(false)
   }, [resize, applyMerges, setSessionAtSlot])
 
+  // Called when RecoveryDialog finishes without recovering any sessions — auto-load default workspace
+  const handleRecoveryDone = useCallback(async () => {
+    try {
+      const api = (window as any).cipherMux
+      const defaultWsId: string | null = await api.config.get('defaultWorkspaceId')
+      if (defaultWsId) {
+        handleWorkspaceApply(defaultWsId)
+      }
+    } catch (err) {
+      console.warn('[App] Failed to auto-load default workspace:', err)
+    }
+  }, [handleWorkspaceApply])
+
   const handleWorkspaceOpenSettings = useCallback((tab: 'personas' | 'workspaces') => {
     setWorkspacesPopupVisible(false)
     ;(window as any).cipherMux.window.openWorkspaces(tab)
@@ -453,11 +467,13 @@ export function App() {
 
   const handleStartEntity = useCallback(async (entityId: EntityId, slotIndex: number) => {
     const api = (window as any).cipherMux
+    // Mark entity as in-flight BEFORE the await — closes the race window where
+    // the onStarted IPC event arrives before the await resolves (RT-X2 fix).
+    inFlightEntityStarts.current.add(entityId)
     if (entityId === 'orchestrator') {
       const session = await api.orchestrator.start()
       const sid = session?.sessionId ?? session?.id
       if (sid) {
-        inFlightPlacements.current.add(sid)
         setOrchestratorSessionId(sid)
         setSessionAtSlot(slotIndex, sid)
         setFocusedSessionId(sid)
@@ -468,7 +484,6 @@ export function App() {
       const session = await api.mpo.start()
       const sid = session?.sessionId ?? session?.id
       if (sid) {
-        inFlightPlacements.current.add(sid)
         setMpoSessionId(sid)
         setSessionAtSlot(slotIndex, sid)
         setFocusedSessionId(sid)
@@ -478,7 +493,6 @@ export function App() {
     const session = await api.entity.start(entityId)
     const sid = session?.id
     if (sid) {
-      inFlightPlacements.current.add(sid)
       switch (entityId) {
         case 'companion': setCompanionSessionId(sid); break
         case 'refinement': setRefinementSessionId(sid); break
@@ -731,7 +745,7 @@ export function App() {
         onCancel={() => setPlacementPopup(null)}
         onResize={handleResize}
       />
-      <RecoveryDialog onDone={noopRef.current} onAdopt={addSession} onRecovered={handleRecovered} />
+      <RecoveryDialog onDone={handleRecoveryDone} onAdopt={addSession} onRecovered={handleRecovered} />
       <BugreportDialog
         visible={bugreportVisible}
         onClose={() => setBugreportVisible(false)}
@@ -740,8 +754,6 @@ export function App() {
         <div class={`modal-overlay${themeEditorActive ? ' modal-overlay--transparent' : ''}`} onClick={() => { setInfoVisible(false); setThemeEditorActive(false) }}>
           <div class="modal-panel" style={{ width: '600px' }} onClick={(e) => e.stopPropagation()}>
             <InfoSettingsView
-              onRescan={rescan}
-              scanning={scanning}
               theme={theme}
               onSetTheme={setTheme}
               initialTab={infoInitialTab}

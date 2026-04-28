@@ -9,8 +9,6 @@ import themesManifest from '../themes.json'
 import '../styles/workspaces.css'
 
 interface InfoSettingsViewProps {
-  onRescan: () => void | Promise<void>
-  scanning: boolean
   theme: ThemeName
   onSetTheme: (t: ThemeName) => void
   initialTab?: TabId
@@ -24,11 +22,6 @@ interface InfoSettingsViewProps {
 }
 
 const api = (window as any).cipherMux
-
-interface AppSection {
-  scanPaths: string[]
-  scanDepth: number
-}
 
 interface LlmConfig {
   ollamaHost: string
@@ -71,11 +64,9 @@ const THEME_TOKEN_GROUPS: Array<{ labelKey: string; tokens: string[] }> = [
   },
 ]
 
-export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme, onOpenBugreport }: InfoSettingsViewProps) {
+export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme, onOpenBugreport }: InfoSettingsViewProps) {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'settings')
-  const [scanPaths, setScanPaths] = useState<string[]>([])
-  const [scanDepth, setScanDepth] = useState(1)
   const [loading, setLoading] = useState(true)
   const [skipPerms, setSkipPerms] = useState(false)
   const [language, setLanguage] = useState<'en' | 'de'>(i18n.language as 'en' | 'de')
@@ -95,9 +86,6 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
   const [llmSaved, setLlmSaved] = useState(false)
 
   const load = useCallback(async () => {
-    const app: AppSection | null = await api.config.get('app')
-    setScanPaths(app?.scanPaths ?? [])
-    setScanDepth(app?.scanDepth ?? 1)
     const sp: boolean = await api.config.getSkipPermissions()
     setSkipPerms(sp)
     const ui = await api.config.get('ui')
@@ -120,34 +108,6 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
   }, [])
 
   useEffect(() => { load() }, [load])
-
-  const persist = useCallback(async (next: Partial<AppSection>) => {
-    const current: AppSection | null = await api.config.get('app')
-    await api.config.set('app', { ...current, ...next })
-  }, [])
-
-  const handleAdd = useCallback(async () => {
-    const dir = await api.dialog.openDir({ title: t('settings.addScanPath') })
-    if (!dir) return
-    if (scanPaths.includes(dir)) return
-    const next = [...scanPaths, dir]
-    setScanPaths(next)
-    await persist({ scanPaths: next })
-    await onRescan()
-  }, [scanPaths, persist, onRescan, t])
-
-  const handleRemove = useCallback(async (p: string) => {
-    const next = scanPaths.filter((x) => x !== p)
-    setScanPaths(next)
-    await persist({ scanPaths: next })
-    await onRescan()
-  }, [scanPaths, persist, onRescan])
-
-  const handleDepthChange = useCallback(async (value: number) => {
-    const clamped = Math.max(1, Math.min(5, Math.floor(value)))
-    setScanDepth(clamped)
-    await persist({ scanDepth: clamped })
-  }, [persist])
 
   const handleLanguageChange = useCallback(async (lng: 'en' | 'de') => {
     setLanguage(lng)
@@ -483,40 +443,6 @@ export function InfoSettingsView({ onRescan, scanning, theme, onSetTheme, initia
             </select>
           </div>
 
-          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.scanPaths')}</div>
-          <div class="settings-section__hint">{t('settings.scanPathsHint')}</div>
-          <ul class="settings-list">
-            {scanPaths.length === 0 && (
-              <li class="settings-list__empty">{t('settings.noScanPaths')}</li>
-            )}
-            {scanPaths.map((p) => (
-              <li key={p} class="settings-list__item">
-                <span class="font-mono text-sm truncate" title={p}>{p}</span>
-                <button class="btn btn--sm" onClick={() => handleRemove(p)} title={t('settings.removePath')}>✕</button>
-              </li>
-            ))}
-          </ul>
-          <div class="settings-row">
-            <button class="btn btn--primary btn--sm" onClick={handleAdd}>{t('settings.addPath')}</button>
-            <button class="btn btn--sm" onClick={onRescan} disabled={scanning}>
-              {scanning ? t('settings.scanning') : t('settings.scanNow')}
-            </button>
-          </div>
-          <div class="settings-row" style={{ marginTop: '12px' }}>
-            <label class="settings-label">
-              <span>{t('settings.scanDepth')}</span>
-              <input
-                class="input input--sm"
-                type="number"
-                min={1}
-                max={5}
-                value={scanDepth}
-                onInput={(e) => handleDepthChange(Number((e.target as HTMLInputElement).value))}
-                style={{ width: '64px' }}
-              />
-            </label>
-            <span class="text-xs text-dim">{t('settings.scanDepthHint')}</span>
-          </div>
           <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.agent')}</div>
           <div class="settings-row" style={{ marginTop: '8px' }}>
             <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
