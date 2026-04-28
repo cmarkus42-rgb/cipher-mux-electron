@@ -198,7 +198,7 @@ export function serializeTestcaseBody(sections: TestcaseSection[]): string {
 
 export function serializeTestcase(tc: ParsedTestcase): string {
   const body = serializeTestcaseBody(tc.sections)
-  return matter.stringify('\n' + body, tc.frontmatter as Record<string, unknown>)
+  return matter.stringify('\n' + body, tc.frontmatter as unknown as Record<string, unknown>)
 }
 
 // ─── Detect ─────────────────────────────────────────────────
