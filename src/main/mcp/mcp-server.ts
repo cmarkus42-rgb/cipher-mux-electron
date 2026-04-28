@@ -7,7 +7,7 @@ import { validateBearer } from './mcp-auth'
 import { registerTools, ToolContext } from './mcp-tools'
 
 /** Session timeout: sessions inactive for longer than this are garbage-collected. */
-export const SESSION_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
+export const SESSION_TIMEOUT_MS = 4 * 60 * 60 * 1000 // 4 hours
 /** How often the GC sweep runs. */
 export const SESSION_GC_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
 /** Maximum concurrent MCP sessions. */
@@ -150,6 +150,14 @@ export class McpServerManager {
       },
     })
 
+    // Log transport errors and close events
+    transport.onerror = (err: Error) => {
+      console.error(`[McpServer] transport error (session ${sessionId}): ${err.message}`)
+    }
+    transport.onclose = () => {
+      console.log(`[McpServer] transport closed (session ${sessionId})`)
+    }
+
     // Connect transport to MCP server
     await mcpServer.connect(transport)
 
@@ -165,6 +173,18 @@ export class McpServerManager {
    * Validates auth, sets CORS headers, routes to the correct session transport.
    */
   private handleRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
+    // Error handlers — log aborted/failed connections instead of crashing silently
+    req.on('error', (err) => {
+      console.error(`[McpServer] request error: ${err.message}`)
+    })
+    res.on('error', (err) => {
+      console.error(`[McpServer] response error: ${err.message}`)
+    })
+
+    // Keep-Alive headers — prevent premature connection drops
+    res.setHeader('Connection', 'keep-alive')
+    res.setHeader('Keep-Alive', 'timeout=600')
+
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
@@ -243,6 +263,7 @@ export class McpServerManager {
       if (isInit) {
         try {
           const session = await this.createSession()
+          res.on('finish', () => { session.lastActivity = Date.now() })
           session.transport.handleRequest(req, res, body)
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err)
@@ -274,6 +295,7 @@ export class McpServerManager {
     }
 
     session.lastActivity = Date.now()
+    res.on('finish', () => { session.lastActivity = Date.now() })
     session.transport.handleRequest(req, res, body)
   }
 
@@ -305,6 +327,7 @@ export class McpServerManager {
     }
 
     session.lastActivity = Date.now()
+    res.on('finish', () => { session.lastActivity = Date.now() })
 
     // On DELETE, clean up the session after the transport handles it
     if (req.method === 'DELETE') {
