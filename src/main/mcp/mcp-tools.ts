@@ -1263,36 +1263,43 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     }
   )
 
-  // 33. mux_ui_open — Open a popup/dialog
+  // 33. mux_ui_open — Open/close/toggle a popup/dialog
   ;(server.registerTool as any)(
     'mux_ui_open',
     {
       description:
-        'Open a popup or dialog in the cipher-mux interface. Known targets: '
-        + 'workspace-popup (workspace chooser), info-dialog (info/settings/shortcuts), '
-        + 'launcher-popup (launcher cell popup, use context.cell e.g. "1-0" to specify which cell).',
+        'Open, close, or toggle a popup/dialog in the cipher-mux interface. Known targets: '
+        + 'workspace-popup (workspace chooser), info-dialog/settings (info/settings/shortcuts), '
+        + 'launcher-popup (launcher cell popup, use context.cell e.g. "1-0" to specify which cell). '
+        + 'Use context.tab to open a specific tab (e.g. "themes", "shortcuts").',
       inputSchema: {
-        target: z.string().describe('Logical name of the popup/dialog to open'),
-        context: z.record(z.unknown()).optional().describe('Additional context, e.g. { cell: "1-0" }'),
+        target: z.string().describe('Logical name of the popup/dialog'),
+        action: z.enum(['open', 'close', 'toggle']).optional().describe('Action to perform (default: toggle)'),
+        context: z.record(z.unknown()).optional().describe('Additional context, e.g. { cell: "1-0", tab: "themes" }'),
       },
     },
-    async (args: { target: string; context?: Record<string, unknown> }) => {
+    async (args: { target: string; action?: 'open' | 'close' | 'toggle'; context?: Record<string, unknown> }) => {
       if (!ctx.windowManager) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'WindowManager not available' }) }], isError: true }
       }
+      // Normalize aliases
+      const targetAliases: Record<string, string> = { settings: 'info-dialog' }
+      const resolvedTarget = targetAliases[args.target] ?? args.target
+
       const knownTargets = ['workspace-popup', 'info-dialog', 'launcher-popup']
-      if (!knownTargets.includes(args.target)) {
+      if (!knownTargets.includes(resolvedTarget)) {
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: `Unknown target: ${args.target}. Known: ${knownTargets.join(', ')}` }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: `Unknown target: ${args.target}. Known: ${[...knownTargets, 'settings'].join(', ')}` }) }],
           isError: true,
         }
       }
       ctx.windowManager.sendToMainWindow(IPC.UI_OPEN, {
-        target: args.target,
+        target: resolvedTarget,
+        action: args.action ?? 'toggle',
         context: args.context,
       })
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, target: args.target }) }],
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, target: resolvedTarget, action: args.action ?? 'toggle' }) }],
       }
     }
   )
