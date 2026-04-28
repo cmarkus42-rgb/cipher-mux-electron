@@ -1,5 +1,5 @@
 // src/renderer/components/InfoSettingsView.tsx
-import { useCallback, useEffect, useState } from 'preact/hooks'
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import i18n from '../i18n'
 import { APP_VERSION } from '../../shared/constants'
@@ -90,6 +90,8 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
   const [language, setLanguage] = useState<'en' | 'de'>(i18n.language as 'en' | 'de')
   const [themeEditorOpen, setThemeEditorOpen] = useState(false)
   const [customTokens, setCustomTokens] = useState<Record<string, string>>({})
+  const [previewing, setPreviewing] = useState(false)
+  const preEditTokensRef = useRef<Record<string, string>>({})
   const [savedNotice, setSavedNotice] = useState(false)
   const [saveAsName, setSaveAsName] = useState('')
   const [saveAsOpen, setSaveAsOpen] = useState(false)
@@ -160,6 +162,29 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
       document.documentElement.style.removeProperty(prop)
     }
     setCustomTokens({})
+    setPreviewing(false)
+  }, [customTokens])
+
+  /** Preview: apply current tokens live without saving. */
+  const handlePreview = useCallback(() => {
+    preEditTokensRef.current = { ...customTokens }
+    // Tokens are already applied live by handleTokenChange
+    setPreviewing(true)
+  }, [customTokens])
+
+  /** Revert: undo preview, restore pre-edit tokens. */
+  const handleRevert = useCallback(() => {
+    // Remove all currently applied tokens
+    for (const prop of Object.keys(customTokens)) {
+      document.documentElement.style.removeProperty(prop)
+    }
+    // Restore pre-edit tokens
+    const original = preEditTokensRef.current
+    for (const [prop, val] of Object.entries(original)) {
+      document.documentElement.style.setProperty(prop, val)
+    }
+    setCustomTokens(original)
+    setPreviewing(false)
   }, [customTokens])
 
   /** Export custom tokens as JSON to clipboard. */
@@ -485,6 +510,10 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
               <div class="theme-editor__actions">
                 <button class="btn btn--sm btn--primary" onClick={handleThemeSave}>{t('themeEditor.save')}</button>
                 <button class="btn btn--sm" onClick={() => setSaveAsOpen(v => !v)}>{t('themeEditor.saveAs')}</button>
+                {!previewing
+                  ? <button class="btn btn--sm" onClick={handlePreview}>{t('themeEditor.preview', 'Preview')}</button>
+                  : <button class="btn btn--sm" onClick={handleRevert}>{t('themeEditor.revert', 'Revert')}</button>
+                }
                 <button class="btn btn--sm" onClick={handleThemeReset}>{t('themeEditor.reset')}</button>
                 <button class="btn btn--sm" onClick={handleThemeExport}>{t('themeEditor.export')}</button>
                 {savedNotice && <span class="theme-editor__notice">{t('themeEditor.saved')}</span>}
