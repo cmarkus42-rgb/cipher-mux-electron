@@ -1,10 +1,16 @@
 // src/renderer/components/NotesTreeView.tsx
 // Hierarchical tag tree + filtered note list for the sidebar Notes section.
+// Tag filter is tri-state: neutral → include (green) → exclude (red) → neutral.
 
 import { h } from 'preact'
 import { useState, useMemo, useCallback } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { NoteInfo } from '../../shared/types'
+
+// ─── Types ─────────────────────────────────────────────────
+
+export type TagFilterMode = 'include' | 'exclude'
+export type TagFilterState = Record<string, TagFilterMode>
 
 // ─── Tag Tree Node ──────────────────────────────────────────
 
@@ -51,33 +57,86 @@ function buildTagTree(tags: string[], noteTags: Map<string, number>): TagNode[] 
   return root
 }
 
+// ─── Tri-state cycle ────────────────────────────────────────
+
+function cycleFilterMode(current: TagFilterMode | undefined): TagFilterMode | undefined {
+  if (!current) return 'include'
+  if (current === 'include') return 'exclude'
+  return undefined // exclude → neutral
+}
+
+// ─── Filter logic ───────────────────────────────────────────
+
+function matchesTagPrefix(noteTag: string, filterTag: string): boolean {
+  return noteTag === filterTag || noteTag.startsWith(filterTag + '/')
+}
+
+export function applyTagFilter(notes: NoteInfo[], filter: TagFilterState): NoteInfo[] {
+  const includes = Object.entries(filter).filter(([, m]) => m === 'include').map(([t]) => t)
+  const excludes = Object.entries(filter).filter(([, m]) => m === 'exclude').map(([t]) => t)
+
+  let result = notes
+
+  // Include: note must match at least one include tag (prefix)
+  if (includes.length > 0) {
+    result = result.filter(n =>
+      n.tags.some(t => includes.some(f => matchesTagPrefix(t, f)))
+    )
+  }
+
+  // Exclude: note must NOT match any exclude tag (prefix)
+  if (excludes.length > 0) {
+    result = result.filter(n =>
+      !n.tags.some(t => excludes.some(f => matchesTagPrefix(t, f)))
+    )
+  }
+
+  return result
+}
+
 // ─── Tree Node Renderer ────────────────────────────────────
 
 interface TreeNodeProps {
   node: TagNode
   depth: number
   expanded: Set<string>
-  selectedPath: string | null
-  onToggle: (path: string) => void
-  onSelect: (path: string) => void
+  filterState: TagFilterState
+  onToggleExpand: (path: string) => void
+  onCycleFilter: (path: string) => void
 }
 
-function TreeNodeItem({ node, depth, expanded, selectedPath, onToggle, onSelect }: TreeNodeProps) {
+function TreeNodeItem({ node, depth, expanded, filterState, onToggleExpand, onCycleFilter }: TreeNodeProps) {
   const hasChildren = node.children.length > 0
   const isExpanded = expanded.has(node.fullPath)
-  const isSelected = selectedPath === node.fullPath
+  const mode = filterState[node.fullPath]
+
+  const modeClass = mode === 'include' ? ' tree-node--include'
+    : mode === 'exclude' ? ' tree-node--exclude'
+    : ''
 
   return (
     <>
       <div
-        class={`tree-node${isSelected ? ' tree-node--selected' : ''}`}
+        class={`tree-node${modeClass}`}
         style={{ paddingLeft: `${depth * 12 + 4}px` }}
-        onClick={() => {
-          if (hasChildren) onToggle(node.fullPath)
-          onSelect(node.fullPath)
+        onClick={(e) => {
+          // Arrow area: toggle expand. Label area: cycle filter.
+          if (hasChildren && (e.target as HTMLElement).classList.contains('tree-node__arrow')) {
+            onToggleExpand(node.fullPath)
+          } else {
+            onCycleFilter(node.fullPath)
+          }
         }}
       >
-        <span class="tree-node__arrow">
+        <span
+          class="tree-node__arrow"
+          onClick={(e) => {
+            if (hasChildren) {
+              e.stopPropagation()
+              onToggleExpand(node.fullPath)
+            }
+          }}
+        >
           {hasChildren ? (isExpanded ? '▾' : '▸') : ' '}
         </span>
         <span class="tree-node__label">{node.name}/</span>
@@ -91,9 +150,9 @@ function TreeNodeItem({ node, depth, expanded, selectedPath, onToggle, onSelect 
           node={child}
           depth={depth + 1}
           expanded={expanded}
-          selectedPath={selectedPath}
-          onToggle={onToggle}
-          onSelect={onSelect}
+          filterState={filterState}
+          onToggleExpand={onToggleExpand}
+          onCycleFilter={onCycleFilter}
         />
       ))}
     </>
@@ -105,9 +164,9 @@ function TreeNodeItem({ node, depth, expanded, selectedPath, onToggle, onSelect 
 interface NotesTreeViewProps {
   notes: NoteInfo[]
   searchTerm: string
-  tagFilter: string[]
+  tagFilter: TagFilterState
   onSearchChange: (term: string) => void
-  onTagFilterChange: (tags: string[]) => void
+  onTagFilterChange: (filter: TagFilterState) => void
   onNoteDoubleClick: (note: NoteInfo) => void
   onNoteDelete: (note: NoteInfo, e: Event) => void
   onNoteDragStart: (note: NoteInfo, e: DragEvent) => void
@@ -125,7 +184,6 @@ export function NotesTreeView({
 }: NotesTreeViewProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [selectedTagPath, setSelectedTagPath] = useState<string | null>(null)
 
   // Build unique tags and their counts
   const { allTags, tagCounts } = useMemo(() => {
@@ -153,31 +211,24 @@ export function NotesTreeView({
     })
   }, [])
 
-  // Select a tag path — updates the filter
-  const selectTagPath = useCallback((path: string) => {
-    if (selectedTagPath === path) {
-      // Deselect
-      setSelectedTagPath(null)
-      onTagFilterChange([])
+  // Cycle tag filter: neutral → include → exclude → neutral
+  const cycleFilter = useCallback((path: string) => {
+    const next = { ...tagFilter }
+    const newMode = cycleFilterMode(next[path])
+    if (newMode) {
+      next[path] = newMode
     } else {
-      setSelectedTagPath(path)
-      // Filter: show notes that have this tag or any child tag (prefix match)
-      onTagFilterChange([path])
+      delete next[path]
     }
-  }, [selectedTagPath, onTagFilterChange])
+    onTagFilterChange(next)
+  }, [tagFilter, onTagFilterChange])
+
+  // Clear all filters
+  const hasActiveFilter = Object.keys(tagFilter).length > 0
 
   // Filter notes
   const filteredNotes = useMemo(() => {
-    let result = notes
-
-    // Tag filter (tree selection uses prefix matching)
-    if (tagFilter.length > 0) {
-      result = result.filter(n =>
-        n.tags.some(t =>
-          tagFilter.some(f => t === f || t.startsWith(f + '/'))
-        )
-      )
-    }
+    let result = applyTagFilter(notes, tagFilter)
 
     // Search term
     if (searchTerm) {
@@ -190,6 +241,9 @@ export function NotesTreeView({
 
     return result
   }, [notes, tagFilter, searchTerm])
+
+  // Flat tag chips for tags that don't appear in the tree (single-segment tags)
+  const flatTags = useMemo(() => allTags.filter(t => !t.includes('/')), [allTags])
 
   const hasTree = tree.length > 0
 
@@ -207,12 +261,12 @@ export function NotesTreeView({
       {/* Tag Tree */}
       {hasTree && (
         <div class="notes-tree-view__tree">
-          {selectedTagPath && (
+          {hasActiveFilter && (
             <div
               class="tree-node tree-node--clear"
-              onClick={() => { setSelectedTagPath(null); onTagFilterChange([]) }}
+              onClick={() => onTagFilterChange({})}
             >
-              <span class="tree-node__label">{t('sidebar.allNotes', 'All Notes')}</span>
+              <span class="tree-node__label">{t('sidebar.clearFilter', 'Clear filter')}</span>
             </div>
           )}
           {tree.map(node => (
@@ -221,16 +275,35 @@ export function NotesTreeView({
               node={node}
               depth={0}
               expanded={expanded}
-              selectedPath={selectedTagPath}
-              onToggle={toggleExpand}
-              onSelect={selectTagPath}
+              filterState={tagFilter}
+              onToggleExpand={toggleExpand}
+              onCycleFilter={cycleFilter}
             />
           ))}
         </div>
       )}
 
+      {/* Flat tag chips (for tags without slash hierarchy) */}
+      {flatTags.length > 0 && !hasTree && (
+        <div class="sidebar-notes__tags">
+          {flatTags.map(tag => {
+            const mode = tagFilter[tag]
+            const cls = mode === 'include' ? 'sidebar-notes__tag--include'
+              : mode === 'exclude' ? 'sidebar-notes__tag--exclude'
+              : ''
+            return (
+              <span
+                key={tag}
+                class={`sidebar-notes__tag ${cls}`}
+                onClick={() => cycleFilter(tag)}
+              >#{tag}</span>
+            )
+          })}
+        </div>
+      )}
+
       {/* Separator */}
-      {hasTree && <div class="notes-tree-view__sep" />}
+      {(hasTree || flatTags.length > 0) && <div class="notes-tree-view__sep" />}
 
       {/* Note List */}
       <div class="notes-tree-view__list">
