@@ -2,26 +2,21 @@
 import { useCallback, useEffect, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { Workspace, WorkspaceCell } from '../../shared/persona-types'
-import type { ProjectInfo } from '../../shared/types'
 import { spanOf, resizeCells } from '../../main/workspace/workspace-manager'
+import { FolderPickerInput } from './FolderPickerInput'
 
 const api = (window as any).cipherMux
 
 export function WorkspacesTab() {
   const { t } = useTranslation()
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
-  const [projects, setProjects] = useState<ProjectInfo[]>([])
   const [activeWsId, setActiveWsId] = useState('')
   const [selectedCell, setSelectedCell] = useState(0)
   const [dirty, setDirty] = useState(false)
 
   const loadAll = useCallback(async () => {
-    const [wsList, projList] = await Promise.all([
-      api.workspaces.list() as Promise<Workspace[]>,
-      api.projects.list() as Promise<ProjectInfo[]>,
-    ])
+    const wsList: Workspace[] = await api.workspaces.list()
     setWorkspaces(wsList)
-    setProjects(projList)
     if (wsList.length > 0 && !activeWsId) {
       setActiveWsId(wsList[0].id)
     }
@@ -183,7 +178,7 @@ export function WorkspacesTab() {
 
   // ── Loading state ──
 
-  if (workspaces.length === 0 && projects.length === 0) {
+  if (workspaces.length === 0) {
     return <div class="ws-pane"><div class="ws-editor" style={{ alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-dim)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{t('workspacesTab.loading')}</div></div>
   }
 
@@ -253,7 +248,6 @@ export function WorkspacesTab() {
                 <span class="dim-val">{ws.rows}</span>
                 <button onClick={() => handleStepRows(1)}>+</button>
               </div>
-              <span class="dim-note" dangerouslySetInnerHTML={{ __html: t('workspacesTab.gridHint') }} />
             </div>
 
             {/* Interactive grid */}
@@ -347,19 +341,13 @@ export function WorkspacesTab() {
                 <div class="insp-grid">
                   <div class="insp-field">
                     <label>{t('workspacesTab.project')}</label>
-                    <select
+                    <FolderPickerInput
                       value={cellData.project}
-                      onChange={(e) =>
-                        handleCellUpdate('project', (e.target as HTMLSelectElement).value)
-                      }
-                    >
-                      <option value="">{t('workspacesTab.projectNone')}</option>
-                      {projects.map((p) => (
-                        <option key={p.path} value={p.path}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(path) => handleCellUpdate('project', path)}
+                      placeholder={t('workspacesTab.projectNone')}
+                      inputClass="input input--sm"
+                      buttonClass="btn btn--sm"
+                    />
                   </div>
                   <div class="insp-field wide">
                     <label>{t('workspacesTab.cellPrompt')}</label>
