@@ -21,6 +21,20 @@ import { configStore } from '../config/config-store'
 import { extractCharacterBlock } from '../character/character-defaults'
 
 /**
+ * Sanitize a name for use as tmux session suffix.
+ * Lowercase, special chars → dash, max 32 chars, no leading/trailing dashes.
+ */
+function sanitizeTmuxName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 32)
+    || 'session'
+}
+
+/**
  * SessionManager — Registry for cipher-mux sessions.
  *
  * Manages session lifecycle (create, stop, recover) and enforces
@@ -94,7 +108,10 @@ export class SessionManager extends EventEmitter {
     }
 
     const id = ulid()
-    const tmuxName = `cmux-${id.slice(-8).toLowerCase()}`
+    const shortId = id.slice(-4).toLowerCase()
+    const tmuxName = opts.name
+      ? `cmux-${sanitizeTmuxName(opts.name)}-${shortId}`
+      : `cmux-${id.slice(-8).toLowerCase()}`
     const now = Date.now()
 
     // Inject CIPHER_MUX_SESSION_ID so the StatusLine hook writes to the
