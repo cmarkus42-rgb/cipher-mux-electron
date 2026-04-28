@@ -72,6 +72,10 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
   const [saveName, setSaveName] = useState('')
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [defaultWsId, setDefaultWsId] = useState<string | null>(null)
+  const [saveTags, setSaveTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+  const [allTags, setAllTags] = useState<string[]>([])
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
 
   useEffect(() => {
     let mounted = true
@@ -95,6 +99,13 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
       if (!mounted) return
       setDefaultWsId(id ?? null)
     }).catch(() => {})
+
+    // Load available tags for autocomplete
+    api.notes?.tags?.().then((tags: string[]) => {
+      if (!mounted) return
+      setAllTags(tags ?? [])
+    }).catch(() => {})
+
     return () => { mounted = false }
   }, [visible])
 
@@ -126,10 +137,35 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     setDefaultWsId(nextId)
   }, [defaultWsId])
 
+  const handleTagInputChange = useCallback((value: string) => {
+    setTagInput(value)
+    if (value.trim()) {
+      const lower = value.toLowerCase()
+      setTagSuggestions(allTags.filter(t => t.toLowerCase().includes(lower) && !saveTags.includes(t)).slice(0, 5))
+    } else {
+      setTagSuggestions([])
+    }
+  }, [allTags, saveTags])
+
+  const handleAddTag = useCallback((tag: string) => {
+    const normalized = tag.trim().toLowerCase()
+    if (normalized && !saveTags.includes(normalized)) {
+      setSaveTags(prev => [...prev, normalized])
+    }
+    setTagInput('')
+    setTagSuggestions([])
+  }, [saveTags])
+
+  const handleRemoveTag = useCallback((tag: string) => {
+    setSaveTags(prev => prev.filter(t => t !== tag))
+  }, [])
+
   const handleSaveCurrentOpen = useCallback(() => {
     const now = new Date()
     const defaultName = `Workspace ${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
     setSaveName(defaultName)
+    setSaveTags([])
+    setTagInput('')
     setShowSaveDialog(true)
   }, [])
 
@@ -161,6 +197,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
         cells,
         merges: {},
         promptOverrides: {},
+        ...(saveTags.length > 0 ? { defaultTags: saveTags } : {}),
       }
 
       await api.workspaces.save(ws)
@@ -204,7 +241,10 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
               <WorkspaceThumbnail ws={ws} />
               <div class="wp-meta">
                 <div class="wp-name">{ws.name}</div>
-                <div class="wp-sub">{buildSubtitle(ws)}</div>
+                <div class="wp-sub">
+                  {buildSubtitle(ws)}
+                  {ws.defaultTags?.length ? ` · ${ws.defaultTags.join(', ')}` : ''}
+                </div>
               </div>
               {activeId === ws.id && (
                 <span class="wp-badge">{t('workspacePopup.active')}</span>
@@ -234,6 +274,43 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
                 autoFocus
                 style={{ width: '100%', marginBottom: '8px' }}
               />
+              {/* Tag input */}
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-dim)', marginBottom: '4px' }}>
+                  {t('workspacePopup.projectTags', 'Project Tags')}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '4px' }}>
+                  {saveTags.map(tag => (
+                    <span key={tag} class="wp-tag-chip">
+                      {tag}
+                      <span class="wp-tag-chip__remove" onClick={() => handleRemoveTag(tag)}>✕</span>
+                    </span>
+                  ))}
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    class="input input--sm"
+                    type="text"
+                    value={tagInput}
+                    onInput={(e) => handleTagInputChange((e.target as HTMLInputElement).value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && tagInput.trim()) {
+                        e.preventDefault()
+                        handleAddTag(tagInput)
+                      }
+                    }}
+                    placeholder={t('workspacePopup.tagPlaceholder', 'Add tag...')}
+                    style={{ width: '100%' }}
+                  />
+                  {tagSuggestions.length > 0 && (
+                    <div class="wp-tag-suggestions">
+                      {tagSuggestions.map(s => (
+                        <div key={s} class="wp-tag-suggestion" onClick={() => handleAddTag(s)}>{s}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
               <div class="wp-save-dialog__info">
                 {currentGrid ? `${currentGrid.config.cols}×${currentGrid.config.rows} · ${currentGrid.slots.filter(s => s.sessionId).length} ${t('workspacePopup.activeSessions')}` : ''}
               </div>
