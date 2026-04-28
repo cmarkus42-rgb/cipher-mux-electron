@@ -65,8 +65,11 @@ export function SessionCell({
   // Fork only available for Claude Code sessions (have adapter capabilities)
   const isClaudeSession = session.capabilities?.['status-line'] === true
 
-  const ctxClass = pct >= 85 ? 'ctx-error' : pct >= 60 ? 'ctx-warn' : 'ctx-ok'
   const dotClass = pct >= 85 ? 'neon-dot--error' : pct >= 60 ? 'neon-dot--warn' : 'neon-dot--ok'
+
+  // Context bar: color based on breakpoints, width scaled so 65% displayed = full bar
+  const barWidth = Math.min((pct / 65) * 100, 100)
+  const barColor = pct >= 56 ? '#e53935' : pct >= 41 ? '#fb8c00' : pct >= 26 ? '#fdd835' : '#43a047'
 
   // Entity color mapping — matches EntityConfig.color values
   const ENTITY_COLORS: Record<EntityId, string> = {
@@ -107,13 +110,17 @@ export function SessionCell({
         style={entityColor ? { borderLeft: `3px solid ${entityColor}` } : undefined}
         data-highlight={slotCol != null && slotRow != null ? `cell-head-${slotCol}-${slotRow}` : undefined}
       >
+        {pct > 0 && (
+          <div
+            class="cell-header__ctx-bar"
+            style={{ width: `${barWidth}%`, backgroundColor: barColor }}
+          />
+        )}
         <div class="cell-header__left">
           {entityColor
             ? <span class="neon-dot" style={{ background: entityColor, boxShadow: `0 0 4px ${entityColor}` }} />
             : <span class={`neon-dot ${dotClass}`} />}
           <span class="cell-name">{session.name}</span>
-          <span class="cell-sep">·</span>
-          <span class={`cell-ctx ${ctxClass}`}>{pct}%</span>
         </div>
         <div class="cell-header__right">
           {maxRows > 1 && (

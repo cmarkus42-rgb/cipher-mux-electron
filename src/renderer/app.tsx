@@ -667,7 +667,8 @@ export function App() {
           else setWorkspacesPopupVisible(prev => !prev)
           break
         case 'info-dialog': {
-          const tab = data.context?.tab as string | undefined
+          type InfoTab = 'settings' | 'about' | 'shortcuts' | undefined
+          const tab = data.context?.tab as InfoTab
           if (action === 'close') {
             setInfoVisible(false)
           } else if (action === 'open') {
