@@ -137,6 +137,28 @@ describe('VoiceInputRouter', () => {
     assert.equal(router.isPinned(), false)
   })
 
+  it('routes to notes editor when focused and not pinned', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    router.setNotesEditorFocused(true)
+    let notesText: string | null = null
+    router.on('notesInsert', (text: string) => { notesText = text })
+    await router.routeTranscription('dictated text')
+    assert.equal(notesText, 'dictated text')
+    assert.equal(sentKeys.length, 0) // NOT sent to session
+  })
+
+  it('pin overrides notes editor focus', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    router.setNotesEditorFocused(true)
+    sessions.set('sess-3', { id: 'sess-3', name: 'pinned', status: 'active' })
+    router.pinToSession('sess-3')
+    await router.routeTranscription('goes to pin')
+    assert.equal(sentKeys.length, 1)
+    assert.equal(sentKeys[0].sessionId, 'sess-3')
+  })
+
   it('getActiveSessionId returns pinned > focused', () => {
     router.setFocusedSession('sess-1')
     assert.equal(router.getActiveSessionId(), 'sess-1')

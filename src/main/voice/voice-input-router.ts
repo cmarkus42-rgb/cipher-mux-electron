@@ -36,6 +36,7 @@ export class VoiceInputRouter extends EventEmitter {
   private mode: 'session' | 'off' = 'off'
   private focusedSessionId: string | null = null
   private pinnedSessionId: string | null = null
+  private notesEditorFocused = false
   private readonly sessionManager: SessionManager
 
   constructor(deps: VoiceInputRouterDeps) {
@@ -53,6 +54,13 @@ export class VoiceInputRouter extends EventEmitter {
 
   setFocusedSession(sessionId: string | null): void {
     this.focusedSessionId = sessionId
+    this.notesEditorFocused = false
+    this.emit('activeSessionChanged', this.getActiveSessionId())
+  }
+
+  /** Set notes editor focus state (STT routes to notes when true). */
+  setNotesEditorFocused(focused: boolean): void {
+    this.notesEditorFocused = focused
     this.emit('activeSessionChanged', this.getActiveSessionId())
   }
 
@@ -117,6 +125,13 @@ export class VoiceInputRouter extends EventEmitter {
       if (relaySession && relaySession.status === 'active') {
         return this.routeToVoiceRelay(voiceRelayId, trimmed, relaySession.name)
       }
+    }
+
+    // Route to notes editor if focused and not pinned to a session
+    if (!this.pinnedSessionId && this.notesEditorFocused) {
+      console.log('[VoiceRouter] routing to notes editor')
+      this.emit('notesInsert', trimmed)
+      return
     }
 
     // Route to pinned session or focused session
