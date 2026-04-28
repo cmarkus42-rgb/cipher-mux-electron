@@ -25,6 +25,7 @@ import { MemoryStore } from './companion/memory-store'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { AdapterRegistry } from './agent/registry'
 import { EntityRegistry, registerBuiltinEntities } from './session/entity-registry'
+import { scanAndRegisterEntities } from './session/entity-scanner'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
 import { BRAND } from '../shared/brand'
@@ -63,6 +64,11 @@ export class IpcHub {
     this.adapterRegistry = new AdapterRegistry()
     const entityRegistry = new EntityRegistry()
     registerBuiltinEntities(entityRegistry, BRAND.orchestratorDir, BRAND.mpoDir)
+    // Scan ~/.config/cipher-mux/entities/ for additional entity directories
+    const scanned = scanAndRegisterEntities(entityRegistry)
+    if (scanned.length > 0) {
+      console.log(`[IpcHub] Scanned ${scanned.length} additional entities: ${scanned.map(e => e.id).join(', ')}`)
+    }
     this.tmux = new TmuxManager()
     // Resolve app root for entity asset deployment
     const appRoot = path.resolve(__dirname, '..', '..', '..')
@@ -205,6 +211,7 @@ export class IpcHub {
       windowManager: this.windowManager,
       noteManager: this.noteManager,
       memoryStore: this.memoryStore,
+      getVoiceManager: () => this.voiceManager,
     }).then(() => {
       // MCP ready → connect tmux, recover sessions, then auto-start defaults
       return this.tmux.connect()
@@ -1352,32 +1359,30 @@ export class IpcHub {
 
   // ─── Notes ─────────────────────────────────────────────
   private registerNoteChannels(): void {
-    ipcMain.handle(IPC.NOTES_LIST, async (_e, { scope }: { scope?: string }) => {
+    ipcMain.handle(IPC.NOTES_LIST, async () => {
       try {
-        // Always list all notes — global + workspace-scoped.
-        // Scope-specific listing missed global notes when a workspace was active.
-        return await this.noteManager.listAll()
+        return await this.noteManager.list()
       } catch (err) {
         console.error('[IpcHub] NOTES_LIST failed:', err)
         return []
       }
     })
 
-    ipcMain.handle(IPC.NOTES_READ, async (_e, { id, scope }: { id: string; scope: string }) => {
-      return this.noteManager.read(id, scope)
+    ipcMain.handle(IPC.NOTES_READ, async (_e, { id }: { id: string }) => {
+      return this.noteManager.read(id)
     })
 
-    ipcMain.handle(IPC.NOTES_SAVE, async (_e, { id, scope, body, tags, skipTagging }: {
-      id: string; scope: string; body: string; tags?: string[]; skipTagging?: boolean
+    ipcMain.handle(IPC.NOTES_SAVE, async (_e, { id, body, tags, skipTagging }: {
+      id: string; body: string; tags?: string[]; skipTagging?: boolean
     }) => {
-      const note = await this.noteManager.save(id, scope, body, tags)
+      const note = await this.noteManager.save(id, body, tags)
       this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', note })
       // Async auto-tagging (fire-and-forget, only on manual Cmd+S save)
       if (!tags && !skipTagging) {
         this.noteTagging.autoTag(body).then(async (autoTags) => {
           if (autoTags && autoTags.length > 0) {
             await this.noteTagging.updateRepository(autoTags)
-            const updated = await this.noteManager.save(id, scope, body, autoTags)
+            const updated = await this.noteManager.save(id, body, autoTags)
             this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tagged', note: updated })
           }
         }).catch(() => { /* Ollama not available — ignore */ })
@@ -1385,18 +1390,18 @@ export class IpcHub {
       return note
     })
 
-    ipcMain.handle(IPC.NOTES_CREATE, async (_e, { scope, title, body }: {
-      scope: string; title: string; body: string
+    ipcMain.handle(IPC.NOTES_CREATE, async (_e, { title, body, tags }: {
+      title: string; body: string; tags?: string[]
     }) => {
-      const note = await this.noteManager.create(scope, title, body)
+      const note = await this.noteManager.create(title, body, tags)
       this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created', note })
       return note
     })
 
-    ipcMain.handle(IPC.NOTES_DELETE, async (_e, { id, scope }: { id: string; scope: string }) => {
-      const ok = await this.noteManager.delete(id, scope)
+    ipcMain.handle(IPC.NOTES_DELETE, async (_e, { id }: { id: string }) => {
+      const ok = await this.noteManager.delete(id)
       if (ok) {
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'deleted', id, scope })
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'deleted', id })
       }
       return { ok }
     })

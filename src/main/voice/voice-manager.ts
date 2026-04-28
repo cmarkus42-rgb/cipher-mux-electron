@@ -271,6 +271,48 @@ export class VoiceManager extends EventEmitter {
     return this._initialized
   }
 
+  /**
+   * Speak text via TTS (used by mux_tts_speak MCP tool).
+   * Lazy-initializes PiperTTS if not yet available (e.g. session mode with skipTTS).
+   */
+  async speakText(text: string, interrupt = false): Promise<void> {
+    if (!this._initialized) {
+      throw new Error('VoiceManager not initialized')
+    }
+
+    // Lazy-init PiperTTS if needed (session mode starts with skipTTS)
+    if (!this.piperTTS) {
+      const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
+      this.piperTTS = new PiperTTS({
+        voice: this.config.piperVoice,
+        modelsDir: this.config.piperModelsDir,
+        nodeModulesPath: appNodeModules,
+      })
+      await this.piperTTS.init()
+      if (this.conversation) {
+        this.conversation.setTTS(this.piperTTS)
+      }
+    }
+
+    if (interrupt) {
+      this.piperTTS.stop()
+      if (this.transport) {
+        this.transport.sendStopPlayback()
+      }
+    }
+
+    // Speak via ConversationEngine if available, else directly via PiperTTS
+    if (this.conversation) {
+      await this.conversation.speakResponse(text)
+    } else {
+      for await (const wavChunk of this.piperTTS.speak(text)) {
+        if (this.transport) {
+          this.transport.sendAudioPlayback(wavChunk.toString('base64'))
+        }
+      }
+    }
+  }
+
   /** Shut down all subsystems and release references */
   shutdown(): void {
     this._initialized = false
