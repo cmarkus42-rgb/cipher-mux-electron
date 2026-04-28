@@ -1969,6 +1969,8 @@
   border: 1px solid currentColor;
   border-top: none;
   border-radius: 0 0 1px 1px;
+  vertical-align: middle;
+  top: 1px;
 }
 
 .icon-trash::before {
