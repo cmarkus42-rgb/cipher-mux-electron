@@ -25,18 +25,7 @@ export function SidebarWindow() {
     return () => unsub()
   }, [])
 
-  // Auto-close the detached window when there are no active sessions to display.
-  // 3-second delay prevents flicker during brief session transitions.
-  useEffect(() => {
-    const hasContent = sessions.some(s => s.status === 'active')
-    if (!hasContent) {
-      const timer = setTimeout(() => {
-        const api = (window as any).cipherMux
-        api.sidebar?.reattach?.()
-      }, 3000)
-      return () => clearTimeout(timer)
-    }
-  }, [sessions])
+  // No auto-close: X-button closes completely, dock button reintegrates
 
   const handleAddToGrid = useCallback((sessionId: string) => {
     // In detached mode, adding to grid is not directly supported
@@ -49,9 +38,9 @@ export function SidebarWindow() {
     await api.sessions.stop(sessionId)
   }, [])
 
-  const handleReattach = useCallback(async () => {
+  const handleDock = useCallback(async () => {
     const api = (window as any).cipherMux
-    await api.sidebar.reattach()
+    await api.sidebar.dock()
   }, [])
 
   return (
@@ -67,7 +56,7 @@ export function SidebarWindow() {
           contextUsages={contextUsages}
           onAddToGrid={handleAddToGrid}
           onKillSession={handleKillSession}
-          onReattach={handleReattach}
+          onReattach={handleDock}
           activeWorkspaceId={null}
           hasNotesCell={false}
           voiceComState={voiceComState}

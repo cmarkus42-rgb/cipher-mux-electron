@@ -199,13 +199,11 @@ export class WindowManager {
     this.sidebarWindow.on('resized', saveBounds)
     this.sidebarWindow.on('moved', saveBounds)
 
-    // X-button = reintegrate sidebar back into main window
-    this.sidebarWindow.on('close', (e) => {
-      // Save bounds before closing
+    // X-button = close completely (hide sidebar, do NOT reintegrate)
+    this.sidebarWindow.on('close', () => {
       saveBounds()
-      // Reattach: clear detach state and notify main window
-      configStore.set('sidebarDetached', false)
-      this.sendToMainWindow(IPC.SIDEBAR_REATTACHED, {})
+      // Notify main window that sidebar is gone (hidden, not docked)
+      this.sendToMainWindow(IPC.SIDEBAR_CLOSED, {})
     })
 
     this.sidebarWindow.on('closed', () => {
@@ -224,6 +222,15 @@ export class WindowManager {
       this.sidebarWindow.focus()
       return true
     }
+  }
+
+  /** Dock sidebar back into main window (reintegrate). */
+  dockSidebarWindow(): void {
+    if (this.sidebarWindow && !this.sidebarWindow.isDestroyed()) {
+      this.sidebarWindow.close()
+    }
+    configStore.set('sidebarDetached', false)
+    this.sendToMainWindow(IPC.SIDEBAR_REATTACHED, {})
   }
 
   closeSidebarWindow(): void {

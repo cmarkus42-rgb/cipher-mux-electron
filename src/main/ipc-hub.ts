@@ -678,6 +678,11 @@ export class IpcHub {
       return { ok: true }
     })
 
+    ipcMain.handle(IPC.SIDEBAR_DOCK, () => {
+      this.windowManager.dockSidebarWindow()
+      return { ok: true }
+    })
+
     ipcMain.handle('cipher-mux:sidebar:is-detached', () => {
       return configStore.get('sidebarDetached') ?? false
     })
