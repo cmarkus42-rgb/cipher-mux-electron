@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { Workspace, WorkspaceCell } from '../../shared/persona-types'
 import { spanOf, resizeCells } from '../../main/workspace/workspace-manager'
-import { FolderPickerInput } from './FolderPickerInput'
 
 const api = (window as any).cipherMux
 
@@ -13,6 +12,7 @@ export function WorkspacesTab() {
   const [activeWsId, setActiveWsId] = useState('')
   const [selectedCell, setSelectedCell] = useState(0)
   const [dirty, setDirty] = useState(false)
+  const [knownProjects, setKnownProjects] = useState<Array<{ path: string; name: string }>>([])
 
   const loadAll = useCallback(async () => {
     const wsList: Workspace[] = await api.workspaces.list()
@@ -20,6 +20,11 @@ export function WorkspacesTab() {
     if (wsList.length > 0 && !activeWsId) {
       setActiveWsId(wsList[0].id)
     }
+    // Load known projects for the project picker
+    try {
+      const projects = await api.projects.list()
+      setKnownProjects(projects ?? [])
+    } catch { /* ignore */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadAll() }, [loadAll])
@@ -341,13 +346,21 @@ export function WorkspacesTab() {
                 <div class="insp-grid">
                   <div class="insp-field">
                     <label>{t('workspacesTab.project')}</label>
-                    <FolderPickerInput
-                      value={cellData.project}
-                      onChange={(path) => handleCellUpdate('project', path)}
-                      placeholder={t('workspacesTab.projectNone')}
-                      inputClass="input input--sm"
-                      buttonClass="btn btn--sm"
-                    />
+                    <div class="folder-picker">
+                      <input
+                        type="text"
+                        class="input input--sm"
+                        list="ws-project-list"
+                        value={cellData.project}
+                        onInput={(e) => handleCellUpdate('project', (e.target as HTMLInputElement).value)}
+                        placeholder={t('workspacesTab.projectNone')}
+                      />
+                      <datalist id="ws-project-list">
+                        {knownProjects.map(p => (
+                          <option key={p.path} value={p.path}>{p.name}</option>
+                        ))}
+                      </datalist>
+                    </div>
                   </div>
                   <div class="insp-field wide">
                     <label>{t('workspacesTab.cellPrompt')}</label>
