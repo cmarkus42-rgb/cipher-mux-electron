@@ -5,19 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Unreleased] — v0.11 Wave 3
 
 ### Added
-- **i18n foundation:** i18next + react-i18next integration with EN (primary) and DE locale files. All 24 renderer components use `useTranslation()` hook. Language switcher in Settings with immediate UI update. Persisted in ConfigStore (SP-1)
-- **Notes MCP full CRUD:** 6 new MCP tools — `mux_notes_read`, `mux_notes_update`, `mux_notes_search`, `mux_notes_delete`, `mux_notes_handoff_create`, `mux_notes_handoff_search` (SP-2)
-- **NoteManager.search():** Full-text search over notes with tag filter, title-priority sorting, max 50 results
-- **NoteManager.createHandoff():** Creates handoff notes with extended frontmatter (`from_session`, `to_entity`, `handoff_status`)
-- **Handoff frontmatter:** `NoteInfo` type extended with optional `fromSession`, `toEntity`, `handoffStatus` fields
-- **13 new tests** covering all SP-2 quality gate testcases (T1–T13)
-- **Session Resume (SP-5 Phase 4a):** `--resume` flag support — entity sessions (Orchestrator, MPO) auto-resume. Manual sessions get a "Resume previous session" checkbox in SessionDialog. `StartSessionOpts.resume` field.
-- **Session Fork (SP-5 Phase 4b):** Fork button (⑂) in SessionCell header for Claude Code sessions. Creates new session with `--fork-session --resume <claude-session-id>`. Claude session ID tracked from statusline JSON.
-- **Orphan Detection (SP-5 Phase 4c):** Periodic (5min) scan for orphaned `cmux-*` tmux sessions not in registry. Sidebar shows "Orphaned Sessions" section with Adopt/Terminate buttons per orphan. Non-cmux sessions ignored (FR-9 scope).
-- **17 new tests** covering all SP-5 quality gate testcases (T1–T9)
+- **Universal Persona Injection (E.1):** Active companion persona (character block) injected into ALL entity CLAUDE.md at session start. Character definitions split into tone/style block and companion-specific tasks.
+- **Dynamic Entity Scanner (E.3):** `EntityScanner` scans `~/.config/cipher-mux/entities/` for CLAUDE.md dirs, registers them as launchable presets. Hardcoded `ENTITY_PRESETS` replaced by `useEntityPresets` hook.
+- **New Entities: Watchdog + Project Launcher:** Watchdog (adversarial testing assistant) and Project Launcher (autonomous sub-project worker) with full CLAUDE.md.
+- **`mux_tts_speak` MCP Tool (F.2):** Entity-driven TTS — any entity session can speak text aloud via MCP. Parameters: `text`, `priority` (`normal`/`interrupt`).
+- **STT Pin-to-Session (F.3):** Pin voice dictation to a specific session via StatusBar toggle. Pinned session receives all STT regardless of grid focus.
+- **Context Usage Color Bar (G.4):** Color-coded progress bar in session header (green/yellow/red).
+- **Settings Tabs (G.1):** Info/Settings restructured into 5 tabs: General, Appearance, Shortcuts, Voice, About.
+- **Tag-based Notes Scoping (P.1):** Flat storage with tag-based categorization replacing scope directories.
+- **Notes Migration (P.3):** Automatic migration from scope-directory layout to flat storage.
+- **Workspace Default Tags (P.2, P.5):** `defaultTags` in workspace config, auto-applied to new notes. UI in workspace save dialog.
+- **Hierarchical Tag Tree (C.1):** Sidebar Notes shows collapsible tag tree with tri-state filter (include/exclude/neutral).
+- **Testcase Parser + View (D.1):** Markdown checkbox testcases with `noteType: 'testcase'`. TestcaseView UI with screenshot integration.
+- **STT Dictation in Notes Editor (C.4):** Voice dictation directly into CodeMirror Notes Editor.
+- **Theme Editor Preview (G.8):** Preview/revert button for theme changes.
+- **Shortcuts Listing (G.3):** Complete keyboard shortcuts listing with i18n.
+- **Sidebar Window Close/Dock (G.5):** X closes, dock button reintegrates.
+- **Human-readable tmux session names:** `cmux-orchestrator-a1b2` instead of `cmux-q3r8x7m1`.
+
+### Changed
+- **Entity CLAUDE.md Template Rewrite (E.4):** All templates follow unified format: Role, Persona, Memory, Capabilities, Working Rules, Scope, TTS instruction.
+- **EntityId type extensible:** `BuiltinEntityId | (string & {})` supports dynamically scanned entities.
+- **Border-Glow Highlight Redesign (B.7):** `mux_ui_highlight` uses border-glow (box-shadow) instead of outline. Theme-aware colors.
+- **`mux_ui_open` Toggle/Close (B.8):** Supports `action: 'open'|'close'|'toggle'` and `tab` context parameter.
+- **Settings renamed from Info (G.2):** "Info" → "Settings" throughout UI.
+- **Orchestrator Template Learnings (H.1):** Quality gates, session continuity, tmux rules, bugfix phase model.
+- **Workspace Project Selector (G.7):** Finder browse replaced with project datalist.
+- **`mux_send` plaintext delivery (H.5, H.6):** Push delivery sends plaintext instead of base64.
+
+### Fixed
+- **MCP HTTP Timeout (A.4):** Disabled server timeouts preventing MCP connection drops.
+- **Drag-and-Drop Race (A.1):** Eliminated stale-closure race in SessionGrid.
+- **Stale Grid Slots (A.2):** Reactive cleanup when sessions die.
+- **Orphaned Entity Session IDs (A.3):** Clear mappings when sessions terminate.
+- **Grid Placement Duplicate (A.5):** Remove from old slot before placing.
+- **Double Spaces in STT (F.5):** Prevent double spaces between STT segments.
+- **BugReport Popup Z-Index (F.6):** Renders above Settings dialog.
+- **Demo Mode Launcher Event (B.3):** Fixed event name mismatch.
+- **Demo Mode Backdrop/Sidebar (B.6, B.9, B.5):** Opacity, highlight positioning, scrollTo.
+- **Cmd+C/V/X/A in Notes Editor (C.3):** Clipboard operations in CodeMirror.
+- **Terminal Restore Fragmentation (H.9):** Two-phase restore prevents line fragmentation.
+- **Workspace Window Mount (G.10):** Error handling for mount race + theme fix.
+- **Template Tests (E.4):** Test expectations aligned with template rewrite.
+
+## [Unreleased] — v0.10 (SP-1 through SP-5)
+
+### Added
+- **i18n foundation:** i18next + react-i18next with EN/DE locales. Language switcher in Settings. (SP-1)
+- **Notes MCP full CRUD:** `mux_notes_read`, `mux_notes_update`, `mux_notes_search`, `mux_notes_delete`, `mux_notes_handoff_create`, `mux_notes_handoff_search` (SP-2)
+- **Session Resume (SP-5):** `--resume` flag support for entity sessions. Manual sessions get checkbox.
+- **Session Fork (SP-5):** Fork button in SessionCell for Claude Code sessions.
+- **Orphan Detection (SP-5):** Periodic scan for orphaned tmux sessions with Adopt/Terminate UI.
+- **30 new tests** covering SP-2 and SP-5 quality gates
 
 ## [0.9.5-beta] - 2026-04-24
 
