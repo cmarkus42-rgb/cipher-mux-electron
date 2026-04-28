@@ -658,21 +658,39 @@ export function App() {
   useEffect(() => {
     const a = (window as any).cipherMux
     if (!a?.ui?.onOpen) return
-    const unsub = a.ui.onOpen((data: { target: string; context?: Record<string, unknown> }) => {
+    const unsub = a.ui.onOpen((data: { target: string; action?: string; context?: Record<string, unknown> }) => {
+      const action = (data.action as 'open' | 'close' | 'toggle') ?? 'toggle'
       switch (data.target) {
         case 'workspace-popup':
-          setWorkspacesPopupVisible(true)
+          if (action === 'close') setWorkspacesPopupVisible(false)
+          else if (action === 'open') setWorkspacesPopupVisible(true)
+          else setWorkspacesPopupVisible(prev => !prev)
           break
-        case 'info-dialog':
-          setInfoInitialTab(undefined)
-          setInfoVisible(true)
+        case 'info-dialog': {
+          const tab = data.context?.tab as string | undefined
+          if (action === 'close') {
+            setInfoVisible(false)
+          } else if (action === 'open') {
+            setInfoInitialTab(tab)
+            setInfoVisible(true)
+          } else {
+            // toggle
+            setInfoVisible(prev => {
+              if (!prev) setInfoInitialTab(tab)
+              return !prev
+            })
+          }
           break
+        }
         case 'launcher-popup': {
-          // Dispatch custom event to open launcher popup at specified cell
           const cell = (data.context?.cell as string) ?? '0-0'
           const [col, row] = cell.split('-').map(Number)
           const slotIndex = (row || 0) * grid.config.cols + (col || 0)
-          window.dispatchEvent(new CustomEvent('launcher-open', { detail: { slotIndex } }))
+          if (action === 'close') {
+            window.dispatchEvent(new CustomEvent('launcher-close', { detail: { slotIndex } }))
+          } else {
+            window.dispatchEvent(new CustomEvent('launcher-open', { detail: { slotIndex } }))
+          }
           break
         }
       }
