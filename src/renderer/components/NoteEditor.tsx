@@ -191,6 +191,15 @@ export function NoteEditor({ content, onSave, onAutoSave }: NoteEditorProps) {
         }).catch(() => {})
         return
       }
+
+      if (e.key === 'a') {
+        e.preventDefault()
+        e.stopPropagation()
+        view.dispatch({
+          selection: { anchor: 0, head: view.state.doc.length },
+        })
+        return
+      }
     }
 
     el.addEventListener('keydown', onKeyDown, true)
