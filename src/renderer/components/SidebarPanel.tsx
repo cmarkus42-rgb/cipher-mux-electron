@@ -4,6 +4,7 @@ import { useMessages } from '../hooks/useMessages'
 import { useInputRequests } from '../hooks/useInputRequests'
 import { useNotes } from '../hooks/useNotes'
 import { NotesTreeView } from './NotesTreeView'
+import type { TagFilterState } from './NotesTreeView'
 import { CompanionMemoryView } from './CompanionMemoryView'
 import { useTranslation } from 'react-i18next'
 
@@ -77,24 +78,26 @@ export function SidebarPanel({
   }, [])
 
   const [orphans, setOrphans] = useState<Array<{ id: string; name: string; tmuxSession: string; projectPath?: string | null }>>([])
-  const [tagFilter, setTagFilter] = useState<string[]>([])
+  const [tagFilter, setTagFilter] = useState<TagFilterState>({})
   const [searchTerm, setSearchTerm] = useState('')
 
   const { notes, tagRepo, deleteNote } = useNotes()
 
-  // Pre-select workspace defaultTags as filter when workspace changes
+  // Pre-select workspace defaultTags as include-filters when workspace changes
   useEffect(() => {
     if (!activeWorkspaceId) {
-      setTagFilter([])
+      setTagFilter({})
       return
     }
     const api = (window as any).cipherMux
     api?.config?.get?.('workspaces')?.then((workspaces: any[]) => {
       const ws = workspaces?.find((w: any) => w.id === activeWorkspaceId)
       if (ws?.defaultTags?.length) {
-        setTagFilter(ws.defaultTags)
+        const filter: TagFilterState = {}
+        for (const tag of ws.defaultTags) filter[tag] = 'include'
+        setTagFilter(filter)
       } else {
-        setTagFilter([])
+        setTagFilter({})
       }
     }).catch(() => {})
   }, [activeWorkspaceId])
