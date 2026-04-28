@@ -415,11 +415,13 @@ export function App() {
         if (openFn) openFn(placementPopup.note)
       }, 100)
     } else {
+      // A.5 fix: remove session from any existing slot before placing in new one
+      removeSession(placementPopup.sessionId)
       setSessionAtSlot(slotIndex, placementPopup.sessionId)
       setFocusedSessionId(placementPopup.sessionId)
       setPlacementPopup(null)
     }
-  }, [placementPopup, setSessionAtSlot, setSlotType])
+  }, [placementPopup, setSessionAtSlot, setSlotType, removeSession])
 
   const handleResize = useCallback((cols: number, rows: number) => {
     resize({ cols, rows })
