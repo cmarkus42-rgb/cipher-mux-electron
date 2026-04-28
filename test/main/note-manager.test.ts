@@ -189,4 +189,81 @@ describe('NoteManager', () => {
     freshMgr.destroy()
     await fs.rm(freshDir, { recursive: true, force: true })
   })
+
+  // ─── 7. P.3 Migration ────────────────────────────────────
+
+  it('migrates notes from global/ subdirectory to flat storage', async () => {
+    const freshDir = await makeTempDir()
+    const globalDir = path.join(freshDir, 'global')
+    await fs.mkdir(globalDir, { recursive: true })
+
+    // Write a note in global/ subdir (old format)
+    const noteId = 'TEST01'
+    const content = '---\ntitle: Migrated Note\ntags:\n  - test\ncreated: "2026-01-01"\nmodified: "2026-01-01"\n---\n\n# Migrated Note\n\nBody.'
+    await fs.writeFile(path.join(globalDir, `${noteId}.md`), content, 'utf-8')
+
+    // Instantiate NoteManager — triggers migration
+    const freshMgr = new NoteManager(freshDir)
+
+    // Note should now be in flat dir
+    const migrated = await freshMgr.read(noteId)
+    assert.ok(migrated, 'migrated note should be readable')
+    assert.equal(migrated.info.title, 'Migrated Note')
+
+    // Old global/ dir should be removed
+    const globalExists = await fs.access(globalDir).then(() => true).catch(() => false)
+    assert.equal(globalExists, false, 'global/ dir should be removed after migration')
+
+    // .migration-done marker should exist
+    const markerExists = await fs.access(path.join(freshDir, '.migration-done')).then(() => true).catch(() => false)
+    assert.equal(markerExists, true, '.migration-done marker should exist')
+
+    freshMgr.destroy()
+    await fs.rm(freshDir, { recursive: true, force: true })
+  })
+
+  it('migrates workspace-scoped notes with workspace tag', async () => {
+    const freshDir = await makeTempDir()
+    const wsDir = path.join(freshDir, 'workspace-abc123')
+    await fs.mkdir(wsDir, { recursive: true })
+
+    const noteId = 'TEST02'
+    const content = '---\ntitle: WS Note\ntags:\n  - coding\ncreated: "2026-01-01"\nmodified: "2026-01-01"\n---\n\n# WS Note\n\nBody.'
+    await fs.writeFile(path.join(wsDir, `${noteId}.md`), content, 'utf-8')
+
+    const freshMgr = new NoteManager(freshDir)
+
+    const migrated = await freshMgr.read(noteId)
+    assert.ok(migrated, 'migrated workspace note should be readable')
+    assert.ok(migrated.info.tags.includes('workspace:abc123'), 'should have workspace tag')
+    assert.ok(migrated.info.tags.includes('coding'), 'should preserve original tags')
+
+    freshMgr.destroy()
+    await fs.rm(freshDir, { recursive: true, force: true })
+  })
+
+  it('does not re-run migration when .migration-done exists', async () => {
+    const freshDir = await makeTempDir()
+    const globalDir = path.join(freshDir, 'global')
+    await fs.mkdir(globalDir, { recursive: true })
+
+    // Write marker first
+    await fs.writeFile(path.join(freshDir, '.migration-done'), '2026-01-01', 'utf-8')
+
+    // Write a note in global/ (should NOT be migrated)
+    await fs.writeFile(path.join(globalDir, 'SKIP.md'), '---\ntitle: Skip\ntags: []\n---\n\nBody', 'utf-8')
+
+    const freshMgr = new NoteManager(freshDir)
+
+    // Note should NOT be in flat dir (migration was skipped)
+    const result = await freshMgr.read('SKIP')
+    assert.equal(result, null, 'note should not be migrated when marker exists')
+
+    // global/ dir should still exist
+    const globalExists = await fs.access(globalDir).then(() => true).catch(() => false)
+    assert.equal(globalExists, true, 'global/ dir should still exist')
+
+    freshMgr.destroy()
+    await fs.rm(freshDir, { recursive: true, force: true })
+  })
 })

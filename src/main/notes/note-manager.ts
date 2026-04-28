@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs'
+import * as fsSync from 'fs'
 import path from 'path'
 import matter from 'gray-matter'
 import { ulid } from 'ulidx'
@@ -7,7 +8,7 @@ import type { NoteInfo, NoteContent, HandoffStatus } from '../../shared/types'
 // ─── NoteManager ────────────────────────────────────────────
 // All notes stored in a flat directory: {notesDir}/{id}.md
 // Scope-based subdirectories (global/, workspace-*/) are deprecated.
-// Categorization is purely tag-based. See P.3 for migration logic.
+// Categorization is purely tag-based. Migration from old layout runs once.
 
 export class NoteManager {
   private notesDir: string
@@ -15,6 +16,90 @@ export class NoteManager {
   constructor(notesDir: string) {
     this.notesDir = notesDir
     void fs.mkdir(this.notesDir, { recursive: true })
+    // Run migration from scope-based dirs (P.3) — synchronous, runs once
+    this.migrateFromScopes()
+  }
+
+  // ─── P.3 Migration ───────────────────────────────────────
+
+  // One-time migration: move notes from global/ and workspace-<id>/
+  // subdirectories into the flat notesDir. Workspace-scoped notes get
+  // a workspace:<id> tag. Writes .migration-done marker to prevent re-running.
+  private migrateFromScopes(): void {
+    const markerPath = path.join(this.notesDir, '.migration-done')
+    if (fsSync.existsSync(markerPath)) return
+
+    let entries: fsSync.Dirent[]
+    try {
+      entries = fsSync.readdirSync(this.notesDir, { withFileTypes: true })
+    } catch {
+      return
+    }
+
+    const scopeDirs = entries.filter(e => e.isDirectory()).map(e => e.name)
+    if (scopeDirs.length === 0) {
+      // No scope dirs to migrate — write marker and return
+      try { fsSync.writeFileSync(markerPath, new Date().toISOString(), 'utf-8') } catch { /* ignore */ }
+      return
+    }
+
+    let migrated = 0
+    for (const scope of scopeDirs) {
+      const scopePath = path.join(this.notesDir, scope)
+      let files: string[]
+      try {
+        files = fsSync.readdirSync(scopePath).filter(f => f.endsWith('.md'))
+      } catch {
+        continue
+      }
+
+      for (const file of files) {
+        const srcPath = path.join(scopePath, file)
+        const destPath = path.join(this.notesDir, file)
+
+        // Skip if destination already exists (name collision)
+        if (fsSync.existsSync(destPath)) continue
+
+        try {
+          // For workspace-scoped notes, inject workspace tag into frontmatter
+          if (scope.startsWith('workspace-')) {
+            const workspaceId = scope.replace('workspace-', '')
+            const raw = fsSync.readFileSync(srcPath, 'utf-8')
+            const parsed = matter(raw)
+            const tags: string[] = parsed.data.tags ?? []
+            const wsTag = `workspace:${workspaceId}`
+            if (!tags.includes(wsTag)) {
+              tags.push(wsTag)
+            }
+            parsed.data.tags = tags
+            const updated = matter.stringify(parsed.content, parsed.data)
+            fsSync.writeFileSync(destPath, updated, 'utf-8')
+            fsSync.unlinkSync(srcPath)
+          } else {
+            // global/ or other dirs — just move the file
+            fsSync.renameSync(srcPath, destPath)
+          }
+          migrated++
+        } catch {
+          // Skip files that can't be migrated
+        }
+      }
+
+      // Remove empty scope directory
+      try {
+        const remaining = fsSync.readdirSync(scopePath)
+        if (remaining.length === 0) {
+          fsSync.rmdirSync(scopePath)
+        }
+      } catch { /* ignore */ }
+    }
+
+    if (migrated > 0) {
+      console.log(`[NoteManager] Migrated ${migrated} notes from scope directories to flat storage`)
+    }
+
+    // Write migration marker
+    try { fsSync.writeFileSync(markerPath, new Date().toISOString(), 'utf-8') } catch { /* ignore */ }
   }
 
   // ─── Helpers ──────────────────────────────────────────────
