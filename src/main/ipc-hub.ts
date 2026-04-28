@@ -1008,6 +1008,9 @@ export class IpcHub {
           console.log('[Voice] InputRouter error:', data.code, data.message)
           this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, data.message)
         })
+        inputRouter.on('activeSessionChanged', (sessionId: string | null) => {
+          this.windowManager.sendToMainWindow(IPC.VOICE_ACTIVE_SESSION, { sessionId })
+        })
         console.log('[Voice] VOICE_START_SESSION => ok')
         return { ok: true }
       } catch (err) {
@@ -1133,6 +1136,23 @@ export class IpcHub {
 
     ipcMain.on(IPC.VOICE_SESSION_TARGET, (_event, { sessionId }: { sessionId: string | null }) => {
       this.voiceManager?.getInputRouter()?.setFocusedSession(sessionId)
+    })
+
+    ipcMain.on(IPC.VOICE_PIN, (_event, { sessionId }: { sessionId: string | null }) => {
+      const router = this.voiceManager?.getInputRouter()
+      if (!router) return
+      if (sessionId) {
+        router.togglePin(sessionId)
+      } else {
+        router.unpinSession()
+      }
+      this.windowManager.sendToMainWindow(IPC.VOICE_PIN_STATUS, {
+        pinned: router.isPinned(),
+        sessionId: router.getPinnedSessionId(),
+      })
+      this.windowManager.sendToMainWindow(IPC.VOICE_ACTIVE_SESSION, {
+        sessionId: router.getActiveSessionId(),
+      })
     })
   }
 

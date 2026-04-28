@@ -79,8 +79,24 @@ export function SidebarPanel({
   const [tagFilter, setTagFilter] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
 
-  const scope = activeWorkspaceId ? `workspace-${activeWorkspaceId}` : 'global'
-  const { notes, tagRepo, deleteNote } = useNotes(scope)
+  const { notes, tagRepo, deleteNote } = useNotes()
+
+  // Pre-select workspace defaultTags as filter when workspace changes
+  useEffect(() => {
+    if (!activeWorkspaceId) {
+      setTagFilter([])
+      return
+    }
+    const api = (window as any).cipherMux
+    api?.config?.get?.('workspaces')?.then((workspaces: any[]) => {
+      const ws = workspaces?.find((w: any) => w.id === activeWorkspaceId)
+      if (ws?.defaultTags?.length) {
+        setTagFilter(ws.defaultTags)
+      } else {
+        setTagFilter([])
+      }
+    }).catch(() => {})
+  }, [activeWorkspaceId])
 
   // Orphan detection: listen for periodic events + initial scan
   useEffect(() => {
@@ -137,7 +153,7 @@ export function SidebarPanel({
   const handleNoteDelete = useCallback(async (note: any, e: Event) => {
     e.stopPropagation()
     if (!confirm(t('sidebar.confirmDelete', { title: note.title || t('notesCell.untitled') }))) return
-    await deleteNote(note.id, note.scope)
+    await deleteNote(note.id)
   }, [deleteNote])
 
   const toggleTag = useCallback((tag: string) => {

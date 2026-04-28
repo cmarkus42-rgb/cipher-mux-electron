@@ -3,7 +3,7 @@ import type { NoteInfo, NoteContent, TagRepository } from '../../shared/types'
 
 const api = () => (window as any).cipherMux
 
-export function useNotes(activeScope: string = 'global') {
+export function useNotes() {
   const [notes, setNotes] = useState<NoteInfo[]>([])
   const [tagRepo, setTagRepo] = useState<TagRepository>({ tags: {} })
   const [loading, setLoading] = useState(true)
@@ -11,7 +11,7 @@ export function useNotes(activeScope: string = 'global') {
   const refresh = useCallback(async () => {
     try {
       const [list, tags] = await Promise.all([
-        api().notes.list(activeScope),
+        api().notes.list(),
         api().notes.tags(),
       ])
       setNotes(list)
@@ -21,7 +21,7 @@ export function useNotes(activeScope: string = 'global') {
     } finally {
       setLoading(false)
     }
-  }, [activeScope])
+  }, [])
 
   useEffect(() => {
     refresh()
@@ -29,20 +29,20 @@ export function useNotes(activeScope: string = 'global') {
     return () => unsub()
   }, [refresh])
 
-  const createNote = useCallback(async (title: string, body: string) => {
-    return api().notes.create(activeScope, title, body) as Promise<NoteInfo>
-  }, [activeScope])
-
-  const readNote = useCallback(async (id: string, scope: string) => {
-    return api().notes.read(id, scope) as Promise<NoteContent | null>
+  const createNote = useCallback(async (title: string, body: string, tags?: string[]) => {
+    return api().notes.create(title, body, tags) as Promise<NoteInfo>
   }, [])
 
-  const saveNote = useCallback(async (id: string, scope: string, body: string, tags?: string[]) => {
-    return api().notes.save(id, scope, body, tags) as Promise<NoteInfo>
+  const readNote = useCallback(async (id: string) => {
+    return api().notes.read(id) as Promise<NoteContent | null>
   }, [])
 
-  const deleteNote = useCallback(async (id: string, scope: string) => {
-    return api().notes.delete(id, scope) as Promise<{ ok: boolean }>
+  const saveNote = useCallback(async (id: string, body: string, tags?: string[]) => {
+    return api().notes.save(id, body, tags) as Promise<NoteInfo>
+  }, [])
+
+  const deleteNote = useCallback(async (id: string) => {
+    return api().notes.delete(id) as Promise<{ ok: boolean }>
   }, [])
 
   return {

@@ -23,6 +23,8 @@ export interface Workspace {
   cells: WorkspaceCell[]  // row-major, length === cols * rows
   merges: Record<string, true>  // "col:row" → merged DOWN
   promptOverrides: Record<string, string>  // personaId → workspace-level prompt
+  /** Tags auto-applied to new notes and pre-selected as sidebar filter when workspace is active. */
+  defaultTags?: string[]
 }
 
 export type PromptSource = 'cell' | 'workspace-override' | 'persona-default'

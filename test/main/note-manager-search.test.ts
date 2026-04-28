@@ -37,8 +37,8 @@ describe('NoteManager — search + handoff (SP-2)', () => {
   // ─── T1: read with valid ID ─────────────────────────────
 
   it('T1: reads note content by valid ID', async () => {
-    const info = await mgr.create('global', 'Read Test', '# Read Test\n\nBody here.')
-    const result = await mgr.read(info.id, 'global')
+    const info = await mgr.create('Read Test', '# Read Test\n\nBody here.')
+    const result = await mgr.read(info.id)
     assert.ok(result, 'should return content')
     assert.equal(result.info.id, info.id)
     assert.ok(result.body.includes('Body here.'))
@@ -47,17 +47,17 @@ describe('NoteManager — search + handoff (SP-2)', () => {
   // ─── T2: read with invalid ID ──────────────────────────
 
   it('T2: returns null for non-existent note', async () => {
-    const result = await mgr.read('nonexistent-id-xyz', 'global')
+    const result = await mgr.read('nonexistent-id-xyz')
     assert.equal(result, null)
   })
 
   // ─── T3: update only tags ──────────────────────────────
 
   it('T3: update only tags preserves body', async () => {
-    const info = await mgr.create('global', 'Tag Only', '# Tag Only\n\nOriginal body.')
-    const updated = await mgr.save(info.id, 'global', '# Tag Only\n\nOriginal body.', ['newtag'])
+    const info = await mgr.create('Tag Only', '# Tag Only\n\nOriginal body.')
+    const updated = await mgr.save(info.id, '# Tag Only\n\nOriginal body.', ['newtag'])
     assert.deepEqual(updated.tags, ['newtag'])
-    const content = await mgr.read(info.id, 'global')
+    const content = await mgr.read(info.id)
     assert.ok(content)
     assert.ok(content.body.includes('Original body.'))
   })
@@ -65,8 +65,8 @@ describe('NoteManager — search + handoff (SP-2)', () => {
   // ─── T4: update body + tags ─────────────────────────────
 
   it('T4: update body + tags together', async () => {
-    const info = await mgr.create('global', 'Both Update', '# Both Update\n\nOld.')
-    const updated = await mgr.save(info.id, 'global', '# New Title\n\nNew body.', ['alpha', 'beta'])
+    const info = await mgr.create('Both Update', '# Both Update\n\nOld.')
+    const updated = await mgr.save(info.id, '# New Title\n\nNew body.', ['alpha', 'beta'])
     assert.equal(updated.title, 'New Title')
     assert.deepEqual(updated.tags, ['alpha', 'beta'])
     assert.ok(updated.modifiedAt >= info.modifiedAt)
@@ -75,47 +75,58 @@ describe('NoteManager — search + handoff (SP-2)', () => {
   // ─── T5: search with query ─────────────────────────────
 
   it('T5: search returns matching notes', async () => {
-    const scope = 'search-scope-t5'
-    await mgr.create(scope, 'Alpha Note', '# Alpha Note\n\nSome alpha content.')
-    await mgr.create(scope, 'Beta Note', '# Beta Note\n\nSome beta content.')
-    await mgr.create(scope, 'Gamma Note', '# Gamma Note\n\nAlpha mentioned in body.')
+    const freshDir = await makeTempDir()
+    const freshMgr = new NoteManager(freshDir)
+    await freshMgr.create('Alpha Note', '# Alpha Note\n\nSome alpha content.')
+    await freshMgr.create('Beta Note', '# Beta Note\n\nSome beta content.')
+    await freshMgr.create('Gamma Note', '# Gamma Note\n\nAlpha mentioned in body.')
 
-    const results = await mgr.search('alpha', { scope })
+    const results = await freshMgr.search('alpha')
     assert.ok(results.length >= 2, `expected >=2 results, got ${results.length}`)
     // Title match should come first
     assert.equal(results[0].info.title, 'Alpha Note')
+
+    freshMgr.destroy()
+    await fs.rm(freshDir, { recursive: true, force: true })
   })
 
   // ─── T6: search with tag filter ────────────────────────
 
   it('T6: search with tags filter returns only matching tags', async () => {
-    const scope = 'search-scope-t6'
-    const note1 = await mgr.create(scope, 'Tagged A', '# Tagged A\n\nContent.')
-    await mgr.save(note1.id, scope, '# Tagged A\n\nContent.', ['important'])
-    const note2 = await mgr.create(scope, 'Tagged B', '# Tagged B\n\nContent.')
-    await mgr.save(note2.id, scope, '# Tagged B\n\nContent.', ['trivial'])
+    const freshDir = await makeTempDir()
+    const freshMgr = new NoteManager(freshDir)
+    const note1 = await freshMgr.create('Tagged A', '# Tagged A\n\nContent.')
+    await freshMgr.save(note1.id, '# Tagged A\n\nContent.', ['important'])
+    const note2 = await freshMgr.create('Tagged B', '# Tagged B\n\nContent.')
+    await freshMgr.save(note2.id, '# Tagged B\n\nContent.', ['trivial'])
 
-    const results = await mgr.search('Content', { scope, tags: ['important'] })
+    const results = await freshMgr.search('Content', { tags: ['important'] })
     assert.equal(results.length, 1)
     assert.equal(results[0].info.id, note1.id)
+
+    freshMgr.destroy()
+    await fs.rm(freshDir, { recursive: true, force: true })
   })
 
   // ─── T7: search without matches ────────────────────────
 
   it('T7: search without matches returns empty array', async () => {
-    const scope = 'search-scope-t7'
-    await mgr.create(scope, 'Findable', '# Findable\n\nSomething.')
-    const results = await mgr.search('xyznonexistent', { scope })
+    const freshDir = await makeTempDir()
+    const freshMgr = new NoteManager(freshDir)
+    await freshMgr.create('Findable', '# Findable\n\nSomething.')
+    const results = await freshMgr.search('xyznonexistent')
     assert.deepEqual(results, [])
+    freshMgr.destroy()
+    await fs.rm(freshDir, { recursive: true, force: true })
   })
 
   // ─── T8: delete note ───────────────────────────────────
 
   it('T8: delete removes note', async () => {
-    const info = await mgr.create('global', 'Delete Target', '# Delete Target\n\nGone.')
-    const deleted = await mgr.delete(info.id, 'global')
+    const info = await mgr.create('Delete Target', '# Delete Target\n\nGone.')
+    const deleted = await mgr.delete(info.id)
     assert.equal(deleted, true)
-    const check = await mgr.read(info.id, 'global')
+    const check = await mgr.read(info.id)
     assert.equal(check, null)
   })
 
@@ -137,8 +148,8 @@ describe('NoteManager — search + handoff (SP-2)', () => {
     assert.equal(note.handoffStatus, 'pending')
     assert.equal(note.scope, 'global')
 
-    // Verify on disk
-    const filePath = path.join(tmpDir, 'global', `${note.id}.md`)
+    // Verify on disk (flat directory)
+    const filePath = path.join(tmpDir, `${note.id}.md`)
     const raw = await fs.readFile(filePath, 'utf-8')
     const parsed = matter(raw)
     assert.equal(parsed.data.from_session, 'worker-1')
@@ -156,7 +167,7 @@ describe('NoteManager — search + handoff (SP-2)', () => {
     await freshMgr.createHandoff('H2', 'Body2', 'sess-b', 'reviewer')
     await freshMgr.createHandoff('H3', 'Body3', 'sess-c', 'any')
 
-    const all = await freshMgr.list('global')
+    const all = await freshMgr.list()
     const companionNotes = all.filter(n =>
       n.tags.includes('handoff') &&
       (n.toEntity === 'companion' || n.toEntity === 'any') &&
@@ -177,7 +188,7 @@ describe('NoteManager — search + handoff (SP-2)', () => {
 
     const h1 = await freshMgr.createHandoff('Pending', 'Body', 'sess-a', 'any')
     // Mark h1 as consumed by re-writing frontmatter
-    const filePath = path.join(freshDir, 'global', `${h1.id}.md`)
+    const filePath = path.join(freshDir, `${h1.id}.md`)
     const raw = await fs.readFile(filePath, 'utf-8')
     const parsed = matter(raw)
     parsed.data.handoff_status = 'consumed'
@@ -185,7 +196,7 @@ describe('NoteManager — search + handoff (SP-2)', () => {
 
     await freshMgr.createHandoff('Still Pending', 'Body2', 'sess-b', 'any')
 
-    const all = await freshMgr.list('global')
+    const all = await freshMgr.list()
     const consumed = all.filter(n =>
       n.tags.includes('handoff') && n.handoffStatus === 'consumed'
     )
@@ -205,7 +216,7 @@ describe('NoteManager — search + handoff (SP-2)', () => {
 
   it('T12: handoff_status can be updated via file manipulation', async () => {
     const note = await mgr.createHandoff('Consume Me', 'Body', 'sess-x', 'any')
-    const filePath = path.join(tmpDir, 'global', `${note.id}.md`)
+    const filePath = path.join(tmpDir, `${note.id}.md`)
 
     // Simulate what mux_notes_update does
     const raw = await fs.readFile(filePath, 'utf-8')
@@ -215,7 +226,7 @@ describe('NoteManager — search + handoff (SP-2)', () => {
     await fs.writeFile(filePath, matter.stringify(parsed.content, parsed.data), 'utf-8')
 
     // Re-read and verify
-    const updated = await mgr.read(note.id, 'global')
+    const updated = await mgr.read(note.id)
     assert.ok(updated)
     assert.equal(updated.info.handoffStatus, 'consumed')
   })
@@ -223,35 +234,42 @@ describe('NoteManager — search + handoff (SP-2)', () => {
   // ─── T13: NoteManager.search() full contract ──────────
 
   it('T13: search combines fulltext + tag filter correctly', async () => {
-    const scope = 'search-scope-t13'
-    const n1 = await mgr.create(scope, 'API Design', '# API Design\n\nREST endpoints.')
-    await mgr.save(n1.id, scope, '# API Design\n\nREST endpoints.', ['architecture'])
-    const n2 = await mgr.create(scope, 'Bug Report', '# Bug Report\n\nAPI crash on null.')
-    await mgr.save(n2.id, scope, '# Bug Report\n\nAPI crash on null.', ['bug'])
-    const n3 = await mgr.create(scope, 'Meeting Notes', '# Meeting Notes\n\nDiscussed API.')
-    await mgr.save(n3.id, scope, '# Meeting Notes\n\nDiscussed API.', ['meeting'])
+    const freshDir = await makeTempDir()
+    const freshMgr = new NoteManager(freshDir)
+    const n1 = await freshMgr.create('API Design', '# API Design\n\nREST endpoints.')
+    await freshMgr.save(n1.id, '# API Design\n\nREST endpoints.', ['architecture'])
+    const n2 = await freshMgr.create('Bug Report', '# Bug Report\n\nAPI crash on null.')
+    await freshMgr.save(n2.id, '# Bug Report\n\nAPI crash on null.', ['bug'])
+    const n3 = await freshMgr.create('Meeting Notes', '# Meeting Notes\n\nDiscussed API.')
+    await freshMgr.save(n3.id, '# Meeting Notes\n\nDiscussed API.', ['meeting'])
 
     // Search "API" with tag "architecture" — only n1 should match
-    const results = await mgr.search('API', { scope, tags: ['architecture'] })
+    const results = await freshMgr.search('API', { tags: ['architecture'] })
     assert.equal(results.length, 1)
     assert.equal(results[0].info.id, n1.id)
 
     // Search "API" without tag filter — all 3 should match
-    const allResults = await mgr.search('API', { scope })
+    const allResults = await freshMgr.search('API')
     assert.equal(allResults.length, 3)
     // Title match first
     assert.equal(allResults[0].info.title, 'API Design')
+
+    freshMgr.destroy()
+    await fs.rm(freshDir, { recursive: true, force: true })
   })
 
   // ─── search: max 50 results cap ───────────────────────
 
   it('search caps at 50 results', async () => {
-    const scope = 'search-scope-cap'
+    const freshDir = await makeTempDir()
+    const freshMgr = new NoteManager(freshDir)
     for (let i = 0; i < 55; i++) {
-      await mgr.create(scope, `Note ${i}`, `# Note ${i}\n\nCommon keyword here.`)
+      await freshMgr.create(`Note ${i}`, `# Note ${i}\n\nCommon keyword here.`)
     }
-    const results = await mgr.search('keyword', { scope })
+    const results = await freshMgr.search('keyword')
     assert.ok(results.length <= 50, `expected <=50, got ${results.length}`)
+    freshMgr.destroy()
+    await fs.rm(freshDir, { recursive: true, force: true })
   })
 
   // ─── createHandoff defaults to_entity to "any" ────────
