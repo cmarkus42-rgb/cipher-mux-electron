@@ -1457,6 +1457,55 @@
   color: var(--color-text-dim);
 }
 
+/* Tag chips in workspace save dialog */
+.wp-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  background: var(--color-accent-soft, rgba(79, 195, 247, 0.1));
+  color: var(--color-accent, #4fc3f7);
+  border: 1px solid var(--color-accent, #4fc3f7);
+  border-radius: 3px;
+}
+
+.wp-tag-chip__remove {
+  cursor: pointer;
+  font-size: 8px;
+  opacity: 0.6;
+}
+
+.wp-tag-chip__remove:hover {
+  opacity: 1;
+}
+
+.wp-tag-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--color-bg-elevated, #333);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  z-index: 10;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.wp-tag-suggestion {
+  padding: 4px 8px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.wp-tag-suggestion:hover {
+  background: var(--color-accent-soft);
+}
+
 /* ================================================================
    Workspaces Window (standalone)
    ================================================================ */
