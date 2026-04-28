@@ -17,8 +17,9 @@ export type AdapterCapabilities = Record<AdapterFeature, boolean>
 
 // ─── Entity Framework ─────────────────────────────────────
 
-/** Well-known entity identifiers. */
-export type EntityId = 'orchestrator' | 'mpo' | 'launcher' | 'companion' | 'refinement' | 'voice-relay' | 'audit'
+/** Well-known entity identifiers. Extensible via string for dynamic/scanned entities. */
+export type BuiltinEntityId = 'orchestrator' | 'mpo' | 'launcher' | 'companion' | 'refinement' | 'voice-relay' | 'audit'
+export type EntityId = BuiltinEntityId | (string & {})
 
 /**
  * Configuration for a functional entity (Orchestrator, MPO, Companion, etc.).
@@ -413,6 +414,7 @@ export interface NoteInfo {
   id: string
   title: string
   tags: string[]
+  /** @deprecated Scope is always 'global' — notes use tags for categorization. Kept for API compat. */
   scope: string
   relativePath: string
   createdAt: string
