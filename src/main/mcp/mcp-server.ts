@@ -58,6 +58,14 @@ export class McpServerManager {
       this.handleRequest(req, res)
     })
 
+    // Disable all default timeouts — SSE streams must stay open indefinitely.
+    // Node.js defaults (keepAliveTimeout=5s, requestTimeout=5min) kill idle
+    // connections and long-running SSE streams, causing MCP tool drops.
+    this.httpServer.timeout = 0
+    this.httpServer.requestTimeout = 0
+    this.httpServer.keepAliveTimeout = 0
+    this.httpServer.headersTimeout = 0
+
     this.startTime = Date.now()
 
     // Start listening
