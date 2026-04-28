@@ -26,6 +26,7 @@ export interface ToolContext {
   windowManager: { sendToMainWindow(channel: string, data: unknown): void } | null
   noteManager: NoteManager | null
   memoryStore: MemoryStore | null
+  getVoiceManager?: () => import('../voice/voice-manager').VoiceManager | null
 }
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']
@@ -618,23 +619,17 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: {
         title: z.string().describe('Note title (also used as # heading)'),
         body: z.string().describe('Markdown body (without the title heading — it will be prepended)'),
-        scope: z.string().optional().describe('Scope: "global" (default) or "workspace-<id>" for workspace-scoped notes'),
         tags: z.array(z.string()).optional().describe('Tags for categorization (max 5, lowercase)'),
       },
     },
-    async (args: { title: string; body: string; scope?: string; tags?: string[] }) => {
+    async (args: { title: string; body: string; tags?: string[] }) => {
       if (!ctx.noteManager) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'NoteManager not available' }) }], isError: true }
       }
       try {
-        const scope = args.scope || 'global'
         const fullBody = `# ${args.title}\n\n${args.body}`
-        const note = await ctx.noteManager.create(scope, args.title, fullBody)
-
-        // If tags provided, save again with tags
-        if (args.tags && args.tags.length > 0) {
-          await ctx.noteManager.save(note.id, scope, fullBody, args.tags.slice(0, 5))
-        }
+        const tags = args.tags ? args.tags.slice(0, 5) : undefined
+        const note = await ctx.noteManager.create(args.title, fullBody, tags)
 
         // Notify UI
         if (ctx.windowManager) {
@@ -642,7 +637,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         }
 
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: note.id, title: note.title, scope }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: note.id, title: note.title }) }],
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
@@ -658,19 +653,17 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   ;(server.registerTool as any)(
     'mux_notes_list',
     {
-      description: 'List notes in the cipher-mux Notes system. Returns title, tags, scope, and timestamps.',
+      description: 'List notes in the cipher-mux Notes system. Returns title, tags, and timestamps. Optionally filter by tags.',
       inputSchema: {
-        scope: z.string().optional().describe('Scope to list: "global", "workspace-<id>", or omit for all notes'),
+        tags: z.array(z.string()).optional().describe('Filter by tags — only notes with at least one matching tag'),
       },
     },
-    async (args: { scope?: string }) => {
+    async (args: { tags?: string[] }) => {
       if (!ctx.noteManager) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'NoteManager not available' }) }], isError: true }
       }
       try {
-        const notes = args.scope
-          ? await ctx.noteManager.list(args.scope)
-          : await ctx.noteManager.listAll()
+        const notes = await ctx.noteManager.list(args.tags)
 
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(notes, null, 2) }],
@@ -692,16 +685,14 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       description: 'Read a note by ID from the cipher-mux Notes system. Returns full content including body and frontmatter.',
       inputSchema: {
         id: z.string().describe('Note ID (ULID)'),
-        scope: z.string().optional().describe('Scope: "global" (default) or "workspace-<id>"'),
       },
     },
-    async (args: { id: string; scope?: string }) => {
+    async (args: { id: string }) => {
       if (!ctx.noteManager) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
       }
       try {
-        const scope = args.scope || 'global'
-        const result = await ctx.noteManager.read(args.id, scope)
+        const result = await ctx.noteManager.read(args.id)
         if (!result) {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Note not found: ${args.id}` }) }], isError: true }
         }
@@ -724,20 +715,18 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         + 'Can also update handoff_status for handoff notes.',
       inputSchema: {
         id: z.string().describe('Note ID (ULID)'),
-        scope: z.string().optional().describe('Scope: "global" (default) or "workspace-<id>"'),
         title: z.string().optional().describe('New title — updates the first # heading in the body'),
         body: z.string().optional().describe('New markdown body (replaces entire body)'),
         tags: z.array(z.string()).optional().describe('New tags (max 5, replaces all existing tags)'),
         handoff_status: z.enum(['pending', 'consumed']).optional().describe('Update handoff status for handoff notes'),
       },
     },
-    async (args: { id: string; scope?: string; title?: string; body?: string; tags?: string[]; handoff_status?: 'pending' | 'consumed' }) => {
+    async (args: { id: string; title?: string; body?: string; tags?: string[]; handoff_status?: 'pending' | 'consumed' }) => {
       if (!ctx.noteManager) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
       }
       try {
-        const scope = args.scope || 'global'
-        const existing = await ctx.noteManager.read(args.id, scope)
+        const existing = await ctx.noteManager.read(args.id)
         if (!existing) {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Note not found: ${args.id}` }) }], isError: true }
         }
@@ -754,13 +743,12 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           }
         }
 
-        const note = await ctx.noteManager.save(args.id, scope, body, tags)
+        const note = await ctx.noteManager.save(args.id, body, tags)
 
         // Update handoff_status in frontmatter if provided (requires re-reading and re-writing the raw file)
         if (args.handoff_status) {
           const filePath = path.join(
             (ctx.noteManager as any).notesDir,
-            scope,
             `${args.id}.md`
           )
           const raw = readFileSync(filePath, 'utf-8')
@@ -795,17 +783,15 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         + 'Max 50 results.',
       inputSchema: {
         query: z.string().describe('Search query — matched case-insensitive against title and body'),
-        scope: z.string().optional().describe('Scope filter: "global", "workspace-<id>", or omit to search all'),
         tags: z.array(z.string()).optional().describe('Tag filter — only notes with at least one matching tag'),
       },
     },
-    async (args: { query: string; scope?: string; tags?: string[] }) => {
+    async (args: { query: string; tags?: string[] }) => {
       if (!ctx.noteManager) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
       }
       try {
         const results = await ctx.noteManager.search(args.query, {
-          scope: args.scope,
           tags: args.tags,
         })
         return {
@@ -825,16 +811,14 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       description: 'Delete a note from the cipher-mux Notes system.',
       inputSchema: {
         id: z.string().describe('Note ID (ULID)'),
-        scope: z.string().optional().describe('Scope: "global" (default) or "workspace-<id>"'),
       },
     },
-    async (args: { id: string; scope?: string }) => {
+    async (args: { id: string }) => {
       if (!ctx.noteManager) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
       }
       try {
-        const scope = args.scope || 'global'
-        const deleted = await ctx.noteManager.delete(args.id, scope)
+        const deleted = await ctx.noteManager.delete(args.id)
         if (!deleted) {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Note not found: ${args.id}` }) }], isError: true }
         }
@@ -912,7 +896,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       }
       try {
         // Search for all notes with 'handoff' tag
-        const allNotes = await ctx.noteManager.list('global')
+        const allNotes = await ctx.noteManager.list()
         const handoffNotes = allNotes.filter(n => n.tags.includes('handoff'))
 
         const statusFilter = args.status || 'pending'
@@ -1332,6 +1316,42 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       ctx.windowManager.sendToMainWindow(IPC.THEME_SET, { theme: args.theme })
       return {
         content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, theme: args.theme }) }],
+      }
+    }
+  )
+
+  // 35. mux_tts_speak — Speak text via TTS
+  ;(server.registerTool as any)(
+    'mux_tts_speak',
+    {
+      description:
+        'Speak text aloud via TTS. Use this to read responses to the user. '
+        + 'Only speak the key message — skip code blocks, tool output, and debug info.',
+      inputSchema: {
+        text: z.string().describe('Text to speak aloud'),
+        priority: z.enum(['normal', 'interrupt']).optional()
+          .describe('normal = queue after current speech, interrupt = stop current speech and play immediately'),
+      },
+    },
+    async (args: { text: string; priority?: 'normal' | 'interrupt' }) => {
+      const voiceManager = ctx.getVoiceManager?.()
+      if (!voiceManager || !voiceManager.isInitialized()) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Voice not active. User must enable voice mode first.' }) }],
+          isError: true,
+        }
+      }
+      try {
+        await voiceManager.speakText(args.text, args.priority === 'interrupt')
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, spoken: args.text.slice(0, 100) }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }],
+          isError: true,
+        }
       }
     }
   )
