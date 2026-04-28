@@ -10,48 +10,28 @@ describe('escapeForTmux', () => {
     assert.equal(escapeForTmux('a\\b'), 'a\\\\b')
   })
 
-  it('should escape double quotes', () => {
-    assert.equal(escapeForTmux('say "hello"'), 'say \\"hello\\"')
-  })
-
-  it('should escape single quotes', () => {
-    assert.equal(escapeForTmux("it's"), "it\\'s")
-  })
-
   it('should escape semicolons', () => {
     assert.equal(escapeForTmux('a; b'), 'a\\; b')
   })
 
-  it('should replace newlines with spaces', () => {
-    assert.equal(escapeForTmux('line1\nline2'), 'line1 line2')
+  it('should preserve quotes and newlines (hex path handles them)', () => {
+    assert.equal(escapeForTmux('say "hello"'), 'say "hello"')
+    assert.equal(escapeForTmux("it's"), "it's")
+    assert.equal(escapeForTmux('line1\nline2'), 'line1\nline2')
   })
 
-  it('should handle multiple special characters together', () => {
-    const input = 'echo "hello"; cat \'file\' \\ done\nend'
-    const result = escapeForTmux(input)
-    assert.ok(!result.includes('\n'), 'no raw newlines')
-    assert.ok(result.includes('\\\\'), 'backslash escaped')
-    assert.ok(result.includes('\\"'), 'double quote escaped')
-    assert.ok(result.includes("\\'"), 'single quote escaped')
-    assert.ok(result.includes('\\;'), 'semicolon escaped')
-  })
-
-  it('should use base64 encoding for messages longer than 500 chars', () => {
+  it('should not use base64 for long messages', () => {
     const longText = 'x'.repeat(501)
     const result = escapeForTmux(longText)
-    assert.ok(result.startsWith("echo '"), 'should start with echo')
-    assert.ok(result.endsWith("' | base64 -d"), 'should end with base64 decode')
-    // Verify the base64 portion decodes back to the original text
-    const b64Part = result.slice("echo '".length, result.length - "' | base64 -d".length)
-    const decoded = Buffer.from(b64Part, 'base64').toString('utf-8')
-    assert.equal(decoded, longText)
+    assert.ok(!result.includes('base64'), 'no base64 encoding')
+    assert.equal(result, longText, 'long text without special chars is unchanged')
   })
 
-  it('should not use base64 for messages of exactly 500 chars', () => {
-    const text = 'y'.repeat(500)
-    const result = escapeForTmux(text)
-    assert.ok(!result.includes('base64'), 'should not use base64 at boundary')
-    assert.equal(result, text, 'plain text with no special chars should be unchanged')
+  it('should handle combined special characters', () => {
+    const result = escapeForTmux('echo "hello"; cat \\ done')
+    assert.ok(result.includes('\\\\'), 'backslash escaped')
+    assert.ok(result.includes('\\;'), 'semicolon escaped')
+    assert.ok(result.includes('"hello"'), 'quotes preserved')
   })
 })
 
