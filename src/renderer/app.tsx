@@ -162,6 +162,7 @@ export function App() {
       if (s.running && s.sessionId) placeOrchestrator(s.sessionId)
     })
     const unsub = api.orchestrator.onStarted((data: any) => {
+      if (inFlightEntityStarts.current.has('orchestrator')) return
       const sid = data?.sessionId ?? data?.id
       if (sid) placeOrchestrator(sid)
     })
@@ -177,6 +178,7 @@ export function App() {
       if (s.running && s.sessionId) placeMpo(s.sessionId)
     })
     const unsub = api.mpo.onStarted((data: any) => {
+      if (inFlightEntityStarts.current.has('mpo')) return
       const sid = data?.sessionId ?? data?.id
       if (sid) placeMpo(sid)
     })
@@ -568,9 +570,10 @@ export function App() {
     const unsub = api.entity.onStarted((data: { entityId: string; session: any }) => {
       const sid = data.session?.id
       if (!sid) return
-      // Skip if session was placed directly via handleStartEntity (RT-X2 race condition fix)
-      if (inFlightPlacements.current.has(sid)) {
-        inFlightPlacements.current.delete(sid)
+      // Skip if this entity was started from the renderer via handleStartEntity (RT-X2 fix).
+      // Check by entityId (available before the await) instead of sessionId (only after).
+      if (inFlightEntityStarts.current.has(data.entityId)) {
+        inFlightEntityStarts.current.delete(data.entityId)
         return
       }
       // Skip if session is already placed in the grid
