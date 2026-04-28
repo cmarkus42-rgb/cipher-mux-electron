@@ -311,6 +311,7 @@ export function NotesTreeView({
           <div
             key={note.id}
             class="bg-card"
+            data-highlight={`side-note-${note.id}`}
             onDblClick={() => onNoteDoubleClick(note)}
             title={t('sidebar.noteDoubleClick')}
             draggable

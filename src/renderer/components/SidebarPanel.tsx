@@ -345,7 +345,7 @@ function BackgroundSessionCard({ session, contextUsage, onClick, onKill, voiceGl
   }, [onKill, session.name, t])
 
   return (
-    <div class={`bg-card${voiceGlow ? ` bg-card--voice-${voiceGlow}` : ''}`} onClick={onClick} title={t('sidebar.clickToPlace')}>
+    <div class={`bg-card${voiceGlow ? ` bg-card--voice-${voiceGlow}` : ''}`} data-highlight={`side-session-${session.id}`} onClick={onClick} title={t('sidebar.clickToPlace')}>
       <div class="bg-card__head">
         <span class="bg-card__name">{displayName(session.name, session.projectPath)}</span>
         <button

@@ -719,6 +719,14 @@ export function App() {
           break
         }
       }
+
+      // scrollTo support: after opening, scroll to element
+      if (data.context?.scrollTo && action !== 'close') {
+        setTimeout(() => {
+          const el = document.querySelector(data.context!.scrollTo as string)
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }, 200) // Allow popup to render first
+      }
     })
     return () => unsub()
   }, [grid.config.cols])
