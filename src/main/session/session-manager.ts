@@ -18,6 +18,7 @@ import type { PersistedSession, PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
 import { configStore } from '../config/config-store'
+import { extractCharacterBlock } from '../character/character-defaults'
 
 /**
  * SessionManager — Registry for cipher-mux sessions.
@@ -505,16 +506,54 @@ export class SessionManager extends EventEmitter {
     return this.sessionAdapters.get(sessionId)
   }
 
-  /** Get the active companion character prompt (or empty string). */
-  private getActiveCompanionPrompt(): string {
+  /** Get the active character block (tone, style, rules) — NOT companion tasks. */
+  private getActiveCharacterBlock(): string {
     try {
       const activeId = configStore.get('activeCharacterId')
       const characters = configStore.get('characters')
       const active = characters.find(c => c.id === activeId)
-      return active?.prompt ?? ''
+      if (!active) return ''
+      return extractCharacterBlock(active)
     } catch {
       return ''
     }
+  }
+
+  /** Get the display name of the active character (e.g. "Relay", "Wayne"). */
+  private getActiveCharacterName(): string {
+    try {
+      const activeId = configStore.get('activeCharacterId')
+      const characters = configStore.get('characters')
+      const active = characters.find(c => c.id === activeId)
+      return active?.name ?? 'Relay'
+    } catch {
+      return 'Relay'
+    }
+  }
+
+  /**
+   * Inject or replace a ## Persona section in a CLAUDE.md string.
+   * If a ## Persona section already exists, it is replaced.
+   * Otherwise, the section is appended after the first heading.
+   */
+  private injectPersonaSection(claudeMd: string, characterBlock: string): string {
+    if (!characterBlock) return claudeMd
+
+    const personaSection = `\n\n## Persona\n\n${characterBlock}`
+
+    // Replace existing persona section
+    const personaRegex = /\n*## Persona\n[\s\S]*?(?=\n## |\n*$)/
+    if (personaRegex.test(claudeMd)) {
+      return claudeMd.replace(personaRegex, personaSection)
+    }
+
+    // Insert after the first heading line
+    const firstHeadingEnd = claudeMd.indexOf('\n')
+    if (firstHeadingEnd > 0) {
+      return claudeMd.substring(0, firstHeadingEnd) + personaSection + claudeMd.substring(firstHeadingEnd)
+    }
+
+    return claudeMd + personaSection
   }
 
   // ─── Entity Framework ───────────────────────────────────
@@ -550,18 +589,6 @@ export class SessionManager extends EventEmitter {
     // Deploy assets if this entity has a template
     if (config.templatePath) {
       deployEntityAssets(config, this.appRoot)
-    }
-
-    // Inject active companion character prompt into Companion CLAUDE.md
-    if (config.id === 'companion' && config.templatePath) {
-      const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
-      const templateSource = path.join(this.appRoot, config.templatePath, 'CLAUDE.md')
-      if (fs.existsSync(templateSource)) {
-        const templateContent = fs.readFileSync(templateSource, 'utf-8')
-        const companionPrompt = this.getActiveCompanionPrompt()
-        const personaSection = companionPrompt ? `\n\n## Companion-Persona\n\n${companionPrompt}` : ''
-        fs.writeFileSync(claudeMdPath, templateContent + personaSection, 'utf-8')
-      }
     }
 
     // Ensure entity directory exists
@@ -630,6 +657,20 @@ export class SessionManager extends EventEmitter {
         },
       }
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2), 'utf-8')
+    }
+
+    // ─── Universal Persona Injection ───────────────────────
+    // Inject the active character block (tone, style, rules) into every
+    // entity's CLAUDE.md. This ensures persona consistency across ALL
+    // entities, not just Companion.
+    const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
+    if (fs.existsSync(claudeMdPath)) {
+      const characterBlock = this.getActiveCharacterBlock()
+      if (characterBlock) {
+        const existing = fs.readFileSync(claudeMdPath, 'utf-8')
+        const withPersona = this.injectPersonaSection(existing, characterBlock)
+        fs.writeFileSync(claudeMdPath, withPersona, 'utf-8')
+      }
     }
 
     // Start session
