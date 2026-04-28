@@ -133,9 +133,7 @@ export function SessionCell({
           {isClaudeSession && (
             <button class="cell-btn" onClick={handleFork} title={t('sessionCell.forkSession')}>⑂</button>
           )}
-          {!isOrchestrator && (
-            <button class="cell-btn" onClick={handleSwitch} title={t('sessionCell.switchProject')}>⇄</button>
-          )}
+          <button class="cell-btn" onClick={handleSwitch} title={t('sessionCell.switchProject')}>⇄</button>
           <button class="cell-btn" onClick={handleSendToBackground} title={t('sessionCell.sendToBackground')}>⏏</button>
           <button class="cell-btn" onClick={handleShell} title={t('sessionCell.openShell')}>$</button>
           <button class="cell-btn" onClick={handleClose} title={t('sessionCell.closeSession')}>✕</button>

@@ -73,7 +73,7 @@ export function StatusBar({
         <button class="status-bar__btn status-bar__btn--active" onClick={onThemeSettings} data-highlight="sb-theme">
           {themeDisplayName(theme)}
         </button>
-        <button class="status-bar__btn" onClick={onInfo} data-highlight="sb-info">{t('statusBar.info')}</button>
+        <button class="status-bar__btn" onClick={onInfo} data-highlight="sb-info">{t('statusBar.settings', 'Settings')}</button>
       </div>
       <span class="status-bar__version">{APP_VERSION}</span>
     </div>
