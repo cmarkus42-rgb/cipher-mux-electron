@@ -1211,14 +1211,54 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       if (!ctx.windowManager) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'WindowManager not available' }) }], isError: true }
       }
+
+      // Clear all — no target validation needed
+      if (args.clear) {
+        ctx.windowManager.sendToMainWindow(IPC.UI_HIGHLIGHT, {
+          target: args.target,
+          duration: args.duration ?? 3000,
+          style: args.style ?? 'glow',
+          clear: true,
+        })
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, target: 'clear' }) }] }
+      }
+
+      if (!args.target) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'No target specified' }) }], isError: true }
+      }
+
+      // Known static targets
+      const knownTargets = [
+        'sb-voice', 'sb-grid', 'sb-workspaces', 'sb-sidebar', 'sb-theme', 'sb-info',
+        'side-messages', 'side-background', 'side-notes', 'side-requests', 'side-memory',
+        'popup-workspace', 'popup-launcher', 'popup-info',
+      ]
+      // Dynamic target prefixes (cell-*, cell-head-*, side-note-*, side-session-*, side-message-*)
+      const dynamicPrefixes = ['cell-', 'cell-head-', 'side-note-', 'side-session-', 'side-message-']
+
+      const isKnown = knownTargets.includes(args.target)
+        || dynamicPrefixes.some(prefix => args.target!.startsWith(prefix))
+
+      if (!isKnown) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({
+            ok: false,
+            error: `Unknown target: "${args.target}"`,
+            knownTargets,
+            dynamicPrefixes: dynamicPrefixes.map(p => `${p}*`),
+          }) }],
+          isError: true,
+        }
+      }
+
       ctx.windowManager.sendToMainWindow(IPC.UI_HIGHLIGHT, {
         target: args.target,
         duration: args.duration ?? 3000,
         style: args.style ?? 'glow',
-        clear: args.clear ?? false,
+        clear: false,
       })
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, target: args.target ?? 'clear' }) }],
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, target: args.target }) }],
       }
     }
   )
