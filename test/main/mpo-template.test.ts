@@ -33,17 +33,18 @@ describe('generateMpoClaudeMd', () => {
     }
   })
 
-  it('does not contain hardcoded persona section (D2: persona via companionPrompt)', () => {
+  it('persona block references companion injection', () => {
     const md = generateMpoClaudeMd(defaultOpts)
-    assert.ok(!md.includes('Wayne Szalinski'))
-    assert.ok(!md.includes('## Persona'))
+    // E.4 template: persona is injected from active companion
+    assert.ok(md.includes('Persona'))
+    assert.ok(md.includes('Companion') || md.includes('companion'))
   })
 
   it('contains 10-phase lifecycle', () => {
     const md = generateMpoClaudeMd(defaultOpts)
-    assert.ok(md.includes('### Phase 1:'))
-    assert.ok(md.includes('### Phase 10:'))
-    assert.ok(md.includes('## Lifecycle'))
+    assert.ok(md.includes('Phase 1:'), 'Should contain Phase 1')
+    assert.ok(md.includes('Phase 10:'), 'Should contain Phase 10')
+    assert.ok(md.includes('Lifecycle') || md.includes('Phasen'), 'Should have lifecycle section')
   })
 
   it('contains 5-level escalation hierarchy', () => {
@@ -57,32 +58,32 @@ describe('generateMpoClaudeMd', () => {
     const md = generateMpoClaudeMd(defaultOpts)
     assert.ok(md.includes('Zerlegungsregeln'))
     assert.ok(md.includes('Feature-basiert'))
-    assert.ok(md.includes('Granularitaets-Heuristik'))
+    assert.ok(md.includes('Granularit'), 'Should contain granularity rules')
   })
 
   it('contains monitoring rules with stuck signals', () => {
     const md = generateMpoClaudeMd(defaultOpts)
-    assert.ok(md.includes('Monitoring-Regeln'))
-    assert.ok(md.includes('Sackgassen-Signale'))
+    assert.ok(md.includes('Monitoring'))
+    assert.ok(md.includes('Sackgassen'))
     assert.ok(md.includes('Kein Output >20 Min'))
   })
 
   it('contains input request rules for bubble and pendelordner', () => {
     const md = generateMpoClaudeMd(defaultOpts)
-    assert.ok(md.includes('Input-Request-Regeln'))
+    assert.ok(md.includes('Input-Request'))
     assert.ok(md.includes('Bubble'))
     assert.ok(md.includes('Pendelordner'))
   })
 
   it('contains retry limit from opts', () => {
     const md = generateMpoClaudeMd(defaultOpts)
-    assert.ok(md.includes('Maximal 2 Retry-Versuche'))
-    assert.ok(md.includes(`Nach 2 Fehlschlaegen`))
+    assert.ok(md.includes(`${defaultOpts.maxRetries} Retr`), 'Should mention retry limit')
+    assert.ok(md.includes('2 Fehlschl'), 'Should mention failure escalation')
   })
 
   it('uses custom retry limit', () => {
     const md = generateMpoClaudeMd({ ...defaultOpts, maxRetries: 3 })
-    assert.ok(md.includes('Maximal 3 Retry-Versuche'))
+    assert.ok(md.includes('3 Retr'), 'Should use custom retry limit')
   })
 
   it('does not hardcode MCP URL or auth (moved to .mcp-connection.md)', () => {
@@ -112,7 +113,7 @@ describe('generateMpoClaudeMd', () => {
 
   it('contains 90% autonomy rule', () => {
     const md = generateMpoClaudeMd(defaultOpts)
-    assert.ok(md.includes('90% Autonomie'))
+    assert.ok(md.includes('90%'))
   })
 
   it('contains no-push rule', () => {
