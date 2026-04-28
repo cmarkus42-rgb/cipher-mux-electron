@@ -35,17 +35,15 @@ const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'sys
  * Escape text for safe injection via tmux send-keys.
  * For long messages (>500 chars), uses base64 encoding to avoid quoting issues.
  */
+/**
+ * Escape text for tmux send-keys -l (literal) fallback path.
+ * The primary hex path (send-keys -H) needs no escaping.
+ * Kept minimal — only used when control mode is unavailable.
+ */
 export function escapeForTmux(text: string): string {
-  if (text.length > 500) {
-    const b64 = Buffer.from(text).toString('base64')
-    return `echo '${b64}' | base64 -d`
-  }
   return text
     .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/'/g, "\\'")
     .replace(/;/g, '\\;')
-    .replace(/\n/g, ' ')
 }
 
 /**
@@ -80,9 +78,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         text: z.string().describe('Message text'),
         sessionId: z.string().optional().describe('Target session ID for push delivery'),
         sessionName: z.string().optional().describe('Target session name for push delivery'),
+        noEnter: z.boolean().optional().describe('If true, do not send Enter after push-delivered text'),
       },
     },
-    async (args: { topic: string; sender: string; text: string; sessionId?: string; sessionName?: string }) => {
+    async (args: { topic: string; sender: string; text: string; sessionId?: string; sessionName?: string; noEnter?: boolean }) => {
       if (!ctx.messageBus) {
         return { content: [{ type: 'text' as const, text: 'MessageBus not available' }], isError: true }
       }
@@ -103,13 +102,13 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         const session = ctx.sessionManager.get(targetId)
         if (session && session.status === 'active') {
           try {
-            // Push-deliver directly — no readiness check needed for active
-            // sessions. The old code captured the pane and looked for ❯/$
-            // prompts, but that fails when Claude's TUI is running (which is
-            // the normal case). The message is on the bus regardless; this
-            // injection is best-effort convenience.
-            const escaped = escapeForTmux(args.text)
-            await ctx.sessionManager.sendKeys(targetId, escaped + '\r')
+            // Push-deliver plaintext directly via sendKeys (hex-encoded in
+            // tmux control mode — no escaping or base64 needed). Enter is
+            // sent separately so it works regardless of text length.
+            await ctx.sessionManager.sendKeys(targetId, args.text)
+            if (!args.noEnter) {
+              await ctx.sessionManager.sendKeys(targetId, '\r')
+            }
             delivered = true
           } catch {
             // sendKeys failed — message is still on the bus
