@@ -96,4 +96,12 @@ describe('VoiceInputRouter', () => {
     await router.routeTranscription('   ')
     assert.equal(sentKeys.length, 0)
   })
+
+  it('avoids double space when transcript already ends with space', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    await router.routeTranscription('hello world ')
+    assert.equal(sentKeys.length, 1)
+    assert.equal(sentKeys[0].keys, 'hello world ')
+  })
 })
