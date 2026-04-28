@@ -194,7 +194,7 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   if (!visible) return null
 
   return (
-    <div class="modal-overlay" onClick={handleClose}>
+    <div class="modal-overlay modal-overlay--bugreport" onClick={handleClose}>
       <div class="modal-panel bugreport-panel" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <span class="modal-title">{t('bugreport.title')}</span>

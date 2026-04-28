@@ -276,6 +276,10 @@
   backdrop-filter: none;
 }
 
+.modal-overlay--bugreport {
+  z-index: calc(var(--z-modal) + 10);
+}
+
 .modal-panel {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
