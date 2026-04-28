@@ -17,16 +17,13 @@ export interface OrchestratorTemplateOpts {
 }
 
 export function generateOrchestratorClaudeMd(opts: OrchestratorTemplateOpts): string {
-  const mcpUrl = `http://${opts.mcpHost}:${opts.mcpPort}/mcp`
-
   return `# Orchestrator — ${BRAND.appName}
 
 Du bist der Orchestrator für ${BRAND.appName}. Deine Aufgabe: Tasks an Worker-Sessions delegieren und deren Fortschritt überwachen.
 
 ## MCP-Server
 
-- **URL:** ${mcpUrl}
-- **Auth:** Bearer ${opts.mcpApiKey}
+Aktuelle Verbindungsdaten stehen in \`.mcp-connection.md\` (wird bei jedem Start aktualisiert).
 
 ## MCP-Tools
 

@@ -570,32 +570,44 @@ export class SessionManager extends EventEmitter {
     // Write CLAUDE.md for entities without asset templates.
     // Each entity gets a role-specific CLAUDE.md so it overrides the global
     // Mimir persona from ~/.claude/CLAUDE.md (fixes B07 persona distribution).
+    // Only write if CLAUDE.md does NOT exist — preserves manual edits.
     if (!config.templatePath) {
       const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
-      if (config.id === 'orchestrator' && this.mcpConfig) {
-        const adapter = this.adapterRegistry.getDefault()
-        fs.writeFileSync(claudeMdPath, generateOrchestratorClaudeMd({
-          mcpHost: this.mcpConfig.mcpHost,
-          mcpPort: this.mcpConfig.mcpPort,
-          mcpApiKey: this.mcpConfig.mcpApiKey,
-          maxRetries: ORCHESTRATOR_MAX_RETRIES,
-          adapterFragment: adapter.buildOrchestratorPromptFragment('de'),
-        }), 'utf-8')
-      } else if (config.id === 'mpo' && this.mcpConfig) {
-        const adapter = this.adapterRegistry.getDefault()
-        fs.writeFileSync(claudeMdPath, generateMpoClaudeMd({
-          mcpHost: this.mcpConfig.mcpHost,
-          mcpPort: this.mcpConfig.mcpPort,
-          mcpApiKey: this.mcpConfig.mcpApiKey,
-          maxRetries: MPO_MAX_RETRIES,
-          adapterFragment: adapter.buildMpoPromptFragment('de'),
-        }), 'utf-8')
-      } else if (config.id === 'audit') {
-        fs.writeFileSync(claudeMdPath, generateAuditClaudeMd(), 'utf-8')
-      } else if (config.id === 'voice-relay') {
-        fs.writeFileSync(claudeMdPath, generateVoiceRelayClaudeMd(), 'utf-8')
-      } else if (!fs.existsSync(claudeMdPath)) {
-        fs.writeFileSync(claudeMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')
+      if (!fs.existsSync(claudeMdPath)) {
+        if (config.id === 'orchestrator' && this.mcpConfig) {
+          const adapter = this.adapterRegistry.getDefault()
+          fs.writeFileSync(claudeMdPath, generateOrchestratorClaudeMd({
+            mcpHost: this.mcpConfig.mcpHost,
+            mcpPort: this.mcpConfig.mcpPort,
+            mcpApiKey: this.mcpConfig.mcpApiKey,
+            maxRetries: ORCHESTRATOR_MAX_RETRIES,
+            adapterFragment: adapter.buildOrchestratorPromptFragment('de'),
+          }), 'utf-8')
+        } else if (config.id === 'mpo' && this.mcpConfig) {
+          const adapter = this.adapterRegistry.getDefault()
+          fs.writeFileSync(claudeMdPath, generateMpoClaudeMd({
+            mcpHost: this.mcpConfig.mcpHost,
+            mcpPort: this.mcpConfig.mcpPort,
+            mcpApiKey: this.mcpConfig.mcpApiKey,
+            maxRetries: MPO_MAX_RETRIES,
+            adapterFragment: adapter.buildMpoPromptFragment('de'),
+          }), 'utf-8')
+        } else if (config.id === 'audit') {
+          fs.writeFileSync(claudeMdPath, generateAuditClaudeMd(), 'utf-8')
+        } else if (config.id === 'voice-relay') {
+          fs.writeFileSync(claudeMdPath, generateVoiceRelayClaudeMd(), 'utf-8')
+        } else {
+          fs.writeFileSync(claudeMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')
+        }
+      }
+      // Always update MCP connection file for entities that use MCP
+      if ((config.id === 'orchestrator' || config.id === 'mpo') && this.mcpConfig) {
+        const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}/mcp`
+        fs.writeFileSync(
+          path.join(config.projectPath, '.mcp-connection.md'),
+          `# MCP-Verbindung (auto-generiert, nicht editieren)\n\n- **URL:** ${mcpUrl}\n- **Auth:** Bearer ${this.mcpConfig.mcpApiKey}\n`,
+          'utf-8',
+        )
       }
     }
 
@@ -757,20 +769,31 @@ export class SessionManager extends EventEmitter {
     // Ensure directory exists
     fs.mkdirSync(orchestratorDir, { recursive: true })
 
-    // Generate and write CLAUDE.md with adapter-specific prompt fragment
+    // Generate CLAUDE.md only if it does NOT exist — preserves manual edits
+    // by the user or Orchestrator session. MCP connection details go into
+    // a separate .mcp-connection.md that is always regenerated.
     const adapter = this.adapterRegistry.getDefault()
-    const claudeMd = generateOrchestratorClaudeMd({
-      mcpHost: config.mcpHost,
-      mcpPort: config.mcpPort,
-      mcpApiKey: config.mcpApiKey,
-      maxRetries: ORCHESTRATOR_MAX_RETRIES,
-      adapterFragment: adapter.buildOrchestratorPromptFragment('de'),
-    })
-    fs.writeFileSync(path.join(orchestratorDir, 'CLAUDE.md'), claudeMd, 'utf-8')
+    const claudeMdPath = path.join(orchestratorDir, 'CLAUDE.md')
+    if (!fs.existsSync(claudeMdPath)) {
+      const claudeMd = generateOrchestratorClaudeMd({
+        mcpHost: config.mcpHost,
+        mcpPort: config.mcpPort,
+        mcpApiKey: config.mcpApiKey,
+        maxRetries: ORCHESTRATOR_MAX_RETRIES,
+        adapterFragment: adapter.buildOrchestratorPromptFragment('de'),
+      })
+      fs.writeFileSync(claudeMdPath, claudeMd, 'utf-8')
+    }
+    // Always update MCP connection file (URL/auth may change between restarts)
+    const mcpUrl = `http://${config.mcpHost}:${config.mcpPort}/mcp`
+    fs.writeFileSync(
+      path.join(orchestratorDir, '.mcp-connection.md'),
+      `# MCP-Verbindung (auto-generiert, nicht editieren)\n\n- **URL:** ${mcpUrl}\n- **Auth:** Bearer ${config.mcpApiKey}\n`,
+      'utf-8',
+    )
 
     // Write .mcp.json into the orchestrator project directory.
     // Claude Code reads this file when starting in the project dir.
-    const mcpUrl = `http://${config.mcpHost}:${config.mcpPort}/mcp`
     const mcpJsonPath = path.join(orchestratorDir, '.mcp.json')
     const mcpJson = {
       mcpServers: {
@@ -876,19 +899,28 @@ export class SessionManager extends EventEmitter {
     const mpoDir = this.resolveMpoDir()
     fs.mkdirSync(mpoDir, { recursive: true })
 
-    // Generate CLAUDE.md with adapter-specific prompt fragment
+    // Generate CLAUDE.md only if it does NOT exist — preserves manual edits
     const adapter = this.adapterRegistry.getDefault()
-    const claudeMd = generateMpoClaudeMd({
-      mcpHost: config.mcpHost,
-      mcpPort: config.mcpPort,
-      mcpApiKey: config.mcpApiKey,
-      maxRetries: MPO_MAX_RETRIES,
-      adapterFragment: adapter.buildMpoPromptFragment('de'),
-    })
-    fs.writeFileSync(path.join(mpoDir, 'CLAUDE.md'), claudeMd, 'utf-8')
+    const claudeMdPath = path.join(mpoDir, 'CLAUDE.md')
+    if (!fs.existsSync(claudeMdPath)) {
+      const claudeMd = generateMpoClaudeMd({
+        mcpHost: config.mcpHost,
+        mcpPort: config.mcpPort,
+        mcpApiKey: config.mcpApiKey,
+        maxRetries: MPO_MAX_RETRIES,
+        adapterFragment: adapter.buildMpoPromptFragment('de'),
+      })
+      fs.writeFileSync(claudeMdPath, claudeMd, 'utf-8')
+    }
+    // Always update MCP connection file (URL/auth may change between restarts)
+    const mcpUrl = `http://${config.mcpHost}:${config.mcpPort}/mcp`
+    fs.writeFileSync(
+      path.join(mpoDir, '.mcp-connection.md'),
+      `# MCP-Verbindung (auto-generiert, nicht editieren)\n\n- **URL:** ${mcpUrl}\n- **Auth:** Bearer ${config.mcpApiKey}\n`,
+      'utf-8',
+    )
 
     // Write .mcp.json for Claude Code MCP auto-discovery
-    const mcpUrl = `http://${config.mcpHost}:${config.mcpPort}/mcp`
     const mcpJsonPath = path.join(mpoDir, '.mcp.json')
     const mcpJson = {
       mcpServers: {
