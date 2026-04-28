@@ -11,7 +11,7 @@ import '../styles/workspaces.css'
 interface InfoSettingsViewProps {
   theme: ThemeName
   onSetTheme: (t: ThemeName) => void
-  initialTab?: TabId
+  initialTab?: string
   onThemeEditorToggle?: (open: boolean) => void
   customThemes?: CustomTheme[]
   activeCustomThemeId?: string | null
@@ -29,7 +29,9 @@ interface LlmConfig {
   ollamaModel: string
 }
 
-type TabId = 'settings' | 'about' | 'shortcuts'
+type TabId = 'general' | 'themes' | 'models' | 'shortcuts' | 'about'
+// Legacy alias for external consumers
+type LegacyTabId = 'settings' | TabId
 
 const SHORTCUT_KEYS = [
   { category: 'global', combo: 'Cmd+B', labelKey: 'info.shortcut.openBugreport' },
@@ -66,7 +68,14 @@ const THEME_TOKEN_GROUPS: Array<{ labelKey: string; tokens: string[] }> = [
 
 export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme, onOpenBugreport }: InfoSettingsViewProps) {
   const { t } = useTranslation()
-  const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'settings')
+  // Map legacy 'settings' tab to 'general', validate tab name
+  const ALL_TABS: TabId[] = ['general', 'themes', 'models', 'shortcuts', 'about']
+  const resolveTab = (t?: string): TabId => {
+    if (t === 'settings') return 'general'
+    if (ALL_TABS.includes(t as TabId)) return t as TabId
+    return 'general'
+  }
+  const [activeTab, setActiveTab] = useState<TabId>(resolveTab(initialTab))
   const [loading, setLoading] = useState(true)
   const [skipPerms, setSkipPerms] = useState(false)
   const [language, setLanguage] = useState<'en' | 'de'>(i18n.language as 'en' | 'de')
@@ -201,16 +210,24 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
     return acc
   }, {})
 
+  const TAB_LABELS: Record<TabId, string> = {
+    general: t('info.tabGeneral', 'General'),
+    themes: t('info.tabThemes', 'Themes'),
+    models: t('info.tabModels', 'Models'),
+    shortcuts: t('info.tabShortcuts'),
+    about: t('info.tabAbout'),
+  }
+
   return (
     <div class="settings-view" data-highlight="popup-info">
       <div class="info-tabs">
-        {(['settings', 'about', 'shortcuts'] as TabId[]).map((tab) => (
+        {(['general', 'themes', 'models', 'shortcuts', 'about'] as TabId[]).map((tab) => (
           <button
             key={tab}
             class={`info-tab ${activeTab === tab ? 'info-tab--active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === 'settings' ? t('info.tabSettings') : tab === 'about' ? t('info.tabAbout') : t('info.tabShortcuts')}
+            {TAB_LABELS[tab]}
           </button>
         ))}
       </div>
@@ -316,7 +333,57 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
         </section>
       )}
 
-      {activeTab === 'settings' && !loading && (
+      {/* ─── General Tab ─────────────────────────────── */}
+      {activeTab === 'general' && !loading && (
+        <section class="settings-section">
+          <div class="settings-section__title">{t('settings.language')}</div>
+          <div class="settings-section__hint">{t('settings.languageHint')}</div>
+          <div class="settings-row" style={{ marginTop: '8px' }}>
+            <select
+              class="input input--sm"
+              value={language}
+              onChange={(e) => handleLanguageChange((e.target as HTMLSelectElement).value as 'en' | 'de')}
+              style={{ width: '160px' }}
+            >
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+            </select>
+          </div>
+
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.agent')}</div>
+          <div class="settings-row" style={{ marginTop: '8px' }}>
+            <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={skipPerms}
+                onChange={async (e) => {
+                  const v = (e.target as HTMLInputElement).checked
+                  setSkipPerms(v)
+                  await api.config.setSkipPermissions(v)
+                }}
+                style={{ marginRight: '8px' }}
+              />
+              <span>{t('settings.skipPermissions')}</span>
+            </label>
+          </div>
+          {skipPerms && (
+            <div class="settings-section__hint" style={{ color: 'var(--color-warning)', marginTop: '6px' }}>
+              {t('settings.skipPermissionsWarning')}
+            </div>
+          )}
+
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.bugreport')}</div>
+          <div class="settings-section__hint">{t('settings.bugreportHint')}</div>
+          <div class="settings-row" style={{ marginTop: '8px' }}>
+            <button class="btn btn--sm btn--primary" onClick={() => onOpenBugreport?.()}>
+              {t('settings.bugreportCreate')}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* ─── Themes Tab ─────────────────────────────── */}
+      {activeTab === 'themes' && !loading && (
         <section class="settings-section">
           <div class="settings-section__title">{t('settings.theme')}</div>
           <div class="settings-section__hint">{t('settings.themeHint')}</div>
@@ -428,45 +495,13 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
               )}
             </div>
           )}
+        </section>
+      )}
 
-          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.language')}</div>
-          <div class="settings-section__hint">{t('settings.languageHint')}</div>
-          <div class="settings-row" style={{ marginTop: '8px' }}>
-            <select
-              class="input input--sm"
-              value={language}
-              onChange={(e) => handleLanguageChange((e.target as HTMLSelectElement).value as 'en' | 'de')}
-              style={{ width: '160px' }}
-            >
-              <option value="en">English</option>
-              <option value="de">Deutsch</option>
-            </select>
-          </div>
-
-          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.agent')}</div>
-          <div class="settings-row" style={{ marginTop: '8px' }}>
-            <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={skipPerms}
-                onChange={async (e) => {
-                  const v = (e.target as HTMLInputElement).checked
-                  setSkipPerms(v)
-                  await api.config.setSkipPermissions(v)
-                }}
-                style={{ marginRight: '8px' }}
-              />
-              <span>{t('settings.skipPermissions')}</span>
-            </label>
-          </div>
-          {skipPerms && (
-            <div class="settings-section__hint" style={{ color: 'var(--color-warning)', marginTop: '6px' }}>
-              {t('settings.skipPermissionsWarning')}
-            </div>
-          )}
-
-          {/* ─── LLM Provider ─────────────────────────────── */}
-          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.llmProvider')}</div>
+      {/* ─── Models Tab ─────────────────────────────── */}
+      {activeTab === 'models' && !loading && (
+        <section class="settings-section">
+          <div class="settings-section__title">{t('settings.llmProvider')}</div>
           <div class="settings-section__hint">{t('settings.llmProviderHint')}</div>
 
           <div class="settings-row" style={{ marginTop: '8px', gap: '8px' }}>
@@ -539,20 +574,6 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
               {llmTestResult.ok ? t('settings.llmConnected') : t('settings.llmConnectionFailed', { error: llmTestResult.error })}
             </div>
           )}
-
-          {/* ─── Bugreport ─────────────────────────────────── */}
-          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.bugreport')}</div>
-          <div class="settings-section__hint">{t('settings.bugreportHint')}</div>
-          <div class="settings-row" style={{ marginTop: '8px' }}>
-            <button class="btn btn--sm btn--primary" onClick={() => onOpenBugreport?.()}>
-              {t('settings.bugreportCreate')}
-            </button>
-          </div>
-
-          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.about')}</div>
-          <div class="settings-section__hint">
-            {t('settings.aboutText', { version: APP_VERSION })}
-          </div>
         </section>
       )}
     </div>
