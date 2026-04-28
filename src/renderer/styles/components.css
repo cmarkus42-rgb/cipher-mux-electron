@@ -971,6 +971,29 @@
   white-space: nowrap;
 }
 
+.voice-pin-btn {
+  cursor: pointer;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 1px 4px;
+  transition: border-color 0.2s;
+}
+
+.voice-pin-btn:hover {
+  border-color: var(--color-border);
+}
+
+.voice-pin-btn--pinned {
+  color: var(--color-accent, var(--color-text));
+  border-color: var(--color-accent, var(--color-border));
+}
+
+.voice-pin-icon {
+  font-size: 8px;
+  margin-right: 2px;
+}
+
 /* 3-state radio group: OFF | STT | COM */
 .voice-radio-group {
   display: inline-flex;

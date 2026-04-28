@@ -2,7 +2,7 @@
  * VoiceControl — 3-state radio selector for voice modes: OFF / STT / COM.
  *
  * Sits in the StatusBar. Three square radio buttons with LED indicator
- * and session target display.
+ * and session target display with optional pin toggle.
  */
 
 import { useTranslation } from 'react-i18next'
@@ -12,6 +12,7 @@ interface VoiceControlProps {
   focusedSessionId: string | null
   focusedSessionName: string | null
   inline?: boolean
+  sessions?: Array<{ id: string; name: string }>
 }
 
 const MODES: VoiceMode[] = ['off', 'stt', 'com']
@@ -21,7 +22,7 @@ const MODE_LABELS: Record<VoiceMode, string> = {
   com: 'COM',
 }
 
-export function VoiceControl({ focusedSessionId, focusedSessionName, inline }: VoiceControlProps) {
+export function VoiceControl({ focusedSessionId, focusedSessionName, inline, sessions }: VoiceControlProps) {
   const { t } = useTranslation()
   const {
     mode,
@@ -31,6 +32,9 @@ export function VoiceControl({ focusedSessionId, focusedSessionName, inline }: V
     toast,
     error,
     switchMode,
+    pinned,
+    pinnedSessionId,
+    togglePin,
   } = useVoiceSession(focusedSessionId, focusedSessionName)
 
   const ledClass = recording
@@ -40,6 +44,13 @@ export function VoiceControl({ focusedSessionId, focusedSessionName, inline }: V
       : active
         ? 'voice-led voice-led--ready'
         : 'voice-led voice-led--off'
+
+  // Resolve display name for the pinned session
+  const pinnedSessionName = pinned && pinnedSessionId && sessions
+    ? sessions.find(s => s.id === pinnedSessionId)?.name ?? pinnedSessionId
+    : null
+
+  const targetName = pinned ? pinnedSessionName : focusedSessionName
 
   return (
     <div class={`voice-pill${active ? ' voice-pill--active' : ''}${inline ? ' voice-pill--inline' : ''}`}>
@@ -72,9 +83,22 @@ export function VoiceControl({ focusedSessionId, focusedSessionName, inline }: V
       </div>
       <span class={ledClass} />
 
-      {/* Session target hint (STT mode, inline) */}
-      {inline && active && focusedSessionName && mode === 'stt' && (
-        <span class="voice-pill__target">{focusedSessionName}</span>
+      {/* Session target with pin toggle (STT mode, inline) */}
+      {inline && active && targetName && mode === 'stt' && (
+        <button
+          class={`voice-pill__target voice-pin-btn${pinned ? ' voice-pin-btn--pinned' : ''}`}
+          onClick={() => {
+            if (pinned && pinnedSessionId) {
+              togglePin(pinnedSessionId)
+            } else if (focusedSessionId) {
+              togglePin(focusedSessionId)
+            }
+          }}
+          title={pinned ? 'Unpin (return to focus-following)' : 'Pin voice to this session'}
+        >
+          <span class="voice-pin-icon">{pinned ? '📌' : '🎯'}</span>
+          {targetName}
+        </button>
       )}
 
       {/* COM mode indicator */}
