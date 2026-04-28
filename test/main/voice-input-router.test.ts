@@ -104,4 +104,46 @@ describe('VoiceInputRouter', () => {
     assert.equal(sentKeys.length, 1)
     assert.equal(sentKeys[0].keys, 'hello world ')
   })
+
+  it('routes to pinned session instead of focused', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    // Add a third active session for pinning
+    sessions.set('sess-3', { id: 'sess-3', name: 'pinned-project', status: 'active' })
+    router.pinToSession('sess-3')
+    await router.routeTranscription('goes to pinned')
+    assert.equal(sentKeys.length, 1)
+    assert.equal(sentKeys[0].sessionId, 'sess-3')
+  })
+
+  it('returns to focus-following after unpin', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    sessions.set('sess-3', { id: 'sess-3', name: 'pinned-project', status: 'active' })
+    router.pinToSession('sess-3')
+    router.unpinSession()
+    await router.routeTranscription('goes to focused')
+    assert.equal(sentKeys.length, 1)
+    assert.equal(sentKeys[0].sessionId, 'sess-1')
+  })
+
+  it('togglePin unpins when already pinned to same session', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    sessions.set('sess-3', { id: 'sess-3', name: 'pinned-project', status: 'active' })
+    router.togglePin('sess-3')
+    assert.equal(router.isPinned(), true)
+    router.togglePin('sess-3')
+    assert.equal(router.isPinned(), false)
+  })
+
+  it('getActiveSessionId returns pinned > focused', () => {
+    router.setFocusedSession('sess-1')
+    assert.equal(router.getActiveSessionId(), 'sess-1')
+    sessions.set('sess-3', { id: 'sess-3', name: 'pinned-project', status: 'active' })
+    router.pinToSession('sess-3')
+    assert.equal(router.getActiveSessionId(), 'sess-3')
+    router.unpinSession()
+    assert.equal(router.getActiveSessionId(), 'sess-1')
+  })
 })

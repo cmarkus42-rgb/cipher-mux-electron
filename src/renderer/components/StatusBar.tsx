@@ -24,6 +24,7 @@ interface StatusBarProps {
   gridRows: number
   focusedSessionId: string | null
   focusedSessionName: string | null
+  sessions?: Array<{ id: string; name: string }>
   onToggleTheme: () => void
   onToggleWorkspaces: () => void
   onInfo: () => void
@@ -33,7 +34,7 @@ interface StatusBarProps {
 
 export function StatusBar({
   theme, sidebarVisible, onToggleSidebar,
-  gridCols, gridRows, focusedSessionId, focusedSessionName,
+  gridCols, gridRows, focusedSessionId, focusedSessionName, sessions,
   onToggleTheme, onInfo, onThemeSettings,
   onGridResize, workspacesPopupVisible, onToggleWorkspaces,
 }: StatusBarProps) {
@@ -45,6 +46,7 @@ export function StatusBar({
           <VoiceControl
             focusedSessionId={focusedSessionId}
             focusedSessionName={focusedSessionName}
+            sessions={sessions}
             inline
           />
         </span>

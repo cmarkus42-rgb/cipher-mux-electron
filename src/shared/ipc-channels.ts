@@ -106,6 +106,9 @@ export const IPC = {
   VOICE_SESSION_TARGET: 'cipher-mux:voice:session-target',
   VOICE_DISPATCHED: 'cipher-mux:voice:dispatched',
   VOICE_COM_STATE: 'cipher-mux:voice:com-state',
+  VOICE_PIN: 'cipher-mux:voice:pin',
+  VOICE_PIN_STATUS: 'cipher-mux:voice:pin-status',
+  VOICE_ACTIVE_SESSION: 'cipher-mux:voice:active-session',
 
   // Personas
   PERSONAS_LIST: 'cipher-mux:personas:list',

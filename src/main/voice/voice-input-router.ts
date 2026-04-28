@@ -1,12 +1,12 @@
 /**
  * VoiceInputRouter — routes transcribed text to sessions.
  *
- * Two routing modes:
+ * Routing priority:
  *   1. Voice-Relay mode: When the voice-relay entity is running, all
  *      transcriptions go there (with auto-Enter, since it's a conversation).
- *   2. Session mode: transcriptions go to the focused session as keystrokes.
- *      User submits via "abschicken" voice command.
- *   3. Off: transcriptions are silently discarded.
+ *   2. Pinned session: If a session is pinned, text goes there regardless of focus.
+ *   3. Focused session: text goes to the focused grid session as keystrokes.
+ *   4. Off: transcriptions are silently discarded.
  *
  * Voice commands (session mode only):
  *   "abschicken" / "absenden" / "senden" / "enter" / "send" → sends Enter
@@ -35,6 +35,7 @@ function stripPunctuation(text: string): string {
 export class VoiceInputRouter extends EventEmitter {
   private mode: 'session' | 'off' = 'off'
   private focusedSessionId: string | null = null
+  private pinnedSessionId: string | null = null
   private readonly sessionManager: SessionManager
 
   constructor(deps: VoiceInputRouterDeps) {
@@ -52,6 +53,45 @@ export class VoiceInputRouter extends EventEmitter {
 
   setFocusedSession(sessionId: string | null): void {
     this.focusedSessionId = sessionId
+    this.emit('activeSessionChanged', this.getActiveSessionId())
+  }
+
+  /** Pin STT to a specific session (overrides focus-following). */
+  pinToSession(sessionId: string): void {
+    this.pinnedSessionId = sessionId
+    this.emit('pinChanged', { pinned: true, sessionId })
+    this.emit('activeSessionChanged', this.getActiveSessionId())
+  }
+
+  /** Remove session pin (return to focus-following). */
+  unpinSession(): void {
+    this.pinnedSessionId = null
+    this.emit('pinChanged', { pinned: false, sessionId: null })
+    this.emit('activeSessionChanged', this.getActiveSessionId())
+  }
+
+  /** Toggle pin for a session. If already pinned to this session, unpin. */
+  togglePin(sessionId: string): void {
+    if (this.pinnedSessionId === sessionId) {
+      this.unpinSession()
+    } else {
+      this.pinToSession(sessionId)
+    }
+  }
+
+  /** Get the session ID that currently receives voice input (pin > focus). */
+  getActiveSessionId(): string | null {
+    return this.pinnedSessionId ?? this.focusedSessionId
+  }
+
+  /** Whether a session is currently pinned. */
+  isPinned(): boolean {
+    return this.pinnedSessionId !== null
+  }
+
+  /** Get the pinned session ID (null if not pinned). */
+  getPinnedSessionId(): string | null {
+    return this.pinnedSessionId
   }
 
   /**
@@ -63,7 +103,8 @@ export class VoiceInputRouter extends EventEmitter {
   }
 
   async routeTranscription(text: string): Promise<void> {
-    console.log('[VoiceRouter] routeTranscription — mode:', this.mode, 'session:', this.focusedSessionId, 'text:', JSON.stringify(text?.slice(0, 80)))
+    const targetId = this.getActiveSessionId()
+    console.log('[VoiceRouter] routeTranscription — mode:', this.mode, 'target:', targetId, 'pinned:', this.pinnedSessionId, 'text:', JSON.stringify(text?.slice(0, 80)))
     if (this.mode === 'off') return
 
     const trimmed = text.trim()
@@ -78,8 +119,8 @@ export class VoiceInputRouter extends EventEmitter {
       }
     }
 
-    // Fallback: route to focused session (existing behavior)
-    return this.routeToFocusedSession(trimmed)
+    // Route to pinned session or focused session
+    return this.routeToSession(trimmed)
   }
 
   /**
@@ -105,17 +146,18 @@ export class VoiceInputRouter extends EventEmitter {
   }
 
   /**
-   * Route transcription to the focused session (existing behavior).
+   * Route transcription to the active session (pinned or focused).
    * Text is sent without Enter — user submits via voice command.
    */
-  private async routeToFocusedSession(text: string): Promise<void> {
-    if (!this.focusedSessionId) {
-      console.log('[VoiceRouter] ERROR: no focused session')
+  private async routeToSession(text: string): Promise<void> {
+    const targetId = this.getActiveSessionId()
+    if (!targetId) {
+      console.log('[VoiceRouter] ERROR: no target session')
       this.emit('error', { code: 'no-session', message: 'No session focused — click a session first' })
       return
     }
 
-    const session = this.sessionManager.get(this.focusedSessionId)
+    const session = this.sessionManager.get(targetId)
 
     if (session && session.status !== 'active') {
       console.log('[VoiceRouter] ERROR: session inactive:', session.name, session.status)
@@ -133,19 +175,19 @@ export class VoiceInputRouter extends EventEmitter {
     try {
       if (command) {
         console.log('[VoiceRouter] voice command:', command.label)
-        await this.sessionManager.sendKeys(this.focusedSessionId, command.keys)
+        await this.sessionManager.sendKeys(targetId, command.keys)
         this.emit('dispatched', {
-          sessionId: this.focusedSessionId,
-          sessionName: session?.name ?? this.focusedSessionId,
+          sessionId: targetId,
+          sessionName: session?.name ?? targetId,
           text: `[${command.label}]`,
         })
       } else {
-        // Send text WITHOUT Enter �� user submits via "abschicken" voice command
-        console.log('[VoiceRouter] sendKeys to', this.focusedSessionId, ':', JSON.stringify(text.slice(0, 60)))
-        await this.sessionManager.sendKeys(this.focusedSessionId, text.trimEnd() + ' ')
+        // Send text WITHOUT Enter — user submits via "abschicken" voice command
+        console.log('[VoiceRouter] sendKeys to', targetId, ':', JSON.stringify(text.slice(0, 60)))
+        await this.sessionManager.sendKeys(targetId, text.trimEnd() + ' ')
         this.emit('dispatched', {
-          sessionId: this.focusedSessionId,
-          sessionName: session?.name ?? this.focusedSessionId,
+          sessionId: targetId,
+          sessionName: session?.name ?? targetId,
           text,
         })
       }

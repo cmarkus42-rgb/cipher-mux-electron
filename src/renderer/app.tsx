@@ -803,6 +803,7 @@ export function App() {
         gridRows={grid.config.rows}
         focusedSessionId={focusedSessionId}
         focusedSessionName={focusedSessionName}
+        sessions={sessions}
         onToggleTheme={toggleTheme}
         onToggleWorkspaces={handleToggleWorkspaces}
         onInfo={() => { setInfoInitialTab(undefined); setInfoVisible(true) }}

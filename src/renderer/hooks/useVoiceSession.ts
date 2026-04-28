@@ -26,6 +26,9 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
   const [comState, setComState] = useState('idle')
   const [toast, setToast] = useState<Toast | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [pinned, setPinned] = useState(false)
+  const [pinnedSessionId, setPinnedSessionId] = useState<string | null>(null)
+  const [activeVoiceSessionId, setActiveVoiceSessionId] = useState<string | null>(null)
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const vadRef = useRef<MicVADInstance | null>(null)
@@ -198,6 +201,19 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
       setComState(state)
     }))
 
+    if (api.voice.onPinStatus) {
+      unsubs.push(api.voice.onPinStatus((data: { pinned: boolean; sessionId: string | null }) => {
+        setPinned(data.pinned)
+        setPinnedSessionId(data.sessionId)
+      }))
+    }
+
+    if (api.voice.onActiveSession) {
+      unsubs.push(api.voice.onActiveSession((data: { sessionId: string | null }) => {
+        setActiveVoiceSessionId(data.sessionId)
+      }))
+    }
+
     return () => unsubs.forEach(fn => fn())
   }, [active, showToast])
 
@@ -232,6 +248,11 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
     }
   }, [active])
 
+  const togglePin = useCallback((sessionId: string) => {
+    const api = (window as any).cipherMux
+    api.voice.pinSession?.(sessionId)
+  }, [])
+
   return {
     mode,
     active,
@@ -243,5 +264,9 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
     error,
     toggle,
     switchMode,
+    pinned,
+    pinnedSessionId,
+    activeVoiceSessionId,
+    togglePin,
   }
 }
