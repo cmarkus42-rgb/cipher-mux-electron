@@ -1011,6 +1011,9 @@ export class IpcHub {
         inputRouter.on('activeSessionChanged', (sessionId: string | null) => {
           this.windowManager.sendToMainWindow(IPC.VOICE_ACTIVE_SESSION, { sessionId })
         })
+        inputRouter.on('notesInsert', (text: string) => {
+          this.windowManager.sendToMainWindow(IPC.VOICE_NOTES_INSERT, { text: text.trimEnd() + ' ' })
+        })
         console.log('[Voice] VOICE_START_SESSION => ok')
         return { ok: true }
       } catch (err) {
@@ -1153,6 +1156,10 @@ export class IpcHub {
       this.windowManager.sendToMainWindow(IPC.VOICE_ACTIVE_SESSION, {
         sessionId: router.getActiveSessionId(),
       })
+    })
+
+    ipcMain.on(IPC.VOICE_NOTES_FOCUS, (_event, { focused }: { focused: boolean }) => {
+      this.voiceManager?.getInputRouter()?.setNotesEditorFocused(focused)
     })
   }
 

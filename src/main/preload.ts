@@ -413,6 +413,13 @@ const api = {
       ipcRenderer.on(IPC.VOICE_ACTIVE_SESSION, handler)
       return () => ipcRenderer.removeListener(IPC.VOICE_ACTIVE_SESSION, handler)
     },
+    setNotesFocus: (focused: boolean) =>
+      ipcRenderer.send(IPC.VOICE_NOTES_FOCUS, { focused }),
+    onNotesInsert: (cb: (data: { text: string }) => void) => {
+      const handler = (_e: unknown, data: { text: string }) => cb(data)
+      ipcRenderer.on(IPC.VOICE_NOTES_INSERT, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_NOTES_INSERT, handler)
+    },
   },
 
   // ─── UI Control (Companion Demo Mode) ────────────────────

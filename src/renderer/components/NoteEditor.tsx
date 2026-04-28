@@ -206,5 +206,38 @@ export function NoteEditor({ content, onSave, onAutoSave }: NoteEditorProps) {
     return () => el.removeEventListener('keydown', onKeyDown, true)
   }, [])
 
+  // Voice STT: notify main when editor gains/loses focus
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const api = (window as any).cipherMux
+
+    const onFocusIn = () => api?.voice?.setNotesFocus?.(true)
+    const onFocusOut = () => api?.voice?.setNotesFocus?.(false)
+
+    el.addEventListener('focusin', onFocusIn)
+    el.addEventListener('focusout', onFocusOut)
+    return () => {
+      el.removeEventListener('focusin', onFocusIn)
+      el.removeEventListener('focusout', onFocusOut)
+      // Ensure we clear notes focus on unmount
+      api?.voice?.setNotesFocus?.(false)
+    }
+  }, [])
+
+  // Voice STT: insert transcribed text at cursor
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.voice?.onNotesInsert) return
+
+    const unsub = api.voice.onNotesInsert((data: { text: string }) => {
+      const view = viewRef.current
+      if (!view) return
+      const cursor = view.state.selection.main.head
+      view.dispatch({ changes: { from: cursor, insert: data.text } })
+    })
+    return () => unsub()
+  }, [])
+
   return <div ref={containerRef} class="note-editor" style={{ height: '100%', overflow: 'hidden' }} />
 }
