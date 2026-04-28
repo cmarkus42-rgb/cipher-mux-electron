@@ -245,30 +245,36 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
     const isBrandNew = !alreadyCaptured && sessionAge < RECOVERED_THRESHOLD_MS
     capturedSessions.add(sessionId)
 
+    // Restore pane content: fit first so tmux has the correct cols/rows,
+    // wait for layout to settle, then capture-pane at the right dimensions.
+    // Uses a two-phase approach: fit at 300ms, capture at 600ms (H.9 fix).
     const restoreTimer = isBrandNew
       ? null
       : setTimeout(() => {
-          api().terminal.capture(sessionId).then((content: string) => {
-            if (content?.trim() && term) {
-              term.reset()
-              term.write(content.replace(/\n/g, '\r\n'), () => {
-                term.scrollToBottom()
-                // Double-fit after restore: immediate + rAF follow-up (T-LC.7).
-                // fitAndSync includes visibility-gate and tmux resize sync.
+          // Phase 1: ensure terminal is at final container size
+          fitAndSync()
+          // Phase 2: capture after tmux has processed the resize
+          setTimeout(() => {
+            api().terminal.capture(sessionId).then((content: string) => {
+              if (content?.trim() && term) {
+                term.reset()
+                term.write(content.replace(/\n/g, '\r\n'), () => {
+                  term.scrollToBottom()
+                  try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
+                  // Final fit to catch any dimension drift
+                  fitAndSync()
+                  requestAnimationFrame(() => fitAndSync())
+                })
+              } else {
                 try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
                 fitAndSync()
                 requestAnimationFrame(() => fitAndSync())
-              })
-            } else {
-              // Even with no content, trigger refresh so the cursor renders
-              try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
-              fitAndSync()
-              requestAnimationFrame(() => fitAndSync())
-            }
-          }).catch(() => {
-            // session may not be ready yet
-          })
-        }, 500)
+              }
+            }).catch(() => {
+              // session may not be ready yet
+            })
+          }, 300)
+        }, 300)
 
     // Send user input to main process
     const inputDisposable = term.onData((data: string) => {
