@@ -1,5 +1,5 @@
 // src/renderer/components/SessionGrid.tsx
-import { useState, useCallback } from 'preact/hooks'
+import { useCallback, useRef } from 'preact/hooks'
 import type { SessionInfo, ContextUsage, EntityId } from '../../shared/types'
 import { computeGridStyle } from '../../shared/grid-types'
 import type { GridState, ThemeName } from '../../shared/grid-types'
@@ -60,23 +60,32 @@ export function SessionGrid({
   onStartEntity, onFocusEntity, onStartPath,
   onOpenNotes, onOpenNote, onCloseNotes, onToggleExpandSlot, onSwap,
 }: SessionGridProps) {
-  const [dragSourceIdx, setDragSourceIdx] = useState<number | null>(null)
+  // Use a ref instead of state to avoid stale-closure race: the drop event
+  // can fire before Preact completes the re-render triggered by setDragSourceIdx,
+  // causing the old handleDrop closure (with null) to execute instead of the swap.
+  const dragSourceRef = useRef<number | null>(null)
   const { cols, rows } = grid.config
 
   const handleDragStart = useCallback((slotIdx: number) => {
-    setDragSourceIdx(slotIdx)
+    dragSourceRef.current = slotIdx
   }, [])
 
   const handleDragOver = useCallback((e: DragEvent) => {
     e.preventDefault()
   }, [])
 
-  const handleDrop = useCallback((targetIdx: number) => {
-    if (dragSourceIdx !== null && dragSourceIdx !== targetIdx) {
-      onSwap(dragSourceIdx, targetIdx)
+  const handleDrop = useCallback((targetIdx: number, e: DragEvent) => {
+    e.preventDefault()
+    const sourceIdx = dragSourceRef.current
+    if (sourceIdx !== null && sourceIdx !== targetIdx) {
+      onSwap(sourceIdx, targetIdx)
     }
-    setDragSourceIdx(null)
-  }, [dragSourceIdx, onSwap])
+    dragSourceRef.current = null
+  }, [onSwap])
+
+  const handleDragEnd = useCallback(() => {
+    dragSourceRef.current = null
+  }, [])
 
   const gridStyle = computeGridStyle(cols, rows)
 
@@ -84,7 +93,7 @@ export function SessionGrid({
 
   return (
     <div class="session-grid-area">
-      <div class="session-grid" style={gridStyle}>
+      <div class="session-grid" style={gridStyle} onDragEnd={handleDragEnd}>
         {grid.slots.map((slot, idx) => {
           // Skip cells covered by a rowSpan above
           if (covered.has(idx)) return null
@@ -103,7 +112,7 @@ export function SessionGrid({
                 onToggleExpand={() => onToggleExpandSlot(idx)}
                 onDragStart={() => handleDragStart(idx)}
                 onDragOver={handleDragOver}
-                onDrop={() => handleDrop(idx)}
+                onDrop={(e: DragEvent) => handleDrop(idx, e)}
               />
             )
           }
@@ -135,7 +144,7 @@ export function SessionGrid({
                 onSendToBackground={onSendToBackground}
                 onDragStart={() => handleDragStart(idx)}
                 onDragOver={handleDragOver}
-                onDrop={() => handleDrop(idx)}
+                onDrop={(e: DragEvent) => handleDrop(idx, e)}
               />
             )
           }
@@ -154,7 +163,7 @@ export function SessionGrid({
               entityStatus={entityStatus}
               activeWorkspaceId={activeWorkspaceId}
               onDragOver={handleDragOver}
-              onDrop={() => handleDrop(idx)}
+              onDrop={(e: DragEvent) => handleDrop(idx, e)}
             />
           )
         })}
