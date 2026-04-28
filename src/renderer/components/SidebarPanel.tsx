@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import { useMessages } from '../hooks/useMessages'
 import { useInputRequests } from '../hooks/useInputRequests'
 import { useNotes } from '../hooks/useNotes'
+import { NotesTreeView } from './NotesTreeView'
 import { CompanionMemoryView } from './CompanionMemoryView'
 import { useTranslation } from 'react-i18next'
 
@@ -129,18 +130,6 @@ export function SidebarPanel({
     setOrphans(prev => prev.filter(o => o.tmuxSession !== tmuxSession))
   }, [])
 
-  // Filter notes
-  const filteredNotes = notes.filter(n => {
-    if (tagFilter.length > 0 && !tagFilter.every(t => n.tags.includes(t))) return false
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase()
-      return n.title.toLowerCase().includes(q) || n.tags.some(t => t.includes(q))
-    }
-    return true
-  })
-
-  const availableTags = [...new Set(notes.flatMap(n => n.tags))].sort()
-
   const handleNoteDoubleClick = useCallback((note: any) => {
     if (onOpenNoteInGrid) {
       onOpenNoteInGrid(note)
@@ -156,8 +145,8 @@ export function SidebarPanel({
     await deleteNote(note.id)
   }, [deleteNote])
 
-  const toggleTag = useCallback((tag: string) => {
-    setTagFilter(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
+  const handleNoteDragStart = useCallback((note: any, e: DragEvent) => {
+    e.dataTransfer?.setData('text/plain', JSON.stringify(note))
   }, [])
 
   const backgroundSessions = sessions.filter(
@@ -198,57 +187,16 @@ export function SidebarPanel({
         </div>
         {!collapsed.notes && (
           <div class="sidebar-section__feed sidebar-section__feed--flex">
-            {/* Search */}
-            <input
-              type="text"
-              class="sidebar-notes__search"
-              placeholder={t('sidebar.notesSearch')}
-              value={searchTerm}
-              onInput={(e) => setSearchTerm((e.target as HTMLInputElement).value)}
+            <NotesTreeView
+              notes={notes}
+              searchTerm={searchTerm}
+              tagFilter={tagFilter}
+              onSearchChange={setSearchTerm}
+              onTagFilterChange={setTagFilter}
+              onNoteDoubleClick={handleNoteDoubleClick}
+              onNoteDelete={handleNoteDelete}
+              onNoteDragStart={handleNoteDragStart}
             />
-            {/* Tag chips */}
-            {availableTags.length > 0 && (
-              <div class="sidebar-notes__tags">
-                {availableTags.map(tag => (
-                  <span
-                    key={tag}
-                    class={`sidebar-notes__tag ${tagFilter.includes(tag) ? 'sidebar-notes__tag--active' : ''}`}
-                    onClick={() => toggleTag(tag)}
-                  >#{tag}</span>
-                ))}
-              </div>
-            )}
-            {/* Note list */}
-            {filteredNotes.map(note => (
-              <div
-                key={note.id}
-                class="bg-card"
-                onDblClick={() => handleNoteDoubleClick(note)}
-                title={t('sidebar.noteDoubleClick')}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer?.setData('text/plain', JSON.stringify(note))
-                }}
-              >
-                <div class="bg-card__head">
-                  <span class="bg-card__name">{note.title && note.title !== 'Untitled' ? note.title : t('notesCell.untitled')}</span>
-                  <button
-                    class="bg-card__delete"
-                    onClick={(e) => handleNoteDelete(note, e)}
-                    title={t('sidebar.noteDelete')}
-                  >✕</button>
-                </div>
-                <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)' }}>
-                  {note.tags.map(t => `#${t}`).join(' ')}
-                </div>
-                <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)', opacity: 0.5 }}>
-                  {note.modifiedAt ? new Date(note.modifiedAt).toLocaleDateString() : ''}
-                </div>
-              </div>
-            ))}
-            {filteredNotes.length === 0 && (
-              <div class="sidebar-panel__empty" style={{ padding: 'var(--space-sm)' }}>{t('sidebar.noNotes')}</div>
-            )}
           </div>
         )}
       </section>
