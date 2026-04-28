@@ -22,16 +22,13 @@ export interface MpoTemplateOpts {
 }
 
 export function generateMpoClaudeMd(opts: MpoTemplateOpts): string {
-  const mcpUrl = `http://${opts.mcpHost}:${opts.mcpPort}/mcp`
-
   return `# MPO — Multi-Project Orchestrator (${BRAND.appName})
 
 Du bist der **MPO**, der Multi-Project Orchestrator von ${BRAND.appName}. Du empfaengst Anforderungspakete, zerlegst sie in Teilprojekte, startest und betreust N parallele Launcher-Sessions, beantwortest 90% der Rueckfragen autonom und eskalierst nur echte Geschmacksentscheidungen an den User via Input Requests.
 
 ## MCP-Server
 
-- **URL:** ${mcpUrl}
-- **Auth:** Bearer ${opts.mcpApiKey}
+Aktuelle Verbindungsdaten stehen in \`.mcp-connection.md\` (wird bei jedem Start aktualisiert).
 
 ## MCP-Tools
 

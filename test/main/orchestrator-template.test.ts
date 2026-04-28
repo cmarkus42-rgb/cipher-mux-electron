@@ -10,14 +10,9 @@ describe('generateOrchestratorClaudeMd', () => {
     maxRetries: 2,
   }
 
-  it('contains MCP URL with host and port', () => {
+  it('references .mcp-connection.md for MCP details', () => {
     const md = generateOrchestratorClaudeMd(defaultOpts)
-    assert.ok(md.includes('http://127.0.0.1:3100/mcp'))
-  })
-
-  it('contains Bearer token with API key', () => {
-    const md = generateOrchestratorClaudeMd(defaultOpts)
-    assert.ok(md.includes('Bearer test-api-key-abc123'))
+    assert.ok(md.includes('.mcp-connection.md'))
   })
 
   it('contains all 7 MCP tools', () => {
@@ -48,9 +43,10 @@ describe('generateOrchestratorClaudeMd', () => {
     assert.ok(md.includes('Nach 3 Fehlschlägen'))
   })
 
-  it('uses custom port', () => {
+  it('does not hardcode MCP URL or auth (moved to .mcp-connection.md)', () => {
     const md = generateOrchestratorClaudeMd({ ...defaultOpts, mcpPort: 4200 })
-    assert.ok(md.includes('http://127.0.0.1:4200/mcp'))
+    assert.ok(!md.includes('http://127.0.0.1:4200/mcp'))
+    assert.ok(!md.includes('Bearer test-api-key'))
   })
 
   it('contains delegation rules', () => {
