@@ -197,5 +197,23 @@ export function useGrid(panelWidth = 0) {
     api().window.fitGrid(state.config.cols, state.config.rows, panelWidthRef.current).catch(() => {})
   }, [persist])
 
-  return { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot, restoreGrid }
+  /** RT-X1 fix: clear slots that reference sessions not in the given set. Resets rowSpan to 1. */
+  const cleanupDeadSessions = useCallback((activeSessionIds: Set<string>) => {
+    setGrid((prev) => {
+      let changed = false
+      const newSlots = prev.slots.map((slot) => {
+        if (slot.sessionId && !activeSessionIds.has(slot.sessionId)) {
+          changed = true
+          return { ...slot, sessionId: null, rowSpan: 1 }
+        }
+        return slot
+      })
+      if (!changed) return prev
+      const next = { ...prev, slots: newSlots }
+      persist(next)
+      return next
+    })
+  }, [persist])
+
+  return { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot, restoreGrid, cleanupDeadSessions }
 }

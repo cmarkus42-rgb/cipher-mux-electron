@@ -40,7 +40,10 @@ export function App() {
   // Uses entityId (known BEFORE the await) instead of sessionId (known only AFTER) — this
   // closes the race window where the IPC event arrives before the await resolves (RT-X2).
   const inFlightEntityStarts = useRef(new Set<string>())
-  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot, restoreGrid } = useGrid(panelWidthRef.current)
+  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot, restoreGrid, cleanupDeadSessions } = useGrid(panelWidthRef.current)
+  // Always-current grid ref for placeEntity to check against (avoids stale closure in event handlers)
+  const gridRef = useRef(grid)
+  gridRef.current = grid
   const { theme, setTheme, toggleTheme, customThemes, activeCustomThemeId, selectCustomTheme, saveCustomTheme, deleteCustomTheme } = useTheme()
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
   const [voiceComState, setVoiceComState] = useState('idle')
@@ -111,6 +114,18 @@ export function App() {
   const [voiceRelaySessionId, setVoiceRelaySessionId] = useState<string | null>(null)
   const [auditSessionId, setAuditSessionId] = useState<string | null>(null)
 
+  // RT-X1 fix: after initial session list load, clean up grid slots referencing dead sessions.
+  // Runs once after a short delay to let recovery/restore complete first.
+  const sessionsRef = useRef(sessions)
+  sessionsRef.current = sessions
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const activeIds = new Set(sessionsRef.current.map(s => s.id))
+      cleanupDeadSessions(activeIds)
+    }, 3000) // Wait 3s for recovery dialog and session restore to complete
+    return () => clearTimeout(timer)
+  }, [cleanupDeadSessions])
+
   const gridSessionIds = grid.slots.filter(s => s.sessionId).map(s => s.sessionId!)
 
   const sidebarHasContent = !!orchestratorSessionId || !!mpoSessionId ||
@@ -150,6 +165,9 @@ export function App() {
   }, [addSession, grid.slots])
 
   const placeEntity = useCallback((sessionId: string) => {
+    // RT-X2 fix: check current grid state via ref (not stale closure).
+    // If session was already placed by handleStartEntity, skip the popup.
+    if (gridRef.current.slots.some(s => s.sessionId === sessionId)) return
     setPlacementPopup({ sessionId })
   }, [])
 
@@ -162,7 +180,10 @@ export function App() {
       if (s.running && s.sessionId) placeOrchestrator(s.sessionId)
     })
     const unsub = api.orchestrator.onStarted((data: any) => {
-      if (inFlightEntityStarts.current.has('orchestrator')) return
+      if (inFlightEntityStarts.current.has('orchestrator')) {
+        inFlightEntityStarts.current.delete('orchestrator')
+        return
+      }
       const sid = data?.sessionId ?? data?.id
       if (sid) placeOrchestrator(sid)
     })
@@ -178,7 +199,10 @@ export function App() {
       if (s.running && s.sessionId) placeMpo(s.sessionId)
     })
     const unsub = api.mpo.onStarted((data: any) => {
-      if (inFlightEntityStarts.current.has('mpo')) return
+      if (inFlightEntityStarts.current.has('mpo')) {
+        inFlightEntityStarts.current.delete('mpo')
+        return
+      }
       const sid = data?.sessionId ?? data?.id
       if (sid) placeMpo(sid)
     })
@@ -472,37 +496,43 @@ export function App() {
     // Mark entity as in-flight BEFORE the await — closes the race window where
     // the onStarted IPC event arrives before the await resolves (RT-X2 fix).
     inFlightEntityStarts.current.add(entityId)
-    if (entityId === 'orchestrator') {
-      const session = await api.orchestrator.start()
-      const sid = session?.sessionId ?? session?.id
+    try {
+      if (entityId === 'orchestrator') {
+        const session = await api.orchestrator.start()
+        const sid = session?.sessionId ?? session?.id
+        if (sid) {
+          setOrchestratorSessionId(sid)
+          setSessionAtSlot(slotIndex, sid)
+          setFocusedSessionId(sid)
+        }
+        return
+      }
+      if (entityId === 'mpo') {
+        const session = await api.mpo.start()
+        const sid = session?.sessionId ?? session?.id
+        if (sid) {
+          setMpoSessionId(sid)
+          setSessionAtSlot(slotIndex, sid)
+          setFocusedSessionId(sid)
+        }
+        return
+      }
+      const session = await api.entity.start(entityId)
+      const sid = session?.id
       if (sid) {
-        setOrchestratorSessionId(sid)
+        switch (entityId) {
+          case 'companion': setCompanionSessionId(sid); break
+          case 'refinement': setRefinementSessionId(sid); break
+          case 'voice-relay': setVoiceRelaySessionId(sid); break
+          case 'audit': setAuditSessionId(sid); break
+        }
         setSessionAtSlot(slotIndex, sid)
         setFocusedSessionId(sid)
       }
-      return
-    }
-    if (entityId === 'mpo') {
-      const session = await api.mpo.start()
-      const sid = session?.sessionId ?? session?.id
-      if (sid) {
-        setMpoSessionId(sid)
-        setSessionAtSlot(slotIndex, sid)
-        setFocusedSessionId(sid)
-      }
-      return
-    }
-    const session = await api.entity.start(entityId)
-    const sid = session?.id
-    if (sid) {
-      switch (entityId) {
-        case 'companion': setCompanionSessionId(sid); break
-        case 'refinement': setRefinementSessionId(sid); break
-        case 'voice-relay': setVoiceRelaySessionId(sid); break
-        case 'audit': setAuditSessionId(sid); break
-      }
-      setSessionAtSlot(slotIndex, sid)
-      setFocusedSessionId(sid)
+    } finally {
+      // RT-X2: always clean up in-flight marker. The event handler may have
+      // already deleted it, but Set.delete is idempotent.
+      inFlightEntityStarts.current.delete(entityId)
     }
   }, [setSessionAtSlot])
 
