@@ -10,8 +10,8 @@ import { registerTools, ToolContext } from './mcp-tools'
 export const SESSION_TIMEOUT_MS = 4 * 60 * 60 * 1000 // 4 hours
 /** How often the GC sweep runs. */
 export const SESSION_GC_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
-/** Maximum concurrent MCP sessions. */
-export const MAX_MCP_SESSIONS = 5
+/** Maximum concurrent MCP sessions (must exceed max grid cells + entities). */
+export const MAX_MCP_SESSIONS = 24
 
 /**
  * Per-client MCP session — each connecting client gets its own
@@ -271,6 +271,7 @@ export class McpServerManager {
       if (isInit) {
         try {
           const session = await this.createSession()
+          session.lastActivity = Date.now()
           res.on('finish', () => { session.lastActivity = Date.now() })
           session.transport.handleRequest(req, res, body)
         } catch (err) {
@@ -382,7 +383,8 @@ export class McpServerManager {
       }
     }
     if (oldest) {
-      console.warn(`[McpServer] session limit (${MAX_MCP_SESSIONS}) reached — evicting oldest session ${oldest.sessionId}`)
+      const idleSeconds = Math.round((Date.now() - oldest.lastActivity) / 1000)
+      console.warn(`[McpServer] session limit (${MAX_MCP_SESSIONS}) reached — evicting session ${oldest.sessionId} (idle ${idleSeconds}s). Active sessions: ${[...this.sessions.keys()].join(', ')}`)
       try {
         await oldest.transport.close()
         await oldest.mcpServer.close()
