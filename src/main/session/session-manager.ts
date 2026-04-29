@@ -34,6 +34,96 @@ function sanitizeTmuxName(name: string): string {
     || 'session'
 }
 
+/** MCP tool permission prefix. */
+const MCP_PREFIX = 'mcp__cipher-mux__'
+
+/**
+ * Return pre-approved MCP tool permissions for a given entity.
+ * Entities WITH a templatePath get permissions from their template's
+ * settings.local.json. This function covers template-less entities only.
+ */
+function getMcpPermissionsForEntity(entityId: EntityId): string[] {
+  switch (entityId) {
+    case 'voice-relay':
+      return [
+        `${MCP_PREFIX}mux_sessions`,
+        `${MCP_PREFIX}mux_status`,
+        `${MCP_PREFIX}mux_read`,
+        `${MCP_PREFIX}mux_send`,
+        `${MCP_PREFIX}mux_context_usage`,
+        `${MCP_PREFIX}mux_create_session`,
+        `${MCP_PREFIX}mux_kill_session`,
+        `${MCP_PREFIX}mux_task_list`,
+        `${MCP_PREFIX}mux_task_get`,
+        `${MCP_PREFIX}mux_notes_create`,
+        `${MCP_PREFIX}mux_notes_list`,
+        `${MCP_PREFIX}mux_notes_search`,
+        `${MCP_PREFIX}mux_notes_read`,
+        `${MCP_PREFIX}mux_grid_resize`,
+        `${MCP_PREFIX}mux_grid_place`,
+        `${MCP_PREFIX}mux_session_focus`,
+        `${MCP_PREFIX}mux_session_eject`,
+        `${MCP_PREFIX}mux_sidebar_toggle`,
+        `${MCP_PREFIX}mux_tts_speak`,
+        `${MCP_PREFIX}mux_ui_open`,
+        `${MCP_PREFIX}mux_ui_highlight`,
+        `${MCP_PREFIX}mux_theme_set`,
+        `${MCP_PREFIX}mux_bugreport_resolve`,
+        `${MCP_PREFIX}companion_memory_write`,
+        `${MCP_PREFIX}companion_memory_recall`,
+        `${MCP_PREFIX}companion_memory_search`,
+        `${MCP_PREFIX}companion_memory_forget`,
+      ]
+    case 'orchestrator':
+    case 'mpo':
+    case 'launcher':
+      return [
+        `${MCP_PREFIX}mux_sessions`,
+        `${MCP_PREFIX}mux_status`,
+        `${MCP_PREFIX}mux_read`,
+        `${MCP_PREFIX}mux_send`,
+        `${MCP_PREFIX}mux_context_usage`,
+        `${MCP_PREFIX}mux_create_session`,
+        `${MCP_PREFIX}mux_kill_session`,
+        `${MCP_PREFIX}mux_task_create`,
+        `${MCP_PREFIX}mux_task_update`,
+        `${MCP_PREFIX}mux_task_list`,
+        `${MCP_PREFIX}mux_task_get`,
+        `${MCP_PREFIX}mux_input_request_create`,
+        `${MCP_PREFIX}mux_notes_create`,
+        `${MCP_PREFIX}mux_notes_list`,
+        `${MCP_PREFIX}mux_notes_search`,
+        `${MCP_PREFIX}mux_notes_read`,
+        `${MCP_PREFIX}mux_notes_update`,
+        `${MCP_PREFIX}mux_notes_delete`,
+        `${MCP_PREFIX}mux_notes_handoff_create`,
+        `${MCP_PREFIX}mux_notes_handoff_search`,
+        `${MCP_PREFIX}mux_bugreport_resolve`,
+        `${MCP_PREFIX}mux_grid_resize`,
+        `${MCP_PREFIX}mux_grid_place`,
+        `${MCP_PREFIX}mux_session_focus`,
+        `${MCP_PREFIX}mux_session_eject`,
+        `${MCP_PREFIX}mux_sidebar_toggle`,
+        `${MCP_PREFIX}mux_tts_speak`,
+        `${MCP_PREFIX}kickoff_complete`,
+        'Bash(tmux:*)',
+      ]
+    case 'audit':
+      return [
+        `${MCP_PREFIX}mux_sessions`,
+        `${MCP_PREFIX}mux_status`,
+        `${MCP_PREFIX}mux_read`,
+        `${MCP_PREFIX}mux_context_usage`,
+        `${MCP_PREFIX}mux_notes_create`,
+        `${MCP_PREFIX}mux_notes_list`,
+        `${MCP_PREFIX}mux_notes_search`,
+        `${MCP_PREFIX}mux_notes_read`,
+      ]
+    default:
+      return []
+  }
+}
+
 /**
  * SessionManager — Registry for cipher-mux sessions.
  *
@@ -614,35 +704,37 @@ export class SessionManager extends EventEmitter {
     // Write CLAUDE.md for entities without asset templates.
     // Each entity gets a role-specific CLAUDE.md so it overrides the global
     // Mimir persona from ~/.claude/CLAUDE.md (fixes B07 persona distribution).
-    // Only write if CLAUDE.md does NOT exist — preserves manual edits.
+    // Code-generated templates (voice-relay, audit) are always refreshed so
+    // updates propagate on next session start. Orchestrator/MPO templates
+    // contain runtime config (MCP host/key) and are also always refreshed.
+    // Only truly generic fallback CLAUDE.md is write-once (preserves manual edits).
     if (!config.templatePath) {
       const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
-      if (!fs.existsSync(claudeMdPath)) {
-        if (config.id === 'orchestrator' && this.mcpConfig) {
-          const adapter = this.adapterRegistry.getDefault()
-          fs.writeFileSync(claudeMdPath, generateOrchestratorClaudeMd({
-            mcpHost: this.mcpConfig.mcpHost,
-            mcpPort: this.mcpConfig.mcpPort,
-            mcpApiKey: this.mcpConfig.mcpApiKey,
-            maxRetries: ORCHESTRATOR_MAX_RETRIES,
-            adapterFragment: adapter.buildOrchestratorPromptFragment('de'),
-          }), 'utf-8')
-        } else if (config.id === 'mpo' && this.mcpConfig) {
-          const adapter = this.adapterRegistry.getDefault()
-          fs.writeFileSync(claudeMdPath, generateMpoClaudeMd({
-            mcpHost: this.mcpConfig.mcpHost,
-            mcpPort: this.mcpConfig.mcpPort,
-            mcpApiKey: this.mcpConfig.mcpApiKey,
-            maxRetries: MPO_MAX_RETRIES,
-            adapterFragment: adapter.buildMpoPromptFragment('de'),
-          }), 'utf-8')
-        } else if (config.id === 'audit') {
-          fs.writeFileSync(claudeMdPath, generateAuditClaudeMd(), 'utf-8')
-        } else if (config.id === 'voice-relay') {
-          fs.writeFileSync(claudeMdPath, generateVoiceRelayClaudeMd(), 'utf-8')
-        } else {
-          fs.writeFileSync(claudeMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')
-        }
+      if (config.id === 'orchestrator' && this.mcpConfig) {
+        const adapter = this.adapterRegistry.getDefault()
+        fs.writeFileSync(claudeMdPath, generateOrchestratorClaudeMd({
+          mcpHost: this.mcpConfig.mcpHost,
+          mcpPort: this.mcpConfig.mcpPort,
+          mcpApiKey: this.mcpConfig.mcpApiKey,
+          maxRetries: ORCHESTRATOR_MAX_RETRIES,
+          adapterFragment: adapter.buildOrchestratorPromptFragment('de'),
+        }), 'utf-8')
+      } else if (config.id === 'mpo' && this.mcpConfig) {
+        const adapter = this.adapterRegistry.getDefault()
+        fs.writeFileSync(claudeMdPath, generateMpoClaudeMd({
+          mcpHost: this.mcpConfig.mcpHost,
+          mcpPort: this.mcpConfig.mcpPort,
+          mcpApiKey: this.mcpConfig.mcpApiKey,
+          maxRetries: MPO_MAX_RETRIES,
+          adapterFragment: adapter.buildMpoPromptFragment('de'),
+        }), 'utf-8')
+      } else if (config.id === 'audit') {
+        fs.writeFileSync(claudeMdPath, generateAuditClaudeMd(), 'utf-8')
+      } else if (config.id === 'voice-relay') {
+        fs.writeFileSync(claudeMdPath, generateVoiceRelayClaudeMd(), 'utf-8')
+      } else if (!fs.existsSync(claudeMdPath)) {
+        // Generic fallback — only write once to preserve manual edits
+        fs.writeFileSync(claudeMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')
       }
       // Always update MCP connection file for entities that use MCP
       if ((config.id === 'orchestrator' || config.id === 'mpo') && this.mcpConfig) {
@@ -652,6 +744,30 @@ export class SessionManager extends EventEmitter {
           `# MCP-Verbindung (auto-generiert, nicht editieren)\n\n- **URL:** ${mcpUrl}\n- **Auth:** Bearer ${this.mcpConfig.mcpApiKey}\n`,
           'utf-8',
         )
+      }
+
+      // Ensure MCP tool permissions for template-less entities that use MCP.
+      // Entities with templates get permissions via ensureTemplateSettings().
+      // Without pre-approved permissions, Claude Code blocks on tool approval
+      // prompts — fatal for non-interactive sessions like voice-relay.
+      if (config.features.includes('mcp') && this.mcpConfig) {
+        const claudeDir = path.join(config.projectPath, '.claude')
+        const settingsPath = path.join(claudeDir, 'settings.local.json')
+        fs.mkdirSync(claudeDir, { recursive: true })
+
+        let settings: Record<string, unknown> = {}
+        try {
+          settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
+        } catch { /* doesn't exist yet */ }
+
+        // Only inject permissions if none are set (don't override user customization)
+        if (!settings.permissions) {
+          const mcpPerms = getMcpPermissionsForEntity(config.id)
+          if (mcpPerms.length > 0) {
+            settings.permissions = { allow: mcpPerms }
+            fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
+          }
+        }
       }
     }
 
