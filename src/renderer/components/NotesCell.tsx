@@ -81,7 +81,8 @@ export function NotesCell({
         try {
           const parser = getParser()
           // Reconstruct raw markdown for parser (body already has no frontmatter)
-          const rawForParser = require('gray-matter').stringify('\n' + result.body, result.info)
+          const fmForParser = { ...result.info, type: result.info.noteType }
+          const rawForParser = require('gray-matter').stringify('\n' + result.body, fmForParser)
           testcase = parser.parseTestcase(rawForParser) ?? undefined
         } catch { /* not a valid testcase, open as regular note */ }
       }
