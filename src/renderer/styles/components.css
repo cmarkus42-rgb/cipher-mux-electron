@@ -2601,11 +2601,33 @@
 }
 
 .unified-dialog__card--running {
-  border-left-color: var(--color-neon, #0f0);
+  border-left-color: var(--entity-color, var(--color-neon, #0f0));
+  background: color-mix(in srgb, var(--entity-color, var(--color-neon, #0f0)) 8%, var(--color-bg-sunken));
+}
+
+.unified-dialog__card--running .unified-dialog__card-name {
+  color: var(--entity-color, var(--color-neon, #0f0));
 }
 
 .unified-dialog__card--running:hover {
-  background: var(--color-accent-soft);
+  background: color-mix(in srgb, var(--entity-color, var(--color-neon, #0f0)) 14%, var(--color-bg-sunken));
+}
+
+.unified-dialog__card-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--entity-color, var(--color-neon, #0f0));
+  margin-right: 6px;
+  vertical-align: middle;
+  box-shadow: 0 0 4px var(--entity-color, var(--color-neon, #0f0));
+  animation: dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .unified-dialog__card-icon {

@@ -212,7 +212,10 @@ export function LauncherCell({
                       style={{ '--entity-color': preset.color } as any}
                     >
                       <div class="unified-dialog__card-info">
-                        <span class="unified-dialog__card-name">{preset.displayName}</span>
+                        <span class="unified-dialog__card-name">
+                          {running && <span class="unified-dialog__card-dot" />}
+                          {preset.displayName}
+                        </span>
                       </div>
                       {running && (
                         <span class="unified-dialog__card-status">{t('unified.running')}</span>
