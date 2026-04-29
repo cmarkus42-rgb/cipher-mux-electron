@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next'
 import type { Workspace, WorkspaceCell } from '../../shared/persona-types'
 import { spanOf, resizeCells } from '../../main/workspace/workspace-manager'
 import { useEntityPresets } from '../hooks/useEntityPresets'
+import { EntityPickerPopup } from './EntityPickerPopup'
+import type { EntityId } from '../../shared/types'
 
 const api = (window as any).cipherMux
 
@@ -19,6 +21,7 @@ export function WorkspacesTab() {
   const [allTags, setAllTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const loadAll = useCallback(async () => {
     const wsList: Workspace[] = await api.workspaces.list()
@@ -481,36 +484,37 @@ export function WorkspacesTab() {
                 <div class="insp-grid">
                   <div class="insp-field">
                     <label>{t('workspacesTab.preset')}</label>
-                    <select
-                      value={cellData.presetId || ''}
-                      onChange={(e) => handleCellPresetChange((e.target as HTMLSelectElement).value)}
-                      style={cellData.presetId && getPresetInfo(cellData.presetId) ? {
-                        borderColor: getPresetInfo(cellData.presetId)!.color,
-                        color: getPresetInfo(cellData.presetId)!.color,
-                      } : undefined}
-                    >
-                      <option value="">{t('workspacesTab.presetNone')}</option>
-                      {entityPresets.map(p => (
-                        <option key={p.id} value={p.id}>{p.displayName}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div class="insp-field">
-                    <label>{t('workspacesTab.project')}</label>
-                    <div class="folder-picker">
-                      <input
-                        type="text"
-                        class="input input--sm"
-                        list="ws-project-list"
-                        value={cellData.project}
-                        onInput={(e) => handleCellUpdate('project', (e.target as HTMLInputElement).value)}
-                        placeholder={t('workspacesTab.projectNone')}
-                      />
-                      <datalist id="ws-project-list">
-                        {knownProjects.map(p => (
-                          <option key={p.path} value={p.path}>{p.name}</option>
-                        ))}
-                      </datalist>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {cellData.presetId && getPresetInfo(cellData.presetId) ? (
+                        <span style={{ color: getPresetInfo(cellData.presetId)!.color, fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+                          {getPresetInfo(cellData.presetId)!.displayName}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--color-text-dim)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+                          {cellData.project || t('workspacesTab.presetNone')}
+                        </span>
+                      )}
+                      <button
+                        class="btn btn--sm"
+                        onClick={() => setPickerOpen(true)}
+                        title={t('workspacesTab.preset')}
+                        style={{ padding: '2px 8px', fontSize: '11px' }}
+                      >
+                        {cellData.presetId || cellData.project ? '\u270E' : '+'}
+                      </button>
+                      {(cellData.presetId || cellData.project) && (
+                        <button
+                          class="btn btn--sm"
+                          onClick={() => {
+                            handleCellPresetChange('')
+                            handleCellUpdate('project', '')
+                          }}
+                          title="Clear"
+                          style={{ padding: '2px 6px', fontSize: '11px', color: 'var(--color-text-dim)' }}
+                        >
+                          &times;
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div class="insp-field wide">
@@ -524,6 +528,25 @@ export function WorkspacesTab() {
                     />
                   </div>
                 </div>
+                {pickerOpen && (
+                  <EntityPickerPopup
+                    onSelectPreset={(presetId: EntityId) => {
+                      handleCellPresetChange(presetId)
+                      handleCellUpdate('project', '')
+                      setPickerOpen(false)
+                    }}
+                    onSelectPath={(path: string) => {
+                      handleCellUpdate('project', path)
+                      handleCellPresetChange('')
+                      setPickerOpen(false)
+                    }}
+                    onSelectNote={() => {
+                      // Notes are not applicable in workspace editor
+                      setPickerOpen(false)
+                    }}
+                    onClose={() => setPickerOpen(false)}
+                  />
+                )}
               </div>
             )}
 
