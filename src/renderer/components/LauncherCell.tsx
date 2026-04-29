@@ -1,23 +1,12 @@
 // src/renderer/components/LauncherCell.tsx
 import { useState, useCallback, useEffect } from 'preact/hooks'
-import { createPortal } from 'preact/compat'
-import { useTranslation } from 'react-i18next'
-import { FolderPickerInput } from './FolderPickerInput'
-import { useNotes } from '../hooks/useNotes'
-import { useEntityPresets } from '../hooks/useEntityPresets'
+import { EntityPickerPopup } from './EntityPickerPopup'
+import type { PathStartOpts } from './EntityPickerPopup'
 import type { EntityId } from '../../shared/types'
 
-const cipherApi = () => (window as any).cipherMux
+export type { PathStartOpts }
 
 // ─── Types ───────────────────────────────────────────────
-
-export interface PathStartOpts {
-  shellOnly?: boolean
-  fork?: boolean
-  skipPermissions?: boolean
-}
-
-type TabMode = 'presets' | 'path' | 'notes'
 
 interface LauncherCellProps {
   slotIndex: number
@@ -42,23 +31,8 @@ export function LauncherCell({
   onStartPath, onOpenNotes, onOpenNote, entityStatus,
   activeWorkspaceId, onDragOver, onDragLeave, onDrop, dragOver,
 }: LauncherCellProps) {
-  const { t } = useTranslation()
   const [popupOpen, setPopupOpen] = useState(false)
-  const [tab, setTab] = useState<TabMode>('presets')
   const [starting, setStarting] = useState<string | null>(null)
-
-  // Path state
-  const [path, setPath] = useState('')
-  const [shellOnly, setShellOnly] = useState(false)
-  const [skipPermissions, setSkipPermissions] = useState(true)
-  const [fork, setFork] = useState(false)
-  const [recentPaths, setRecentPaths] = useState<string[]>([])
-
-  // Notes
-  const { notes } = useNotes()
-
-  // Entity presets (dynamic from registry)
-  const entityPresets = useEntityPresets()
 
   // Listen for Cmd+N launcher-open event
   useEffect(() => {
@@ -66,47 +40,29 @@ export function LauncherCell({
       const detail = (e as CustomEvent).detail
       if (detail?.slotIndex === slotIndex) {
         setPopupOpen(true)
-        setTab('presets')
       }
     }
     window.addEventListener('launcher-open', handler)
     return () => window.removeEventListener('launcher-open', handler)
   }, [slotIndex])
 
-  // Load recent paths when popup opens
-  useEffect(() => {
-    if (!popupOpen) return
-    cipherApi().config.get('app').then((cfg: any) => {
-      setRecentPaths(cfg?.recentPaths ?? [])
-    }).catch(() => {})
-  }, [popupOpen])
-
-  // Reset state when popup opens + Escape to close
+  // Reset starting state when popup opens
   useEffect(() => {
     if (popupOpen) {
       setStarting(null)
-      const onKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          e.stopPropagation()
-          setPopupOpen(false)
-        }
-      }
-      window.addEventListener('keydown', onKeyDown)
-      return () => window.removeEventListener('keydown', onKeyDown)
     }
   }, [popupOpen])
 
   const handleOpen = useCallback(() => {
     setPopupOpen(true)
-    setTab('presets')
   }, [])
 
   const handleClose = useCallback(() => {
     setPopupOpen(false)
   }, [])
 
-  const handleEntityClick = useCallback(async (entityId: EntityId) => {
-    if (entityStatus[entityId]) {
+  const handleSelectPreset = useCallback(async (entityId: EntityId, running: boolean) => {
+    if (running) {
       onFocusEntity(entityId)
       setPopupOpen(false)
       return
@@ -120,10 +76,9 @@ export function LauncherCell({
     } finally {
       setStarting(null)
     }
-  }, [entityStatus, onStartEntity, onFocusEntity])
+  }, [onStartEntity, onFocusEntity])
 
-  const handleResumeClick = useCallback(async (e: Event, entityId: EntityId) => {
-    e.stopPropagation()
+  const handleResumePreset = useCallback(async (entityId: EntityId) => {
     setStarting(entityId)
     try {
       await onResumeEntity(entityId)
@@ -135,28 +90,12 @@ export function LauncherCell({
     }
   }, [onResumeEntity])
 
-  const handlePathStart = useCallback(() => {
-    const p = path.trim()
-    if (!p) return
-    onStartPath(p, { shellOnly, fork, skipPermissions: !shellOnly && skipPermissions })
-    // Save to recent paths
-    cipherApi().config.get('app').then((cfg: any) => {
-      const existing: string[] = cfg?.recentPaths ?? []
-      const updated = [p, ...existing.filter((x: string) => x !== p)].slice(0, 10)
-      cipherApi().config.set('app', { ...cfg, recentPaths: updated }).catch(() => {})
-    }).catch(() => {})
-    setPath('')
+  const handleSelectPath = useCallback((path: string, opts: PathStartOpts) => {
+    onStartPath(path, opts)
     setPopupOpen(false)
-  }, [path, shellOnly, fork, skipPermissions, onStartPath])
+  }, [onStartPath])
 
-  const handlePathKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      handlePathStart()
-    }
-  }, [handlePathStart])
-
-  const handleNoteClick = useCallback((note: any) => {
+  const handleSelectNote = useCallback((note: any) => {
     onOpenNote(note)
     setPopupOpen(false)
   }, [onOpenNote])
@@ -165,174 +104,6 @@ export function LauncherCell({
     onOpenNotes()
     setPopupOpen(false)
   }, [onOpenNotes])
-
-  const popupContent = popupOpen ? createPortal(
-    <div class="launcher-popup-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}>
-      <div class="launcher-popup" data-highlight="popup-launcher">
-        <div class="launcher-popup__header">
-          <span class="launcher-popup__title">{t('unified.title')}</span>
-          <button class="cell-btn" onClick={handleClose}>&times;</button>
-        </div>
-
-        {/* Tab bar */}
-        <div class="launcher-popup__tabs">
-          <button
-            class={`launcher-popup__tab${tab === 'presets' ? ' launcher-popup__tab--active' : ''}`}
-            onClick={() => setTab('presets')}
-          >
-            {t('unified.tabPresets')}
-          </button>
-          <button
-            class={`launcher-popup__tab${tab === 'path' ? ' launcher-popup__tab--active' : ''}`}
-            onClick={() => setTab('path')}
-          >
-            {t('unified.tabPath')}
-          </button>
-          <button
-            class={`launcher-popup__tab${tab === 'notes' ? ' launcher-popup__tab--active' : ''}`}
-            onClick={() => setTab('notes')}
-          >
-            {t('launcher.notes')}
-          </button>
-        </div>
-
-        {/* Presets tab */}
-        {tab === 'presets' && (
-          <div class="launcher-popup__body">
-            <div class="launcher-popup__presets">
-              {entityPresets.map(preset => {
-                const running = entityStatus[preset.id]
-                const isStarting = starting === preset.id
-                return (
-                  <div key={preset.id} class="unified-dialog__card-row">
-                    <button
-                      class={`unified-dialog__card${running ? ' unified-dialog__card--running' : ''}`}
-                      onClick={() => handleEntityClick(preset.id as EntityId)}
-                      disabled={isStarting}
-                      style={{ '--entity-color': preset.color } as any}
-                    >
-                      <div class="unified-dialog__card-info">
-                        <span class="unified-dialog__card-name">
-                          {running && <span class="unified-dialog__card-dot" />}
-                          {preset.displayName}
-                        </span>
-                      </div>
-                      {running && (
-                        <span class="unified-dialog__card-status">{t('unified.running')}</span>
-                      )}
-                      {isStarting && (
-                        <span class="unified-dialog__card-status">{t('unified.starting')}</span>
-                      )}
-                    </button>
-                    {running && (
-                      <button
-                        class="unified-dialog__card-resume"
-                        onClick={(e: any) => handleResumeClick(e, preset.id as EntityId)}
-                        disabled={isStarting}
-                        title={t('unified.resume')}
-                      >
-                        {t('unified.resumeShort')}
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Path tab */}
-        {tab === 'path' && (
-          <div class="launcher-popup__body">
-            <FolderPickerInput
-              value={path}
-              onChange={setPath}
-              placeholder={t('unified.pathPlaceholder')}
-              onKeyDown={handlePathKeyDown}
-              autofocus
-            />
-
-            {recentPaths.length > 0 && (
-              <div class="unified-dialog__recents">
-                <span class="unified-dialog__recents-label">{t('unified.recentPaths')}</span>
-                {recentPaths.map(rp => (
-                  <button
-                    key={rp}
-                    class="unified-dialog__recent-item"
-                    onClick={() => setPath(rp)}
-                  >
-                    {rp.split('/').filter(Boolean).pop()} <span class="unified-dialog__recent-path">{rp}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div class="unified-dialog__options">
-              <label class="unified-dialog__option">
-                <input type="checkbox" checked={shellOnly} onChange={(e) => {
-                  setShellOnly((e.target as HTMLInputElement).checked)
-                }} />
-                <span>{t('unified.shellOnly')}</span>
-              </label>
-              {!shellOnly && (
-                <>
-                  <label class="unified-dialog__option">
-                    <input type="checkbox" checked={skipPermissions} onChange={(e) => {
-                      setSkipPermissions((e.target as HTMLInputElement).checked)
-                    }} />
-                    <span>{t('unified.skipPermissions')}</span>
-                  </label>
-                  <label class="unified-dialog__option">
-                    <input type="checkbox" checked={fork} onChange={(e) => {
-                      setFork((e.target as HTMLInputElement).checked)
-                    }} />
-                    <span>{t('unified.fork')}</span>
-                  </label>
-                </>
-              )}
-            </div>
-
-            <div class="unified-dialog__footer">
-              <button class="btn btn--sm" onClick={handleClose}>{t('unified.cancel')}</button>
-              <button class="btn btn--sm btn--primary" onClick={handlePathStart} disabled={!path.trim()}>
-                {t('unified.start')}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Notes tab */}
-        {tab === 'notes' && (
-          <div class="launcher-popup__body">
-            <button class="btn btn--sm btn--primary" onClick={handleNewNote} style={{ marginBottom: '8px' }}>
-              {t('launcher.newNote')}
-            </button>
-            {notes.length > 0 ? (
-              <div class="launcher-popup__notes-list">
-                {notes.map(note => (
-                  <button
-                    key={note.id}
-                    class="launcher-popup__note-item"
-                    onClick={() => handleNoteClick(note)}
-                  >
-                    <span class="launcher-popup__note-title">{note.title && note.title !== 'Untitled' ? note.title : t('notesCell.untitled')}</span>
-                    {note.tags.length > 0 && (
-                      <span class="launcher-popup__note-tags">
-                        {note.tags.map((tag: string) => `#${tag}`).join(' ')}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div class="sidebar-panel__empty">{t('sidebar.noNotes')}</div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>,
-    document.body
-  ) : null
 
   return (
     <div
@@ -345,8 +116,18 @@ export function LauncherCell({
       <div class="launcher-cell__trigger" onClick={handleOpen}>
         <div class="launcher-circle"><span>+</span></div>
       </div>
-      {popupContent}
+      {popupOpen && (
+        <EntityPickerPopup
+          onSelectPreset={handleSelectPreset}
+          onResumePreset={handleResumePreset}
+          onSelectPath={handleSelectPath}
+          onSelectNote={handleSelectNote}
+          onNewNote={handleNewNote}
+          onClose={handleClose}
+          entityStatus={entityStatus}
+          startingEntity={starting}
+        />
+      )}
     </div>
   )
 }
-
