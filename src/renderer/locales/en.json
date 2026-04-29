@@ -412,6 +412,8 @@
   "unified.desc.audit": "Security and code quality audit",
   "unified.running": "running",
   "unified.starting": "starting...",
+  "unified.resume": "Resume last conversation (stops current, restarts with --resume)",
+  "unified.resumeShort": "Resume",
   "unified.pathPlaceholder": "Project path or folder...",
   "unified.recentPaths": "Recent:",
   "unified.shellOnly": "Shell only (no Claude)",

@@ -24,13 +24,15 @@ interface SessionCellProps {
   onSendToBackground: (sessionId: string) => void
   onDragStart: (sessionId: string) => void
   onDragOver: (e: DragEvent) => void
+  onDragLeave: () => void
   onDrop: (e: DragEvent) => void
+  dragOver?: boolean
 }
 
 export function SessionCell({
   session, contextUsage, focused, isOrchestrator, theme,
   rowSpan, maxRows, slotCol, slotRow,
-  onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDragStart, onDragOver, onDrop,
+  onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDragStart, onDragOver, onDragLeave, onDrop, dragOver,
 }: SessionCellProps) {
   const { t } = useTranslation()
   const { terminalRef } = useTerminal(session.id, theme, session.createdAt)
@@ -88,6 +90,7 @@ export function SessionCell({
     'session-cell',
     focused && 'session-cell--focused',
     (isOrchestrator || isEntity) && 'session-cell--orchestrator',
+    dragOver && 'session-cell--drag-over',
   ].filter(Boolean).join(' ')
 
   const expanded = rowSpan > 1
@@ -100,6 +103,7 @@ export function SessionCell({
       style={cellStyle}
       onClick={handleClick}
       onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
       onDrop={onDrop}
       data-highlight={slotCol != null && slotRow != null ? `cell-${slotCol}-${slotRow}` : undefined}
     >

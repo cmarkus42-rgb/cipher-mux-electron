@@ -156,6 +156,8 @@ export interface AppConfig {
   personas: import('./persona-types').Persona[]
   workspaces: import('./persona-types').Workspace[]
   activeWorkspaceId: string | null
+  /** Workspace ID to auto-load on fresh app start (set via star toggle in WorkspacePopup). */
+  defaultWorkspaceId: string | null
   /** Active companion character ID. */
   activeCharacterId: string
   /** Available companion characters. */

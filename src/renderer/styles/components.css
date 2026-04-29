@@ -1667,6 +1667,40 @@
   50% { box-shadow: 0 0 4px color-mix(in srgb, #9b59b6 20%, transparent); }
 }
 
+/* Compact background card (collapsed by default) */
+.bg-card--compact {
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.bg-card--compact .bg-card__head {
+  margin-bottom: 0;
+}
+
+.bg-card__compact-line2 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  margin-top: 2px;
+}
+
+.bg-card__path-short {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.bg-card--expanded {
+  padding: var(--space-sm);
+}
+
+.bg-card--expanded .bg-card__head {
+  margin-bottom: var(--space-xxs);
+}
+
 .bg-card__path {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -2601,6 +2635,42 @@
   color: var(--color-neon, #0f0);
   font-family: var(--font-mono);
   white-space: nowrap;
+}
+
+.unified-dialog__card-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.unified-dialog__card-row > .unified-dialog__card {
+  flex: 1;
+  min-width: 0;
+}
+
+.unified-dialog__card-resume {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  background: var(--color-bg-sunken);
+  border: 1px solid var(--color-border);
+  color: var(--color-neon, #0f0);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+}
+
+.unified-dialog__card-resume:hover {
+  background: var(--color-accent-soft);
+  border-color: var(--color-neon, #0f0);
+}
+
+.unified-dialog__card-resume:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 
 .unified-dialog__options {

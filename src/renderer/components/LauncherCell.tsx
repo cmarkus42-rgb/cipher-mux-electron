@@ -24,6 +24,7 @@ interface LauncherCellProps {
   slotCol?: number
   slotRow?: number
   onStartEntity: (entityId: EntityId) => Promise<void>
+  onResumeEntity: (entityId: EntityId) => Promise<void>
   onFocusEntity: (entityId: EntityId) => void
   onStartPath: (path: string, opts: PathStartOpts) => void
   onOpenNotes: () => void
@@ -31,13 +32,15 @@ interface LauncherCellProps {
   entityStatus: Record<string, boolean>
   activeWorkspaceId: string | null
   onDragOver: (e: DragEvent) => void
+  onDragLeave: () => void
   onDrop: (e: DragEvent) => void
+  dragOver?: boolean
 }
 
 export function LauncherCell({
-  slotIndex, slotCol, slotRow, onStartEntity, onFocusEntity, onStartPath,
-  onOpenNotes, onOpenNote, entityStatus,
-  activeWorkspaceId, onDragOver, onDrop,
+  slotIndex, slotCol, slotRow, onStartEntity, onResumeEntity, onFocusEntity,
+  onStartPath, onOpenNotes, onOpenNote, entityStatus,
+  activeWorkspaceId, onDragOver, onDragLeave, onDrop, dragOver,
 }: LauncherCellProps) {
   const { t } = useTranslation()
   const [popupOpen, setPopupOpen] = useState(false)
@@ -119,6 +122,19 @@ export function LauncherCell({
     }
   }, [entityStatus, onStartEntity, onFocusEntity])
 
+  const handleResumeClick = useCallback(async (e: Event, entityId: EntityId) => {
+    e.stopPropagation()
+    setStarting(entityId)
+    try {
+      await onResumeEntity(entityId)
+      setPopupOpen(false)
+    } catch (err) {
+      console.error(`[LauncherCell] Failed to resume ${entityId}:`, err)
+    } finally {
+      setStarting(null)
+    }
+  }, [onResumeEntity])
+
   const handlePathStart = useCallback(() => {
     const p = path.trim()
     if (!p) return
@@ -188,23 +204,34 @@ export function LauncherCell({
                 const running = entityStatus[preset.id]
                 const isStarting = starting === preset.id
                 return (
-                  <button
-                    key={preset.id}
-                    class={`unified-dialog__card${running ? ' unified-dialog__card--running' : ''}`}
-                    onClick={() => handleEntityClick(preset.id as EntityId)}
-                    disabled={isStarting}
-                    style={{ '--entity-color': preset.color } as any}
-                  >
-                    <div class="unified-dialog__card-info">
-                      <span class="unified-dialog__card-name">{preset.displayName}</span>
-                    </div>
+                  <div key={preset.id} class="unified-dialog__card-row">
+                    <button
+                      class={`unified-dialog__card${running ? ' unified-dialog__card--running' : ''}`}
+                      onClick={() => handleEntityClick(preset.id as EntityId)}
+                      disabled={isStarting}
+                      style={{ '--entity-color': preset.color } as any}
+                    >
+                      <div class="unified-dialog__card-info">
+                        <span class="unified-dialog__card-name">{preset.displayName}</span>
+                      </div>
+                      {running && (
+                        <span class="unified-dialog__card-status">{t('unified.running')}</span>
+                      )}
+                      {isStarting && (
+                        <span class="unified-dialog__card-status">{t('unified.starting')}</span>
+                      )}
+                    </button>
                     {running && (
-                      <span class="unified-dialog__card-status">{t('unified.running')}</span>
+                      <button
+                        class="unified-dialog__card-resume"
+                        onClick={(e: any) => handleResumeClick(e, preset.id as EntityId)}
+                        disabled={isStarting}
+                        title={t('unified.resume')}
+                      >
+                        {t('unified.resumeShort')}
+                      </button>
                     )}
-                    {isStarting && (
-                      <span class="unified-dialog__card-status">{t('unified.starting')}</span>
-                    )}
-                  </button>
+                  </div>
                 )
               })}
             </div>
@@ -306,8 +333,9 @@ export function LauncherCell({
 
   return (
     <div
-      class="launcher-cell"
+      class={`launcher-cell${dragOver ? ' launcher-cell--drag-over' : ''}`}
       onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
       onDrop={onDrop}
       data-highlight={slotCol != null && slotRow != null ? `cell-${slotCol}-${slotRow}` : undefined}
     >

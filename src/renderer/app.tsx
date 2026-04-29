@@ -580,6 +580,29 @@ export function App() {
     }
   }, [setSessionAtSlot])
 
+  const handleResumeEntity = useCallback(async (entityId: EntityId, slotIndex: number) => {
+    const api = (window as any).cipherMux
+    inFlightEntityStarts.current.add(entityId)
+    try {
+      const session = await api.entity.resume(entityId)
+      const sid = session?.id
+      if (sid) {
+        switch (entityId) {
+          case 'orchestrator': setOrchestratorSessionId(sid); break
+          case 'mpo': setMpoSessionId(sid); break
+          case 'companion': setCompanionSessionId(sid); break
+          case 'refinement': setRefinementSessionId(sid); break
+          case 'voice-relay': setVoiceRelaySessionId(sid); break
+          case 'audit': setAuditSessionId(sid); break
+        }
+        setSessionAtSlot(slotIndex, sid)
+        setFocusedSessionId(sid)
+      }
+    } finally {
+      inFlightEntityStarts.current.delete(entityId)
+    }
+  }, [setSessionAtSlot])
+
   const handleFocusEntity = useCallback((entityId: EntityId) => {
     const sid = getEntitySessionId(entityId)
     if (!sid) return
@@ -636,6 +659,40 @@ export function App() {
       setPlacementPopup({ note })
     }
   }, [grid.slots])
+
+  // ─── Drag & Drop from Sidebar to Grid (C.6) ───────────
+  const handleDropSession = useCallback((sessionId: string, slotIndex: number) => {
+    // If slot is occupied, send old session to background
+    const currentSlot = grid.slots[slotIndex]
+    if (currentSlot?.sessionId) {
+      removeSession(currentSlot.sessionId)
+    }
+    // Remove dragged session from any existing slot first
+    removeSession(sessionId)
+    setSessionAtSlot(slotIndex, sessionId)
+    setFocusedSessionId(sessionId)
+  }, [grid.slots, removeSession, setSessionAtSlot])
+
+  const handleDropNoteOnEmpty = useCallback((note: any, slotIndex: number) => {
+    setSlotType(slotIndex, 'notes')
+    setSidebarVisible(true)
+    setTimeout(() => {
+      const openFn = (window as any).__notesCell_openNote
+      if (openFn) openFn(note)
+    }, 100)
+  }, [setSlotType])
+
+  const handleDropNoteOnSession = useCallback(async (note: any, sessionId: string) => {
+    const api = (window as any).cipherMux
+    // Fetch full note content (drag data only has NoteInfo, no body)
+    let body = ''
+    try {
+      const full = await api.notes.read(note.id)
+      body = full?.body ?? ''
+    } catch { /* ignore */ }
+    const text = `Hier, guck dir das an:\n${note.title || 'Untitled'}\n\n${body}`
+    api.terminal.write(sessionId, text)
+  }, [])
 
   // Listen for entity-started events
   useEffect(() => {
@@ -779,6 +836,7 @@ export function App() {
           onFork={handleFork}
           onSendToBackground={handleSendToBackground}
           onStartEntity={handleStartEntity}
+          onResumeEntity={handleResumeEntity}
           onFocusEntity={handleFocusEntity}
           onStartPath={handlePathStart}
           onOpenNotes={handleOpenNotes}
@@ -786,6 +844,9 @@ export function App() {
           onCloseNotes={handleCloseNotes}
           onToggleExpandSlot={toggleExpandSlot}
           onSwap={swap}
+          onDropSession={handleDropSession}
+          onDropNoteOnEmpty={handleDropNoteOnEmpty}
+          onDropNoteOnSession={handleDropNoteOnSession}
         />
         {!sidebarDetached && (
           <SidebarPanel

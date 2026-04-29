@@ -739,6 +739,40 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
+   * Queue Claude Code launch with --resume for an entity session.
+   * Stops the existing session first, then starts a fresh one with --resume.
+   */
+  async resumeEntity(entityId: EntityId): Promise<SessionInfo> {
+    // Stop existing session if running
+    if (this.isEntityRunning(entityId)) {
+      await this.stopEntity(entityId)
+    }
+
+    // Start fresh session
+    const session = await this.startEntity(entityId)
+
+    // Queue Claude launch with --resume flag
+    const sessionId = this.entitySessionIds.get(entityId)
+    if (!sessionId) throw new Error(`${entityId} is not running after restart`)
+
+    const config = this.entityRegistry.get(entityId)
+    if (!config) throw new Error(`Unknown entity: ${entityId}`)
+
+    const adapter = this.adapterRegistry.getDefault()
+    const launchCmd = adapter.buildLaunchCommand({
+      projectPath: config.projectPath,
+      sessionName: config.displayName,
+      isOrchestrator: entityId === 'orchestrator',
+      isMpo: entityId === 'mpo',
+      resume: true,
+    })
+    const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
+    this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
+
+    return session
+  }
+
+  /**
    * Schedule a startup greeting to be sent after Claude is ready.
    * Waits ~12s for Claude CLI to boot, then sends the greeting via tmux.
    */

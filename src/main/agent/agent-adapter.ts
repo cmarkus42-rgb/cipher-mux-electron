@@ -40,6 +40,8 @@ export interface LaunchOpts {
   isMpo?: boolean
   /** Fork from an existing Claude session (--fork-session <id>) */
   forkFromClaudeSessionId?: string
+  /** Resume the most recent conversation (--resume) */
+  resume?: boolean
 }
 
 export interface AdapterContext {

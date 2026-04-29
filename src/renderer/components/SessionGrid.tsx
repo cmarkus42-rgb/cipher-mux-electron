@@ -1,5 +1,5 @@
 // src/renderer/components/SessionGrid.tsx
-import { useCallback, useRef } from 'preact/hooks'
+import { useCallback, useRef, useState } from 'preact/hooks'
 import type { SessionInfo, ContextUsage, EntityId } from '../../shared/types'
 import { computeGridStyle } from '../../shared/grid-types'
 import type { GridState, ThemeName } from '../../shared/grid-types'
@@ -25,6 +25,7 @@ interface SessionGridProps {
   onFork: (sessionId: string) => void
   onSendToBackground: (sessionId: string) => void
   onStartEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
+  onResumeEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
   onFocusEntity: (entityId: EntityId) => void
   onStartPath: (path: string, opts: PathStartOpts, slotIndex: number) => void
   onOpenNotes: (slotIndex: number) => void
@@ -32,6 +33,9 @@ interface SessionGridProps {
   onCloseNotes: (slotIndex: number) => void
   onToggleExpandSlot: (slotIndex: number) => void
   onSwap: (idxA: number, idxB: number) => void
+  onDropSession: (sessionId: string, slotIndex: number) => void
+  onDropNoteOnEmpty: (note: any, slotIndex: number) => void
+  onDropNoteOnSession: (note: any, sessionId: string) => void
 }
 
 /**
@@ -57,34 +61,76 @@ export function SessionGrid({
   grid, sessions, contextUsages, focusedSessionId, theme,
   orchestratorSessionId, activeWorkspaceId, entityStatus, onFocusSession, onCloseSession,
   onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground,
-  onStartEntity, onFocusEntity, onStartPath,
+  onStartEntity, onResumeEntity, onFocusEntity, onStartPath,
   onOpenNotes, onOpenNote, onCloseNotes, onToggleExpandSlot, onSwap,
+  onDropSession, onDropNoteOnEmpty, onDropNoteOnSession,
 }: SessionGridProps) {
   // Use a ref instead of state to avoid stale-closure race: the drop event
   // can fire before Preact completes the re-render triggered by setDragSourceIdx,
   // causing the old handleDrop closure (with null) to execute instead of the swap.
   const dragSourceRef = useRef<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
   const { cols, rows } = grid.config
 
   const handleDragStart = useCallback((slotIdx: number) => {
     dragSourceRef.current = slotIdx
   }, [])
 
-  const handleDragOver = useCallback((e: DragEvent) => {
+  const handleDragOver = useCallback((targetIdx: number, e: DragEvent) => {
     e.preventDefault()
+    setDragOverIdx(targetIdx)
+  }, [])
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverIdx(null)
   }, [])
 
   const handleDrop = useCallback((targetIdx: number, e: DragEvent) => {
     e.preventDefault()
+    setDragOverIdx(null)
+
+    // Check for sidebar drag data first
+    const cipherType = e.dataTransfer?.getData('application/x-cipher-type')
+
+    if (cipherType === 'session') {
+      const sessionId = e.dataTransfer?.getData('application/x-cipher-session-id')
+      if (sessionId) {
+        // Session from sidebar → place in grid slot
+        // If target slot has a session, the old one goes to background (handled by onDropSession)
+        onDropSession(sessionId, targetIdx)
+        return
+      }
+    }
+
+    if (cipherType === 'note') {
+      const noteJson = e.dataTransfer?.getData('application/x-cipher-note')
+      if (noteJson) {
+        try {
+          const note = JSON.parse(noteJson)
+          const slot = grid.slots[targetIdx]
+          if (slot?.sessionId) {
+            // Note on occupied cell → send note content to session
+            onDropNoteOnSession(note, slot.sessionId)
+          } else {
+            // Note on empty cell → open NotesCell with this note
+            onDropNoteOnEmpty(note, targetIdx)
+          }
+        } catch { /* ignore parse error */ }
+        return
+      }
+    }
+
+    // Default: grid-internal swap
     const sourceIdx = dragSourceRef.current
     if (sourceIdx !== null && sourceIdx !== targetIdx) {
       onSwap(sourceIdx, targetIdx)
     }
     dragSourceRef.current = null
-  }, [onSwap])
+  }, [onSwap, onDropSession, onDropNoteOnEmpty, onDropNoteOnSession, grid.slots])
 
   const handleDragEnd = useCallback(() => {
     dragSourceRef.current = null
+    setDragOverIdx(null)
   }, [])
 
   const gridStyle = computeGridStyle(cols, rows)
@@ -111,8 +157,10 @@ export function SessionGrid({
                 onClose={() => onCloseNotes(idx)}
                 onToggleExpand={() => onToggleExpandSlot(idx)}
                 onDragStart={() => handleDragStart(idx)}
-                onDragOver={handleDragOver}
+                onDragOver={(e: DragEvent) => handleDragOver(idx, e)}
+                onDragLeave={handleDragLeave}
                 onDrop={(e: DragEvent) => handleDrop(idx, e)}
+                dragOver={dragOverIdx === idx}
               />
             )
           }
@@ -143,8 +191,10 @@ export function SessionGrid({
                 onFork={onFork}
                 onSendToBackground={onSendToBackground}
                 onDragStart={() => handleDragStart(idx)}
-                onDragOver={handleDragOver}
+                onDragOver={(e: DragEvent) => handleDragOver(idx, e)}
+                onDragLeave={handleDragLeave}
                 onDrop={(e: DragEvent) => handleDrop(idx, e)}
+                dragOver={dragOverIdx === idx}
               />
             )
           }
@@ -156,14 +206,17 @@ export function SessionGrid({
               slotCol={idx % cols}
               slotRow={Math.floor(idx / cols)}
               onStartEntity={(entityId) => onStartEntity(entityId, idx)}
+              onResumeEntity={(entityId) => onResumeEntity(entityId, idx)}
               onFocusEntity={onFocusEntity}
               onStartPath={(path, opts) => onStartPath(path, opts, idx)}
               onOpenNotes={() => onOpenNotes(idx)}
               onOpenNote={(note) => onOpenNote(note, idx)}
               entityStatus={entityStatus}
               activeWorkspaceId={activeWorkspaceId}
-              onDragOver={handleDragOver}
+              onDragOver={(e: DragEvent) => handleDragOver(idx, e)}
+              onDragLeave={handleDragLeave}
               onDrop={(e: DragEvent) => handleDrop(idx, e)}
+              dragOver={dragOverIdx === idx}
             />
           )
         })}

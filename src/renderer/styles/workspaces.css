@@ -1252,7 +1252,7 @@
 
 .wp-row {
   display: grid;
-  grid-template-columns: 64px 1fr auto auto;
+  grid-template-columns: 64px 1fr auto;
   gap: 10px;
   padding: 8px 12px;
   border-bottom: 1px solid var(--color-border);
@@ -1324,6 +1324,9 @@
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   padding: 2px 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+  border-radius: 3px;
 }
 
 .wp-default-star {
