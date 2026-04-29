@@ -307,10 +307,18 @@ export class SessionManager extends EventEmitter {
     // Stop output watcher before killing session
     this.tmux.unwatchSession(session.tmuxSession)
 
+    // Kill tmux session — retry once if first attempt fails (e.g. control-mode lag)
+    const tmuxName = session.tmuxSession
     try {
-      await this.tmux.killSession(session.tmuxSession)
+      await this.tmux.killSession(tmuxName)
     } catch {
-      // tmux session may already be gone
+      // Retry after short delay
+      try {
+        await new Promise((r) => setTimeout(r, 200))
+        await this.tmux.killSession(tmuxName)
+      } catch {
+        console.warn(`[SessionManager] tmux kill-session failed for "${tmuxName}", session may linger as orphan`)
+      }
     }
 
     session.status = 'stopped'
@@ -328,8 +336,26 @@ export class SessionManager extends EventEmitter {
       if (entityId === 'mpo') this.mpoSessionId = null
     }
 
-    // Remove from persistent store
+    // Remove from persistent store — must happen AFTER in-memory cleanup
+    // so that any concurrent persistGridState() call (debounced from renderer)
+    // will also filter this session out via the this.sessions.has() check.
     this.sessionStore.removeSession(sessionId)
+
+    // Also clean up grid state slots that reference this session to prevent
+    // stale session IDs from persisting in sessions.json gridState.
+    const gridState = this.sessionStore.getGridState()
+    if (gridState) {
+      let dirty = false
+      for (const slot of gridState.slots) {
+        if (slot.sessionId === sessionId) {
+          slot.sessionId = null
+          dirty = true
+        }
+      }
+      if (dirty) {
+        this.sessionStore.saveGridState(gridState)
+      }
+    }
   }
 
   /**
@@ -1153,6 +1179,17 @@ export class SessionManager extends EventEmitter {
     // a stale grid-save from re-adding sessions that were already stopped.
     const sessions = this.sessionStore.getSessions()
       .filter(ps => this.sessions.has(ps.id))
+
+    // Build set of valid session IDs for slot cleanup
+    const validIds = new Set(sessions.map(s => s.id))
+
+    // Clean grid slots that reference sessions no longer in the registry
+    for (const slot of gridState.slots) {
+      if (slot.sessionId && !validIds.has(slot.sessionId)) {
+        slot.sessionId = null
+      }
+    }
+
     for (const ps of sessions) {
       const slotIdx = gridState.slots.findIndex(s => s.sessionId === ps.id)
       ps.gridSlot = slotIdx >= 0 ? slotIdx : null
