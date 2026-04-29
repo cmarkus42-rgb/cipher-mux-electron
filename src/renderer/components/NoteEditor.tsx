@@ -234,7 +234,10 @@ export function NoteEditor({ content, onSave, onAutoSave }: NoteEditorProps) {
       const view = viewRef.current
       if (!view) return
       const cursor = view.state.selection.main.head
-      view.dispatch({ changes: { from: cursor, insert: data.text } })
+      view.dispatch({
+        changes: { from: cursor, insert: data.text },
+        selection: { anchor: cursor + data.text.length },
+      })
     })
     return () => unsub()
   }, [])
