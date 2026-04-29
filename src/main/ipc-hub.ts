@@ -260,10 +260,18 @@ export class IpcHub {
     const defaultWorkspaceId = configStore.get('defaultWorkspaceId')
 
     if (activeWorkspaceId) {
-      // Workspace is set — renderer will load it via useEffect on mount.
-      // Don't auto-start anything here; the workspace apply flow handles it.
-      console.log(`[IpcHub] Active workspace "${activeWorkspaceId}" set — renderer will apply it`)
-      return
+      // Stale activeWorkspaceId from a previous session but no default set?
+      // Clear it — the workspace was not meant to auto-load.
+      if (!defaultWorkspaceId) {
+        console.log(`[IpcHub] Clearing stale activeWorkspaceId "${activeWorkspaceId}" (no default set)`)
+        configStore.set('activeWorkspaceId', null)
+        // Fall through to "no workspace" path below
+      } else {
+        // Workspace is set — renderer will load it via useEffect on mount.
+        // Don't auto-start anything here; the workspace apply flow handles it.
+        console.log(`[IpcHub] Active workspace "${activeWorkspaceId}" set — renderer will apply it`)
+        return
+      }
     }
 
     if (defaultWorkspaceId) {
