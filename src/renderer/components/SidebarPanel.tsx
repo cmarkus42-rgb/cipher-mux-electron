@@ -355,15 +355,25 @@ function BackgroundSessionCard({ session, contextUsage, onClick, onKill, voiceGl
     e.dataTransfer.effectAllowed = 'move'
   }, [session.id])
 
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const handleClick = useCallback((e: MouseEvent) => {
-    // Single click toggles collapsed/expanded
+    // Delay single-click to distinguish from double-click
     e.preventDefault()
-    setExpanded(prev => !prev)
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
+    clickTimerRef.current = setTimeout(() => {
+      clickTimerRef.current = null
+      setExpanded(prev => !prev)
+    }, 250)
   }, [])
 
   const handleDblClick = useCallback((e: MouseEvent) => {
-    // Double click places session in grid
+    // Cancel pending single-click, then place in grid
     e.preventDefault()
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current)
+      clickTimerRef.current = null
+    }
     onClick()
   }, [onClick])
 
