@@ -219,6 +219,11 @@
   "workspacesTab.mergeHint": "Mit Zelle darunter zusammenfügen",
   "workspacesTab.splitHint": "Zusammengefügte Zelle trennen",
   "workspacesTab.custom": "(custom)",
+  "workspacesTab.preset": "Preset",
+  "workspacesTab.presetNone": "-- kein Preset --",
+  "workspacesTab.isDefault": "Standard-Workspace (laedt beim Start)",
+  "workspacesTab.setDefault": "Als Standard-Workspace setzen",
+  "workspacesTab.unsetDefault": "Standard-Workspace entfernen",
 
   "workspacesWindow.workspaces": "workspaces",
   "workspacesWindow.personas": "personas",

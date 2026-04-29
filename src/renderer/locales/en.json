@@ -219,6 +219,11 @@
   "workspacesTab.mergeHint": "Merge with cell below",
   "workspacesTab.splitHint": "Split merged cell",
   "workspacesTab.custom": "(custom)",
+  "workspacesTab.preset": "Preset",
+  "workspacesTab.presetNone": "-- no preset --",
+  "workspacesTab.isDefault": "Default workspace (auto-loads on start)",
+  "workspacesTab.setDefault": "Set as default workspace",
+  "workspacesTab.unsetDefault": "Remove as default workspace",
 
   "workspacesWindow.workspaces": "workspaces",
   "workspacesWindow.personas": "personas",
