@@ -20,9 +20,12 @@ export function WorkspacesTab() {
     if (wsList.length > 0 && !activeWsId) {
       setActiveWsId(wsList[0].id)
     }
-    // Load known projects for the project picker
+    // Load known projects for the project picker — try cache first, scan if empty
     try {
-      const projects = await api.projects.list()
+      let projects = await api.projects.list()
+      if (!projects || projects.length === 0) {
+        projects = await api.projects.scan()
+      }
       setKnownProjects(projects ?? [])
     } catch { /* ignore */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
