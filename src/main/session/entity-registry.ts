@@ -64,8 +64,8 @@ function expandHome(p: string): string {
  */
 export function registerBuiltinEntities(
   registry: EntityRegistry,
-  orchestratorDir: string,
-  mpoDir: string,
+  _orchestratorDir?: string,
+  _mpoDir?: string,
 ): void {
   const entitiesBase = expandHome('~/.config/cipher-mux/entities')
 
@@ -74,7 +74,7 @@ export function registerBuiltinEntities(
     displayName: 'Orchestrator',
     icon: '🎯',
     color: '#4fc3f7',
-    projectPath: expandHome(orchestratorDir),
+    projectPath: `${entitiesBase}/orchestrator`,
     features: ['mcp'],
     visible: true,
   })
@@ -84,7 +84,7 @@ export function registerBuiltinEntities(
     displayName: 'MPO',
     icon: '🔀',
     color: '#ab47bc',
-    projectPath: expandHome(mpoDir),
+    projectPath: `${entitiesBase}/mpo`,
     features: ['mcp'],
     visible: true,
   })
