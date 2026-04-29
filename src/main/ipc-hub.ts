@@ -1,4 +1,5 @@
 import { app, dialog, ipcMain, screen } from 'electron'
+import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import { WindowManager } from './window-manager'
@@ -139,6 +140,7 @@ export class IpcHub {
     this.registerNoteChannels()
     this.registerGridControlChannels()
     this.registerEntityChannels()
+    this.registerPresetChannels()
     this.registerCompanionChannels()
     this.setupEventForwarding()
 
@@ -255,11 +257,19 @@ export class IpcHub {
    */
   private autoStartDefault(): void {
     const activeWorkspaceId = configStore.get('activeWorkspaceId')
+    const defaultWorkspaceId = configStore.get('defaultWorkspaceId')
 
     if (activeWorkspaceId) {
       // Workspace is set — renderer will load it via useEffect on mount.
       // Don't auto-start anything here; the workspace apply flow handles it.
-      console.log(`[IpcHub] Default workspace "${activeWorkspaceId}" set — renderer will apply it`)
+      console.log(`[IpcHub] Active workspace "${activeWorkspaceId}" set — renderer will apply it`)
+      return
+    }
+
+    if (defaultWorkspaceId) {
+      // Default workspace configured — renderer will load it via handleRecoveryDone.
+      // Don't auto-start Companion here; the workspace apply flow handles session creation.
+      console.log(`[IpcHub] Default workspace "${defaultWorkspaceId}" set — renderer will apply it after recovery`)
       return
     }
 
@@ -1562,6 +1572,17 @@ export class IpcHub {
       return session
     })
 
+    ipcMain.handle(IPC.ENTITY_RESUME, async (_e, { entityId }: { entityId: EntityId }) => {
+      const mcpConfig = configStore.get('mcp')
+      this.sessionManager.setMcpConfig({
+        mcpHost: mcpConfig?.host ?? MCP_DEFAULT_HOST,
+        mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
+        mcpApiKey: mcpConfig?.apiKey ?? '',
+      })
+      const session = await this.sessionManager.resumeEntity(entityId)
+      return session
+    })
+
     ipcMain.handle(IPC.ENTITY_STOP, async (_e, { entityId }: { entityId: EntityId }) => {
       await this.sessionManager.stopEntity(entityId)
       return { ok: true }
@@ -1576,6 +1597,78 @@ export class IpcHub {
 
     ipcMain.handle(IPC.ENTITY_LIST, async () => {
       return this.sessionManager.getEntityRegistry().list()
+    })
+  }
+
+  // ─── Presets (Entity CLAUDE.md Editor) ──────────────────
+  private registerPresetChannels(): void {
+    const entitiesDir = path.join(os.homedir(), '.config/cipher-mux/entities')
+
+    ipcMain.handle(IPC.PRESETS_LIST, async () => {
+      // Return entities that have a projectPath inside ~/.config/cipher-mux/entities
+      const registry = this.sessionManager.getEntityRegistry()
+      const all = registry.list()
+      return all
+        .filter(e => e.projectPath.startsWith(entitiesDir))
+        .map(e => ({
+          id: e.id,
+          displayName: e.displayName,
+          color: e.color,
+          icon: e.icon,
+          projectPath: e.projectPath,
+        }))
+    })
+
+    ipcMain.handle(IPC.PRESETS_READ, async (_e, { entityId }: { entityId: string }) => {
+      const claudeMdPath = path.join(entitiesDir, entityId, 'CLAUDE.md')
+      try {
+        const content = fs.readFileSync(claudeMdPath, 'utf-8')
+        return { ok: true, content }
+      } catch {
+        return { ok: false, content: '', error: 'File not found' }
+      }
+    })
+
+    ipcMain.handle(IPC.PRESETS_SAVE, async (_e, { entityId, content }: { entityId: string; content: string }) => {
+      const claudeMdPath = path.join(entitiesDir, entityId, 'CLAUDE.md')
+      try {
+        fs.writeFileSync(claudeMdPath, content, 'utf-8')
+        return { ok: true }
+      } catch (err: any) {
+        return { ok: false, error: err.message }
+      }
+    })
+
+    ipcMain.handle(IPC.PRESETS_CREATE, async (_e, { entityId, displayName }: { entityId: string; displayName: string }) => {
+      const dir = path.join(entitiesDir, entityId)
+      const claudeMdPath = path.join(dir, 'CLAUDE.md')
+      try {
+        if (fs.existsSync(dir)) {
+          return { ok: false, error: 'Preset directory already exists' }
+        }
+        fs.mkdirSync(dir, { recursive: true })
+        const template = `# ${displayName}\n\n## Rolle\n\n\n\n## Faehigkeiten\n\n\n\n## Arbeitsregeln\n\n\n\n## Scope\n\n`
+        fs.writeFileSync(claudeMdPath, template, 'utf-8')
+        // Re-scan to register the new entity
+        const registry = this.sessionManager.getEntityRegistry()
+        scanAndRegisterEntities(registry)
+        return { ok: true }
+      } catch (err: any) {
+        return { ok: false, error: err.message }
+      }
+    })
+
+    ipcMain.handle(IPC.PRESETS_DELETE, async (_e, { entityId }: { entityId: string }) => {
+      const dir = path.join(entitiesDir, entityId)
+      try {
+        if (!fs.existsSync(dir)) {
+          return { ok: false, error: 'Preset directory not found' }
+        }
+        fs.rmSync(dir, { recursive: true, force: true })
+        return { ok: true }
+      } catch (err: any) {
+        return { ok: false, error: err.message }
+      }
     })
   }
 
