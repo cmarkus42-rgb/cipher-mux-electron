@@ -51,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Workspace Window Mount (G.10):** Error handling for mount race + theme fix.
 - **Template Tests (E.4):** Test expectations aligned with template rewrite.
 
+### Changed (Workspace & Entity Cleanup, 2026-04-29 Nachmittag)
+- **EntityPickerPopup extracted:** LauncherCell popup refactored into reusable `EntityPickerPopup.tsx`. Used in both grid LauncherCell and Workspace Editor cell inspector.
+- **Workspace Editor uses Popup:** Cell inspector replaced `<select>` dropdown with the real EntityPickerPopup (same as grid). Presets, Paths, Notes all selectable per cell.
+- **Companion button removed from Workspace Popup:** Redundant shortcut — Companion editor is in the Workspaces window.
+- **Dynamic entityStatus:** Running indicator computed from active sessions (`session.entityId`) instead of 6 hardcoded state variables. All dynamic entities now show running status.
+
 ### Fixed (Bug-Fix-Runde 2026-04-29, nach Watchdog-Testlauf)
 - **TestcaseView Rendering (D.1):** Parser moved to main process via IPC — `require('gray-matter')` fails in Vite/ESM renderer.
 - **STT Notes Cursor (C.4):** Cursor positioned after inserted text, not before.
