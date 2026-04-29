@@ -990,8 +990,15 @@
 }
 
 .voice-pin-icon {
-  font-size: 8px;
-  margin-right: 2px;
+  font-size: 10px;
+  margin-right: 3px;
+  opacity: 0.5;
+  transition: opacity 0.15s, color 0.15s;
+}
+.voice-pin-icon--pinned {
+  opacity: 1;
+  color: var(--color-accent, #4fc3f7);
+  text-shadow: 0 0 4px var(--color-accent, #4fc3f7);
 }
 
 /* 3-state radio group: OFF | STT | COM */

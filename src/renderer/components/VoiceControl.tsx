@@ -96,7 +96,7 @@ export function VoiceControl({ focusedSessionId, focusedSessionName, inline, ses
           }}
           title={pinned ? 'Unpin (return to focus-following)' : 'Pin voice to this session'}
         >
-          <span class="voice-pin-icon">{pinned ? '📌' : '🎯'}</span>
+          <span class={`voice-pin-icon${pinned ? ' voice-pin-icon--pinned' : ''}`}>&#x25C9;</span>
           {targetName}
         </button>
       )}
