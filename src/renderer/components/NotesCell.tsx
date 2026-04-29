@@ -36,7 +36,9 @@ interface NotesCellProps {
   onToggleExpand: () => void
   onDragStart: () => void
   onDragOver: (e: DragEvent) => void
+  onDragLeave: () => void
   onDrop: (e: DragEvent) => void
+  dragOver?: boolean
 }
 
 export function NotesCell({
@@ -49,7 +51,9 @@ export function NotesCell({
   onToggleExpand,
   onDragStart,
   onDragOver,
+  onDragLeave,
   onDrop,
+  dragOver,
 }: NotesCellProps) {
   const { t } = useTranslation()
   const { saveNote, deleteNote } = useNotes()
@@ -246,9 +250,10 @@ export function NotesCell({
 
   return (
     <div
-      class="session-cell notes-cell"
+      class={`session-cell notes-cell${dragOver ? ' session-cell--drag-over' : ''}`}
       style={cellStyle}
       onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
       onDrop={onDrop}
       data-highlight={slotCol != null && slotRow != null ? `cell-${slotCol}-${slotRow}` : undefined}
     >

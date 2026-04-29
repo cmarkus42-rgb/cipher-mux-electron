@@ -25,6 +25,7 @@ const defaults: AppConfig = {
   personas: [...BUILTIN_PERSONAS, ...SEED_CUSTOM_PERSONAS] as AppConfig['personas'],
   workspaces: [...SEED_WORKSPACES] as AppConfig['workspaces'],
   activeWorkspaceId: null,
+  defaultWorkspaceId: null,
   activeCharacterId: DEFAULT_CHARACTER_ID,
   characters: [...SEED_CHARACTERS],
   app: {

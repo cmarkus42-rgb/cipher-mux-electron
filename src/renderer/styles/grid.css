@@ -259,6 +259,11 @@
   border-style: dashed;
 }
 
+.launcher-cell--drag-over {
+  border: 2px dashed var(--color-accent);
+  background: rgba(var(--color-accent-rgb, 0, 255, 170), 0.06);
+}
+
 /* project popup */
 .modal-overlay {
   position: fixed;

@@ -240,21 +240,23 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
             >
               <WorkspaceThumbnail ws={ws} />
               <div class="wp-meta">
-                <div class="wp-name">{ws.name}</div>
+                <div class="wp-name">
+                  {ws.name}
+                  {activeId === ws.id && (
+                    <span class="wp-badge">{t('workspacePopup.active')}</span>
+                  )}
+                </div>
                 <div class="wp-sub">
                   {buildSubtitle(ws)}
                   {ws.defaultTags?.length ? ` · ${ws.defaultTags.join(', ')}` : ''}
                 </div>
               </div>
-              {activeId === ws.id && (
-                <span class="wp-badge">{t('workspacePopup.active')}</span>
-              )}
               <button
                 class={`wp-default-star${defaultWsId === ws.id ? ' wp-default-star--active' : ''}`}
                 onClick={(e) => { e.stopPropagation(); handleSetDefault(ws.id) }}
                 title={defaultWsId === ws.id ? t('workspacePopup.unsetDefault') : t('workspacePopup.setDefault')}
               >
-                {defaultWsId === ws.id ? '★' : '☆'}
+                {defaultWsId === ws.id ? '\u2605' : '\u2606'}
               </button>
             </div>
           ))}

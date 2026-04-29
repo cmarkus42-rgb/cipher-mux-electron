@@ -70,8 +70,17 @@ export function RecoveryDialog({ onDone, onAdopt, onRecovered }: RecoveryDialogP
         if (handledRef.current) return
         if (result && (result.recovered.length > 0 || result.orphaned.length > 0)) {
           processResult(result)
+        } else if (result) {
+          // Empty recovery result (no recovered, no orphaned) — finish immediately
+          processResult(result)
         } else if (Date.now() - startTime < POLL_TIMEOUT_MS) {
           pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
+        } else {
+          // Poll timed out without any result — call onDone so default workspace can load
+          if (!handledRef.current) {
+            handledRef.current = true
+            onDoneRef.current()
+          }
         }
       }).catch(() => {
         // Retry on error too (IPC might not be ready yet)

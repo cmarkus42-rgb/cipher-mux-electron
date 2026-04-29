@@ -53,6 +53,9 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     if (this.configReader.getSkipPermissions()) {
       args.push('--dangerously-skip-permissions')
     }
+    if (opts.resume) {
+      args.push('--resume')
+    }
     if (opts.forkFromClaudeSessionId) {
       args.push('--fork-session', opts.forkFromClaudeSessionId)
     }

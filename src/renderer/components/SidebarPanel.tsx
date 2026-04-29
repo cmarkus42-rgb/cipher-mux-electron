@@ -149,7 +149,10 @@ export function SidebarPanel({
   }, [deleteNote])
 
   const handleNoteDragStart = useCallback((note: any, e: DragEvent) => {
-    e.dataTransfer?.setData('text/plain', JSON.stringify(note))
+    if (!e.dataTransfer) return
+    e.dataTransfer.setData('application/x-cipher-type', 'note')
+    e.dataTransfer.setData('application/x-cipher-note', JSON.stringify(note))
+    e.dataTransfer.effectAllowed = 'move'
   }, [])
 
   const backgroundSessions = sessions.filter(
@@ -322,6 +325,7 @@ interface BackgroundSessionCardProps {
 function BackgroundSessionCard({ session, contextUsage, onClick, onKill, voiceGlow }: BackgroundSessionCardProps) {
   const { t } = useTranslation()
   const [lastOutput, setLastOutput] = useState<string>('')
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -344,30 +348,85 @@ function BackgroundSessionCard({ session, contextUsage, onClick, onKill, voiceGl
     onKill()
   }, [onKill, session.name, t])
 
+  const handleDragStart = useCallback((e: DragEvent) => {
+    if (!e.dataTransfer) return
+    e.dataTransfer.setData('application/x-cipher-type', 'session')
+    e.dataTransfer.setData('application/x-cipher-session-id', session.id)
+    e.dataTransfer.effectAllowed = 'move'
+  }, [session.id])
+
+  const handleClick = useCallback((e: MouseEvent) => {
+    // Single click toggles collapsed/expanded
+    e.preventDefault()
+    setExpanded(prev => !prev)
+  }, [])
+
+  const handleDblClick = useCallback((e: MouseEvent) => {
+    // Double click places session in grid
+    e.preventDefault()
+    onClick()
+  }, [onClick])
+
+  const dName = displayName(session.name, session.projectPath)
+  const pathBasename = session.projectPath
+    ? session.projectPath.replace(/\/+$/, '').split('/').pop() ?? ''
+    : ''
+  const showPathInCompact = pathBasename && pathBasename !== dName
+
   return (
-    <div class={`bg-card${voiceGlow ? ` bg-card--voice-${voiceGlow}` : ''}`} data-highlight={`side-session-${session.id}`} onClick={onClick} title={t('sidebar.clickToPlace')}>
+    <div
+      class={`bg-card bg-card--compact${expanded ? ' bg-card--expanded' : ''}${voiceGlow ? ` bg-card--voice-${voiceGlow}` : ''}`}
+      data-highlight={`side-session-${session.id}`}
+      onClick={handleClick}
+      onDblClick={handleDblClick}
+      title={expanded ? t('sidebar.clickToPlace') : ''}
+      draggable
+      onDragStart={handleDragStart}
+    >
+      {/* Line 1: Name + Kill */}
       <div class="bg-card__head">
-        <span class="bg-card__name">{displayName(session.name, session.projectPath)}</span>
+        <span class="bg-card__name">{dName}</span>
         <button
           class="bg-card__kill"
           onClick={handleKill}
           title={t('sidebar.killSession')}
-        >✕</button>
-        <span class="bg-card__path">{session.projectPath ?? ''}</span>
+        >x</button>
       </div>
-      {contextUsage && (
-        <div class="bg-card__context">
-          <span class="bg-card__tokens">
-            {contextUsage.used != null ? `${Math.round(contextUsage.used / 1000)}k` : '?'}
-            /{contextUsage.total != null ? `${Math.round(contextUsage.total / 1000)}k` : '?'}
-          </span>
-          <div class="bg-card__bar">
-            <div class="bg-card__fill" style={{ width: `${contextUsage.usedPercentage}%` }} />
-          </div>
+
+      {/* Line 2 (collapsed): Token usage + path basename */}
+      {!expanded && (
+        <div class="bg-card__compact-line2">
+          {contextUsage && (
+            <span class="bg-card__tokens">
+              {contextUsage.used != null ? `${Math.round(contextUsage.used / 1000)}k` : '?'}
+              /{contextUsage.total != null ? `${Math.round(contextUsage.total / 1000)}k` : '?'}
+            </span>
+          )}
+          {showPathInCompact && (
+            <span class="bg-card__path-short">{pathBasename}</span>
+          )}
         </div>
       )}
-      {lastOutput && (
-        <div class="bg-card__preview">{lastOutput}</div>
+
+      {/* Expanded: full details */}
+      {expanded && (
+        <>
+          <span class="bg-card__path">{session.projectPath ?? ''}</span>
+          {contextUsage && (
+            <div class="bg-card__context">
+              <span class="bg-card__tokens">
+                {contextUsage.used != null ? `${Math.round(contextUsage.used / 1000)}k` : '?'}
+                /{contextUsage.total != null ? `${Math.round(contextUsage.total / 1000)}k` : '?'}
+              </span>
+              <div class="bg-card__bar">
+                <div class="bg-card__fill" style={{ width: `${contextUsage.usedPercentage}%` }} />
+              </div>
+            </div>
+          )}
+          {lastOutput && (
+            <div class="bg-card__preview">{lastOutput}</div>
+          )}
+        </>
       )}
     </div>
   )
