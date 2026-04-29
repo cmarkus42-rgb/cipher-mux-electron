@@ -129,7 +129,7 @@ export function registerBuiltinEntities(
     color: '#9b59b6',
     projectPath: `${entitiesBase}/voice-relay`,
     startupGreeting: 'Session gestartet. Warte auf Voice-Input.',
-    features: ['mcp'],
+    features: ['mcp', 'memory'],
     visible: true,
   })
 
