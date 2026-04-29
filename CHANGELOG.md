@@ -51,6 +51,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Workspace Window Mount (G.10):** Error handling for mount race + theme fix.
 - **Template Tests (E.4):** Test expectations aligned with template rewrite.
 
+### Fixed (Bug-Fix-Runde 2026-04-29, nach Watchdog-Testlauf)
+- **TestcaseView Rendering (D.1):** Parser moved to main process via IPC — `require('gray-matter')` fails in Vite/ESM renderer.
+- **STT Notes Cursor (C.4):** Cursor positioned after inserted text, not before.
+- **Ghost Session Recovery:** Sessions removed from sessions.json on stop. Grid slots scrubbed. tmux kill retries.
+- **Orchestrator/MPO Entity Migration:** Removed BUILTIN_PERSONAS, both run as entity directories with full CLAUDE.md.
+- **Preset Editor UI (E.2):** New PresetEditor component — 4-tab editor (Rolle/Faehigkeiten/Arbeitsregeln/Scope) in Workspaces window.
+- **Workspace Editor Presets:** Preset dropdown per cell, default star, tags visible/editable in editor.
+- **Workspace Active Status:** Stale activeWorkspaceId cleared on restart when no default set.
+- **Sidebar Click/Dblclick:** 250ms delay pattern separates single-click (toggle) from double-click (open in grid).
+- **STT Auto-Unpin Background:** Pinned session auto-unpins when moved to background.
+- **LauncherCell Running Indicator:** Pulsing dot + colored name + tinted background for active presets.
+- **MCP Grid-Place/Resize:** Fixed resize() signature (object not args) + stale closure via gridRef.
+- **MCP Permissions for Voice-Relay:** Template-less entities get auto-generated permissions.allow.
+- **Resume Button (E.7):** Split-button in LauncherCell popup for --resume.
+- **Compact Background Sessions (C.5):** 2-line default, click to expand, double-click to open.
+- **Drag & Drop Sidebar→Grid (C.6):** Sessions + notes draggable from sidebar to grid cells.
+- **Pin Icon CSS-Art:** Replaced emoji with CSS circle indicator.
+
 ## [Unreleased] — v0.10 (SP-1 through SP-5)
 
 ### Added
