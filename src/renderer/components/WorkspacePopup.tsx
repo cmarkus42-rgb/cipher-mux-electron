@@ -329,7 +329,6 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
 
         <div class="wp-foot">
           <button class="ghost" onClick={handleSaveCurrentOpen} disabled={!currentGrid}>{t('workspacePopup.saveCurrent')}</button>
-          <button class="ghost" onClick={() => onOpenSettings('personas')}>Companion</button>
           <button class="ghost" onClick={() => onOpenSettings('workspaces')}>{t('workspacePopup.editBtn')}</button>
           <button onClick={handleLoad} disabled={!selectedId}>{t('workspacePopup.load')}</button>
         </div>
