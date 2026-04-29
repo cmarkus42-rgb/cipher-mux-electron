@@ -503,12 +503,18 @@ export function App() {
     setWorkspacesPopupVisible(false)
   }, [resize, applyMerges, setSessionAtSlot])
 
-  // Called when RecoveryDialog finishes without recovering any sessions — auto-load default workspace
+  // Called when RecoveryDialog finishes — auto-load default workspace only if no sessions exist yet
   const handleRecoveryDone = useCallback(async () => {
     try {
+      // Only auto-load default workspace when no sessions are active
+      // (i.e., fresh start with no recovery). If sessions were recovered,
+      // they are already placed and we must not overwrite them.
+      if (sessionsRef.current.length > 0) return
+
       const api = (window as any).cipherMux
       const defaultWsId: string | null = await api.config.get('defaultWorkspaceId')
       if (defaultWsId) {
+        console.log(`[App] Auto-loading default workspace: ${defaultWsId}`)
         handleWorkspaceApply(defaultWsId)
       }
     } catch (err) {
