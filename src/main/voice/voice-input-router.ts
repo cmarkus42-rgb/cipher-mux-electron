@@ -161,10 +161,29 @@ export class VoiceInputRouter extends EventEmitter {
   }
 
   /**
+   * Check whether the pinned session is still visible in the grid.
+   * If it moved to background, auto-unpin so STT follows focus again.
+   */
+  private autoUnpinIfBackground(): void {
+    if (!this.pinnedSessionId) return
+    const gridState = this.sessionManager.getSessionStore().getGridState()
+    if (!gridState) return
+    const inGrid = gridState.slots.some(
+      (s: { sessionId?: string | null }) => s.sessionId === this.pinnedSessionId
+    )
+    if (!inGrid) {
+      console.log('[VoiceRouter] pinned session no longer in grid — auto-unpinning')
+      this.unpinSession()
+    }
+  }
+
+  /**
    * Route transcription to the active session (pinned or focused).
    * Text is sent without Enter — user submits via voice command.
    */
   private async routeToSession(text: string): Promise<void> {
+    // Auto-unpin if pinned session was moved to background
+    this.autoUnpinIfBackground()
     const targetId = this.getActiveSessionId()
     if (!targetId) {
       console.log('[VoiceRouter] ERROR: no target session')
