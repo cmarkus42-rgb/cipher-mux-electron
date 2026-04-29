@@ -16,6 +16,9 @@ export function WorkspacesTab() {
   const [knownProjects, setKnownProjects] = useState<Array<{ path: string; name: string }>>([])
   const [defaultWsId, setDefaultWsId] = useState<string | null>(null)
   const entityPresets = useEntityPresets()
+  const [allTags, setAllTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
 
   const loadAll = useCallback(async () => {
     const wsList: Workspace[] = await api.workspaces.list()
@@ -35,6 +38,11 @@ export function WorkspacesTab() {
     try {
       const defId = await api.config.get('defaultWorkspaceId')
       setDefaultWsId(defId ?? null)
+    } catch { /* ignore */ }
+    // Load available tags for autocomplete
+    try {
+      const tags = await api.notes?.tags?.()
+      setAllTags(tags ?? [])
     } catch { /* ignore */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -162,6 +170,34 @@ export function WorkspacesTab() {
     setDefaultWsId(nextId)
   }
 
+  const handleTagInputChange = (value: string) => {
+    setTagInput(value)
+    if (value.trim()) {
+      const lower = value.toLowerCase()
+      const current = ws?.defaultTags ?? []
+      setTagSuggestions(allTags.filter(t => t.toLowerCase().includes(lower) && !current.includes(t)).slice(0, 5))
+    } else {
+      setTagSuggestions([])
+    }
+  }
+
+  const handleAddTag = (tag: string) => {
+    if (!ws) return
+    const normalized = tag.trim().toLowerCase()
+    const current = ws.defaultTags ?? []
+    if (normalized && !current.includes(normalized)) {
+      updateWs({ defaultTags: [...current, normalized] })
+    }
+    setTagInput('')
+    setTagSuggestions([])
+  }
+
+  const handleRemoveTag = (tag: string) => {
+    if (!ws) return
+    const current = ws.defaultTags ?? []
+    updateWs({ defaultTags: current.filter(t => t !== tag) })
+  }
+
   const getPresetInfo = (presetId?: string) => {
     if (!presetId) return null
     return entityPresets.find(p => p.id === presetId) ?? null
@@ -279,11 +315,19 @@ export function WorkspacesTab() {
           <>
             {/* Name row */}
             <div class="ws-ed-row">
+              {defaultWsId === ws.id && <span class="ws-default-star" title={t('workspacesTab.isDefault')}>&#9733;</span>}
               <input
                 class="ws-ed-name"
                 value={ws.name}
                 onInput={(e) => updateWs({ name: (e.target as HTMLInputElement).value })}
               />
+              <button
+                class={`ws-ed-tool${defaultWsId === ws.id ? ' ws-ed-tool--star-active' : ''}`}
+                onClick={() => handleToggleDefault(ws.id)}
+                title={defaultWsId === ws.id ? t('workspacesTab.unsetDefault') : t('workspacesTab.setDefault')}
+              >
+                {defaultWsId === ws.id ? '\u2605' : '\u2606'}
+              </button>
               <button class="ws-ed-tool" onClick={handleDuplicate}>{t('workspacesTab.duplicate')}</button>
               <button class="ws-ed-tool danger" onClick={handleDelete}>{t('workspacesTab.delete')}</button>
             </div>
@@ -301,6 +345,41 @@ export function WorkspacesTab() {
                 <button onClick={() => handleStepRows(-1)}>-</button>
                 <span class="dim-val">{ws.rows}</span>
                 <button onClick={() => handleStepRows(1)}>+</button>
+              </div>
+            </div>
+
+            {/* Tags */}
+            <div class="ws-ed-tags">
+              <span class="dim-label">{t('workspacesTab.tags', 'Tags')}</span>
+              <div class="ws-ed-tags__chips">
+                {(ws.defaultTags ?? []).map(tag => (
+                  <span key={tag} class="ws-tag-chip ws-tag-chip--editable">
+                    #{tag}
+                    <span class="ws-tag-chip__remove" onClick={() => handleRemoveTag(tag)}>&times;</span>
+                  </span>
+                ))}
+                <div class="ws-ed-tags__input-wrap">
+                  <input
+                    class="ws-ed-tags__input"
+                    type="text"
+                    value={tagInput}
+                    onInput={(e) => handleTagInputChange((e.target as HTMLInputElement).value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && tagInput.trim()) {
+                        e.preventDefault()
+                        handleAddTag(tagInput)
+                      }
+                    }}
+                    placeholder={t('workspacesTab.addTag', '+ tag')}
+                  />
+                  {tagSuggestions.length > 0 && (
+                    <div class="ws-ed-tags__suggestions">
+                      {tagSuggestions.map(s => (
+                        <div key={s} class="ws-ed-tags__suggestion" onClick={() => handleAddTag(s)}>{s}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

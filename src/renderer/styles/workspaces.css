@@ -525,8 +525,32 @@
   opacity: 0.8;
 }
 
+.ws-tag-chip--editable {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  opacity: 1;
+}
+
+.ws-tag-chip__remove {
+  cursor: pointer;
+  color: var(--color-text-dim);
+  font-size: 11px;
+  line-height: 1;
+}
+.ws-tag-chip__remove:hover {
+  color: var(--color-neon-red);
+}
+
 .ws-default-star {
   color: var(--color-accent);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
 }
 
 .ws-default-toggle {
@@ -566,10 +590,14 @@
 /* ── Name Row ── */
 
 .ws-ed-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
+  display: flex;
   gap: 8px;
   align-items: stretch;
+}
+
+.ws-ed-row .ws-ed-name {
+  flex: 1;
+  min-width: 0;
 }
 
 .ws-ed-row > * {
@@ -629,6 +657,74 @@
   background: var(--color-neon-red);
   color: white;
   border-color: var(--color-neon-red);
+}
+
+.ws-ed-tool--star-active {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+/* ── Tags Editor ── */
+
+.ws-ed-tags {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 12px;
+  background: var(--color-bg-sunken);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.ws-ed-tags__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  flex: 1;
+}
+
+.ws-ed-tags__input-wrap {
+  position: relative;
+}
+
+.ws-ed-tags__input {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-dim);
+  padding: 2px 4px;
+  width: 80px;
+}
+.ws-ed-tags__input:focus {
+  outline: none;
+  border-color: var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.ws-ed-tags__suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  min-width: 120px;
+}
+
+.ws-ed-tags__suggestion {
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+  color: var(--color-text);
+}
+.ws-ed-tags__suggestion:hover {
+  background: var(--color-accent);
+  color: var(--color-bg);
 }
 
 /* ── Dimension Steppers ── */
