@@ -1333,17 +1333,18 @@
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--color-text-dim);
-  padding: 0 4px;
+  padding: 2px 6px;
   margin-left: auto;
-  opacity: 0.4;
+  opacity: 0.6;
   transition: opacity 0.15s, color 0.15s;
+  flex-shrink: 0;
 }
 
-.wp-row:hover .wp-default-star { opacity: 0.8; }
+.wp-row:hover .wp-default-star { opacity: 0.9; }
 .wp-default-star--active { opacity: 1 !important; color: var(--color-neon-orange, #ffb74d); }
-.wp-default-star:hover { opacity: 1; }
+.wp-default-star:hover { opacity: 1; color: var(--color-neon-orange, #ffb74d); }
 
 .wp-legend {
   display: flex;
