@@ -1480,6 +1480,35 @@ export class IpcHub {
       }
     })
 
+    // Parse a testcase note in main process (where gray-matter is available)
+    ipcMain.handle(IPC.NOTES_PARSE_TESTCASE, async (_e, { id }: { id: string }) => {
+      try {
+        const result = await this.noteManager.read(id)
+        if (!result || result.info.noteType !== 'testcase') return null
+        const { parseTestcase } = require('./notes/testcase-parser')
+        // Read raw file to get frontmatter intact for parser
+        const fsNode = require('fs')
+        const pathNode = require('path')
+        const rawPath = pathNode.join(this.noteManager['notesDir'], `${id}.md`)
+        const raw = fsNode.readFileSync(rawPath, 'utf-8')
+        return parseTestcase(raw) ?? null
+      } catch (err) {
+        console.error('[IpcHub] NOTES_PARSE_TESTCASE failed:', err)
+        return null
+      }
+    })
+
+    // Serialize testcase sections back to markdown body (main process)
+    ipcMain.handle(IPC.NOTES_SERIALIZE_TESTCASE, async (_e, { sections }: { sections: any[] }) => {
+      try {
+        const { serializeTestcaseBody } = require('./notes/testcase-parser')
+        return serializeTestcaseBody(sections)
+      } catch (err) {
+        console.error('[IpcHub] NOTES_SERIALIZE_TESTCASE failed:', err)
+        return null
+      }
+    })
+
     ipcMain.handle(IPC.NOTES_TAGS, async () => {
       return this.noteTagging.getTagRepository()
     })

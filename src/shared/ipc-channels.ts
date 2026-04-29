@@ -156,6 +156,8 @@ export const IPC = {
   NOTES_TAG_UPDATE: 'cipher-mux:notes:tag-update',
   NOTES_TAG_DELETE: 'cipher-mux:notes:tag-delete',
   NOTES_SCREENSHOT: 'cipher-mux:notes:screenshot',
+  NOTES_PARSE_TESTCASE: 'cipher-mux:notes:parse-testcase',
+  NOTES_SERIALIZE_TESTCASE: 'cipher-mux:notes:serialize-testcase',
   NOTES_CHANGED: 'cipher-mux:notes:changed',
 
   // Grid Control (MCP App-Control)
