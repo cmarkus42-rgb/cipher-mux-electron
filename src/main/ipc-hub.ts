@@ -731,15 +731,10 @@ export class IpcHub {
   // ─── Orchestrator ────────────────────────────────────────
   private registerOrchestratorChannels(): void {
     ipcMain.handle(IPC.ORCHESTRATOR_START, async () => {
-      const mcpConfig = configStore.get('mcp')
-      const session = await this.sessionManager.startOrchestrator({
-        mcpHost: mcpConfig?.host ?? MCP_DEFAULT_HOST,
-        mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
-        mcpApiKey: mcpConfig?.apiKey ?? '',
-      })
+      const session = await this.sessionManager.startEntity('orchestrator')
       // Queue Claude launch — fires when renderer reports real terminal size
       try {
-        this.sessionManager.queueOrchestratorClaude()
+        this.sessionManager.queueEntityClaude('orchestrator')
       } catch (err) {
         console.error('[IpcHub] Failed to queue orchestrator claude:', err)
       }
@@ -747,14 +742,14 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.ORCHESTRATOR_STOP, async () => {
-      await this.sessionManager.stopOrchestrator()
+      await this.sessionManager.stopEntity('orchestrator')
       return { ok: true }
     })
 
     ipcMain.handle(IPC.ORCHESTRATOR_STATUS, async () => {
       return {
-        running: this.sessionManager.isOrchestratorRunning(),
-        sessionId: this.sessionManager.getOrchestratorSessionId(),
+        running: this.sessionManager.isEntityRunning('orchestrator'),
+        sessionId: this.sessionManager.getEntitySessionId('orchestrator'),
       }
     })
   }
@@ -762,14 +757,9 @@ export class IpcHub {
   // ─── MPO ─────────────────────────────────────────────
   private registerMpoChannels(): void {
     ipcMain.handle(IPC.MPO_START, async () => {
-      const mcpConfig = configStore.get('mcp')
-      const session = await this.sessionManager.startMpo({
-        mcpHost: mcpConfig?.host ?? MCP_DEFAULT_HOST,
-        mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
-        mcpApiKey: mcpConfig?.apiKey ?? '',
-      })
+      const session = await this.sessionManager.startEntity('mpo')
       try {
-        this.sessionManager.queueMpoClaude()
+        this.sessionManager.queueEntityClaude('mpo')
       } catch (err) {
         console.error('[IpcHub] Failed to queue MPO claude:', err)
       }
@@ -777,14 +767,14 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.MPO_STOP, async () => {
-      await this.sessionManager.stopMpo()
+      await this.sessionManager.stopEntity('mpo')
       return { ok: true }
     })
 
     ipcMain.handle(IPC.MPO_STATUS, async () => {
       return {
-        running: this.sessionManager.isMpoRunning(),
-        sessionId: this.sessionManager.getMpoSessionId(),
+        running: this.sessionManager.isEntityRunning('mpo'),
+        sessionId: this.sessionManager.getEntitySessionId('mpo'),
       }
     })
   }
