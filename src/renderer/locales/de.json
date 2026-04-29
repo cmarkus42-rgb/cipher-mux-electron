@@ -224,6 +224,8 @@
   "workspacesTab.isDefault": "Standard-Workspace (laedt beim Start)",
   "workspacesTab.setDefault": "Als Standard-Workspace setzen",
   "workspacesTab.unsetDefault": "Standard-Workspace entfernen",
+  "workspacesTab.tags": "Tags",
+  "workspacesTab.addTag": "+ Tag",
 
   "workspacesWindow.workspaces": "workspaces",
   "workspacesWindow.personas": "personas",
