@@ -164,15 +164,16 @@ export function App() {
     if (auditSessionId && !activeIds.has(auditSessionId)) setAuditSessionId(null)
   }, [sessions, orchestratorSessionId, mpoSessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
 
-  // Entity status map for unified dialog
-  const entityStatus = useMemo<Record<string, boolean>>(() => ({
-    orchestrator: !!orchestratorSessionId,
-    mpo: !!mpoSessionId,
-    companion: !!companionSessionId,
-    refinement: !!refinementSessionId,
-    'voice-relay': !!voiceRelaySessionId,
-    audit: !!auditSessionId,
-  }), [orchestratorSessionId, mpoSessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
+  // Entity status map for unified dialog — computed dynamically from active sessions
+  // so that ANY entity (including dynamic ones like watchdog, projectlauncher, etc.)
+  // is recognised as running, not just the 6 hardcoded ones.
+  const entityStatus = useMemo<Record<string, boolean>>(() => {
+    const status: Record<string, boolean> = {}
+    for (const s of sessions) {
+      if (s.entityId && s.status === 'active') status[s.entityId] = true
+    }
+    return status
+  }, [sessions])
 
   const placeOrchestrator = useCallback((sessionId: string) => {
     setOrchestratorSessionId(sessionId)
