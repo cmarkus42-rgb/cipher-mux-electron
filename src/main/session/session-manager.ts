@@ -4,11 +4,9 @@ import * as path from 'path'
 import * as os from 'os'
 import { ulid } from 'ulidx'
 import type { SessionInfo, StartSessionOpts, RecoveryResult, EntityId } from '../../shared/types'
-import { MAX_SESSIONS, ORCHESTRATOR_MAX_RETRIES, MPO_MAX_RETRIES } from '../../shared/constants'
+import { MAX_SESSIONS } from '../../shared/constants'
 import { BRAND } from '../../shared/brand'
 import { TmuxManager } from '../tmux/tmux-manager'
-import { generateOrchestratorClaudeMd } from './orchestrator-template'
-import { generateMpoClaudeMd } from './mpo-template'
 import { generateAuditClaudeMd } from './audit-template'
 import { generateVoiceRelayClaudeMd } from './voice-relay-template'
 import { EntityRegistry } from './entity-registry'
@@ -320,6 +318,15 @@ export class SessionManager extends EventEmitter {
     this.emit('session-stopped', session)
     this.sessions.delete(sessionId)
     this.sessionAdapters.delete(sessionId)
+
+    // Clean up entity links if this was an entity session
+    if (session.entityId) {
+      const entityId = session.entityId as EntityId
+      this.entitySessionIds.delete(entityId)
+      this.entityRegistry.unlinkSession(sessionId)
+      if (entityId === 'orchestrator') this.orchestratorSessionId = null
+      if (entityId === 'mpo') this.mpoSessionId = null
+    }
 
     // Remove from persistent store
     this.sessionStore.removeSession(sessionId)
@@ -705,30 +712,12 @@ export class SessionManager extends EventEmitter {
     // Each entity gets a role-specific CLAUDE.md so it overrides the global
     // Mimir persona from ~/.claude/CLAUDE.md (fixes B07 persona distribution).
     // Code-generated templates (voice-relay, audit) are always refreshed so
-    // updates propagate on next session start. Orchestrator/MPO templates
-    // contain runtime config (MCP host/key) and are also always refreshed.
+    // updates propagate on next session start. Orchestrator and MPO use
+    // pre-authored CLAUDE.md in their entity directories (no code generation).
     // Only truly generic fallback CLAUDE.md is write-once (preserves manual edits).
     if (!config.templatePath) {
       const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
-      if (config.id === 'orchestrator' && this.mcpConfig) {
-        const adapter = this.adapterRegistry.getDefault()
-        fs.writeFileSync(claudeMdPath, generateOrchestratorClaudeMd({
-          mcpHost: this.mcpConfig.mcpHost,
-          mcpPort: this.mcpConfig.mcpPort,
-          mcpApiKey: this.mcpConfig.mcpApiKey,
-          maxRetries: ORCHESTRATOR_MAX_RETRIES,
-          adapterFragment: adapter.buildOrchestratorPromptFragment('de'),
-        }), 'utf-8')
-      } else if (config.id === 'mpo' && this.mcpConfig) {
-        const adapter = this.adapterRegistry.getDefault()
-        fs.writeFileSync(claudeMdPath, generateMpoClaudeMd({
-          mcpHost: this.mcpConfig.mcpHost,
-          mcpPort: this.mcpConfig.mcpPort,
-          mcpApiKey: this.mcpConfig.mcpApiKey,
-          maxRetries: MPO_MAX_RETRIES,
-          adapterFragment: adapter.buildMpoPromptFragment('de'),
-        }), 'utf-8')
-      } else if (config.id === 'audit') {
+      if (config.id === 'audit') {
         fs.writeFileSync(claudeMdPath, generateAuditClaudeMd(), 'utf-8')
       } else if (config.id === 'voice-relay') {
         fs.writeFileSync(claudeMdPath, generateVoiceRelayClaudeMd(), 'utf-8')
@@ -737,7 +726,7 @@ export class SessionManager extends EventEmitter {
         fs.writeFileSync(claudeMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')
       }
       // Always update MCP connection file for entities that use MCP
-      if ((config.id === 'orchestrator' || config.id === 'mpo') && this.mcpConfig) {
+      if (config.features.includes('mcp') && this.mcpConfig) {
         const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}/mcp`
         fs.writeFileSync(
           path.join(config.projectPath, '.mcp-connection.md'),
@@ -946,258 +935,6 @@ export class SessionManager extends EventEmitter {
    */
   getEntitySessionId(entityId: EntityId): string | null {
     return this.entitySessionIds.get(entityId) ?? null
-  }
-
-  // ─── Orchestrator ─────────────────────────────────────
-
-  /**
-   * Resolve the orchestrator directory path (expand ~).
-   */
-  private resolveOrchestratorDir(): string {
-    return BRAND.orchestratorDir.replace(/^~/, os.homedir())
-  }
-
-  /**
-   * Start the Orchestrator session.
-   * Creates the orchestrator directory and CLAUDE.md, then starts
-   * a special session pointing at that directory.
-   */
-  async startOrchestrator(config: OrchestratorConfig): Promise<SessionInfo> {
-    if (this.orchestratorSessionId) {
-      const existing = this.sessions.get(this.orchestratorSessionId)
-      if (existing && existing.status === 'active') {
-        throw new Error('Orchestrator is already running')
-      }
-      // Stale reference — clear it
-      this.orchestratorSessionId = null
-    }
-
-    const orchestratorDir = this.resolveOrchestratorDir()
-
-    // Ensure directory exists
-    fs.mkdirSync(orchestratorDir, { recursive: true })
-
-    // Generate CLAUDE.md only if it does NOT exist — preserves manual edits
-    // by the user or Orchestrator session. MCP connection details go into
-    // a separate .mcp-connection.md that is always regenerated.
-    const adapter = this.adapterRegistry.getDefault()
-    const claudeMdPath = path.join(orchestratorDir, 'CLAUDE.md')
-    if (!fs.existsSync(claudeMdPath)) {
-      const claudeMd = generateOrchestratorClaudeMd({
-        mcpHost: config.mcpHost,
-        mcpPort: config.mcpPort,
-        mcpApiKey: config.mcpApiKey,
-        maxRetries: ORCHESTRATOR_MAX_RETRIES,
-        adapterFragment: adapter.buildOrchestratorPromptFragment('de'),
-      })
-      fs.writeFileSync(claudeMdPath, claudeMd, 'utf-8')
-    }
-    // Always update MCP connection file (URL/auth may change between restarts)
-    const mcpUrl = `http://${config.mcpHost}:${config.mcpPort}/mcp`
-    fs.writeFileSync(
-      path.join(orchestratorDir, '.mcp-connection.md'),
-      `# MCP-Verbindung (auto-generiert, nicht editieren)\n\n- **URL:** ${mcpUrl}\n- **Auth:** Bearer ${config.mcpApiKey}\n`,
-      'utf-8',
-    )
-
-    // Write .mcp.json into the orchestrator project directory.
-    // Claude Code reads this file when starting in the project dir.
-    const mcpJsonPath = path.join(orchestratorDir, '.mcp.json')
-    const mcpJson = {
-      mcpServers: {
-        'cipher-mux': {
-          type: 'http',
-          url: mcpUrl,
-          headers: {
-            Authorization: `Bearer ${config.mcpApiKey}`,
-          },
-        },
-      },
-    }
-    fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2), 'utf-8')
-
-    // MCP registration via `claude mcp add-json` happens automatically
-    // in start() when mcpConfig is set. The .mcp.json above is an
-    // additional fallback specific to the orchestrator directory.
-
-    // Start session — command is sent separately after renderer has resized
-    const session = await this.start({
-      name: 'Orchestrator',
-      projectPath: orchestratorDir,
-    })
-
-    this.orchestratorSessionId = session.id
-    this.emit('orchestrator-started', session)
-    return session
-  }
-
-  /**
-   * Queue Claude Code launch in the Orchestrator session.
-   * The command is sent only after the renderer marks the terminal ready
-   * with its real size, so the TUI doesn't start at tmux's default 80x24.
-   */
-  queueOrchestratorClaude(): void {
-    if (!this.orchestratorSessionId) {
-      throw new Error('Orchestrator is not running')
-    }
-    const adapter = this.adapterRegistry.getDefault()
-    const launchCmd = adapter.buildLaunchCommand({
-      projectPath: this.resolveOrchestratorDir(),
-      sessionName: 'Orchestrator',
-      isOrchestrator: true,
-    })
-    const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
-    this.setPendingLaunch(
-      this.orchestratorSessionId,
-      `clear; ${cmdStr}\n`,
-    )
-  }
-
-  /**
-   * Stop the Orchestrator session.
-   */
-  async stopOrchestrator(): Promise<void> {
-    if (!this.orchestratorSessionId) {
-      throw new Error('Orchestrator is not running')
-    }
-    await this.stop(this.orchestratorSessionId)
-    this.orchestratorSessionId = null
-    this.emit('orchestrator-stopped')
-  }
-
-  /**
-   * Check if the Orchestrator is currently running.
-   */
-  isOrchestratorRunning(): boolean {
-    if (!this.orchestratorSessionId) return false
-    const session = this.sessions.get(this.orchestratorSessionId)
-    return (session?.status === 'active') || false
-  }
-
-  /**
-   * Get the Orchestrator session ID (or null).
-   */
-  getOrchestratorSessionId(): string | null {
-    return this.orchestratorSessionId
-  }
-
-  // ─── MPO (Multi-Project Orchestrator) ───────────────
-
-  /**
-   * Resolve the MPO directory path (expand ~).
-   */
-  private resolveMpoDir(): string {
-    return BRAND.mpoDir.replace(/^~/, os.homedir())
-  }
-
-  /**
-   * Start the MPO session.
-   * Creates the MPO directory and CLAUDE.md, then starts
-   * a special session pointing at that directory.
-   */
-  async startMpo(config: OrchestratorConfig): Promise<SessionInfo> {
-    if (this.mpoSessionId) {
-      const existing = this.sessions.get(this.mpoSessionId)
-      if (existing && existing.status === 'active') {
-        throw new Error('MPO is already running')
-      }
-      this.mpoSessionId = null
-    }
-
-    const mpoDir = this.resolveMpoDir()
-    fs.mkdirSync(mpoDir, { recursive: true })
-
-    // Generate CLAUDE.md only if it does NOT exist — preserves manual edits
-    const adapter = this.adapterRegistry.getDefault()
-    const claudeMdPath = path.join(mpoDir, 'CLAUDE.md')
-    if (!fs.existsSync(claudeMdPath)) {
-      const claudeMd = generateMpoClaudeMd({
-        mcpHost: config.mcpHost,
-        mcpPort: config.mcpPort,
-        mcpApiKey: config.mcpApiKey,
-        maxRetries: MPO_MAX_RETRIES,
-        adapterFragment: adapter.buildMpoPromptFragment('de'),
-      })
-      fs.writeFileSync(claudeMdPath, claudeMd, 'utf-8')
-    }
-    // Always update MCP connection file (URL/auth may change between restarts)
-    const mcpUrl = `http://${config.mcpHost}:${config.mcpPort}/mcp`
-    fs.writeFileSync(
-      path.join(mpoDir, '.mcp-connection.md'),
-      `# MCP-Verbindung (auto-generiert, nicht editieren)\n\n- **URL:** ${mcpUrl}\n- **Auth:** Bearer ${config.mcpApiKey}\n`,
-      'utf-8',
-    )
-
-    // Write .mcp.json for Claude Code MCP auto-discovery
-    const mcpJsonPath = path.join(mpoDir, '.mcp.json')
-    const mcpJson = {
-      mcpServers: {
-        'cipher-mux': {
-          type: 'http',
-          url: mcpUrl,
-          headers: { Authorization: `Bearer ${config.mcpApiKey}` },
-        },
-      },
-    }
-    fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2), 'utf-8')
-
-    const session = await this.start({
-      name: 'MPO',
-      projectPath: mpoDir,
-    })
-
-    this.mpoSessionId = session.id
-    this.emit('mpo-started', session)
-    return session
-  }
-
-  /**
-   * Queue Claude Code launch in the MPO session.
-   */
-  queueMpoClaude(): void {
-    if (!this.mpoSessionId) {
-      throw new Error('MPO is not running')
-    }
-    const adapter = this.adapterRegistry.getDefault()
-    const launchCmd = adapter.buildLaunchCommand({
-      projectPath: this.resolveMpoDir(),
-      sessionName: 'MPO',
-      isMpo: true,
-    })
-    const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
-    this.setPendingLaunch(this.mpoSessionId, `clear; ${cmdStr}\n`)
-  }
-
-  /**
-   * Stop the MPO session.
-   */
-  async stopMpo(): Promise<void> {
-    if (!this.mpoSessionId) {
-      return // already stopped — no-op
-    }
-    try {
-      await this.stop(this.mpoSessionId)
-    } catch {
-      // Session may already be gone (killed externally)
-    }
-    this.mpoSessionId = null
-    this.emit('mpo-stopped')
-  }
-
-  /**
-   * Check if the MPO is currently running.
-   */
-  isMpoRunning(): boolean {
-    if (!this.mpoSessionId) return false
-    const session = this.sessions.get(this.mpoSessionId)
-    return (session?.status === 'active') || false
-  }
-
-  /**
-   * Get the MPO session ID (or null).
-   */
-  getMpoSessionId(): string | null {
-    return this.mpoSessionId
   }
 
   // ─── Session Resume / Fork ──────────────────────────────
@@ -1412,7 +1149,10 @@ export class SessionManager extends EventEmitter {
    */
   persistGridState(gridState: PersistedGridState): void {
     // Also update gridSlot on each persisted session
+    // Filter out sessions no longer in the in-memory registry — prevents
+    // a stale grid-save from re-adding sessions that were already stopped.
     const sessions = this.sessionStore.getSessions()
+      .filter(ps => this.sessions.has(ps.id))
     for (const ps of sessions) {
       const slotIdx = gridState.slots.findIndex(s => s.sessionId === ps.id)
       ps.gridSlot = slotIdx >= 0 ? slotIdx : null
