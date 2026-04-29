@@ -189,10 +189,18 @@ export const IPC = {
 
   // Entity Framework
   ENTITY_START: 'cipher-mux:entity:start',
+  ENTITY_RESUME: 'cipher-mux:entity:resume',
   ENTITY_STOP: 'cipher-mux:entity:stop',
   ENTITY_STATUS: 'cipher-mux:entity:status',
   ENTITY_LIST: 'cipher-mux:entity:list',
   ENTITY_STARTED: 'cipher-mux:entity:started',
+
+  // Presets (Entity CLAUDE.md Editor)
+  PRESETS_LIST: 'cipher-mux:presets:list',
+  PRESETS_READ: 'cipher-mux:presets:read',
+  PRESETS_SAVE: 'cipher-mux:presets:save',
+  PRESETS_CREATE: 'cipher-mux:presets:create',
+  PRESETS_DELETE: 'cipher-mux:presets:delete',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

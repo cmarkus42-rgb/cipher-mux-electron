@@ -330,6 +330,7 @@ const api = {
   // ─── Entities ──────────────────────────────────────────
   entity: {
     start: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_START, { entityId }),
+    resume: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_RESUME, { entityId }),
     stop: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_STOP, { entityId }),
     status: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_STATUS, { entityId }),
     list: () => ipcRenderer.invoke(IPC.ENTITY_LIST),
@@ -338,6 +339,15 @@ const api = {
       ipcRenderer.on(IPC.ENTITY_STARTED, handler)
       return () => ipcRenderer.removeListener(IPC.ENTITY_STARTED, handler)
     },
+  },
+
+  // ─── Presets ──────────────────────────────────────────────
+  presets: {
+    list: () => ipcRenderer.invoke(IPC.PRESETS_LIST),
+    read: (entityId: string) => ipcRenderer.invoke(IPC.PRESETS_READ, { entityId }),
+    save: (entityId: string, content: string) => ipcRenderer.invoke(IPC.PRESETS_SAVE, { entityId, content }),
+    create: (entityId: string, displayName: string) => ipcRenderer.invoke(IPC.PRESETS_CREATE, { entityId, displayName }),
+    delete: (entityId: string) => ipcRenderer.invoke(IPC.PRESETS_DELETE, { entityId }),
   },
 
   // ─── Voice ──────────────────────────────────────────────
