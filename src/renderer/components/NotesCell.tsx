@@ -8,13 +8,6 @@ import { useNotes } from '../hooks/useNotes'
 import type { NoteInfo } from '../../shared/types'
 import type { ParsedTestcase, TestcaseSection } from '../../main/notes/testcase-parser'
 
-// Lazy-load parser to avoid pulling Node.js code into renderer bundle at import time
-let _parser: typeof import('../../main/notes/testcase-parser') | null = null
-function getParser() {
-  if (!_parser) _parser = require('../../main/notes/testcase-parser')
-  return _parser!
-}
-
 interface NoteTab {
   id: string
   title: string
@@ -75,16 +68,15 @@ export function NotesCell({
       const result = await apiObj.notes.read(info.id)
       if (!result) return
 
-      // Detect testcase note
+      // Detect testcase note — parsing runs in main process via IPC
       let testcase: ParsedTestcase | undefined
       if (info.noteType === 'testcase') {
         try {
-          const parser = getParser()
-          // Reconstruct raw markdown for parser (body already has no frontmatter)
-          const fmForParser = { ...result.info, type: result.info.noteType }
-          const rawForParser = require('gray-matter').stringify('\n' + result.body, fmForParser)
-          testcase = parser.parseTestcase(rawForParser) ?? undefined
-        } catch { /* not a valid testcase, open as regular note */ }
+          const parsed = await apiObj.notes.parseTestcase(info.id)
+          testcase = parsed ?? undefined
+        } catch (err) {
+          console.error('[NotesCell] Failed to parse testcase:', err)
+        }
       }
 
       const tab: NoteTab = {
@@ -163,13 +155,14 @@ export function NotesCell({
     [activeTab],
   )
 
-  // Testcase: update sections → serialize → save
+  // Testcase: update sections → serialize via IPC → save
   const handleTestcaseUpdate = useCallback(
     async (sections: TestcaseSection[]) => {
       if (!activeTab?.testcase) return
-      const parser = getParser()
+      const apiObj = (window as any).cipherMux
       const updated: ParsedTestcase = { ...activeTab.testcase, sections }
-      const body = parser.serializeTestcaseBody(sections)
+      const body = await apiObj.notes.serializeTestcaseBody(sections)
+      if (!body) { console.error('[NotesCell] serializeTestcaseBody returned null'); return }
       const result = await saveNote(activeTab.id, body)
       const title = result?.title || activeTab.title
       setTabs((prev) =>
@@ -181,20 +174,28 @@ export function NotesCell({
     [activeTab, saveNote],
   )
 
-  // Testcase: archive
+  // Testcase: archive — summarize locally (pure logic), serialize via IPC
   const handleTestcaseArchive = useCallback(async () => {
     if (!activeTab?.testcase) return
-    const parser = getParser()
-    const summary = parser.summarizeTestcase(activeTab.testcase.sections)
+    const apiObj = (window as any).cipherMux
+    // Summarize locally (no Node.js deps needed)
+    const sections = activeTab.testcase.sections
+    let total = 0, pass = 0, fail = 0
+    for (const s of sections) {
+      for (const item of s.items) {
+        total++
+        if (item.status === 'pass') pass++
+        else if (item.status === 'fail') fail++
+      }
+    }
     const fm = {
       ...activeTab.testcase.frontmatter,
       archived: true,
       archivedAt: new Date().toISOString(),
-      summary: `${summary.pass}/${summary.total} PASS, ${summary.fail} FAIL`,
+      summary: `${pass}/${total} PASS, ${fail} FAIL`,
     }
-    const body = parser.serializeTestcaseBody(activeTab.testcase.sections)
-    const raw = require('gray-matter').stringify('\n' + body, fm)
-    // Write raw to disk via save (the body part)
+    const body = await apiObj.notes.serializeTestcaseBody(sections)
+    if (!body) { console.error('[NotesCell] serializeTestcaseBody returned null on archive'); return }
     await saveNote(activeTab.id, body)
     const updated: ParsedTestcase = { ...activeTab.testcase, frontmatter: fm as any }
     setTabs((prev) =>
@@ -214,7 +215,6 @@ export function NotesCell({
       if (result?.path) {
         // Update comment with screenshot ref
         const ref = `![screenshot](${result.path})`
-        const parser = getParser()
         const newSections = activeTab.testcase!.sections.map(s => ({
           ...s,
           items: s.items.map(item =>

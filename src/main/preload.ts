@@ -226,6 +226,10 @@ const api = {
       ipcRenderer.invoke(IPC.NOTES_DELETE, { id }),
     screenshot: (noteId: string, itemId: string): Promise<{ path: string } | null> =>
       ipcRenderer.invoke(IPC.NOTES_SCREENSHOT, { noteId, itemId }),
+    parseTestcase: (id: string) =>
+      ipcRenderer.invoke(IPC.NOTES_PARSE_TESTCASE, { id }),
+    serializeTestcaseBody: (sections: any[]) =>
+      ipcRenderer.invoke(IPC.NOTES_SERIALIZE_TESTCASE, { sections }),
     tags: () => ipcRenderer.invoke(IPC.NOTES_TAGS),
     tagList: (): Promise<Array<{ name: string; count: number; description: string; isSeed: boolean }>> =>
       ipcRenderer.invoke(IPC.NOTES_TAG_LIST),
