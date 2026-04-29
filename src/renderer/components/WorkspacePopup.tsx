@@ -41,6 +41,7 @@ function WorkspaceThumbnail({ ws }: { ws: Workspace }) {
           const cellIdx = row * ws.cols + col
           const cell = ws.cells[cellIdx]
           const hasProject = cell?.project && cell.project !== ''
+          const hasPreset = !!cell?.presetId
           return (
             <div
               key={`${col}:${row}`}
@@ -48,7 +49,7 @@ function WorkspaceThumbnail({ ws }: { ws: Workspace }) {
               style={{
                 gridColumn: `${col + 1}`,
                 gridRow: `${row + 1} / span ${span}`,
-                background: hasProject ? 'var(--color-accent, #4fc3f7)' : '#6A6A72',
+                background: hasPreset ? 'var(--color-accent, #4fc3f7)' : hasProject ? 'var(--color-accent, #4fc3f7)' : '#6A6A72',
               }}
             />
           )

@@ -13,6 +13,7 @@ export interface WorkspaceCell {
   project: string    // project path or slug
   prompt: string     // per-cell prompt
   type?: 'session' | 'notes'
+  presetId?: string  // entity preset id — when set, this entity is started in the cell on workspace load
 }
 
 export interface Workspace {
@@ -34,25 +35,9 @@ export interface ResolvedPrompt {
   source: PromptSource
 }
 
-export const BUILTIN_PERSONA_IDS = ['orchestrator', 'mpo', 'empty'] as const
+export const BUILTIN_PERSONA_IDS = ['empty'] as const
 
 export const BUILTIN_PERSONAS: readonly Persona[] = [
-  {
-    id: 'orchestrator',
-    name: 'Orchestrator',
-    color: '#B8601A',
-    builtin: true,
-    defaultPrompt:
-      'You coordinate the work in this session grid. Read the user goal, split it into concrete tasks, assign them to worker cells, and gate merges via the MPO. Keep a short running plan at the top of every reply.',
-  },
-  {
-    id: 'mpo',
-    name: 'MPO',
-    color: '#2d8a4e',
-    builtin: true,
-    defaultPrompt:
-      'You are the Meta-Prompt Officer. Verify every claim the orchestrator or workers make by reading source. Block merges with concrete evidence. Keep a compact log: file:line → claim → verdict.',
-  },
   {
     id: 'empty',
     name: '(empty)',
@@ -121,8 +106,8 @@ export const SEED_WORKSPACES: readonly Workspace[] = [
       orchestrator: 'You coordinate a triage. Read the latest failing CI run, split into a repro task and a code-read task. Gate merges via MPO.',
     },
     cells: [
-      { persona: 'orchestrator', project: '', prompt: '' },
-      { persona: 'mpo',          project: '', prompt: '' },
+      { persona: 'orchestrator', project: '', prompt: '', presetId: 'orchestrator' },
+      { persona: 'mpo',          project: '', prompt: '', presetId: 'mpo' },
       { persona: 'empty',        project: '', prompt: 'grep stacktrace' },
       { persona: 'empty',        project: '', prompt: 'read changelog' },
       { persona: 'auditor',      project: '', prompt: 'review open PR' },
@@ -137,7 +122,7 @@ export const SEED_WORKSPACES: readonly Workspace[] = [
     rows: 2,
     promptOverrides: {},
     cells: [
-      { persona: 'orchestrator', project: '', prompt: '' },
+      { persona: 'orchestrator', project: '', prompt: '', presetId: 'orchestrator' },
       { persona: 'developer',    project: '', prompt: '' },
       { persona: 'auditor',      project: '', prompt: 'review' },
       { persona: 'empty',        project: '', prompt: '' },

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { Workspace, WorkspaceCell } from '../../shared/persona-types'
 import { spanOf, resizeCells } from '../../main/workspace/workspace-manager'
+import { useEntityPresets } from '../hooks/useEntityPresets'
 
 const api = (window as any).cipherMux
 
@@ -13,6 +14,8 @@ export function WorkspacesTab() {
   const [selectedCell, setSelectedCell] = useState(0)
   const [dirty, setDirty] = useState(false)
   const [knownProjects, setKnownProjects] = useState<Array<{ path: string; name: string }>>([])
+  const [defaultWsId, setDefaultWsId] = useState<string | null>(null)
+  const entityPresets = useEntityPresets()
 
   const loadAll = useCallback(async () => {
     const wsList: Workspace[] = await api.workspaces.list()
@@ -27,6 +30,11 @@ export function WorkspacesTab() {
         projects = await api.projects.scan()
       }
       setKnownProjects(projects ?? [])
+    } catch { /* ignore */ }
+    // Load default workspace id
+    try {
+      const defId = await api.config.get('defaultWorkspaceId')
+      setDefaultWsId(defId ?? null)
     } catch { /* ignore */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -141,6 +149,24 @@ export function WorkspacesTab() {
     updateWs({ cells })
   }
 
+  const handleCellPresetChange = (presetId: string) => {
+    if (!ws) return
+    const cells = [...ws.cells]
+    cells[selectedCell] = { ...cells[selectedCell], presetId: presetId || undefined }
+    updateWs({ cells })
+  }
+
+  const handleToggleDefault = async (wsId: string) => {
+    const nextId = defaultWsId === wsId ? null : wsId
+    await api.config.set('defaultWorkspaceId', nextId)
+    setDefaultWsId(nextId)
+  }
+
+  const getPresetInfo = (presetId?: string) => {
+    if (!presetId) return null
+    return entityPresets.find(p => p.id === presetId) ?? null
+  }
+
   // ── Mini thumbnail ──
 
   const renderThumb = (w: Workspace) => {
@@ -152,9 +178,12 @@ export function WorkspacesTab() {
         if (span === 0) continue
         const cell = w.cells[idx]
         const hasProject = cell?.project && cell.project !== ''
-        const bg = hasProject
-          ? 'var(--color-accent, #4fc3f7)'
-          : 'repeating-linear-gradient(45deg, var(--color-bg-elevated) 0 2px, var(--color-bg-sunken) 2px 4px)'
+        const thumbPreset = cell?.presetId ? entityPresets.find(p => p.id === cell.presetId) : null
+        const bg = thumbPreset
+          ? thumbPreset.color
+          : hasProject
+            ? 'var(--color-accent, #4fc3f7)'
+            : 'repeating-linear-gradient(45deg, var(--color-bg-elevated) 0 2px, var(--color-bg-sunken) 2px 4px)'
         cells.push(
           <div
             key={`${col}-${row}`}
@@ -208,6 +237,7 @@ export function WorkspacesTab() {
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {workspaces.map((w) => {
             const filledCount = w.cells.filter((c) => c.project && c.project !== '').length
+            const presetCount = w.cells.filter((c) => c.presetId).length
             return (
               <div
                 key={w.id}
@@ -215,12 +245,28 @@ export function WorkspacesTab() {
                 onClick={() => selectWs(w.id)}
               >
                 {renderThumb(w)}
-                <div>
-                  <div class="ws-item-name">{w.name}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div class="ws-item-name">
+                    {defaultWsId === w.id && <span class="ws-default-star" title={t('workspacesTab.isDefault')}>&#9733; </span>}
+                    {w.name}
+                  </div>
                   <div class="ws-item-sub">
                     {w.cols}&times;{w.rows} &middot; {filledCount} slot{filledCount === 1 ? '' : 's'}
+                    {presetCount > 0 && ` \u00B7 ${presetCount} preset${presetCount === 1 ? '' : 's'}`}
                   </div>
+                  {w.defaultTags && w.defaultTags.length > 0 && (
+                    <div class="ws-item-tags">
+                      {w.defaultTags.map(tag => <span key={tag} class="ws-tag-chip">#{tag}</span>)}
+                    </div>
+                  )}
                 </div>
+                <button
+                  class={`ws-default-toggle${defaultWsId === w.id ? ' ws-default-toggle--active' : ''}`}
+                  onClick={(e) => { e.stopPropagation(); handleToggleDefault(w.id) }}
+                  title={defaultWsId === w.id ? t('workspacesTab.unsetDefault') : t('workspacesTab.setDefault')}
+                >
+                  {defaultWsId === w.id ? '\u2605' : '\u2606'}
+                </button>
               </div>
             )
           })}
@@ -270,6 +316,8 @@ export function WorkspacesTab() {
                       if (span === 0) continue
                       const cell = ws.cells[idx] ?? { persona: 'empty', project: '', prompt: '' }
                       const hasProject = cell.project && cell.project !== ''
+                      const cellPreset = getPresetInfo(cell.presetId)
+                      const hasContent = hasProject || !!cellPreset
                       const promptDisplay = cell.prompt
                         ? cell.prompt.slice(0, 48).replace(/\n/g, ' ')
                         : t('workspacesTab.noPrompt')
@@ -288,7 +336,7 @@ export function WorkspacesTab() {
                           style={{
                             gridColumn: `${col + 1}`,
                             gridRow: `${row + 1} / span ${span}`,
-                            '--persona-color': hasProject ? 'var(--color-accent, #4fc3f7)' : '#6A6A72',
+                            '--persona-color': cellPreset ? cellPreset.color : hasProject ? 'var(--color-accent, #4fc3f7)' : '#6A6A72',
                           } as any}
                           onClick={(e) => {
                             if ((e.target as HTMLElement).classList.contains('merge-handle')) return
@@ -301,8 +349,13 @@ export function WorkspacesTab() {
                               [{col},{row}]
                             </span>
                           </div>
+                          {cellPreset && (
+                            <div class="ed-cell-preset" style={{ color: cellPreset.color }}>
+                              {cellPreset.displayName}
+                            </div>
+                          )}
                           <div class="ed-cell-project">
-                            {cell.project || '\u2014'}
+                            {cell.project || (cellPreset ? '' : '\u2014')}
                           </div>
                           <div class="ed-cell-prompt">
                             {promptDisplay}
@@ -347,6 +400,22 @@ export function WorkspacesTab() {
                   </span>
                 </div>
                 <div class="insp-grid">
+                  <div class="insp-field">
+                    <label>{t('workspacesTab.preset')}</label>
+                    <select
+                      value={cellData.presetId || ''}
+                      onChange={(e) => handleCellPresetChange((e.target as HTMLSelectElement).value)}
+                      style={cellData.presetId && getPresetInfo(cellData.presetId) ? {
+                        borderColor: getPresetInfo(cellData.presetId)!.color,
+                        color: getPresetInfo(cellData.presetId)!.color,
+                      } : undefined}
+                    >
+                      <option value="">{t('workspacesTab.presetNone')}</option>
+                      {entityPresets.map(p => (
+                        <option key={p.id} value={p.id}>{p.displayName}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div class="insp-field">
                     <label>{t('workspacesTab.project')}</label>
                     <div class="folder-picker">

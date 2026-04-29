@@ -10,6 +10,7 @@ export interface ApplyResult {
 
 export interface SessionStarter {
   start(opts: { name: string; projectPath: string; autoLaunch?: string }): Promise<{ id: string }>
+  startEntity?(entityId: string): Promise<{ id: string }>
 }
 
 /**
@@ -135,7 +136,7 @@ export async function applyWorkspace(
   // 1. Set grid dimensions
   gridCallback(workspace.cols, workspace.rows)
 
-  // 2. For each cell with a project, spawn a session
+  // 2. For each cell with a project or preset, spawn a session
   for (let i = 0; i < workspace.cells.length; i++) {
     const cell = workspace.cells[i]
 
@@ -146,6 +147,18 @@ export async function applyWorkspace(
     const col = i % workspace.cols
     const row = Math.floor(i / workspace.cols)
     if (spanOf(workspace, col, row) === 0) continue
+
+    // Preset-based entity start takes priority
+    if (cell.presetId && sessionStarter.startEntity) {
+      try {
+        const session = await sessionStarter.startEntity(cell.presetId)
+        startedSessions.push({ cellIndex: i, sessionId: session.id })
+        sessionsStarted++
+      } catch (err) {
+        warnings.push(`Failed to start entity ${cell.presetId}: ${(err as Error).message}`)
+      }
+      continue
+    }
 
     if (!cell.project) {
       continue
