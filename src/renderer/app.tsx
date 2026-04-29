@@ -277,19 +277,20 @@ export function App() {
 
     if (api.gridControl.onGridResize) {
       unsubs.push(api.gridControl.onGridResize((data: { cols: number; rows: number }) => {
-        resize(data.cols, data.rows)
+        resize({ cols: data.cols, rows: data.rows })
       }))
     }
     if (api.gridControl.onGridPlace) {
       unsubs.push(api.gridControl.onGridPlace((data: { sessionId: string; col: number; row: number }) => {
-        const targetIdx = data.row * grid.config.cols + data.col
+        const cols = gridRef.current.config.cols
+        const targetIdx = data.row * cols + data.col
         setSessionAtSlot(targetIdx, data.sessionId)
       }))
     }
     if (api.gridControl.onSessionFocus) {
       unsubs.push(api.gridControl.onSessionFocus((data: { sessionId: string }) => {
         // If session is in background, bring it to grid
-        const inGrid = grid.slots.some(s => s.sessionId === data.sessionId)
+        const inGrid = gridRef.current.slots.some(s => s.sessionId === data.sessionId)
         if (!inGrid) {
           addSession(data.sessionId)
         }
@@ -302,7 +303,7 @@ export function App() {
         // Clear focus if ejected session was focused (prevents STT routing to background)
         setFocusedSessionId((prev: string | null) => {
           if (prev === data.sessionId) {
-            const remaining = grid.slots.find(s => s.sessionId && s.sessionId !== data.sessionId)
+            const remaining = gridRef.current.slots.find(s => s.sessionId && s.sessionId !== data.sessionId)
             return remaining?.sessionId ?? null
           }
           return prev
@@ -320,7 +321,7 @@ export function App() {
     }
 
     return () => unsubs.forEach(fn => fn())
-  }, [resize, setSessionAtSlot, addSession, removeSession, grid.config.cols, grid.slots])
+  }, [resize, setSessionAtSlot, addSession, removeSession])
 
   const handleOpenNotes = useCallback((slotIndex: number) => {
     setSlotType(slotIndex, 'notes')
