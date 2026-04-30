@@ -148,13 +148,23 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
     setCustomTokens(prev => ({ ...prev, [prop]: value }))
   }, [])
 
-  /** Save custom tokens to ConfigStore. */
+  /** Save custom tokens to ConfigStore — only allowed for custom themes. */
   const handleThemeSave = useCallback(async () => {
+    if (!activeCustomThemeId) {
+      // Built-in theme: open Save As dialog instead of overwriting
+      setSaveAsOpen(true)
+      return
+    }
     const ui = await api.config.get('ui') ?? {}
-    await api.config.set('ui', { ...ui, customThemeTokens: customTokens })
+    // Update the active custom theme's tokens
+    const customs: CustomTheme[] = ui?.customThemes ?? []
+    const updated = customs.map(ct =>
+      ct.id === activeCustomThemeId ? { ...ct, tokens: { ...ct.tokens, ...customTokens } } : ct
+    )
+    await api.config.set('ui', { ...ui, customThemes: updated, customThemeTokens: customTokens })
     setSavedNotice(true)
     setTimeout(() => setSavedNotice(false), 2000)
-  }, [customTokens])
+  }, [customTokens, activeCustomThemeId])
 
   /** Reset all custom overrides back to theme defaults. */
   const handleThemeReset = useCallback(() => {
