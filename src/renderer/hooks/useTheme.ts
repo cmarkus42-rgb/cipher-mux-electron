@@ -95,7 +95,7 @@ export function useTheme() {
     setActiveCustomThemeId(null)
     clearCustomTokens()
     applyTheme(next)
-    persistUi({ theme: next, activeCustomThemeId: null })
+    persistUi({ theme: next, activeCustomThemeId: null, customThemeTokens: {} })
   }, [persistUi])
 
   const selectCustomTheme = useCallback((ct: CustomTheme) => {
@@ -136,7 +136,7 @@ export function useTheme() {
       setActiveCustomThemeId(null)
       clearCustomTokens()
       applyTheme(next)
-      persistUi({ theme: next, activeCustomThemeId: null })
+      persistUi({ theme: next, activeCustomThemeId: null, customThemeTokens: {} })
       return next
     })
   }, [persistUi])
