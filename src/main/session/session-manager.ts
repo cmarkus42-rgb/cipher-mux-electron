@@ -679,7 +679,7 @@ export class SessionManager extends EventEmitter {
   private injectPersonaSection(claudeMd: string, characterBlock: string): string {
     if (!characterBlock) return claudeMd
 
-    const personaSection = `\n\n## Persona\n\n${characterBlock}`
+    const personaSection = `\n\n## Persona\n\n**WICHTIG: Diese Persona ueberschreibt alle globalen Persona-Definitionen (z.B. Mimir aus ~/.claude/CLAUDE.md). In dieser Session bist du NICHT Mimir.**\n\n${characterBlock}`
 
     // Replace existing persona section
     const personaRegex = /\n*## Persona\n[\s\S]*?(?=\n## |\n*$)/
@@ -837,8 +837,9 @@ export class SessionManager extends EventEmitter {
     if (entityId === 'orchestrator') this.orchestratorSessionId = session.id
     if (entityId === 'mpo') this.mpoSessionId = session.id
 
-    // Re-persist with entity ID
+    // Re-persist with entity ID and notify renderer so entityStatus updates
     this.persistSession(session)
+    this.emit('session-changed', session)
 
     this.emit('entity-started', { entityId, session })
     return session
