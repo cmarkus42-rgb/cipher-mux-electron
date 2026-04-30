@@ -159,12 +159,7 @@ export class NoteManager {
   }
 
   /** Serialize note to markdown with frontmatter */
-  private stringify(fm: {
-    title: string
-    tags: string[]
-    created: string
-    modified: string
-  }, body: string): string {
+  private stringify(fm: Record<string, unknown>, body: string): string {
     return matter.stringify('\n' + body, fm)
   }
 
@@ -237,11 +232,20 @@ export class NoteManager {
   }
 
   async save(id: string, body: string, tags?: string[]): Promise<NoteInfo> {
-    const existing = await this.parseFile(this.filePath(id))
+    const filePath = this.filePath(id)
+    const existing = await this.parseFile(filePath)
     const now = new Date().toISOString()
     const title = this.extractTitle(body)
 
-    const fm = {
+    // Read existing frontmatter to preserve custom fields (type, from_session, etc.)
+    let existingFm: Record<string, unknown> = {}
+    try {
+      const raw = await fs.readFile(filePath, 'utf-8')
+      existingFm = matter(raw).data as Record<string, unknown>
+    } catch { /* new file, no existing frontmatter */ }
+
+    const fm: Record<string, unknown> = {
+      ...existingFm,
       title,
       tags: tags ?? existing?.info.tags ?? [],
       created: existing?.info.createdAt ?? now,
@@ -251,15 +255,15 @@ export class NoteManager {
     await fs.mkdir(this.notesDir, { recursive: true })
 
     const content = this.stringify(fm, body)
-    await fs.writeFile(this.filePath(id), content, 'utf-8')
+    await fs.writeFile(filePath, content, 'utf-8')
 
     return {
       id,
       title,
-      tags: fm.tags,
+      tags: fm.tags as string[],
       scope: 'global',
       relativePath: `${id}.md`,
-      createdAt: fm.created,
+      createdAt: fm.created as string,
       modifiedAt: now,
     }
   }
