@@ -285,6 +285,8 @@ export function App() {
       unsubs.push(api.gridControl.onGridPlace((data: { sessionId: string; col: number; row: number }) => {
         const cols = gridRef.current.config.cols
         const targetIdx = data.row * cols + data.col
+        // RT-10 fix: clear session from old slot before placing in new one
+        removeSession(data.sessionId)
         setSessionAtSlot(targetIdx, data.sessionId)
       }))
     }
