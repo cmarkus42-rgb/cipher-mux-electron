@@ -183,10 +183,17 @@ export function App() {
   const placeMpo = useCallback((sessionId: string) => {
     setMpoSessionId((prev) => {
       if (prev === sessionId) return prev
-      setPlacementPopup({ sessionId })
+      // Try auto-placement first; only show popup if grid is full
+      if (gridRef.current.slots.some(s => s.sessionId === sessionId)) {
+        // Already placed (e.g. by handleStartEntity)
+      } else if (gridRef.current.slots.some(s => !s.sessionId && s.type === 'session')) {
+        addSession(sessionId)
+      } else {
+        setPlacementPopup({ sessionId })
+      }
       return sessionId
     })
-  }, [addSession, grid.slots])
+  }, [addSession])
 
   const placeEntity = useCallback((sessionId: string) => {
     // RT-X2 fix: check current grid state via ref (not stale closure).
