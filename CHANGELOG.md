@@ -75,6 +75,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Drag & Drop Sidebar→Grid (C.6):** Sessions + notes draggable from sidebar to grid cells.
 - **Pin Icon CSS-Art:** Replaced emoji with CSS circle indicator.
 
+### Fixed (RT-Runde Bug-Fixes 2026-04-30, nach Watchdog-Retest)
+- **NoteManager.save() Custom Frontmatter (RT-1):** save() preserves custom frontmatter fields (type, from_session etc.) via spread over existing FM data.
+- **Grid-Place Doppelte Anzeige (RT-10, REGRESSION):** removeSession() called before setSessionAtSlot() — old cell cleared before placing in new one.
+- **Theme-Editor Built-in Immutable (RT-W2):** Built-in themes are read-only. Save redirects to "Save As" for built-ins. customThemeTokens cleared on theme switch.
+- **MPO Persona Override (RT-4):** Persona section in MPO CLAUDE.md with explicit override against global Mimir persona. Dynamic injection adds override hint.
+- **Pin UI Reset on Unpin (RT-8):** pinChanged events forwarded via IPC to renderer. STT deactivation resets pinned/pinnedSessionId.
+- **Workspace Active Status Startup (RT-6):** activeWorkspaceId always cleared on startup instead of only when no default set.
+- **EntityPickerPopup Stale State (RT-12/13):** Combined handleCellAssign sets presetId + project atomically in single updateWs call.
+- **MPO GridSelector Popup (GridSelector):** placeMpo() uses addSession() for free slots. Popup only when grid is actually full.
+
 ## [Unreleased] — v0.10 (SP-1 through SP-5)
 
 ### Added
