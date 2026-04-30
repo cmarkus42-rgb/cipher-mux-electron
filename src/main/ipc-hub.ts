@@ -1027,6 +1027,9 @@ export class IpcHub {
         inputRouter.on('notesInsert', (text: string) => {
           this.windowManager.sendToMainWindow(IPC.VOICE_NOTES_INSERT, { text: text.trimEnd() + ' ' })
         })
+        inputRouter.on('pinChanged', (data: { pinned: boolean; sessionId: string | null }) => {
+          this.windowManager.sendToMainWindow(IPC.VOICE_PIN_STATUS, data)
+        })
         console.log('[Voice] VOICE_START_SESSION => ok')
         return { ok: true }
       } catch (err) {

@@ -106,6 +106,8 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
       setRecording(false)
       setProcessing(false)
       setVoiceState('idle')
+      setPinned(false)
+      setPinnedSessionId(null)
       ;(window as any).__cipherMuxSessionVoiceActive = false
     } else if (mode === 'com') {
       teardownVAD()
