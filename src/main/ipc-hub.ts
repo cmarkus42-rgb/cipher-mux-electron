@@ -259,19 +259,13 @@ export class IpcHub {
     const activeWorkspaceId = configStore.get('activeWorkspaceId')
     const defaultWorkspaceId = configStore.get('defaultWorkspaceId')
 
+    // Always clear activeWorkspaceId on startup — it represents "currently applied",
+    // not "should auto-apply". The apply flow (WORKSPACES_APPLY handler) sets it again
+    // when a workspace is actually applied. This prevents stale "AKTIV" badges in the
+    // workspace popup after restart (RT-6).
     if (activeWorkspaceId) {
-      // Stale activeWorkspaceId from a previous session but no default set?
-      // Clear it — the workspace was not meant to auto-load.
-      if (!defaultWorkspaceId) {
-        console.log(`[IpcHub] Clearing stale activeWorkspaceId "${activeWorkspaceId}" (no default set)`)
-        configStore.set('activeWorkspaceId', null)
-        // Fall through to "no workspace" path below
-      } else {
-        // Workspace is set — renderer will load it via useEffect on mount.
-        // Don't auto-start anything here; the workspace apply flow handles it.
-        console.log(`[IpcHub] Active workspace "${activeWorkspaceId}" set — renderer will apply it`)
-        return
-      }
+      console.log(`[IpcHub] Clearing stale activeWorkspaceId "${activeWorkspaceId}" on startup`)
+      configStore.set('activeWorkspaceId', null)
     }
 
     if (defaultWorkspaceId) {
