@@ -167,6 +167,14 @@ export function WorkspacesTab() {
     updateWs({ cells })
   }
 
+  /** Atomically set preset + project on selected cell (avoids stale-state overwrites). */
+  const handleCellAssign = (presetId: string, project: string) => {
+    if (!ws) return
+    const cells = [...ws.cells]
+    cells[selectedCell] = { ...cells[selectedCell], presetId: presetId || undefined, project }
+    updateWs({ cells })
+  }
+
   const handleToggleDefault = async (wsId: string) => {
     const nextId = defaultWsId === wsId ? null : wsId
     await api.config.set('defaultWorkspaceId', nextId)
@@ -505,10 +513,7 @@ export function WorkspacesTab() {
                       {(cellData.presetId || cellData.project) && (
                         <button
                           class="btn btn--sm"
-                          onClick={() => {
-                            handleCellPresetChange('')
-                            handleCellUpdate('project', '')
-                          }}
+                          onClick={() => handleCellAssign('', '')}
                           title="Clear"
                           style={{ padding: '2px 6px', fontSize: '11px', color: 'var(--color-text-dim)' }}
                         >
@@ -531,13 +536,11 @@ export function WorkspacesTab() {
                 {pickerOpen && (
                   <EntityPickerPopup
                     onSelectPreset={(presetId: EntityId) => {
-                      handleCellPresetChange(presetId)
-                      handleCellUpdate('project', '')
+                      handleCellAssign(presetId, '')
                       setPickerOpen(false)
                     }}
                     onSelectPath={(path: string) => {
-                      handleCellUpdate('project', path)
-                      handleCellPresetChange('')
+                      handleCellAssign('', path)
                       setPickerOpen(false)
                     }}
                     onSelectNote={() => {
