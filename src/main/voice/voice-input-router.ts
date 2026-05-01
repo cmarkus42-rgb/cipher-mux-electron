@@ -49,10 +49,10 @@ const GRID_NAV_COMMANDS: Array<{
   direction: 'up' | 'down' | 'left' | 'right'
   label: string
 }> = [
-  { patterns: ['grid hoch', 'zelle hoch', 'focus hoch'],     direction: 'up',    label: 'grid-up' },
-  { patterns: ['grid runter', 'zelle runter', 'focus runter'], direction: 'down',  label: 'grid-down' },
-  { patterns: ['grid links', 'zelle links', 'focus links'],   direction: 'left',  label: 'grid-left' },
-  { patterns: ['grid rechts', 'zelle rechts', 'focus rechts'], direction: 'right', label: 'grid-right' },
+  { patterns: ['grid hoch', 'grit hoch', 'grüt hoch', 'zelle hoch', 'focus hoch', 'nächste oben'],     direction: 'up',    label: 'grid-up' },
+  { patterns: ['grid runter', 'grit runter', 'grüt runter', 'zelle runter', 'focus runter', 'nächste unten'], direction: 'down',  label: 'grid-down' },
+  { patterns: ['grid links', 'grit links', 'grüt links', 'zelle links', 'focus links', 'nächste links'],   direction: 'left',  label: 'grid-left' },
+  { patterns: ['grid rechts', 'grit rechts', 'grüt rechts', 'zelle rechts', 'focus rechts', 'nächste rechts'], direction: 'right', label: 'grid-right' },
 ]
 
 function stripPunctuation(text: string): string {
