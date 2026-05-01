@@ -28,6 +28,20 @@ const VOICE_COMMANDS: Array<{ patterns: string[]; keys: string; label: string }>
   { patterns: ['neue zeile', 'new line', 'newline', 'zeilenumbruch'], keys: '\n', label: 'newline' },
 ]
 
+// Scroll navigation commands — matched before VOICE_COMMANDS.
+// On match, a 'scroll' event is emitted instead of sending keys to tmux.
+const SCROLL_COMMANDS: Array<{
+  patterns: string[]
+  action: 'up' | 'down' | 'top' | 'bottom' | 'to-marker'
+  label: string
+}> = [
+  { patterns: ['hoch', 'scroll hoch', 'rauf'],           action: 'up',        label: 'scroll-up' },
+  { patterns: ['runter', 'scroll runter', 'weiter'],      action: 'down',      label: 'scroll-down' },
+  { patterns: ['ganz hoch', 'anfang'],                    action: 'top',       label: 'scroll-top' },
+  { patterns: ['ganz runter', 'ende'],                    action: 'bottom',    label: 'scroll-bottom' },
+  { patterns: ['zum marker', 'lese start', 'lesestart'],  action: 'to-marker', label: 'scroll-marker' },
+]
+
 function stripPunctuation(text: string): string {
   return text.replace(/[.,!?;:…–—'"„"‚'»«()[\]{}]/g, '').trim()
 }
@@ -204,6 +218,20 @@ export class VoiceInputRouter extends EventEmitter {
 
     // Check for voice commands before sending as text
     const normalized = stripPunctuation(text.toLowerCase())
+
+    // Check for scroll navigation commands first
+    const scrollCmd = SCROLL_COMMANDS.find(cmd => cmd.patterns.includes(normalized))
+    if (scrollCmd) {
+      console.log('[VoiceRouter] scroll command:', scrollCmd.label)
+      this.emit('scroll', { sessionId: targetId, action: scrollCmd.action })
+      this.emit('dispatched', {
+        sessionId: targetId,
+        sessionName: session?.name ?? targetId,
+        text: `[${scrollCmd.label}]`,
+      })
+      return
+    }
+
     const command = VOICE_COMMANDS.find(cmd => cmd.patterns.includes(normalized))
 
     try {

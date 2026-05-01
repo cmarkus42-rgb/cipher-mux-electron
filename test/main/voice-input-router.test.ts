@@ -168,4 +168,58 @@ describe('VoiceInputRouter', () => {
     router.unpinSession()
     assert.equal(router.getActiveSessionId(), 'sess-1')
   })
+
+  it('emits scroll event for "hoch" command', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    let scrollEvent: any = null
+    router.on('scroll', (data) => { scrollEvent = data })
+    await router.routeTranscription('hoch')
+    assert.ok(scrollEvent)
+    assert.equal(scrollEvent.sessionId, 'sess-1')
+    assert.equal(scrollEvent.action, 'up')
+    assert.equal(sentKeys.length, 0, 'scroll commands must NOT send keys to tmux')
+  })
+
+  it('emits scroll event for "ganz runter" command', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    let scrollEvent: any = null
+    router.on('scroll', (data) => { scrollEvent = data })
+    await router.routeTranscription('Ganz runter.')
+    assert.ok(scrollEvent)
+    assert.equal(scrollEvent.action, 'bottom')
+    assert.equal(sentKeys.length, 0)
+  })
+
+  it('emits scroll event for "zum marker" command', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    let scrollEvent: any = null
+    router.on('scroll', (data) => { scrollEvent = data })
+    await router.routeTranscription('zum Marker')
+    assert.ok(scrollEvent)
+    assert.equal(scrollEvent.action, 'to-marker')
+    assert.equal(sentKeys.length, 0)
+  })
+
+  it('emits dispatched event with scroll label', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    let dispatched: any = null
+    router.on('dispatched', (data) => { dispatched = data })
+    await router.routeTranscription('weiter')
+    assert.ok(dispatched)
+    assert.equal(dispatched.text, '[scroll-down]')
+  })
+
+  it('does not match scroll command in longer text', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    let scrollEvent: any = null
+    router.on('scroll', (data) => { scrollEvent = data })
+    await router.routeTranscription('scroll mal hoch bitte')
+    assert.equal(scrollEvent, null, 'partial match should not trigger scroll')
+    assert.equal(sentKeys.length, 1, 'text should be sent normally')
+  })
 })
