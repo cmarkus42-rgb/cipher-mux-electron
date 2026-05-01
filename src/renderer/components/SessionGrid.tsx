@@ -79,10 +79,12 @@ export function SessionGrid({
   useEffect(() => {
     const api = (window as any).cipherMux
     if (!api?.terminal?.onGridNav) return
+    // Build set of session IDs actually visible in the grid
+    const visibleSessionIds = new Set(sessions.map(s => s.id))
     const unsub = api.terminal.onGridNav((data: { direction: string }) => {
       const { cols, rows } = grid.config
-      // Find current focused slot
-      const currentIdx = grid.slots.findIndex(s => s.sessionId === focusedSessionId)
+      // Find current focused slot — must be a visible session
+      const currentIdx = grid.slots.findIndex(s => s.sessionId === focusedSessionId && visibleSessionIds.has(s.sessionId ?? ''))
       if (currentIdx < 0) return
       const col = currentIdx % cols
       const row = Math.floor(currentIdx / cols)
@@ -96,12 +98,13 @@ export function SessionGrid({
       }
       const targetIdx = targetRow * cols + targetCol
       const targetSession = grid.slots[targetIdx]?.sessionId
-      if (targetSession && targetSession !== focusedSessionId) {
+      // Only navigate to sessions that are actually visible in the grid
+      if (targetSession && targetSession !== focusedSessionId && visibleSessionIds.has(targetSession)) {
         onFocusSession(targetSession)
       }
     })
     return () => unsub()
-  }, [grid, focusedSessionId, onFocusSession])
+  }, [grid, focusedSessionId, onFocusSession, sessions])
 
   // Use a ref instead of state to avoid stale-closure race: the drop event
   // can fire before Preact completes the re-render triggered by setDragSourceIdx,
