@@ -222,7 +222,7 @@ export class IpcHub {
       return this.tmux.connect()
     }).then(() => {
       return this.sessionManager.recover()
-    }).then((result) => {
+    }).then(async (result) => {
       // Cache for pull-based retrieval by the renderer
       this.cachedRecoveryResult = result
       console.log(`[IpcHub] recovery complete: ${result.recovered.length} recovered, ${result.orphaned.length} orphaned, gridState=${!!result.gridState}`)
@@ -232,8 +232,25 @@ export class IpcHub {
       this.sessionManager.startOrphanDetection()
       this.sessionManager.startExitDetection()
 
-      // Only auto-start if no sessions were recovered
-      if (result.recovered.length === 0) {
+      // Keep Working: restore sessions from snapshot (overrides recovery + default start)
+      const rawSnapshot = configStore.get('keepWorkingSnapshot')
+      // Support both old (Array) and new ({ sessions, gridConfig }) formats
+      const snapshotSessions = rawSnapshot
+        ? (Array.isArray(rawSnapshot) ? rawSnapshot : rawSnapshot.sessions)
+        : null
+      const snapshotGridConfig = rawSnapshot && !Array.isArray(rawSnapshot)
+        ? rawSnapshot.gridConfig
+        : undefined
+      if (snapshotSessions && snapshotSessions.length > 0) {
+        console.log(`[IpcHub] keepWorking: restoring ${snapshotSessions.length} sessions from snapshot`)
+        // Kill any recovered sessions — we'll recreate with --resume
+        for (const session of result.recovered) {
+          try { await this.sessionManager.stop(session.id) } catch { /* ok */ }
+        }
+        configStore.set('keepWorkingSnapshot', undefined as any)
+        this.restoreKeepWorkingSnapshot(snapshotSessions, snapshotGridConfig)
+      } else if (result.recovered.length === 0) {
+        // Only auto-start if no sessions were recovered
         this.autoStartDefault()
       }
     }).catch((err) => {
@@ -311,6 +328,10 @@ export class IpcHub {
   private setupEventForwarding(): void {
     this.sessionManager.on('session-changed', (session) => {
       this.windowManager.sendToMainWindow(IPC.SESSION_CHANGED, session)
+    })
+
+    this.sessionManager.on('session-closing', (session) => {
+      this.windowManager.sendToMainWindow(IPC.SESSION_CLOSING, session)
     })
 
     this.sessionManager.on('session-stopped', (session) => {
@@ -450,7 +471,7 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.SESSIONS_STOP, async (_e, { sessionId }: { sessionId: string }) => {
-      await this.sessionManager.stop(sessionId)
+      await this.sessionManager.gracefulStop(sessionId)
       return { ok: true }
     })
 
@@ -998,10 +1019,10 @@ export class IpcHub {
           sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
           sendStopCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'processing'),
           sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
-          sendAudioPlayback: () => {},
+          sendAudioPlayback: (b64) => this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_AUDIO, b64),
           sendStateChange: (state) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state),
-          sendStopPlayback: () => {},
-          sendGenerationDone: () => {},
+          sendStopPlayback: () => this.windowManager.sendToMainWindow(IPC.VOICE_STOP_PLAYBACK, null),
+          sendGenerationDone: () => this.windowManager.sendToMainWindow(IPC.VOICE_GENERATION_DONE, null),
           dispatchStatus: (text: string, level: string) => console.log(`[Voice:${level}] ${text}`),
           cancelStream: () => {},
         }
@@ -1010,6 +1031,7 @@ export class IpcHub {
 
         console.log('[Voice] Starting session mode...')
         const inputRouter = this.voiceManager.startSessionMode(this.sessionManager)
+        inputRouter.setSubmitMode(configStore.get('voiceSubmitMode') ?? 'auto')
         inputRouter.on('dispatched', (data: { sessionId: string; sessionName: string; text: string }) => {
           console.log('[Voice] Dispatched to session:', data.sessionName, 'text:', data.text.slice(0, 80))
           this.windowManager.sendToMainWindow(IPC.VOICE_DISPATCHED, data)
@@ -1033,6 +1055,10 @@ export class IpcHub {
             sessionId: data.sessionId,
             action: data.action,
           })
+        })
+        inputRouter.on('gridNav', (data: { direction: string }) => {
+          console.log('[Voice] Grid nav:', data.direction)
+          this.windowManager.sendToMainWindow(IPC.GRID_NAV, data)
         })
         console.log('[Voice] VOICE_START_SESSION => ok')
         this.startBtShutter()
@@ -1066,7 +1092,10 @@ export class IpcHub {
           sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
           sendStopCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'processing'),
           sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
-          sendAudioPlayback: () => this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'speaking'),
+          sendAudioPlayback: (b64) => {
+            this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_AUDIO, b64)
+            this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'speaking')
+          },
           sendStateChange: (state) => {
             this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state)
             this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, state)
@@ -1094,6 +1123,9 @@ export class IpcHub {
             sessionId: data.sessionId,
             action: data.action,
           })
+        })
+        inputRouter.on('gridNav', (data: { direction: string }) => {
+          this.windowManager.sendToMainWindow(IPC.GRID_NAV, data)
         })
 
         // Start voice-relay entity as background session (no grid placement)
@@ -1192,6 +1224,18 @@ export class IpcHub {
 
     ipcMain.on(IPC.VOICE_NOTES_FOCUS, (_event, { focused }: { focused: boolean }) => {
       this.voiceManager?.getInputRouter()?.setNotesEditorFocused(focused)
+    })
+
+    ipcMain.handle('cipher-mux:tts:speak', async (_e, { text }: { text: string }) => {
+      if (!this.voiceManager?.isInitialized()) {
+        return { ok: false, error: 'Voice not active' }
+      }
+      try {
+        await this.voiceManager.speakText(text)
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: (err as Error).message }
+      }
     })
   }
 
@@ -1642,7 +1686,12 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.ENTITY_LIST, async () => {
-      return this.sessionManager.getEntityRegistry().list()
+      const configs = this.sessionManager.getEntityRegistry().list()
+      const overrides = configStore.get('entitySortOrders') ?? {}
+      return configs.map(c => ({
+        ...c,
+        sortOrder: overrides[c.id] ?? c.sortOrder ?? 100,
+      }))
     })
   }
 
@@ -1654,6 +1703,7 @@ export class IpcHub {
       // Return entities that have a projectPath inside ~/.config/cipher-mux/entities
       const registry = this.sessionManager.getEntityRegistry()
       const all = registry.list()
+      const overrides = configStore.get('entitySortOrders') ?? {}
       return all
         .filter(e => e.projectPath.startsWith(entitiesDir))
         .map(e => ({
@@ -1662,7 +1712,9 @@ export class IpcHub {
           color: e.color,
           icon: e.icon,
           projectPath: e.projectPath,
+          sortOrder: overrides[e.id] ?? e.sortOrder ?? 100,
         }))
+        .sort((a, b) => a.sortOrder - b.sortOrder)
     })
 
     ipcMain.handle(IPC.PRESETS_READ, async (_e, { entityId }: { entityId: string }) => {
@@ -1747,6 +1799,12 @@ export class IpcHub {
   }
 
   // ─── BT Shutter Remote ──────────────────────────────────
+
+  /** Timestamp of last BT Shutter button event — used to suppress the
+   *  duplicate HID keystroke that the shutter also sends to macOS. */
+  private btShutterLastEventTs = 0
+  private btShutterInputGuard: ((e: Electron.Event, input: Electron.Input) => void) | null = null
+
   private startBtShutter(): void {
     const btConfig = configStore.get('btShutter')
     if (!btConfig?.enabled) return
@@ -1758,6 +1816,10 @@ export class IpcHub {
     })
 
     this.btShutterManager.on('button', (event: BtShutterEvent) => {
+      // Mark timestamp so the before-input-event guard can suppress the
+      // duplicate HID keystroke that arrives ~0-50ms later.
+      this.btShutterLastEventTs = Date.now()
+
       // Route shutter events through VoiceInputRouter (same target as STT)
       const router = this.voiceManager?.getInputRouter()
       if (router) {
@@ -1777,6 +1839,24 @@ export class IpcHub {
       this.windowManager.sendToMainWindow(IPC.BT_SHUTTER_STATUS, status)
     })
 
+    // Suppress the duplicate Enter keystroke that the BT Shutter HID device
+    // sends to macOS (arrives as a normal keydown in the Electron renderer).
+    const mainWin = this.windowManager.getMainWindow()
+    if (mainWin) {
+      this.btShutterInputGuard = (_e: Electron.Event, input: Electron.Input) => {
+        const elapsed = Date.now() - this.btShutterLastEventTs
+        if (elapsed < 200 && input.type === 'keyDown' && input.key === 'Enter') {
+          _e.preventDefault()
+          console.log('[BtShutter] Suppressed duplicate HID Enter keystroke')
+        }
+      }
+      mainWin.webContents.on('before-input-event', this.btShutterInputGuard)
+    }
+
+    // BT Shutter volume-key side-effects are suppressed at two levels:
+    // 1. ab-shutter-bridge uses kIOHIDOptionsTypeSeizeDevice (exclusive HID capture)
+    // 2. Electron disables HardwareMediaKeyHandling (Chromium switch in main.ts)
+
     this.btShutterManager.start()
   }
 
@@ -1785,9 +1865,87 @@ export class IpcHub {
       this.btShutterManager.shutdown()
       this.btShutterManager = null
     }
+
+    // Remove the before-input-event guard
+    if (this.btShutterInputGuard) {
+      const mainWin = this.windowManager.getMainWindow()
+      if (mainWin && !mainWin.isDestroyed()) {
+        mainWin.webContents.off('before-input-event', this.btShutterInputGuard)
+      }
+      this.btShutterInputGuard = null
+    }
+
+  }
+
+  private restoreKeepWorkingSnapshot(
+    snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string }>,
+    gridConfig?: { cols: number; rows: number },
+  ): void {
+    // Restore grid dimensions BEFORE placing sessions
+    if (gridConfig) {
+      console.log(`[IpcHub] keepWorking: restoring grid ${gridConfig.cols}x${gridConfig.rows}`)
+      this.windowManager.sendToMainWindow(IPC.GRID_RESIZE, gridConfig)
+    }
+
+    const adapter = this.sessionManager['adapterRegistry'].getDefault()
+    // Start sessions sequentially with small delay to avoid overwhelming tmux
+    let delay = gridConfig ? 200 : 0 // small delay after grid resize to let renderer settle
+    for (const entry of snapshot) {
+      setTimeout(async () => {
+        try {
+          // Build launch command with --resume
+          const escaped = entry.projectPath.replace(/'/g, "'\\''")
+          const launchCmd = adapter.buildLaunchCommand({
+            projectPath: entry.projectPath,
+            sessionName: entry.name,
+            resume: true,
+          })
+          const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
+          const autoLaunch = `cd '${escaped}' && clear; ${cmdStr}\n`
+
+          const session = await this.sessionManager.start({
+            name: entry.name,
+            projectPath: entry.projectPath,
+            autoLaunch,
+          })
+
+          // Place in grid via renderer
+          this.windowManager.sendToMainWindow(IPC.SESSION_VISIBLE_ADD, {
+            sessionId: session.id,
+            slotIndex: entry.gridSlot,
+          })
+          console.log(`[IpcHub] keepWorking: restored "${entry.name}" at slot ${entry.gridSlot}`)
+        } catch (err) {
+          console.error(`[IpcHub] keepWorking: failed to restore "${entry.name}":`, (err as Error).message)
+        }
+      }, delay)
+      delay += 500
+    }
   }
 
   async destroy(): Promise<void> {
+    // Keep Working: save snapshot of current sessions before shutdown
+    if (configStore.get('keepWorking')) {
+      const sessions = this.sessionManager.list().filter(s => s.status === 'active')
+      const gridState = this.sessionManager.getSessionStore().getGridState()
+      if (sessions.length > 0 && gridState) {
+        const snapshot = sessions.map(s => {
+          const slotIdx = gridState.slots.findIndex(slot => slot.sessionId === s.id)
+          return {
+            name: s.name ?? 'session',
+            projectPath: s.projectPath ?? '',
+            gridSlot: slotIdx >= 0 ? slotIdx : -1,
+            entityId: s.entityId,
+          }
+        }).filter(e => e.projectPath && e.gridSlot >= 0)
+        configStore.set('keepWorkingSnapshot', {
+          sessions: snapshot,
+          gridConfig: gridState.config,
+        })
+        console.log(`[IpcHub] keepWorking: saved snapshot of ${snapshot.length} sessions (grid: ${gridState.config.cols}x${gridState.config.rows})`)
+      }
+    }
+
     this.stopBtShutter()
     this.noteManager.destroy()
     this.memoryStore?.close()

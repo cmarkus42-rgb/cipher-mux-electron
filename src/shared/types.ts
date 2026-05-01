@@ -44,11 +44,13 @@ export interface EntityConfig {
   features: string[]
   /** Whether this entity is visible in the grid (default true, false = background). */
   visible?: boolean
+  /** Sort order for display in menus (lower = first, default 100). */
+  sortOrder?: number
 }
 
 // ─── Session ───────────────────────────────────────────────
 
-export type SessionStatus = 'active' | 'stopped' | 'orphaned'
+export type SessionStatus = 'active' | 'closing' | 'stopped' | 'orphaned'
 
 export interface SessionInfo {
   id: string
@@ -219,6 +221,23 @@ export interface AppConfig {
   windows: {
     main: { x: number; y: number; width: number; height: number }
   }
+  /** BT Shutter Remote configuration. */
+  btShutter: {
+    enabled: boolean
+    binaryPath?: string
+    deviceFilter?: { vendorId: number; productId: number }
+  }
+  /** Keep Working mode: save grid state on quit, resume all sessions on next start. */
+  keepWorking?: boolean
+  /** Snapshot of sessions saved on keepWorking quit — consumed on next start. */
+  keepWorkingSnapshot?: {
+    sessions: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string }>
+    gridConfig?: { cols: number; rows: number }
+  }
+  /** Persisted sort order overrides for entity presets (entityId → sortOrder). */
+  entitySortOrders?: Record<string, number>
+  /** Voice submit mode: 'auto' sends Enter after STT, 'manual' waits for BT clicker. */
+  voiceSubmitMode?: 'auto' | 'manual'
   /** Whether the sidebar is detached into its own window. Persisted across restarts. */
   sidebarDetached?: boolean
   /** Saved sidebar window bounds for size/position persistence. */
