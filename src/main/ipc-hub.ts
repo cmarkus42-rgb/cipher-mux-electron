@@ -14,6 +14,8 @@ import { generateApiKey } from './mcp/mcp-auth'
 import { KickoffOrchestrator } from './project/kickoff-orchestrator'
 import { BugreportManager } from './bugreport/bugreport-manager'
 import { VoiceManager } from './voice/voice-manager'
+import { BtShutterManager } from './bluetooth/bt-shutter-manager'
+import type { BtShutterEvent, BtShutterStatus } from './bluetooth/bt-shutter-manager'
 import type { ConversationTransport } from './voice/conversation-engine'
 import { TaskManager } from './task/task-manager'
 import { TaskWatcher } from './task/task-watcher'
@@ -56,6 +58,7 @@ export class IpcHub {
   private noteManager!: NoteManager
   private noteTagging!: NoteTagging
   private memoryStore: MemoryStore | null = null
+  private btShutterManager: BtShutterManager | null = null
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
   private cachedRecoveryResult: RecoveryResult | null = null
 
@@ -1024,7 +1027,15 @@ export class IpcHub {
         inputRouter.on('pinChanged', (data: { pinned: boolean; sessionId: string | null }) => {
           this.windowManager.sendToMainWindow(IPC.VOICE_PIN_STATUS, data)
         })
+        inputRouter.on('scroll', (data: { sessionId: string; action: string }) => {
+          console.log('[Voice] Scroll command:', data.action, 'session:', data.sessionId)
+          this.windowManager.sendToMainWindow(IPC.CELL_SCROLL, {
+            sessionId: data.sessionId,
+            action: data.action,
+          })
+        })
         console.log('[Voice] VOICE_START_SESSION => ok')
+        this.startBtShutter()
         return { ok: true }
       } catch (err) {
         const msg = (err as Error).message
@@ -1078,6 +1089,12 @@ export class IpcHub {
         inputRouter.on('error', (data: { code: string; message: string }) => {
           this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, data.message)
         })
+        inputRouter.on('scroll', (data: { sessionId: string; action: string }) => {
+          this.windowManager.sendToMainWindow(IPC.CELL_SCROLL, {
+            sessionId: data.sessionId,
+            action: data.action,
+          })
+        })
 
         // Start voice-relay entity as background session (no grid placement)
         if (!this.sessionManager.isEntityRunning('voice-relay')) {
@@ -1098,6 +1115,7 @@ export class IpcHub {
 
         this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'idle')
         console.log('[Voice] VOICE_START_COM => ok')
+        this.startBtShutter()
         return { ok: true }
       } catch (err) {
         const msg = (err as Error).message
@@ -1113,6 +1131,7 @@ export class IpcHub {
 
     ipcMain.handle(IPC.VOICE_STOP_COM, async () => {
       console.log('[Voice] VOICE_STOP_COM handler invoked')
+      this.stopBtShutter()
       try {
         // Stop output routing
         if (this.voiceManager) {
@@ -1145,6 +1164,9 @@ export class IpcHub {
 
     ipcMain.on(IPC.VOICE_SET_ROUTING_MODE, (_event, { mode }: { mode: 'session' | 'off' }) => {
       this.voiceManager?.getInputRouter()?.setMode(mode)
+      if (mode === 'off') {
+        this.stopBtShutter()
+      }
     })
 
     ipcMain.on(IPC.VOICE_SESSION_TARGET, (_event, { sessionId }: { sessionId: string | null }) => {
@@ -1479,7 +1501,7 @@ export class IpcHub {
     ipcMain.handle(IPC.NOTES_PARSE_TESTCASE, async (_e, { id }: { id: string }) => {
       try {
         const result = await this.noteManager.read(id)
-        if (!result || result.info.noteType !== 'testcase') return null
+        if (!result || !result.info.tags?.includes('testcase')) return null
         const { parseTestcase } = require('./notes/testcase-parser')
         // Read raw file to get frontmatter intact for parser
         const fsNode = require('fs')
@@ -1724,7 +1746,49 @@ export class IpcHub {
     })
   }
 
+  // ─── BT Shutter Remote ──────────────────────────────────
+  private startBtShutter(): void {
+    const btConfig = configStore.get('btShutter')
+    if (!btConfig?.enabled) return
+    if (this.btShutterManager?.isRunning()) return
+
+    this.btShutterManager = new BtShutterManager({
+      binaryPath: btConfig.binaryPath,
+      deviceFilter: btConfig.deviceFilter,
+    })
+
+    this.btShutterManager.on('button', (event: BtShutterEvent) => {
+      // Route shutter events through VoiceInputRouter (same target as STT)
+      const router = this.voiceManager?.getInputRouter()
+      if (router) {
+        const targetId = router.getActiveSessionId()
+        if (targetId) {
+          const keys = event.action === 'submit' ? '\r' : '\x15'
+          this.sessionManager.sendKeys(targetId, keys).catch(err => {
+            console.error('[BtShutter] sendKeys failed:', (err as Error).message)
+          })
+        }
+      }
+      // Still notify renderer for UI feedback
+      this.windowManager.sendToMainWindow(IPC.BT_SHUTTER_EVENT, event)
+    })
+
+    this.btShutterManager.on('status', (status: BtShutterStatus) => {
+      this.windowManager.sendToMainWindow(IPC.BT_SHUTTER_STATUS, status)
+    })
+
+    this.btShutterManager.start()
+  }
+
+  private stopBtShutter(): void {
+    if (this.btShutterManager) {
+      this.btShutterManager.shutdown()
+      this.btShutterManager = null
+    }
+  }
+
   async destroy(): Promise<void> {
+    this.stopBtShutter()
     this.noteManager.destroy()
     this.memoryStore?.close()
     this.inputRequestWatcher?.stop()
