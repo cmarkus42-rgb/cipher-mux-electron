@@ -658,6 +658,10 @@ export class IpcHub {
           slots: grid.slots,
         })
       }
+      // Keep Working: live-update snapshot on every grid change
+      if (configStore.get('keepWorking') && grid?.config && grid?.slots) {
+        this.updateKeepWorkingSnapshot(grid)
+      }
     })
 
     ipcMain.handle('cipher-mux:config:get-skip-permissions', () => {
@@ -1224,6 +1228,11 @@ export class IpcHub {
 
     ipcMain.on(IPC.VOICE_NOTES_FOCUS, (_event, { focused }: { focused: boolean }) => {
       this.voiceManager?.getInputRouter()?.setNotesEditorFocused(focused)
+    })
+
+    ipcMain.handle('cipher-mux:tts:stop', () => {
+      this.voiceManager?.stopSpeech()
+      return { ok: true }
     })
 
     ipcMain.handle('cipher-mux:tts:speak', async (_e, { text }: { text: string }) => {
@@ -1921,6 +1930,25 @@ export class IpcHub {
       }, delay)
       delay += 500
     }
+  }
+
+  /** Live-update Keep Working snapshot when grid changes (called on every CONFIG_SAVE_GRID). */
+  private updateKeepWorkingSnapshot(grid: { config: { cols: number; rows: number }; slots: Array<{ sessionId: string | null }> }): void {
+    const sessions = this.sessionManager.list().filter(s => s.status === 'active')
+    if (sessions.length === 0) return
+    const snapshot = sessions.map(s => {
+      const slotIdx = grid.slots.findIndex(slot => slot.sessionId === s.id)
+      return {
+        name: s.name ?? 'session',
+        projectPath: s.projectPath ?? '',
+        gridSlot: slotIdx >= 0 ? slotIdx : -1,
+        entityId: s.entityId,
+      }
+    }).filter(e => e.projectPath && e.gridSlot >= 0)
+    configStore.set('keepWorkingSnapshot', {
+      sessions: snapshot,
+      gridConfig: grid.config,
+    })
   }
 
   async destroy(): Promise<void> {
