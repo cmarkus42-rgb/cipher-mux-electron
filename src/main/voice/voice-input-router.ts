@@ -49,14 +49,33 @@ const GRID_NAV_COMMANDS: Array<{
   direction: 'up' | 'down' | 'left' | 'right'
   label: string
 }> = [
-  { patterns: ['grid hoch', 'grit hoch', 'grüt hoch', 'zelle hoch', 'focus hoch', 'nächste oben'],     direction: 'up',    label: 'grid-up' },
-  { patterns: ['grid runter', 'grit runter', 'grüt runter', 'zelle runter', 'focus runter', 'nächste unten'], direction: 'down',  label: 'grid-down' },
-  { patterns: ['grid links', 'grit links', 'grüt links', 'zelle links', 'focus links', 'nächste links'],   direction: 'left',  label: 'grid-left' },
-  { patterns: ['grid rechts', 'grit rechts', 'grüt rechts', 'zelle rechts', 'focus rechts', 'nächste rechts'], direction: 'right', label: 'grid-right' },
+  { patterns: ['grid hoch', 'grit hoch', 'gritt hoch', 'grüt hoch', 'great hoch', 'zelle hoch', 'focus hoch', 'nächste oben'],     direction: 'up',    label: 'grid-up' },
+  { patterns: ['grid runter', 'grit runter', 'gritt runter', 'grüt runter', 'great runter', 'zelle runter', 'focus runter', 'nächste unten'], direction: 'down',  label: 'grid-down' },
+  { patterns: ['grid links', 'grit links', 'gritt links', 'grüt links', 'great links', 'zelle links', 'focus links', 'nächste links'],   direction: 'left',  label: 'grid-left' },
+  { patterns: ['grid rechts', 'grit rechts', 'gritt rechts', 'grüt rechts', 'great rechts', 'zelle rechts', 'focus rechts', 'nächste rechts'], direction: 'right', label: 'grid-right' },
 ]
 
 function stripPunctuation(text: string): string {
   return text.replace(/[.,!?;:…–—'"„"‚'»«()[\]{}]/g, '').trim()
+}
+
+/** Fuzzy-match grid navigation: "<grid-like-word> <direction>" */
+const GRID_PREFIXES = ['grid', 'grit', 'gritt', 'grüt', 'great', 'gret', 'greed', 'grip', 'zelle', 'focus']
+const DIRECTION_MAP: Record<string, 'up' | 'down' | 'left' | 'right'> = {
+  hoch: 'up', oben: 'up', rauf: 'up',
+  runter: 'down', unten: 'down',
+  links: 'left',
+  rechts: 'right',
+}
+
+function matchGridNav(normalized: string): { direction: 'up' | 'down' | 'left' | 'right'; label: string } | null {
+  const words = normalized.split(/\s+/)
+  if (words.length !== 2) return null
+  const [prefix, dir] = words
+  if (!GRID_PREFIXES.includes(prefix)) return null
+  const direction = DIRECTION_MAP[dir]
+  if (!direction) return null
+  return { direction, label: `grid-${direction}` }
 }
 
 export class VoiceInputRouter extends EventEmitter {
@@ -245,7 +264,11 @@ export class VoiceInputRouter extends EventEmitter {
 
     // Check for grid navigation and scroll commands (if enabled)
     const voiceCommandsOn = configStore.get('voiceCommandsEnabled') !== false
-    const gridCmd = voiceCommandsOn ? GRID_NAV_COMMANDS.find(cmd => cmd.patterns.includes(normalized)) : undefined
+    console.log('[VoiceRouter] normalized:', JSON.stringify(normalized), 'voiceCommandsOn:', voiceCommandsOn)
+    // Grid nav: try exact match first, then fuzzy prefix+direction match
+    const gridCmd = voiceCommandsOn
+      ? (GRID_NAV_COMMANDS.find(cmd => cmd.patterns.includes(normalized)) ?? matchGridNav(normalized))
+      : undefined
     if (gridCmd) {
       console.log('[VoiceRouter] grid nav command:', gridCmd.label)
       this.emit('gridNav', { direction: gridCmd.direction })
