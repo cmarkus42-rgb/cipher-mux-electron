@@ -1,5 +1,5 @@
 // src/renderer/components/SessionGrid.tsx
-import { useCallback, useRef, useState } from 'preact/hooks'
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import type { SessionInfo, ContextUsage, EntityId } from '../../shared/types'
 import { computeGridStyle } from '../../shared/grid-types'
 import type { GridState, ThemeName } from '../../shared/grid-types'
@@ -74,6 +74,34 @@ export function SessionGrid({
   onDropSession, onDropNoteOnEmpty, onDropNoteOnSession,
 }: SessionGridProps) {
   useScrollHandler(grid)
+
+  // Grid navigation via voice commands
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.terminal?.onGridNav) return
+    const unsub = api.terminal.onGridNav((data: { direction: string }) => {
+      const { cols, rows } = grid.config
+      // Find current focused slot
+      const currentIdx = grid.slots.findIndex(s => s.sessionId === focusedSessionId)
+      if (currentIdx < 0) return
+      const col = currentIdx % cols
+      const row = Math.floor(currentIdx / cols)
+      let targetCol = col
+      let targetRow = row
+      switch (data.direction) {
+        case 'up':    targetRow = Math.max(0, row - 1); break
+        case 'down':  targetRow = Math.min(rows - 1, row + 1); break
+        case 'left':  targetCol = Math.max(0, col - 1); break
+        case 'right': targetCol = Math.min(cols - 1, col + 1); break
+      }
+      const targetIdx = targetRow * cols + targetCol
+      const targetSession = grid.slots[targetIdx]?.sessionId
+      if (targetSession && targetSession !== focusedSessionId) {
+        onFocusSession(targetSession)
+      }
+    })
+    return () => unsub()
+  }, [grid, focusedSessionId, onFocusSession])
 
   // Use a ref instead of state to avoid stale-closure race: the drop event
   // can fire before Preact completes the re-render triggered by setDragSourceIdx,
