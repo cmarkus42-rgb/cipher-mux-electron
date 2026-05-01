@@ -221,6 +221,30 @@ Minimalistischer Markdown-Editor als dritte Grid-Cell-Option (neben Session und 
 - **MCP:** `mux_notes_create` (mit Tags + Scope) und `mux_notes_list` — MCP-Clients koennen Notes anlegen, UI aktualisiert via NOTES_CHANGED Event
 - **Delete:** Sidebar (hover-reveal Button) + aktiver Tab (Trash-Icon), jeweils mit Confirm-Dialog
 
+## Testcase-Notes schreiben
+
+Testcase-Notes verwenden `noteType: testcase` und ein spezielles Checkbox-Format, das der TestcaseView (Tri-State-Checkboxen, Kommentare, Screenshots) rendert. **Normales Markdown wird NICHT gerendert** — der Parser erkennt nur dieses Format:
+
+```markdown
+## Sektions-Titel
+
+- [ ] **T-ID.1** Beschreibung des Testcases
+- [ ] **T-ID.2** Noch ein Testcase
+- [x] **T-ID.3** Bestandener Test
+- [-] **T-ID.4** Fehlgeschlagener Test // Kommentar zum Fehler
+```
+
+**Regeln:**
+- Sektionen: `## Titel` (H2-Headings)
+- Items: `- [ ] **ID** Beschreibung` (Checkbox + Bold-ID + Text)
+- Status: `[ ]` = offen, `[x]` = PASS, `[-]` = FAIL
+- Kommentare: ` // Kommentartext` nach der Beschreibung
+- Screenshots: `![screenshot](pfad)` im Kommentar
+- IDs muessen eindeutig sein (z.B. `T-BF.1`, `T-VS.3`)
+- Kein anderes Markdown verwenden (keine `###`, keine `**bold**` in Beschreibungen, keine Tabellen)
+
+**Beim Anlegen via MCP:** `mux_notes_create` mit Tag `testcase` — der Tag setzt `noteType: testcase` automatisch.
+
 ## Bekannte Constraints
 
 - **macOS-only:** tmux als harte Abhängigkeit, osascript-Integration
