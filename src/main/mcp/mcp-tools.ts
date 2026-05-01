@@ -1367,4 +1367,30 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       }
     }
   )
+
+  // 36. mux_cell_scroll — Scroll a terminal cell
+  ;(server.registerTool as any)(
+    'mux_cell_scroll',
+    {
+      description:
+        'Scroll a terminal cell. Actions: "up"/"down" scroll by ~1 page, '
+        + '"top"/"bottom" jump to extremes, "to-marker" jumps to the start '
+        + 'of the last response (set automatically on each user submission).',
+      inputSchema: {
+        sessionId: z.string().optional().describe('Target session ID. If omitted, uses the calling session.'),
+        cell: z.string().optional().describe('Target cell by grid position (e.g. "cell-0-0"). Alternative to sessionId.'),
+        action: z.enum(['up', 'down', 'top', 'bottom', 'to-marker']).describe('Scroll action to perform'),
+        lines: z.number().optional().describe('Number of lines to scroll (only for up/down). Default: ~1 page.'),
+      },
+    },
+    async (args: { sessionId?: string; cell?: string; action: string; lines?: number }) => {
+      if (!ctx.windowManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'WindowManager not available' }) }], isError: true }
+      }
+      ctx.windowManager.sendToMainWindow(IPC.CELL_SCROLL, args)
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }],
+      }
+    }
+  )
 }
