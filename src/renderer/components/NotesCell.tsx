@@ -70,7 +70,7 @@ export function NotesCell({
 
       // Detect testcase note — parsing runs in main process via IPC
       let testcase: ParsedTestcase | undefined
-      if (info.noteType === 'testcase') {
+      if (info.tags?.includes('testcase')) {
         try {
           const parsed = await apiObj.notes.parseTestcase(info.id)
           testcase = parsed ?? undefined
@@ -213,13 +213,12 @@ export function NotesCell({
     if (apiObj?.notes?.screenshot) {
       const result = await apiObj.notes.screenshot(activeTab.id, itemId)
       if (result?.path) {
-        // Update comment with screenshot ref
-        const ref = `![screenshot](${result.path})`
+        // Store screenshot as separate attribute — do NOT append to comment text
         const newSections = activeTab.testcase!.sections.map(s => ({
           ...s,
           items: s.items.map(item =>
             item.id === itemId
-              ? { ...item, comment: (item.comment ? item.comment + ' ' : '') + ref, screenshotRef: result.path }
+              ? { ...item, screenshotRef: result.path }
               : item
           ),
         }))
@@ -246,6 +245,23 @@ export function NotesCell({
     }
   }, [openNote])
 
+  // Handle note drops directly (works even when cell is empty/first time)
+  const handleNoteDrop = useCallback((e: DragEvent) => {
+    const cipherType = e.dataTransfer?.getData('application/x-cipher-type')
+    if (cipherType === 'note') {
+      const noteJson = e.dataTransfer?.getData('application/x-cipher-note')
+      if (noteJson) {
+        try {
+          const note = JSON.parse(noteJson)
+          openNote(note)
+          e.stopPropagation()
+          return
+        } catch { /* fall through to grid handler */ }
+      }
+    }
+    onDrop(e)
+  }, [openNote, onDrop])
+
   const expanded = rowSpan > 1
   const cellStyle = expanded ? { gridRow: `span ${rowSpan}` } : undefined
 
@@ -255,7 +271,7 @@ export function NotesCell({
       style={cellStyle}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      onDrop={handleNoteDrop}
       data-highlight={slotCol != null && slotRow != null ? `cell-${slotCol}-${slotRow}` : undefined}
     >
       <div class="cell-header" draggable onDragStart={onDragStart}>
@@ -305,16 +321,41 @@ export function NotesCell({
           >
             <span class="notes-tab__title">{(tab.title && tab.title !== 'Untitled') ? tab.title : t('notesCell.untitled')}</span>
             {tab.id === activeTabId && (
-              <button
-                class="notes-tab__delete"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleDeleteNote(tab.id)
-                }}
-                title={t('notesCell.deleteNote')}
-              >
-                <span class="icon-trash" />
-              </button>
+              <>
+                <button
+                  class="notes-tab__action"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const api = (window as any).cipherMux
+                    if ((window as any).__cipherMuxTtsSpeaking) {
+                      api?.voice?.stopSpeech?.()
+                      ;(window as any).__cipherMuxTtsSpeaking = false
+                    } else {
+                      const body = (tab.content || '').replace(/^---[\s\S]*?---\n?/, '').trim()
+                      if (body) {
+                        ;(window as any).__cipherMuxTtsSpeaking = true
+                        api?.voice?.speak?.(body.slice(0, 2000)).finally(() => {
+                          ;(window as any).__cipherMuxTtsSpeaking = false
+                        })
+                      }
+                    }
+                  }}
+                  title="Vorlesen / Stopp (TTS)"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '10px', opacity: 0.6, padding: '0 3px' }}
+                >
+                  {(window as any).__cipherMuxTtsSpeaking ? '\u25A0' : '\u25B6'}
+                </button>
+                <button
+                  class="notes-tab__delete"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteNote(tab.id)
+                  }}
+                  title={t('notesCell.deleteNote')}
+                >
+                  <span class="icon-trash" />
+                </button>
+              </>
             )}
             <button
               class="notes-tab__close"

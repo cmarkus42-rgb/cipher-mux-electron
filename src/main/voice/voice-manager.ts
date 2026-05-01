@@ -362,6 +362,13 @@ export class VoiceManager extends EventEmitter {
     })
   }
 
+  /** Stop all TTS playback (Piper + macOS say). Called by tts:stop IPC. */
+  stopSpeech(): void {
+    if (this.piperTTS) this.piperTTS.stop()
+    this.stopMacosSay()
+    if (this.transport) this.transport.sendStopPlayback()
+  }
+
   /** Stop any running macOS `say` process. */
   private stopMacosSay(): void {
     if (this.sayProcess) {

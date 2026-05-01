@@ -17,6 +17,11 @@ const api = {
       ipcRenderer.on(IPC.SESSION_CHANGED, handler)
       return () => ipcRenderer.removeListener(IPC.SESSION_CHANGED, handler)
     },
+    onClosing: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.SESSION_CLOSING, handler)
+      return () => ipcRenderer.removeListener(IPC.SESSION_CLOSING, handler)
+    },
     onStopped: (cb: (data: unknown) => void) => {
       const handler = (_e: unknown, data: unknown) => cb(data)
       ipcRenderer.on(IPC.SESSION_STOPPED, handler)
@@ -66,6 +71,11 @@ const api = {
       const handler = (_e: unknown, data: { sessionId?: string; cell?: string; action: string; lines?: number }) => cb(data)
       ipcRenderer.on(IPC.CELL_SCROLL, handler)
       return () => ipcRenderer.removeListener(IPC.CELL_SCROLL, handler)
+    },
+    onGridNav: (cb: (data: { direction: string }) => void) => {
+      const handler = (_e: unknown, data: { direction: string }) => cb(data)
+      ipcRenderer.on(IPC.GRID_NAV, handler)
+      return () => ipcRenderer.removeListener(IPC.GRID_NAV, handler)
     },
   },
 
@@ -447,6 +457,8 @@ const api = {
       ipcRenderer.on(IPC.VOICE_NOTES_INSERT, handler)
       return () => ipcRenderer.removeListener(IPC.VOICE_NOTES_INSERT, handler)
     },
+    speak: (text: string) => ipcRenderer.invoke('cipher-mux:tts:speak', { text }),
+    stopSpeech: () => ipcRenderer.invoke('cipher-mux:tts:stop'),
   },
 
   // ─── BT Shutter Remote ─────────────────────────────────
