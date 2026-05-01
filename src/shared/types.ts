@@ -238,6 +238,12 @@ export interface AppConfig {
   entitySortOrders?: Record<string, number>
   /** Voice submit mode: 'auto' sends Enter after STT, 'manual' waits for BT clicker. */
   voiceSubmitMode?: 'auto' | 'manual'
+  /** TTS enabled — if false, mux_tts_speak is silently ignored. Default: true. */
+  ttsEnabled?: boolean
+  /** TTS voice preference: 'local' = Piper, 'macos' = macOS say. Default: 'local'. */
+  ttsVoice?: 'local' | 'macos'
+  /** Voice commands (scroll, grid nav) enabled. Default: true. */
+  voiceCommandsEnabled?: boolean
   /** Whether the sidebar is detached into its own window. Persisted across restarts. */
   sidebarDetached?: boolean
   /** Saved sidebar window bounds for size/position persistence. */

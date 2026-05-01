@@ -16,6 +16,7 @@
 
 import { EventEmitter } from 'node:events'
 import type { SessionManager } from '../session/session-manager'
+import { configStore } from '../config/config-store'
 
 export interface VoiceInputRouterDeps {
   sessionManager: SessionManager
@@ -42,6 +43,18 @@ const SCROLL_COMMANDS: Array<{
   { patterns: ['zum marker', 'lese start', 'lesestart'],  action: 'to-marker', label: 'scroll-marker' },
 ]
 
+// Grid navigation commands — emits 'gridNav' event for focus switching
+const GRID_NAV_COMMANDS: Array<{
+  patterns: string[]
+  direction: 'up' | 'down' | 'left' | 'right'
+  label: string
+}> = [
+  { patterns: ['grid hoch', 'zelle hoch', 'focus hoch'],     direction: 'up',    label: 'grid-up' },
+  { patterns: ['grid runter', 'zelle runter', 'focus runter'], direction: 'down',  label: 'grid-down' },
+  { patterns: ['grid links', 'zelle links', 'focus links'],   direction: 'left',  label: 'grid-left' },
+  { patterns: ['grid rechts', 'zelle rechts', 'focus rechts'], direction: 'right', label: 'grid-right' },
+]
+
 function stripPunctuation(text: string): string {
   return text.replace(/[.,!?;:…–—'"„"‚'»«()[\]{}]/g, '').trim()
 }
@@ -52,10 +65,21 @@ export class VoiceInputRouter extends EventEmitter {
   private pinnedSessionId: string | null = null
   private notesEditorFocused = false
   private readonly sessionManager: SessionManager
+  /** 'auto' = send Enter after STT text, 'manual' = user submits via BT clicker */
+  private submitMode: 'auto' | 'manual' = 'auto'
 
   constructor(deps: VoiceInputRouterDeps) {
     super()
     this.sessionManager = deps.sessionManager
+  }
+
+  setSubmitMode(mode: 'auto' | 'manual'): void {
+    this.submitMode = mode
+    console.log('[VoiceRouter] submitMode set to:', mode)
+  }
+
+  getSubmitMode(): 'auto' | 'manual' {
+    return this.submitMode
   }
 
   setMode(mode: 'session' | 'off'): void {
@@ -219,8 +243,22 @@ export class VoiceInputRouter extends EventEmitter {
     // Check for voice commands before sending as text
     const normalized = stripPunctuation(text.toLowerCase())
 
-    // Check for scroll navigation commands first
-    const scrollCmd = SCROLL_COMMANDS.find(cmd => cmd.patterns.includes(normalized))
+    // Check for grid navigation and scroll commands (if enabled)
+    const voiceCommandsOn = configStore.get('voiceCommandsEnabled') !== false
+    const gridCmd = voiceCommandsOn ? GRID_NAV_COMMANDS.find(cmd => cmd.patterns.includes(normalized)) : undefined
+    if (gridCmd) {
+      console.log('[VoiceRouter] grid nav command:', gridCmd.label)
+      this.emit('gridNav', { direction: gridCmd.direction })
+      this.emit('dispatched', {
+        sessionId: targetId,
+        sessionName: session?.name ?? targetId,
+        text: `[${gridCmd.label}]`,
+      })
+      return
+    }
+
+    // Check for scroll navigation commands
+    const scrollCmd = voiceCommandsOn ? SCROLL_COMMANDS.find(cmd => cmd.patterns.includes(normalized)) : undefined
     if (scrollCmd) {
       console.log('[VoiceRouter] scroll command:', scrollCmd.label)
       this.emit('scroll', { sessionId: targetId, action: scrollCmd.action })
@@ -244,9 +282,9 @@ export class VoiceInputRouter extends EventEmitter {
           text: `[${command.label}]`,
         })
       } else {
-        // Send text WITHOUT Enter — user submits via "abschicken" voice command
-        console.log('[VoiceRouter] sendKeys to', targetId, ':', JSON.stringify(text.slice(0, 60)))
-        await this.sessionManager.sendKeys(targetId, text.trimEnd() + ' ')
+        // Send text — auto-submit adds Enter, manual leaves it for BT clicker
+        console.log('[VoiceRouter] sendKeys to', targetId, '(submitMode:', this.submitMode, '):', JSON.stringify(text.slice(0, 60)))
+        await this.sessionManager.sendKeys(targetId, text.trimEnd() + (this.submitMode === 'auto' ? '\r' : ' '))
         this.emit('dispatched', {
           sessionId: targetId,
           sessionName: session?.name ?? targetId,

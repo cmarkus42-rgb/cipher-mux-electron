@@ -12,6 +12,7 @@ import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { STTRouter } from './stt-router'
 import { PiperTTS } from './tts-piper'
+import { configStore } from '../config/config-store'
 import { ConversationEngine, type ConversationTransport } from './conversation-engine'
 import { VoiceState } from './voice-state'
 import { OllamaChat } from './ollama-chat'
@@ -278,6 +279,17 @@ export class VoiceManager extends EventEmitter {
   async speakText(text: string, interrupt = false): Promise<void> {
     if (!this._initialized) {
       throw new Error('VoiceManager not initialized')
+    }
+
+    // Check TTS toggle
+    if (configStore.get('ttsEnabled') === false) return
+
+    // Check voice preference — skip Piper and go straight to macOS if preferred
+    const voicePref = configStore.get('ttsVoice') ?? 'local'
+    if (voicePref === 'macos') {
+      if (interrupt) this.stopMacosSay()
+      await this.speakViaMacosSay(text)
+      return
     }
 
     // Try PiperTTS first
