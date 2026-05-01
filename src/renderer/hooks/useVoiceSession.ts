@@ -90,6 +90,11 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
       onVADMisfire: () => {
         api.voice.vadMisfire()
       },
+    }, {
+      positiveSpeechThreshold: 0.5,
+      negativeSpeechThreshold: 0.25,
+      minSpeechFrames: 3,
+      preSpeechPadFrames: 5,
     })
     vadRef.current.start()
   }, [])
@@ -218,6 +223,21 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
 
     return () => unsubs.forEach(fn => fn())
   }, [active, showToast])
+
+  // BT Shutter Remote event handler — keys are routed by Main Process via
+  // VoiceInputRouter now. Renderer only listens for UI feedback (toast).
+  useEffect(() => {
+    if (!active) return
+
+    const api = (window as any).cipherMux
+    if (!api.btShutter?.onEvent) return
+
+    const unsub = api.btShutter.onEvent((event: { button: string; action: string }) => {
+      console.log(`[BtShutter] UI received: ${event.button} → ${event.action}`)
+    })
+
+    return () => unsub()
+  }, [active])
 
   // PTT hotkey handler (Ctrl+Shift+Space)
   useEffect(() => {
