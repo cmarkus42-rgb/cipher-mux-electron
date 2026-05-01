@@ -7,6 +7,7 @@ import { SessionCell } from './SessionCell'
 import { LauncherCell } from './LauncherCell'
 import type { PathStartOpts } from './LauncherCell'
 import { NotesCell } from './NotesCell'
+import { useScrollHandler } from '../hooks/useScrollHandler'
 
 interface SessionGridProps {
   grid: GridState
@@ -17,6 +18,10 @@ interface SessionGridProps {
   orchestratorSessionId: string | null
   activeWorkspaceId: string | null
   entityStatus: Record<string, boolean>
+  voiceTargetSessionId: string | null
+  voicePinned: boolean
+  onToggleVoicePin: (sessionId: string) => void
+  workspaceLoading: boolean
   onFocusSession: (sessionId: string) => void
   onCloseSession: (sessionId: string) => void
   onSwitchProject: (sessionId: string) => void
@@ -59,12 +64,17 @@ function getCoveredSlots(slots: GridState['slots'], cols: number, rows: number):
 
 export function SessionGrid({
   grid, sessions, contextUsages, focusedSessionId, theme,
-  orchestratorSessionId, activeWorkspaceId, entityStatus, onFocusSession, onCloseSession,
+  orchestratorSessionId, activeWorkspaceId, entityStatus,
+  voiceTargetSessionId, voicePinned, onToggleVoicePin,
+  workspaceLoading,
+  onFocusSession, onCloseSession,
   onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground,
   onStartEntity, onResumeEntity, onFocusEntity, onStartPath,
   onOpenNotes, onOpenNote, onCloseNotes, onToggleExpandSlot, onSwap,
   onDropSession, onDropNoteOnEmpty, onDropNoteOnSession,
 }: SessionGridProps) {
+  useScrollHandler(grid)
+
   // Use a ref instead of state to avoid stale-closure race: the drop event
   // can fire before Preact completes the re-render triggered by setDragSourceIdx,
   // causing the old handleDrop closure (with null) to execute instead of the swap.
@@ -178,6 +188,9 @@ export function SessionGrid({
                 contextUsage={contextUsages[session.id]}
                 focused={session.id === focusedSessionId}
                 isOrchestrator={session.id === orchestratorSessionId}
+                isVoiceTarget={session.id === voiceTargetSessionId}
+                isVoicePinned={voicePinned && session.id === voiceTargetSessionId}
+                onToggleVoicePin={onToggleVoicePin}
                 theme={theme}
                 rowSpan={slot.rowSpan}
                 maxRows={rows}
@@ -213,6 +226,7 @@ export function SessionGrid({
               onOpenNote={(note) => onOpenNote(note, idx)}
               entityStatus={entityStatus}
               activeWorkspaceId={activeWorkspaceId}
+              workspaceLoading={workspaceLoading}
               onDragOver={(e: DragEvent) => handleDragOver(idx, e)}
               onDragLeave={handleDragLeave}
               onDrop={(e: DragEvent) => handleDrop(idx, e)}
