@@ -273,49 +273,95 @@ export class VoiceManager extends EventEmitter {
 
   /**
    * Speak text via TTS (used by mux_tts_speak MCP tool).
-   * Lazy-initializes PiperTTS if not yet available (e.g. session mode with skipTTS).
+   * Tries PiperTTS first (with lazy-init), falls back to macOS `say` if unavailable.
    */
   async speakText(text: string, interrupt = false): Promise<void> {
     if (!this._initialized) {
       throw new Error('VoiceManager not initialized')
     }
 
-    // Lazy-init PiperTTS if needed (session mode starts with skipTTS)
-    if (!this.piperTTS) {
-      const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
-      this.piperTTS = new PiperTTS({
-        voice: this.config.piperVoice,
-        modelsDir: this.config.piperModelsDir,
-        nodeModulesPath: appNodeModules,
-      })
-      await this.piperTTS.init()
-      if (this.conversation) {
-        this.conversation.setTTS(this.piperTTS)
-      }
-    }
-
-    if (interrupt) {
-      this.piperTTS.stop()
-      if (this.transport) {
-        this.transport.sendStopPlayback()
-      }
-    }
-
-    // Speak via ConversationEngine if available, else directly via PiperTTS
-    if (this.conversation) {
-      await this.conversation.speakResponse(text)
-    } else {
-      for await (const wavChunk of this.piperTTS.speak(text)) {
-        if (this.transport) {
-          this.transport.sendAudioPlayback(wavChunk.toString('base64'))
+    // Try PiperTTS first
+    try {
+      // Lazy-init PiperTTS if needed (session mode starts with skipTTS)
+      if (!this.piperTTS) {
+        const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
+        this.piperTTS = new PiperTTS({
+          voice: this.config.piperVoice,
+          modelsDir: this.config.piperModelsDir,
+          nodeModulesPath: appNodeModules,
+        })
+        await this.piperTTS.init()
+        if (this.conversation) {
+          this.conversation.setTTS(this.piperTTS)
         }
       }
+
+      if (interrupt) {
+        this.piperTTS.stop()
+        this.stopMacosSay()
+        if (this.transport) {
+          this.transport.sendStopPlayback()
+        }
+      }
+
+      // Speak via ConversationEngine if available, else directly via PiperTTS
+      let piperProducedAudio = false
+      if (this.conversation) {
+        piperProducedAudio = await this.conversation.speakResponse(text)
+      } else {
+        for await (const wavChunk of this.piperTTS.speak(text)) {
+          piperProducedAudio = true
+          if (this.transport) {
+            this.transport.sendAudioPlayback(wavChunk.toString('base64'))
+          }
+        }
+      }
+
+      if (piperProducedAudio) return
+      console.warn('[VoiceManager] PiperTTS produced no audio, falling back to macOS say')
+    } catch (err) {
+      console.warn('[VoiceManager] PiperTTS failed, falling back to macOS say:', (err as Error).message)
+      this.piperTTS = null
+    }
+
+    // Fallback: macOS say (direct, no renderer pipeline needed)
+    await this.speakViaMacosSay(text)
+  }
+
+  /** Fallback TTS via macOS `say` command — simple and reliable. */
+  private sayProcess: import('child_process').ChildProcess | null = null
+
+  private speakViaMacosSay(text: string): Promise<void> {
+    // Kill any running say process before starting a new one
+    this.stopMacosSay()
+    return new Promise((resolve, reject) => {
+      const { execFile } = require('child_process')
+      this.sayProcess = execFile('say', [text], (err: Error | null) => {
+        this.sayProcess = null
+        if (err && (err as any).killed) {
+          resolve() // intentionally killed via stop — not an error
+        } else if (err) {
+          console.error('[VoiceManager] macOS say failed:', err.message)
+          reject(err)
+        } else {
+          resolve()
+        }
+      })
+    })
+  }
+
+  /** Stop any running macOS `say` process. */
+  private stopMacosSay(): void {
+    if (this.sayProcess) {
+      try { this.sayProcess.kill('SIGTERM') } catch { /* ignore */ }
+      this.sayProcess = null
     }
   }
 
   /** Shut down all subsystems and release references */
   shutdown(): void {
     this._initialized = false
+    this.stopMacosSay()
 
     if (this.outputRouter) {
       this.outputRouter.shutdown()
