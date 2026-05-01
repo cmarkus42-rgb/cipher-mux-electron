@@ -73,6 +73,10 @@ const THEME_TOKEN_GROUPS: Array<{ labelKey: string; tokens: string[] }> = [
     labelKey: 'themeEditor.groupCtx',
     tokens: ['--color-ctx-ok', '--color-ctx-warn', '--color-ctx-error'],
   },
+  {
+    labelKey: 'themeEditor.groupHighlight',
+    tokens: ['--color-highlight', '--color-highlight-dim'],
+  },
 ]
 
 export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme, onOpenBugreport }: InfoSettingsViewProps) {
@@ -105,6 +109,14 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
   const [llmTesting, setLlmTesting] = useState(false)
   const [llmSaved, setLlmSaved] = useState(false)
 
+  // Voice / Sprachsteuerung state
+  const [btShutterEnabled, setBtShutterEnabled] = useState(false)
+  const [voiceSubmitMode, setVoiceSubmitMode] = useState<'auto' | 'manual'>('auto')
+  const [ttsEnabled, setTtsEnabled] = useState(true)
+  const [ttsVoice, setTtsVoice] = useState<'local' | 'macos'>('local')
+  const [voiceCommandsEnabled, setVoiceCommandsEnabled] = useState(true)
+  const [keepWorking, setKeepWorking] = useState(false)
+
   const load = useCallback(async () => {
     const sp: boolean = await api.config.getSkipPermissions()
     setSkipPerms(sp)
@@ -114,9 +126,22 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
       setCustomTokens(ui.customThemeTokens)
       // Apply custom tokens to document
       for (const [prop, val] of Object.entries(ui.customThemeTokens as Record<string, string>)) {
-        document.documentElement.style.setProperty(prop, val)
+        document.body.style.setProperty(prop, val)
       }
     }
+    // Load BT Shutter config
+    const btShutter = await api.config.get('btShutter')
+    if (btShutter) setBtShutterEnabled(btShutter.enabled ?? false)
+    const vsm = await api.config.get('voiceSubmitMode')
+    if (vsm) setVoiceSubmitMode(vsm)
+    const ttsEn = await api.config.get('ttsEnabled')
+    setTtsEnabled(ttsEn ?? true)
+    const ttsV = await api.config.get('ttsVoice')
+    if (ttsV) setTtsVoice(ttsV)
+    const vcEn = await api.config.get('voiceCommandsEnabled')
+    setVoiceCommandsEnabled(vcEn ?? true)
+    const kw = await api.config.get('keepWorking')
+    setKeepWorking(kw ?? false)
     // Load LLM config
     const llm: LlmConfig | null = await api.config.get('llm')
     if (llm) {
@@ -144,7 +169,7 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
 
   /** Change a single token — live-apply + track in state. */
   const handleTokenChange = useCallback((prop: string, value: string) => {
-    document.documentElement.style.setProperty(prop, value)
+    document.body.style.setProperty(prop, value)
     setCustomTokens(prev => ({ ...prev, [prop]: value }))
   }, [])
 
@@ -169,7 +194,7 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
   /** Reset all custom overrides back to theme defaults. */
   const handleThemeReset = useCallback(() => {
     for (const prop of Object.keys(customTokens)) {
-      document.documentElement.style.removeProperty(prop)
+      document.body.style.removeProperty(prop)
     }
     setCustomTokens({})
     setPreviewing(false)
@@ -186,12 +211,12 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
   const handleRevert = useCallback(() => {
     // Remove all currently applied tokens
     for (const prop of Object.keys(customTokens)) {
-      document.documentElement.style.removeProperty(prop)
+      document.body.style.removeProperty(prop)
     }
     // Restore pre-edit tokens
     const original = preEditTokensRef.current
     for (const [prop, val] of Object.entries(original)) {
-      document.documentElement.style.setProperty(prop, val)
+      document.body.style.setProperty(prop, val)
     }
     setCustomTokens(original)
     setPreviewing(false)
@@ -422,6 +447,115 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
             <button class="btn btn--sm btn--primary" onClick={() => onOpenBugreport?.()}>
               {t('settings.bugreportCreate')}
             </button>
+          </div>
+
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>Sprachsteuerung</div>
+          <div class="settings-section__hint">TTS, Voice Commands, BT Shutter und Submit-Modus.</div>
+
+          <div class="settings-row" style={{ marginTop: '8px' }}>
+            <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={ttsEnabled}
+                onChange={async (e) => {
+                  const v = (e.target as HTMLInputElement).checked
+                  setTtsEnabled(v)
+                  await api.config.set('ttsEnabled', v)
+                }}
+                style={{ marginRight: '8px' }}
+              />
+              <span>TTS (Text-to-Speech)</span>
+            </label>
+          </div>
+          {ttsEnabled && (
+            <div class="settings-row" style={{ marginTop: '8px' }}>
+              <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                <select
+                  value={ttsVoice}
+                  onChange={async (e) => {
+                    const v = (e.target as HTMLSelectElement).value as 'local' | 'macos'
+                    setTtsVoice(v)
+                    await api.config.set('ttsVoice', v)
+                  }}
+                  style={{ marginRight: '8px' }}
+                  class="input input--sm"
+                >
+                  <option value="local">Lokal (Piper)</option>
+                  <option value="macos">macOS Systemstimme</option>
+                </select>
+                <span>TTS-Stimme</span>
+              </label>
+            </div>
+          )}
+
+          <div class="settings-row" style={{ marginTop: '8px' }}>
+            <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={voiceCommandsEnabled}
+                onChange={async (e) => {
+                  const v = (e.target as HTMLInputElement).checked
+                  setVoiceCommandsEnabled(v)
+                  await api.config.set('voiceCommandsEnabled', v)
+                }}
+                style={{ marginRight: '8px' }}
+              />
+              <span>Voice Commands (Scroll, Grid-Navigation)</span>
+            </label>
+          </div>
+
+          <div class="settings-row" style={{ marginTop: '8px' }}>
+            <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
+              <select
+                value={voiceSubmitMode}
+                onChange={async (e) => {
+                  const v = (e.target as HTMLSelectElement).value as 'auto' | 'manual'
+                  setVoiceSubmitMode(v)
+                  await api.config.set('voiceSubmitMode', v)
+                }}
+                style={{ marginRight: '8px' }}
+                class="input input--sm"
+              >
+                <option value="auto">Auto-Enter nach STT</option>
+                <option value="manual">Manuell (BT-Clicker)</option>
+              </select>
+              <span>Voice Submit Mode</span>
+            </label>
+          </div>
+
+          <div class="settings-row" style={{ marginTop: '8px' }}>
+            <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={btShutterEnabled}
+                onChange={async (e) => {
+                  const v = (e.target as HTMLInputElement).checked
+                  setBtShutterEnabled(v)
+                  const current = await api.config.get('btShutter') ?? {}
+                  await api.config.set('btShutter', { ...current, enabled: v })
+                }}
+                style={{ marginRight: '8px' }}
+              />
+              <span>BT Shutter Remote</span>
+            </label>
+          </div>
+
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>Keep Working</div>
+          <div class="settings-section__hint">Beim Beenden alle Sessions speichern und beim naechsten Start mit Resume wieder hochfahren.</div>
+          <div class="settings-row" style={{ marginTop: '8px' }}>
+            <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={keepWorking}
+                onChange={async (e) => {
+                  const v = (e.target as HTMLInputElement).checked
+                  setKeepWorking(v)
+                  await api.config.set('keepWorking', v)
+                }}
+                style={{ marginRight: '8px' }}
+              />
+              <span>Keep Working — Sessions bei App-Neustart mit Resume fortsetzen</span>
+            </label>
           </div>
         </section>
       )}
