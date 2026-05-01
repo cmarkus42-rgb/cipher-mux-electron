@@ -62,6 +62,11 @@ const api = {
       ipcRenderer.on(IPC.TERMINAL_DATA, handler)
       return () => ipcRenderer.removeListener(IPC.TERMINAL_DATA, handler)
     },
+    onCellScroll: (cb: (data: { sessionId?: string; cell?: string; action: string; lines?: number }) => void) => {
+      const handler = (_e: unknown, data: { sessionId?: string; cell?: string; action: string; lines?: number }) => cb(data)
+      ipcRenderer.on(IPC.CELL_SCROLL, handler)
+      return () => ipcRenderer.removeListener(IPC.CELL_SCROLL, handler)
+    },
   },
 
   // ─── Messages ──────────────────────────────────────────
@@ -441,6 +446,20 @@ const api = {
       const handler = (_e: unknown, data: { text: string }) => cb(data)
       ipcRenderer.on(IPC.VOICE_NOTES_INSERT, handler)
       return () => ipcRenderer.removeListener(IPC.VOICE_NOTES_INSERT, handler)
+    },
+  },
+
+  // ─── BT Shutter Remote ─────────────────────────────────
+  btShutter: {
+    onEvent: (cb: (data: { button: string; action: string }) => void) => {
+      const handler = (_e: unknown, data: { button: string; action: string }) => cb(data)
+      ipcRenderer.on(IPC.BT_SHUTTER_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC.BT_SHUTTER_EVENT, handler)
+    },
+    onStatus: (cb: (data: { status: string; error?: string }) => void) => {
+      const handler = (_e: unknown, data: { status: string; error?: string }) => cb(data)
+      ipcRenderer.on(IPC.BT_SHUTTER_STATUS, handler)
+      return () => ipcRenderer.removeListener(IPC.BT_SHUTTER_STATUS, handler)
     },
   },
 

@@ -6,6 +6,7 @@ import { CanvasAddon } from '@xterm/addon-canvas'
 import '@xterm/xterm/css/xterm.css'
 import { getTerminalTheme } from './useTheme'
 import type { ThemeName } from '../../shared/grid-types'
+import { registerTerminal, unregisterTerminal, setMarker } from '../terminal-registry'
 
 const api = () => (window as any).cipherMux
 
@@ -155,6 +156,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
 
     termRef.current = term
     fitAddonRef.current = fitAddon
+    registerTerminal(sessionId, term)
 
     // Track first successful fit so we can signal TERMINAL_READY exactly once.
     // This unblocks any queued auto-launch commands in the main process (e.g.
@@ -278,6 +280,10 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
 
     // Send user input to main process
     const inputDisposable = term.onData((data: string) => {
+      // Track scroll marker on Enter — marks start of next response
+      if (data === '\r') {
+        setMarker(sessionId, term.buffer.active.baseY + term.buffer.active.cursorY)
+      }
       api().terminal.write(sessionId, data)
     })
 
@@ -300,6 +306,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       intersectionObserver.disconnect()
       inputDisposable.dispose()
       unsubscribe()
+      unregisterTerminal(sessionId)
       term.dispose()
       termRef.current = null
       fitAddonRef.current = null

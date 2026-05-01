@@ -166,6 +166,7 @@ export const IPC = {
   SESSION_FOCUS: 'cipher-mux:session:focus',
   SESSION_EJECT: 'cipher-mux:session:eject',
   SIDEBAR_TOGGLE: 'cipher-mux:sidebar:toggle',
+  CELL_SCROLL: 'cipher-mux:cell:scroll',
 
   // Companion Memory
   COMPANION_RECALL: 'cipher-mux:companion:recall',
@@ -188,6 +189,10 @@ export const IPC = {
   UI_HIGHLIGHT: 'cipher-mux:ui:highlight',
   UI_OPEN: 'cipher-mux:ui:open',
   THEME_SET: 'cipher-mux:theme:set',
+
+  // BT Shutter Remote
+  BT_SHUTTER_EVENT: 'cipher-mux:bt-shutter:event',
+  BT_SHUTTER_STATUS: 'cipher-mux:bt-shutter:status',
 
   // Entity Framework
   ENTITY_START: 'cipher-mux:entity:start',
