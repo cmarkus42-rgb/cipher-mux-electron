@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 950" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6d28d9"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#15803d"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#92400e"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="1240" height="950" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="620" y="38" text-anchor="middle" font-size="24" font-weight="700" fill="#1e1e1e">Multi-Session-Entwicklungsarchitektur</text>
+  <text x="620" y="62" text-anchor="middle" font-size="15" fill="#757575">Cipher-App (cipher-mux v2) als Referenz · Erweiterung deines Systems-Engineering-Workflows</text>
+
+  <!-- Layer zones (background) -->
+  <rect x="240" y="100" width="770" height="170" rx="10" ry="10" fill="#dbe4ff" fill-opacity="0.45" stroke="#4a9eed" stroke-width="1"/>
+  <text x="252" y="118" font-size="14" font-weight="600" fill="#2563eb">L0 · Stakeholder &amp; Architektur</text>
+
+  <rect x="240" y="290" width="770" height="180" rx="10" ry="10" fill="#e5dbff" fill-opacity="0.45" stroke="#8b5cf6" stroke-width="1"/>
+  <text x="252" y="308" font-size="14" font-weight="600" fill="#6d28d9">L1 · Subsysteme (Systems-Engineering-Zerlegung)</text>
+
+  <rect x="240" y="490" width="770" height="220" rx="10" ry="10" fill="#d3f9d8" fill-opacity="0.45" stroke="#22c55e" stroke-width="1"/>
+  <text x="252" y="508" font-size="14" font-weight="600" fill="#15803d">L2 · Worker (inferenz-taugliche Häppchen)</text>
+
+  <!-- Spec box (left, spans all layers) -->
+  <rect x="40" y="100" width="180" height="610" rx="10" ry="10" fill="#fff3bf" stroke="#f59e0b" stroke-width="2"/>
+  <text x="60" y="128" font-size="20" font-weight="700" fill="#92400e">SPEC</text>
+  <text x="60" y="155" font-size="13" font-weight="600" fill="#92400e">Single Source of Truth</text>
+  <line x1="55" y1="167" x2="205" y2="167" stroke="#f59e0b" stroke-width="1"/>
+  <text x="60" y="195" font-size="13" fill="#1e1e1e">• Use Cases</text>
+  <text x="60" y="220" font-size="13" fill="#1e1e1e">• Architektur</text>
+  <text x="60" y="245" font-size="13" fill="#1e1e1e">• APIs / Schemas</text>
+  <text x="60" y="270" font-size="13" fill="#1e1e1e">• Off-Limits</text>
+  <text x="60" y="295" font-size="13" fill="#1e1e1e">• Tests / Akzeptanz</text>
+  <text x="60" y="320" font-size="13" fill="#1e1e1e">• ADRs</text>
+  <line x1="55" y1="340" x2="205" y2="340" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="60" y="362" font-size="12" fill="#757575">überlebt alle Sessions.</text>
+  <text x="60" y="380" font-size="12" fill="#757575">Wird in jeder Session</text>
+  <text x="60" y="398" font-size="12" fill="#757575">referenziert &amp; validiert.</text>
+  <line x1="55" y1="420" x2="205" y2="420" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="60" y="442" font-size="12" font-weight="600" fill="#92400e">≈ CLAUDE.md</text>
+  <text x="60" y="460" font-size="12" font-weight="600" fill="#92400e">+ docs/specs/*.md</text>
+  <text x="60" y="478" font-size="12" font-weight="600" fill="#92400e">+ ADR-Verzeichnis</text>
+  <line x1="55" y1="498" x2="205" y2="498" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="60" y="520" font-size="12" fill="#1e1e1e" font-weight="600">Iteration:</text>
+  <text x="60" y="540" font-size="11" fill="#1e1e1e">jeder Lauf endet mit</text>
+  <text x="60" y="556" font-size="11" fill="#1e1e1e">Spec-Conformance-</text>
+  <text x="60" y="572" font-size="11" fill="#1e1e1e">Check.</text>
+  <text x="60" y="595" font-size="11" fill="#1e1e1e">Bei Drift:</text>
+  <text x="60" y="611" font-size="11" fill="#1e1e1e">Spec aktualisieren</text>
+  <text x="60" y="627" font-size="11" fill="#1e1e1e">ODER Code anpassen,</text>
+  <text x="60" y="643" font-size="11" fill="#1e1e1e">nie still ignorieren.</text>
+  <text x="60" y="675" font-size="11" font-style="italic" fill="#92400e">Vergessens-Schutz:</text>
+  <text x="60" y="691" font-size="11" font-style="italic" fill="#92400e">Anforderungs-IDs in</text>
+  <text x="60" y="704" font-size="11" font-style="italic" fill="#92400e">jedem Übergabeprompt</text>
+
+  <!-- Reviewer box (right) -->
+  <rect x="1030" y="100" width="180" height="200" rx="10" ry="10" fill="#ffd8a8" stroke="#f59e0b" stroke-width="2"/>
+  <text x="1050" y="125" font-size="17" font-weight="700" fill="#92400e">REVIEWER</text>
+  <text x="1050" y="146" font-size="12" fill="#757575">frischer Kontext, separat</text>
+  <line x1="1042" y1="158" x2="1198" y2="158" stroke="#f59e0b" stroke-width="1"/>
+  <text x="1050" y="178" font-size="12" fill="#1e1e1e">• Plan-Review (vor Code)</text>
+  <text x="1050" y="198" font-size="12" fill="#1e1e1e">• Code-Review (nach Diff)</text>
+  <text x="1050" y="218" font-size="12" fill="#1e1e1e">• Spec-Conformance</text>
+  <text x="1050" y="238" font-size="12" fill="#1e1e1e">• Risk-Review (Off-Limits?)</text>
+  <line x1="1042" y1="252" x2="1198" y2="252" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="1050" y="272" font-size="11" font-weight="600" fill="#92400e">Modell: Sonnet</text>
+  <text x="1050" y="288" font-size="11" fill="#92400e">Eigener Cache (frisch),</text>
+
+  <!-- L0 Stakeholder Session -->
+  <rect x="420" y="140" width="400" height="120" rx="10" ry="10" fill="#a5d8ff" stroke="#2563eb" stroke-width="2"/>
+  <text x="620" y="166" text-anchor="middle" font-size="19" font-weight="700" fill="#1e3a5f">L0 · Stakeholder-Session</text>
+  <line x1="430" y1="178" x2="810" y2="178" stroke="#2563eb" stroke-width="1"/>
+  <text x="620" y="200" text-anchor="middle" font-size="13" fill="#1e1e1e">Anforderungen klären · Systems-Engineering-Zerlegung</text>
+  <text x="620" y="220" text-anchor="middle" font-size="13" fill="#1e1e1e">Spec schreiben · Übergabeprompts pro Subsystem entwerfen</text>
+  <text x="620" y="244" text-anchor="middle" font-size="12" font-weight="600" fill="#92400e">Plan-Modus  ·  Modell: opusplan  ·  langlebige Session, /compact an Bruchstellen</text>
+
+  <!-- Spec → L0 arrow -->
+  <line x1="220" y1="195" x2="416" y2="195" stroke="#92400e" stroke-width="2.5" marker-end="url(#arrow-amber)"/>
+  <rect x="252" y="178" width="118" height="20" rx="4" fill="#fff3bf" stroke="#f59e0b" stroke-width="0.5"/>
+  <text x="311" y="192" text-anchor="middle" font-size="11" fill="#92400e" font-weight="600">Anforderungspaket</text>
+
+  <!-- L1 Subsystem boxes (4) -->
+  <g>
+    <rect x="248" y="325" width="170" height="135" rx="10" ry="10" fill="#d0bfff" stroke="#6d28d9" stroke-width="2"/>
+    <text x="333" y="348" text-anchor="middle" font-size="15" font-weight="700" fill="#2d1b69">S1 · tmux Backend</text>
+    <line x1="258" y1="358" x2="408" y2="358" stroke="#6d28d9" stroke-width="0.8"/>
+    <text x="333" y="378" text-anchor="middle" font-size="12" fill="#2d1b69">PTY-Mgmt · Sessions</text>
+    <text x="333" y="395" text-anchor="middle" font-size="12" fill="#2d1b69">tmux-Bind · Recovery</text>
+    <line x1="258" y1="408" x2="408" y2="408" stroke="#6d28d9" stroke-width="0.5" stroke-dasharray="3,3"/>
+    <text x="333" y="425" text-anchor="middle" font-size="11" fill="#1e1e1e">sub-CLAUDE.md S1</text>
+    <text x="333" y="441" text-anchor="middle" font-size="11" fill="#92400e" font-weight="600">Plan-Mode · Sonnet</text>
+    <text x="333" y="455" text-anchor="middle" font-size="10" fill="#757575">Worktree: feature/tmux</text>
+  </g>
+
+  <g>
+    <rect x="438" y="325" width="170" height="135" rx="10" ry="10" fill="#d0bfff" stroke="#6d28d9" stroke-width="2"/>
+    <text x="523" y="348" text-anchor="middle" font-size="15" font-weight="700" fill="#2d1b69">S2 · IPC + MsgBus</text>
+    <line x1="448" y1="358" x2="598" y2="358" stroke="#6d28d9" stroke-width="0.8"/>
+    <text x="523" y="378" text-anchor="middle" font-size="12" fill="#2d1b69">SQLite-MessageBus</text>
+    <text x="523" y="395" text-anchor="middle" font-size="12" fill="#2d1b69">IPC-Bridge · Events</text>
+    <line x1="448" y1="408" x2="598" y2="408" stroke="#6d28d9" stroke-width="0.5" stroke-dasharray="3,3"/>
+    <text x="523" y="425" text-anchor="middle" font-size="11" fill="#1e1e1e">sub-CLAUDE.md S2</text>
+    <text x="523" y="441" text-anchor="middle" font-size="11" fill="#92400e" font-weight="600">Plan-Mode · Sonnet</text>
+    <text x="523" y="455" text-anchor="middle" font-size="10" fill="#757575">Worktree: feature/ipc</text>
+  </g>
+
+  <g>
+    <rect x="628" y="325" width="170" height="135" rx="10" ry="10" fill="#d0bfff" stroke="#6d28d9" stroke-width="2"/>
+    <text x="713" y="348" text-anchor="middle" font-size="15" font-weight="700" fill="#2d1b69">S3 · UI (Preact)</text>
+    <line x1="638" y1="358" x2="788" y2="358" stroke="#6d28d9" stroke-width="0.8"/>
+    <text x="713" y="378" text-anchor="middle" font-size="12" fill="#2d1b69">Activity Rail · Cockpit</text>
+    <text x="713" y="395" text-anchor="middle" font-size="12" fill="#2d1b69">Chatroom · Panes</text>
+    <line x1="638" y1="408" x2="788" y2="408" stroke="#6d28d9" stroke-width="0.5" stroke-dasharray="3,3"/>
+    <text x="713" y="425" text-anchor="middle" font-size="11" fill="#1e1e1e">sub-CLAUDE.md S3</text>
+    <text x="713" y="441" text-anchor="middle" font-size="11" fill="#92400e" font-weight="600">Plan-Mode · Sonnet</text>
+    <text x="713" y="455" text-anchor="middle" font-size="10" fill="#757575">Worktree: feature/ui</text>
+  </g>
+
+  <g>
+    <rect x="818" y="325" width="170" height="135" rx="10" ry="10" fill="#d0bfff" stroke="#6d28d9" stroke-width="2"/>
+    <text x="903" y="348" text-anchor="middle" font-size="15" font-weight="700" fill="#2d1b69">S4 · Orchestr. + MCP</text>
+    <line x1="828" y1="358" x2="978" y2="358" stroke="#6d28d9" stroke-width="0.8"/>
+    <text x="903" y="378" text-anchor="middle" font-size="12" fill="#2d1b69">on-demand Spawn</text>
+    <text x="903" y="395" text-anchor="middle" font-size="12" fill="#2d1b69">MCP-Adapter</text>
+    <line x1="828" y1="408" x2="978" y2="408" stroke="#6d28d9" stroke-width="0.5" stroke-dasharray="3,3"/>
+    <text x="903" y="425" text-anchor="middle" font-size="11" fill="#1e1e1e">sub-CLAUDE.md S4</text>
+    <text x="903" y="441" text-anchor="middle" font-size="11" fill="#92400e" font-weight="600">Plan-Mode · Sonnet</text>
+    <text x="903" y="455" text-anchor="middle" font-size="10" fill="#757575">Worktree: feature/orch</text>
+  </g>
+
+  <!-- L0 → L1 arrows (4 splay arrows from L0 bottom) -->
+  <line x1="540" y1="260" x2="333" y2="325" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <line x1="595" y1="260" x2="523" y2="325" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <line x1="650" y1="260" x2="713" y2="325" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <line x1="705" y1="260" x2="903" y2="325" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <rect x="500" y="265" width="240" height="20" rx="4" fill="#dbe4ff" stroke="#4a9eed" stroke-width="0.5"/>
+  <text x="620" y="280" text-anchor="middle" font-size="11" fill="#2563eb" font-weight="600">Übergabeprompt + sub-CLAUDE.md (pro Subsystem)</text>
+
+  <!-- L2 Worker boxes (8: 2 per L1 subsystem) -->
+  <g>
+    <rect x="253" y="525" width="160" height="55" rx="8" ry="8" fill="#b2f2bb" stroke="#15803d" stroke-width="2"/>
+    <text x="333" y="548" text-anchor="middle" font-size="13" font-weight="600" fill="#15803d">PTY-Spawn-Logik</text>
+    <text x="333" y="566" text-anchor="middle" font-size="10" fill="#15803d">Subagent · Haiku</text>
+    <rect x="253" y="595" width="160" height="55" rx="8" ry="8" fill="#b2f2bb" stroke="#15803d" stroke-width="2"/>
+    <text x="333" y="618" text-anchor="middle" font-size="13" font-weight="600" fill="#15803d">tmux-Bind &amp; Recovery</text>
+    <text x="333" y="636" text-anchor="middle" font-size="10" fill="#15803d">Subagent · Sonnet</text>
+    <rect x="253" y="665" width="160" height="35" rx="8" ry="8" fill="#ffffff" stroke="#15803d" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="333" y="687" text-anchor="middle" font-size="11" font-style="italic" fill="#757575">… weitere Häppchen</text>
+  </g>
+
+  <g>
+    <rect x="443" y="525" width="160" height="55" rx="8" ry="8" fill="#b2f2bb" stroke="#15803d" stroke-width="2"/>
+    <text x="523" y="548" text-anchor="middle" font-size="13" font-weight="600" fill="#15803d">SQLite-Schema + Migr.</text>
+    <text x="523" y="566" text-anchor="middle" font-size="10" fill="#15803d">Subagent · Sonnet</text>
+    <rect x="443" y="595" width="160" height="55" rx="8" ry="8" fill="#b2f2bb" stroke="#15803d" stroke-width="2"/>
+    <text x="523" y="618" text-anchor="middle" font-size="13" font-weight="600" fill="#15803d">IPC-Bridge Renderer</text>
+    <text x="523" y="636" text-anchor="middle" font-size="10" fill="#15803d">Subagent · Sonnet</text>
+    <rect x="443" y="665" width="160" height="35" rx="8" ry="8" fill="#ffffff" stroke="#15803d" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="523" y="687" text-anchor="middle" font-size="11" font-style="italic" fill="#757575">… weitere Häppchen</text>
+  </g>
+
+  <g>
+    <rect x="633" y="525" width="160" height="55" rx="8" ry="8" fill="#b2f2bb" stroke="#15803d" stroke-width="2"/>
+    <text x="713" y="548" text-anchor="middle" font-size="13" font-weight="600" fill="#15803d">Activity-Rail-Komp.</text>
+    <text x="713" y="566" text-anchor="middle" font-size="10" fill="#15803d">Subagent · Sonnet</text>
+    <rect x="633" y="595" width="160" height="55" rx="8" ry="8" fill="#b2f2bb" stroke="#15803d" stroke-width="2"/>
+    <text x="713" y="618" text-anchor="middle" font-size="13" font-weight="600" fill="#15803d">Cockpit-Card SSE</text>
+    <text x="713" y="636" text-anchor="middle" font-size="10" fill="#15803d">Subagent · Sonnet</text>
+    <rect x="633" y="665" width="160" height="35" rx="8" ry="8" fill="#ffffff" stroke="#15803d" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="713" y="687" text-anchor="middle" font-size="11" font-style="italic" fill="#757575">… weitere Häppchen</text>
+  </g>
+
+  <g>
+    <rect x="823" y="525" width="160" height="55" rx="8" ry="8" fill="#b2f2bb" stroke="#15803d" stroke-width="2"/>
+    <text x="903" y="548" text-anchor="middle" font-size="13" font-weight="600" fill="#15803d">MCP-Adapter Auth</text>
+    <text x="903" y="566" text-anchor="middle" font-size="10" fill="#15803d">Subagent · Sonnet</text>
+    <rect x="823" y="595" width="160" height="55" rx="8" ry="8" fill="#b2f2bb" stroke="#15803d" stroke-width="2"/>
+    <text x="903" y="618" text-anchor="middle" font-size="13" font-weight="600" fill="#15803d">On-demand Spawner</text>
+    <text x="903" y="636" text-anchor="middle" font-size="10" fill="#15803d">Subagent · Haiku</text>
+    <rect x="823" y="665" width="160" height="35" rx="8" ry="8" fill="#ffffff" stroke="#15803d" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="903" y="687" text-anchor="middle" font-size="11" font-style="italic" fill="#757575">… weitere Häppchen</text>
+  </g>
+
+  <!-- L1 → L2 arrows (8) -->
+  <line x1="305" y1="460" x2="305" y2="525" stroke="#15803d" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <line x1="361" y1="460" x2="361" y2="595" stroke="#15803d" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <line x1="495" y1="460" x2="495" y2="525" stroke="#15803d" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <line x1="551" y1="460" x2="551" y2="595" stroke="#15803d" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <line x1="685" y1="460" x2="685" y2="525" stroke="#15803d" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <line x1="741" y1="460" x2="741" y2="595" stroke="#15803d" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <line x1="875" y1="460" x2="875" y2="525" stroke="#15803d" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <line x1="931" y1="460" x2="931" y2="595" stroke="#15803d" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <rect x="240" y="465" width="155" height="18" rx="4" fill="#d3f9d8" stroke="#22c55e" stroke-width="0.5"/>
+  <text x="317" y="478" text-anchor="middle" font-size="10" fill="#15803d" font-weight="600">Inferenz-taugliche Häppchen</text>
+
+  <!-- Rückfrage arrows (dashed, examples) -->
+  <line x1="500" y1="325" x2="560" y2="260" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arrow-red)"/>
+  <rect x="438" y="305" width="84" height="18" rx="3" fill="#ffe5e5" stroke="#ef4444" stroke-width="0.5"/>
+  <text x="480" y="318" text-anchor="middle" font-size="10" fill="#ef4444" font-weight="600">Rückfrage ↑</text>
+
+  <line x1="555" y1="525" x2="540" y2="460" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arrow-red)"/>
+  <rect x="588" y="487" width="84" height="18" rx="3" fill="#ffe5e5" stroke="#ef4444" stroke-width="0.5"/>
+  <text x="630" y="500" text-anchor="middle" font-size="10" fill="#ef4444" font-weight="600">Rückfrage ↑</text>
+
+  <!-- Validation feedback arrows (dashed, back to spec) -->
+  <path d="M 248 390 C 200 390, 175 380, 220 350" stroke="#92400e" stroke-width="2" stroke-dasharray="6,4" fill="none" marker-end="url(#arrow-amber)"/>
+  <rect x="142" y="368" width="80" height="18" rx="3" fill="#fff3bf" stroke="#f59e0b" stroke-width="0.5"/>
+  <text x="182" y="381" text-anchor="middle" font-size="10" fill="#92400e" font-weight="600">Validation</text>
+
+  <path d="M 253 580 C 200 580, 175 530, 220 480" stroke="#92400e" stroke-width="2" stroke-dasharray="6,4" fill="none" marker-end="url(#arrow-amber)"/>
+
+  <!-- Reviewer arrows (dashed) to L0 and L1 -->
+  <line x1="1030" y1="180" x2="824" y2="180" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arrow-amber)"/>
+  <line x1="1030" y1="240" x2="990" y2="380" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arrow-amber)"/>
+  <rect x="970" y="262" width="64" height="18" rx="3" fill="#ffd8a8" stroke="#f59e0b" stroke-width="0.5"/>
+  <text x="1002" y="275" text-anchor="middle" font-size="10" fill="#92400e" font-weight="600">reviewt</text>
+
+  <!-- Footer panel -->
+  <rect x="40" y="730" width="1170" height="195" rx="10" ry="10" fill="#f8f9fa" stroke="#bfbfbf" stroke-width="1"/>
+  <text x="60" y="755" font-size="15" font-weight="700" fill="#1e1e1e">Token-Disziplin &amp; Modellwahl</text>
+  <line x1="60" y1="763" x2="1190" y2="763" stroke="#bfbfbf" stroke-width="0.5"/>
+
+  <!-- Color square + text -->
+  <rect x="60" y="775" width="14" height="14" rx="2" fill="#a5d8ff" stroke="#2563eb" stroke-width="1"/>
+  <text x="82" y="787" font-size="13" font-weight="700" fill="#2563eb">L0</text>
+  <text x="110" y="787" font-size="12" fill="#1e1e1e">Opus / opusplan — einmalig viel Reasoning, dann delegieren · Plan-Modus zwingend · schmale CLAUDE.md (&lt; 200 Zeilen)</text>
+
+  <rect x="60" y="800" width="14" height="14" rx="2" fill="#d0bfff" stroke="#6d28d9" stroke-width="1"/>
+  <text x="82" y="812" font-size="13" font-weight="700" fill="#6d28d9">L1</text>
+  <text x="110" y="812" font-size="12" fill="#1e1e1e">Sonnet — eine Session pro Subsystem · eigene sub-CLAUDE.md · Off-Limits explizit · /clear zwischen Subsystemen</text>
+
+  <rect x="60" y="825" width="14" height="14" rx="2" fill="#b2f2bb" stroke="#15803d" stroke-width="1"/>
+  <text x="82" y="837" font-size="13" font-weight="700" fill="#15803d">L2</text>
+  <text x="110" y="837" font-size="12" fill="#1e1e1e">Sonnet/Haiku — Subagents in eigenen Worktrees · TDD-first · fokussierte Spawn-Prompts · Häppchen klein halten</text>
+
+  <rect x="60" y="850" width="14" height="14" rx="2" fill="#ffd8a8" stroke="#f59e0b" stroke-width="1"/>
+  <text x="82" y="862" font-size="13" font-weight="700" fill="#92400e">RV</text>
+  <text x="110" y="862" font-size="12" fill="#1e1e1e">Reviewer — frischer Kontext (kein Cache-Bias) · prüft Plan, Code &amp; Spec-Conformance · separate Session, nicht Subagent</text>
+
+  <line x1="60" y1="878" x2="1190" y2="878" stroke="#bfbfbf" stroke-width="0.5" stroke-dasharray="3,3"/>
+
+  <text x="60" y="898" font-size="12" font-weight="700" fill="#1e1e1e">Anti-Vergessens-Mechanik:</text>
+  <text x="60" y="915" font-size="11" fill="#1e1e1e">(1) Anforderungs-IDs in Spec → werden in jeden Übergabeprompt kopiert  ·  (2) jede Subsystem-Session beendet mit Spec-Conformance-Check (Reviewer)</text>
+  <text x="60" y="930" font-size="11" fill="#1e1e1e">(3) Worker-Output landet in Worktree → Diff gegen Spec-Akzeptanz, bevor Merge  ·  (4) bei Drift: Spec aktualisieren ODER Code anpassen, nie still ignorieren</text>
+
+  <!-- Legend top-right -->
+  <rect x="1030" y="320" width="180" height="155" rx="8" ry="8" fill="#ffffff" stroke="#bfbfbf" stroke-width="1"/>
+  <text x="1050" y="340" font-size="13" font-weight="700" fill="#1e1e1e">Legende</text>
+  <line x1="1050" y1="348" x2="1198" y2="348" stroke="#bfbfbf" stroke-width="0.5"/>
+  <line x1="1050" y1="362" x2="1080" y2="362" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="1090" y="366" font-size="11" fill="#1e1e1e">Anweisung / Auftrag</text>
+  <line x1="1050" y1="385" x2="1080" y2="385" stroke="#92400e" stroke-width="2" marker-end="url(#arrow-amber)"/>
+  <text x="1090" y="389" font-size="11" fill="#1e1e1e">Spec-Bezug</text>
+  <line x1="1050" y1="408" x2="1080" y2="408" stroke="#15803d" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="1090" y="412" font-size="11" fill="#1e1e1e">Häppchen-Spawn</text>
+  <line x1="1050" y1="431" x2="1080" y2="431" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow-red)"/>
+  <text x="1090" y="435" font-size="11" fill="#1e1e1e">Rückfrage ↑</text>
+  <line x1="1050" y1="454" x2="1080" y2="454" stroke="#92400e" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow-amber)"/>
+  <text x="1090" y="458" font-size="11" fill="#1e1e1e">Validation / reviewt</text>
+</svg>

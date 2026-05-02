@@ -1,0 +1,9 @@
+version: '1.0'
+name: untitled
+breathing.frequency_hz: 0.15
+breathing.head_amplitude_deg: 2
+breathing.antenna_sway_deg: 5
+ambient.look_around_interval_s: 8
+ambient.micro_movement_amplitude_deg: 0.5
+speaking.wobble_amplitude_deg: 3
+speaking.wobble_frequency_hz: 4
