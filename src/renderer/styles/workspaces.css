@@ -2068,3 +2068,45 @@
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+/* ── Context Paths (Cell Inspector) ── */
+
+.context-path-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.context-path-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.context-path-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.context-path-remove {
+  background: none;
+  border: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.context-path-remove:hover {
+  color: var(--color-accent);
+}

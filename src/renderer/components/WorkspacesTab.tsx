@@ -160,6 +160,28 @@ export function WorkspacesTab() {
     updateWs({ cells })
   }
 
+  const handleContextPathAdd = async () => {
+    if (!ws) return
+    const result = await api.dialog.openDir({ title: 'Add Context Directory' })
+    if (!result) return
+    const cells = [...ws.cells]
+    const cell = cells[selectedCell]
+    const existing = cell.contextPaths ?? []
+    if (!existing.includes(result)) {
+      cells[selectedCell] = { ...cell, contextPaths: [...existing, result] }
+      updateWs({ cells })
+    }
+  }
+
+  const handleContextPathRemove = (pathToRemove: string) => {
+    if (!ws) return
+    const cells = [...ws.cells]
+    const cell = cells[selectedCell]
+    const filtered = (cell.contextPaths ?? []).filter((p) => p !== pathToRemove)
+    cells[selectedCell] = { ...cell, contextPaths: filtered.length > 0 ? filtered : undefined }
+    updateWs({ cells })
+  }
+
   const handleCellPresetChange = (presetId: string) => {
     if (!ws) return
     const cells = [...ws.cells]
@@ -526,12 +548,35 @@ export function WorkspacesTab() {
                     <label>{t('workspacesTab.cellPrompt')}</label>
                     <textarea
                       value={cellData.prompt}
-                      placeholder="Optional cell-specific prompt"
+                      placeholder="Optional cell-specific prompt (injected as ## Workspace Prompt in CLAUDE.md)"
                       onInput={(e) =>
                         handleCellUpdate('prompt', (e.target as HTMLTextAreaElement).value)
                       }
                     />
                   </div>
+                  {/* Context Directories — only for project-path cells */}
+                  {cellData.project && !cellData.presetId && (
+                    <div class="insp-field wide">
+                      <label>Context Directories</label>
+                      <div class="context-path-list">
+                        {(cellData.contextPaths ?? []).map((p) => (
+                          <div key={p} class="context-path-item">
+                            <span class="context-path-text" title={p}>{p}</span>
+                            <button
+                              class="context-path-remove"
+                              onClick={() => handleContextPathRemove(p)}
+                              title="Remove"
+                            >&times;</button>
+                          </div>
+                        ))}
+                        <button
+                          class="btn btn--sm context-path-add"
+                          onClick={handleContextPathAdd}
+                          style={{ fontSize: '11px', marginTop: '4px' }}
+                        >+ Add Directory</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {pickerOpen && (
                   <EntityPickerPopup

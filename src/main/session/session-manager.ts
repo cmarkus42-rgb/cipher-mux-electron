@@ -277,6 +277,15 @@ export class SessionManager extends EventEmitter {
       }
     }
 
+    // Inject workspace prompt + context directories into project CLAUDE.md
+    if (opts.projectPath && (opts.workspacePrompt || opts.contextPaths?.length)) {
+      try {
+        this.injectWorkspaceSections(opts.projectPath, opts.workspacePrompt, opts.contextPaths)
+      } catch (err) {
+        console.warn('[SessionManager] Workspace section injection failed:', err)
+      }
+    }
+
     // Create tmux session (empty projectPath → home dir)
     const cwd = opts.projectPath || require('os').homedir()
     const tmuxSession = await this.tmux.createSession(tmuxName, {
@@ -817,6 +826,59 @@ export class SessionManager extends EventEmitter {
     }
 
     return claudeMd + personaSection
+  }
+
+  /**
+   * Inject, replace, or remove a named ## section in a CLAUDE.md string.
+   * body === null removes the section entirely.
+   */
+  private injectSection(claudeMd: string, sectionName: string, body: string | null): string {
+    const sectionRegex = new RegExp(`\\n*## ${sectionName}\\n[\\s\\S]*?(?=\\n## |\\n*$)`)
+
+    if (body === null) {
+      // Remove the section if it exists
+      return claudeMd.replace(sectionRegex, '')
+    }
+
+    const sectionBlock = `\n\n## ${sectionName}\n\n${body}`
+
+    if (sectionRegex.test(claudeMd)) {
+      return claudeMd.replace(sectionRegex, sectionBlock)
+    }
+
+    // Append at end
+    return claudeMd + sectionBlock
+  }
+
+  /**
+   * Inject workspace prompt and context directories into a project's CLAUDE.md.
+   * Called during workspace apply for project-path cells.
+   */
+  injectWorkspaceSections(projectPath: string, workspacePrompt?: string, contextPaths?: string[]): void {
+    const claudeMdPath = path.join(projectPath, 'CLAUDE.md')
+    let content = ''
+    try {
+      content = fs.readFileSync(claudeMdPath, 'utf-8')
+    } catch {
+      // CLAUDE.md doesn't exist yet — start fresh
+    }
+
+    // Inject or remove Workspace Prompt section
+    if (workspacePrompt && workspacePrompt.trim()) {
+      content = this.injectSection(content, 'Workspace Prompt', workspacePrompt.trim())
+    } else {
+      content = this.injectSection(content, 'Workspace Prompt', null)
+    }
+
+    // Inject or remove Context Directories section
+    if (contextPaths && contextPaths.length > 0) {
+      const body = contextPaths.map((p) => `- \`${p}\``).join('\n')
+      content = this.injectSection(content, 'Context Directories', body)
+    } else {
+      content = this.injectSection(content, 'Context Directories', null)
+    }
+
+    fs.writeFileSync(claudeMdPath, content, 'utf-8')
   }
 
   // ─── Entity Framework ───────────────────────────────────
