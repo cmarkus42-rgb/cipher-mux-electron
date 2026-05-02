@@ -27,7 +27,9 @@ const defaults: AppConfig = {
   activeWorkspaceId: null,
   defaultWorkspaceId: null,
   activeCharacterId: DEFAULT_CHARACTER_ID,
+  globalActivePersonaId: null,
   characters: [...SEED_CHARACTERS],
+  globalRules: '',
   app: {
     scanPaths: [...BRAND.scanPaths],
     scanDepth: DEFAULT_SCAN_DEPTH,
