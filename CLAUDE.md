@@ -20,8 +20,42 @@ Phasen-Übersicht:
 11. ~~v0.9.1–0.9.5: Unified Sidebar, Workspace Apply E2E, Bugfixes, Cell Split, Terminal Width~~ ✅ (2026-04-24)
 12. ~~v0.9.6: Notes Editor — dritte Grid-Cell-Option, CodeMirror 6, Ollama Auto-Tagging~~ ✅ (2026-04-25)
 13. ~~v0.9.7–0.9.8: Hands-Free Scroll, Voice Settings, Grid-Nav, Keep Working, TTS Stop~~ ✅ (2026-05-02)
+14. ~~v0.9.9: Keep Working Restore Fix, BT Shutter App-Bundle~~ ✅ (2026-05-02)
+15. ~~v0.9.10: Keep Working Restore Fix v2 — 3-Layer Bug~~ ✅ (2026-05-02)
 
-**Status:** v0.9.8c, 591 Tests (54 Test-Dateien). Hands-Free Scroll Control (Voice + MCP), Sprachsteuerung Settings-Gruppe (TTS Toggle/Stimme, Voice Commands Toggle), Grid-Navigation per Stimme (Fuzzy-Matching), Keep Working Grid-Restore, TTS Play/Stop Toggle. TestcaseView mit Tri-State-Checkboxen.
+**Status:** v0.9.11, 591 Tests (54 Test-Dateien). BT Shutter Fix: macOS 26 blockiert `kIOHIDOptionsTypeSeizeDevice` fuer adhoc-signierte Binaries — umgestellt auf non-exclusive HID + CGEventTap Volume-Suppression.
+
+### Keep Working Restore — Fragile Zone
+
+Keep Working Restore war Gegenstand von 3 Bug-Fix-Runden (v0.9.9–v0.9.10). Die Kette ist lang und hat enge Timing-Abhängigkeiten. **Wenn du in dieser Gegend arbeitest, lies das hier.**
+
+#### Datenfluss (happy path)
+
+```
+Quit:  destroy() → keepWorkingSnapshot in Config schreiben (Session-Namen, Pfade, Grid-Slots)
+       → tmux.disconnect() (Sessions überleben, tmux-Server bleibt)
+
+Start: init() → synchron: stale Session-IDs aus ui.grid clearen
+       → async: mcpServer.start → tmux.connect → sessionManager.recover()
+         → restoreKeepWorkingFromRecovery(): tmux-Sessions matchen, Grid-State in Config schreiben
+         → Push KEEP_WORKING_RESTORE an Renderer + Cache setzen
+       Renderer: Poll (500ms/10s) holt Cache → applyKeepWorkingRestore() → Grid + Sessions da
+```
+
+#### Was leicht kaputtgeht
+
+1. **tmux-Output ist nicht sauber.** `listSessions()` parst `tmux list-panes -a` — das liefert gelegentlich malformed Lines (leere Felder, Zombie-Sessions). Jeder Code der auf `tmuxSession.name` etc. zugreift MUSS defensiv sein. Ein Crash hier killt die gesamte Init-Chain still.
+
+2. **Session-IDs überleben keinen Restart.** `recover()` vergibt neue IDs für recovered Sessions. `ui.grid` Config enthält alte IDs. Deshalb werden Slot-Session-IDs beim Startup synchron genullt. Wenn du an `configStore` oder `ui.grid` Persistence arbeitest: nie davon ausgehen, dass Session-IDs über Restarts stabil sind.
+
+3. **Timing Main ↔ Renderer.** Die Init-Chain ist async (200ms–2s). Der Renderer mounted schneller. Deshalb: Pull ist ein Poll (nicht einmaliger Abruf), und Push kann vor `dom-ready` gedropt werden. Wenn du neue IPC-Events in der Init-Chain hinzufügst: gleiches Pattern (Cache + Poll + Push als Backup).
+
+4. **`destroy()` muss durchlaufen.** Nur Cmd+Q schreibt den Snapshot. Force-Kill → kein Snapshot → kein Restore. Das ist by design, aber wichtig zu wissen.
+
+#### Diagnostik
+
+- **`/tmp/kw-debug.json`** — wird bei jedem Startup geschrieben (Success UND Error-Fall). Prüfe `phase`, `error`, `recovered`, `orphaned`.
+- **Terminal-Start für Logs:** `/Applications/cipher-mux.app/Contents/MacOS/cipher-mux 2>&1 | tee /tmp/kw-test.log`
 
 ## Build & Test
 
@@ -253,6 +287,63 @@ Testcase-Notes verwenden `noteType: testcase` und ein spezielles Checkbox-Format
 - Kein anderes Markdown verwenden (keine `###`, keine `**bold**` in Beschreibungen, keine Tabellen)
 
 **Beim Anlegen via MCP:** `mux_notes_create` mit Tag `testcase` — der Tag setzt `noteType: testcase` automatisch.
+
+## BT Shutter / Bluetooth Remote Control
+
+Bluetooth-Fernbedienungen (AB Shutter 3, CamKix, etc.) steuern cipher-mux Sessions. Architektur:
+
+```
+BT Remote → macOS HID → ab-shutter-bridge (Swift) → JSON stdout → BtShutterManager (TS) → ipc-hub → tmux sendKeys
+```
+
+### Komponenten
+
+- **Swift Bridge:** `/Users/Shared/Nextcloud/Claude/ab-shutter-bridge/ABShutterBridge.swift` (Quellcode)
+- **Compiled Binary:** `assets/bin/ab-shutter-bridge` (wird via `extraResources` nach `Contents/Resources/bin/` kopiert)
+- **TS Manager:** `src/main/bluetooth/bt-shutter-manager.ts` — spawnt Binary als Child-Process, parst JSON-Events
+- **Integration:** `src/main/ipc-hub.ts` → `startBtShutter()` / `stopBtShutter()` — Init-Chain, Button→sendKeys Routing
+
+### macOS 26+ HID-Zugriff (WICHTIG)
+
+**`kIOHIDOptionsTypeSeizeDevice` funktioniert NICHT mehr** auf macOS Tahoe (26.x) fuer adhoc-signierte Binaries. Apple hat die Anforderungen verschaerft — `kIOReturnNotPermitted` (-536870207) auch mit korrekten TCC-Eintraegen.
+
+**Loesung (seit v0.9.11):** Zwei-Stufen-Ansatz:
+1. `IOHIDManagerOpen` mit `kIOHIDOptionsTypeNone` (non-exclusive) — funktioniert ohne spezielle Signatur
+2. `CGEventTap` auf `.cgSessionEventTap` suppressed NX_SYSDEFINED Events (Subtype 8 = Media Keys) waehrend der HID-Callback aktiv ist
+
+**CGEvent-Feld-Mapping (macOS 26, verifiziert):**
+- Field 99 = NX_SYSDEFINED Subtype (8 = `NX_SUBTYPE_AUX_CONTROL_BUTTONS`)
+- Field 87 = Media Key Data (keyCode + flags encoded)
+- `.mouseEventNumber` (Field 0) enthaelt NICHT data1 fuer SYSDEFINED Events — das war der urspruengliche Bug
+
+### Binary bauen
+
+```bash
+cd /Users/Shared/Nextcloud/Claude/ab-shutter-bridge
+swiftc ABShutterBridge.swift -o ab-shutter-bridge -framework IOKit -framework Foundation
+cp ab-shutter-bridge /path/to/cipher-mux-electron/assets/bin/
+```
+
+NICHT `codesign -fs -` ausfuehren — das erzeugt explicit adhoc (flags=0x2) statt linker-signed (flags=0x20002). Der Compiler erzeugt automatisch linker-signed, was fuer TCC-Erkennung sauberer ist.
+
+### Button-Mapping
+
+| BT Button | HID Usage | Default Action | Relay JSON |
+|-----------|-----------|---------------|------------|
+| BIG (Vol+) | 0xE9 (Consumer Page 0x0C) | Clear input (Ctrl+U) | `{"button":"big","action":"clear"}` |
+| SMALL (Vol-) | 0xEA (Consumer Page 0x0C) | Submit (Enter) | `{"button":"small","action":"submit"}` |
+
+### Permissions (macOS System Settings)
+
+Benoetigt fuer den User:
+- **Eingabeueberwachung (Input Monitoring):** ab-shutter-bridge Binary UND cipher-mux.app
+- **Bedienungshilfen (Accessibility):** ab-shutter-bridge Binary (fuer CGEventTap)
+
+Bei jedem neuen Binary (Neukompilierung) fragt macOS erneut nach — das ist korrekt, da sich der Code-Hash aendert.
+
+### Erweiterung: Neue BT Remotes
+
+Alle gaengigen BT Camera Shutter Remotes nutzen dasselbe HID Consumer Control Protokoll (Usage Page 0x0C, Volume Up/Down). Die Bridge ist bereits generisch: ohne VID/PID-Filter matched sie JEDES Consumer Control Device. Fuer neue Remote-Typen mit anderen HID Usages: `inputCallback` in `ABShutterBridge.swift` erweitern, neues Usage-Mapping hinzufuegen.
 
 ## Bekannte Constraints
 
