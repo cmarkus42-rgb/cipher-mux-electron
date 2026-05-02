@@ -1628,4 +1628,114 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       }
     }
   )
+
+  // 39. mux_ideation_handoff_refinement — Hand off Anforderungspaket from Ideation to Refinement
+  ;(server.registerTool as any)(
+    'mux_ideation_handoff_refinement',
+    {
+      description:
+        'Hand off a completed Anforderungspaket from the Ideation Partner to Refinement. '
+        + 'Creates or finds an existing Refinement session and sends the package path as context.',
+      inputSchema: {
+        anforderungspaketPath: z.string().describe('Absolute path to the Anforderungspaket markdown file'),
+        projectPath: z.string().optional().describe('Project directory path (optional)'),
+      },
+    },
+    async (args: { anforderungspaketPath: string; projectPath?: string }) => {
+      try {
+        const sessions = ctx.sessionManager.list()
+        let refinementSession = sessions.find(s => s.entityId === 'refinement')
+
+        if (!refinementSession) {
+          try {
+            refinementSession = await ctx.sessionManager.startEntity('refinement', {
+              name: 'Refinement',
+              projectPath: args.projectPath,
+            })
+          } catch {
+            refinementSession = await ctx.sessionManager.start({
+              name: 'Refinement',
+              projectPath: args.projectPath || process.cwd(),
+            })
+          }
+          if (ctx.windowManager) {
+            ctx.windowManager.sendToMainWindow(IPC.SESSION_VISIBLE_ADD, { sessionId: refinementSession.id })
+          }
+        }
+
+        if (ctx.messageBus) {
+          ctx.messageBus.send({
+            topic: 'system' as Topic,
+            sender: 'ideation-partner',
+            payload: { text: `Ideation handoff: Anforderungspaket at ${args.anforderungspaketPath}`, sessionId: refinementSession.id },
+          })
+        }
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({
+            ok: true,
+            refinementSessionId: refinementSession.id,
+            anforderungspaketPath: args.anforderungspaketPath,
+          }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: errMsg }) }],
+          isError: true,
+        }
+      }
+    }
+  )
+
+  // 40. mux_ideation_skill_run — Run an ideation skill with brain context
+  ;(server.registerTool as any)(
+    'mux_ideation_skill_run',
+    {
+      description:
+        'Run an ideation skill (e.g. pre-mortem, persona-roundtable) with the current brain as context. '
+        + 'Reads the skill markdown file and returns its content for execution.',
+      inputSchema: {
+        skillId: z.string().describe('Skill ID (e.g. "pre-mortem", "persona-roundtable", "oss-telescope")'),
+        skillsDir: z.string().optional().describe('Skills directory path (defaults to ~/.config/cipher-mux/skills/ideation/)'),
+      },
+    },
+    async (args: { skillId: string; skillsDir?: string }) => {
+      try {
+        const skillsDir = args.skillsDir || `${require('os').homedir()}/.config/cipher-mux/skills/ideation`
+        const skillPath = require('path').join(skillsDir, `${args.skillId}.md`)
+        let skillContent: string
+
+        try {
+          skillContent = require('fs').readFileSync(skillPath, 'utf-8')
+        } catch {
+          // Return known skill description as fallback
+          const { KNOWN_SKILLS } = require('../ideation-partner/skill-registry')
+          const known = KNOWN_SKILLS.find((s: { id: string }) => s.id === args.skillId)
+          if (known) {
+            skillContent = `# ${known.name}\n\n${known.description}\n\n**Wann einsetzen:** ${known.suggestWhen}`
+          } else {
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: `Unknown skill: ${args.skillId}` }) }],
+              isError: true,
+            }
+          }
+        }
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({
+            ok: true,
+            skillId: args.skillId,
+            skillContent,
+          }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: errMsg }) }],
+          isError: true,
+        }
+      }
+    }
+  )
 }

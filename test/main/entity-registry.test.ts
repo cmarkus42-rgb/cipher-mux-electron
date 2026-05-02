@@ -90,13 +90,13 @@ describe('EntityRegistry', () => {
 })
 
 describe('registerBuiltinEntities()', () => {
-  it('registers all 7 builtin entities', () => {
+  it('registers all 8 builtin entities', () => {
     const registry = new EntityRegistry()
     registerBuiltinEntities(registry, '~/.config/cipher-mux/orchestrator', '~/.config/cipher-mux/mpo')
     const entities = registry.list()
-    assert.strictEqual(entities.length, 7)
+    assert.strictEqual(entities.length, 8)
     const ids = entities.map((e: any) => e.id).sort()
-    assert.deepStrictEqual(ids, ['audit', 'companion', 'launcher', 'mpo', 'orchestrator', 'refinement', 'voice-relay'])
+    assert.deepStrictEqual(ids, ['audit', 'companion', 'ideation-partner', 'launcher', 'mpo', 'orchestrator', 'refinement', 'voice-relay'])
   })
 
   it('companion has correct display name and color', () => {

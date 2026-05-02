@@ -130,6 +130,18 @@ export function registerBuiltinEntities(
   })
 
   registry.register({
+    id: 'ideation-partner',
+    displayName: 'Ideation Partner',
+    icon: '💡',
+    color: '#26a69a',
+    projectPath: `${entitiesBase}/ideation-partner`,
+    templatePath: 'the ideation session',
+    features: ['mcp', 'memory'],
+    visible: true,
+    sortOrder: 55,
+  })
+
+  registry.register({
     id: 'voice-relay',
     displayName: 'Voice',
     icon: '🎙',

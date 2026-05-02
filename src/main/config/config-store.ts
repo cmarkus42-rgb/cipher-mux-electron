@@ -1,5 +1,6 @@
 import { app } from 'electron'
 import * as fs from 'fs'
+import * as os from 'os'
 import * as path from 'path'
 import type { AppConfig, Character } from '../../shared/types'
 import { createEmptyGrid } from '../../shared/grid-types'
@@ -83,8 +84,15 @@ const defaults: AppConfig = {
     reAuditDepth: 'standard' as const,
     ossLicenseSondierungEnabled: true,
   },
+  ideation_partner: {
+    enabled: true,
+    brainBaseDir: `${os.homedir()}/.config/cipher-mux/ideations`,
+    skillsDir: `${os.homedir()}/.config/cipher-mux/skills/ideation`,
+    subAgentUnsicherheitspflicht: true,
+  },
   experimental: {
     refinement_v2: false,
+    ideation_partner: false,
   },
   entitySortOrders: {} as Record<string, number>,
   entityHidden: {} as Record<string, boolean>,
