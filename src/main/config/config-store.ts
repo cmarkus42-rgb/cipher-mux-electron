@@ -79,6 +79,7 @@ const defaults: AppConfig = {
   },
   entitySortOrders: {} as Record<string, number>,
   entityHidden: {} as Record<string, boolean>,
+  entityPersonaOverrides: {} as Record<string, string>,
   voiceSubmitMode: 'auto' as const,
   sidebarDetached: false,
   sidebarWindowBounds: null as { x: number; y: number; width: number; height: number } | null,

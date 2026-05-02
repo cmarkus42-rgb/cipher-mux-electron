@@ -1461,6 +1461,22 @@ export class IpcHub {
       configStore.set('globalActivePersonaId', personaId)
       return { ok: true }
     })
+
+    ipcMain.handle(IPC.ENTITY_PERSONA_OVERRIDE_GET, (_e, entityId: string) => {
+      const overrides = configStore.get('entityPersonaOverrides') ?? {}
+      return overrides[entityId] ?? null
+    })
+
+    ipcMain.handle(IPC.ENTITY_PERSONA_OVERRIDE_SET, (_e, entityId: string, characterId: string | null) => {
+      const overrides = { ...(configStore.get('entityPersonaOverrides') ?? {}) }
+      if (characterId) {
+        overrides[entityId] = characterId
+      } else {
+        delete overrides[entityId]
+      }
+      configStore.set('entityPersonaOverrides', overrides)
+      return { ok: true }
+    })
   }
 
   /** Sync the active character's prompt as a SKILL.md to all project skills directories. */

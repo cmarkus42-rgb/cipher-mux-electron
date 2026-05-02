@@ -18,6 +18,7 @@ import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
 import { configStore } from '../config/config-store'
 import { extractCharacterBlock } from '../character/character-defaults'
+import { resolvePersonaForPreset } from './persona-resolver'
 
 /**
  * Sanitize a name for use as tmux session suffix.
@@ -765,6 +766,21 @@ export class SessionManager extends EventEmitter {
     }
   }
 
+  /** Get the character block for a specific entity, using the persona resolver. */
+  private getCharacterBlockForEntity(entityId: string): string {
+    try {
+      const overrides = configStore.get('entityPersonaOverrides') ?? {}
+      const resolved = resolvePersonaForPreset(entityId, {
+        getCharacters: () => configStore.get('characters'),
+        getActiveCharacterId: () => configStore.get('activeCharacterId'),
+        getGlobalActivePersonaId: () => configStore.get('globalActivePersonaId'),
+      }, overrides[entityId] ?? null)
+      return extractCharacterBlock(resolved)
+    } catch {
+      return this.getActiveCharacterBlock()
+    }
+  }
+
   /** Get the display name of the active character (e.g. "Relay", "Wayne"). */
   private getActiveCharacterName(): string {
     try {
@@ -916,12 +932,11 @@ export class SessionManager extends EventEmitter {
     }
 
     // ─── Universal Persona Injection ───────────────────────
-    // Inject the active character block (tone, style, rules) into every
-    // entity's CLAUDE.md. This ensures persona consistency across ALL
-    // entities, not just Companion.
+    // Inject the resolved character block (tone, style, rules) into every
+    // entity's CLAUDE.md. Uses persona-resolver: global > preset override > default matrix > fallback.
     const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
     if (fs.existsSync(claudeMdPath)) {
-      const characterBlock = this.getActiveCharacterBlock()
+      const characterBlock = this.getCharacterBlockForEntity(entityId)
       if (characterBlock) {
         const existing = fs.readFileSync(claudeMdPath, 'utf-8')
         const withPersona = this.injectPersonaSection(existing, characterBlock)
