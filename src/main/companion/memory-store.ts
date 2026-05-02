@@ -11,12 +11,16 @@ export interface WriteMemoryOpts {
   salience?: number
   ttlDays?: number
   sourceExcerpt?: string
+  scopeKind?: 'user' | 'workspace' | 'session'
+  scopeId?: string
 }
 
 export interface RecallOpts {
   limit?: number
   kindFilter?: MemoryKind
   since?: number
+  scopeKind?: 'user' | 'workspace' | 'session'
+  scopeId?: string
 }
 
 interface RawMemoryRow {
@@ -29,6 +33,8 @@ interface RawMemoryRow {
   salience: number
   ttl_days: number | null
   source_excerpt: string | null
+  scope_kind: string
+  scope_id: string | null
 }
 
 interface RawFtsRow extends RawMemoryRow {
@@ -68,10 +74,6 @@ export class MemoryStore {
   private db: Database.Database
 
   private stmtInsert: Database.Statement
-  private stmtRecall: Database.Statement
-  private stmtRecallSince: Database.Statement
-  private stmtRecallKind: Database.Statement
-  private stmtRecallKindSince: Database.Statement
   private stmtSearch: Database.Statement
   private stmtDeleteMemory: Database.Statement
 
@@ -112,34 +114,26 @@ export class MemoryStore {
       this.db.exec(COMPANION_TRIGGERS_SQL)
     }
 
+    // Scope column migration — idempotent
+    const hasScopeKind = this.db.prepare(
+      "SELECT COUNT(*) as cnt FROM pragma_table_info('memories') WHERE name='scope_kind'"
+    ).get() as { cnt: number }
+    if (hasScopeKind.cnt === 0) {
+      this.db.exec(
+        "ALTER TABLE memories ADD COLUMN scope_kind TEXT NOT NULL DEFAULT 'user';\n" +
+        "ALTER TABLE memories ADD COLUMN scope_id TEXT;"
+      )
+      this.db.exec("CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories(scope_kind, scope_id)")
+    }
+
     // Prepare statements
     this.stmtInsert = this.db.prepare(
-      `INSERT INTO memories (id, ts, session_id, persona, kind, text, salience, ttl_days, source_excerpt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-
-    this.stmtRecall = this.db.prepare(
-      `SELECT id, ts, session_id, persona, kind, text, salience, ttl_days, source_excerpt
-       FROM memories ORDER BY ts DESC LIMIT ?`
-    )
-
-    this.stmtRecallSince = this.db.prepare(
-      `SELECT id, ts, session_id, persona, kind, text, salience, ttl_days, source_excerpt
-       FROM memories WHERE ts >= ? ORDER BY ts DESC LIMIT ?`
-    )
-
-    this.stmtRecallKind = this.db.prepare(
-      `SELECT id, ts, session_id, persona, kind, text, salience, ttl_days, source_excerpt
-       FROM memories WHERE kind = ? ORDER BY ts DESC LIMIT ?`
-    )
-
-    this.stmtRecallKindSince = this.db.prepare(
-      `SELECT id, ts, session_id, persona, kind, text, salience, ttl_days, source_excerpt
-       FROM memories WHERE kind = ? AND ts >= ? ORDER BY ts DESC LIMIT ?`
+      `INSERT INTO memories (id, ts, session_id, persona, kind, text, salience, ttl_days, source_excerpt, scope_kind, scope_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
 
     this.stmtSearch = this.db.prepare(
-      `SELECT m.id, m.ts, m.session_id, m.persona, m.kind, m.text, m.salience, m.ttl_days, m.source_excerpt, fts.rank
+      `SELECT m.id, m.ts, m.session_id, m.persona, m.kind, m.text, m.salience, m.ttl_days, m.source_excerpt, m.scope_kind, m.scope_id, fts.rank
        FROM memories_fts fts
        JOIN memories m ON m.rowid = fts.rowid
        WHERE memories_fts MATCH ?
@@ -210,6 +204,8 @@ export class MemoryStore {
       opts.salience ?? 0.5,
       opts.ttlDays ?? null,
       opts.sourceExcerpt ?? null,
+      opts.scopeKind ?? 'user',
+      opts.scopeId ?? null,
     )
     return {
       id, ts,
@@ -220,24 +216,30 @@ export class MemoryStore {
       salience: opts.salience ?? 0.5,
       ttlDays: opts.ttlDays ?? null,
       sourceExcerpt: opts.sourceExcerpt ?? null,
+      scopeKind: opts.scopeKind ?? 'user',
+      scopeId: opts.scopeId ?? null,
     }
   }
 
-  /** Recall recent memories, newest first. */
+  /** Recall recent memories, newest first. Supports scope filtering. */
   recall(opts?: RecallOpts): Memory[] {
     const limit = opts?.limit ?? 20
-    let rows: RawMemoryRow[]
+    const conditions: string[] = []
+    const params: unknown[] = []
 
-    if (opts?.kindFilter && opts?.since) {
-      rows = this.stmtRecallKindSince.all(opts.kindFilter, opts.since, limit) as RawMemoryRow[]
-    } else if (opts?.kindFilter) {
-      rows = this.stmtRecallKind.all(opts.kindFilter, limit) as RawMemoryRow[]
-    } else if (opts?.since) {
-      rows = this.stmtRecallSince.all(opts.since, limit) as RawMemoryRow[]
-    } else {
-      rows = this.stmtRecall.all(limit) as RawMemoryRow[]
+    if (opts?.kindFilter) { conditions.push('kind = ?'); params.push(opts.kindFilter) }
+    if (opts?.since) { conditions.push('ts >= ?'); params.push(opts.since) }
+    if (opts?.scopeKind) {
+      conditions.push('scope_kind = ?'); params.push(opts.scopeKind)
+      if (opts?.scopeId) { conditions.push('scope_id = ?'); params.push(opts.scopeId) }
     }
 
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+    const sql = `SELECT id, ts, session_id, persona, kind, text, salience, ttl_days, source_excerpt, scope_kind, scope_id
+                 FROM memories ${where} ORDER BY ts DESC LIMIT ?`
+    params.push(limit)
+
+    const rows = this.db.prepare(sql).all(...params) as RawMemoryRow[]
     return rows.map(rowToMemory)
   }
 
@@ -371,6 +373,8 @@ function rowToMemory(row: RawMemoryRow): Memory {
     salience: row.salience,
     ttlDays: row.ttl_days,
     sourceExcerpt: row.source_excerpt,
+    scopeKind: (row.scope_kind ?? 'user') as 'user' | 'workspace' | 'session',
+    scopeId: row.scope_id ?? null,
   }
 }
 
