@@ -19,8 +19,9 @@ Phasen-Übersicht:
 10. ~~Phase C4 (Session Coloring) + Phase D (Workspaces + Personas) + Phase E (Communication) + Phase G1 (Shell Button)~~ ✅ (2026-04-24)
 11. ~~v0.9.1–0.9.5: Unified Sidebar, Workspace Apply E2E, Bugfixes, Cell Split, Terminal Width~~ ✅ (2026-04-24)
 12. ~~v0.9.6: Notes Editor — dritte Grid-Cell-Option, CodeMirror 6, Ollama Auto-Tagging~~ ✅ (2026-04-25)
+13. ~~v0.9.7–0.9.8: Hands-Free Scroll, Voice Settings, Grid-Nav, Keep Working, TTS Stop~~ ✅ (2026-05-02)
 
-**Status:** v0.9.6-beta, 527 Tests (50 Test-Dateien), Build sauber. Notes Editor (CodeMirror 6 Markdown, Frontmatter, Ollama Auto-Tagging, MCP-Tools, Sidebar Notes-Tab mit Search/Tag-Filter, Delete UI). Unified Sidebar, Detachable Sidebar, Cell Split, Terminal Width Fix, Workspace Apply E2E, Config Migration.
+**Status:** v0.9.8c, 591 Tests (54 Test-Dateien). Hands-Free Scroll Control (Voice + MCP), Sprachsteuerung Settings-Gruppe (TTS Toggle/Stimme, Voice Commands Toggle), Grid-Navigation per Stimme (Fuzzy-Matching), Keep Working Grid-Restore, TTS Play/Stop Toggle. TestcaseView mit Tri-State-Checkboxen.
 
 ## Build & Test
 
@@ -141,11 +142,13 @@ Personas definieren Rollen (Name, Farbe, Default-Prompt). Workspaces kombinieren
 
 ## MCP-Server: Worker-Session-Handling
 
-Der MCP-Server stellt 16 Tools bereit, die von Orchestrator, MPO und Worker-Sessions genutzt werden:
+Der MCP-Server stellt 20+ Tools bereit, die von Orchestrator, MPO und Worker-Sessions genutzt werden:
 
 **Session-Tools:** `mux_create_session`, `mux_kill_session`, `mux_sessions`, `mux_send`, `mux_read`, `mux_status`, `mux_context_usage`
 **Task-Tools:** `mux_task_create`, `mux_task_update`, `mux_task_list`, `mux_task_get`
-**Notes-Tools:** `mux_notes_create`, `mux_notes_list` — erlauben MCP-Clients (z.B. Refinement-Sessions) Notes in der Sidebar anzulegen
+**Notes-Tools:** `mux_notes_create`, `mux_notes_list` — erlauben MCP-Clients Notes in der Sidebar anzulegen
+**UI-Control:** `mux_grid_resize`, `mux_grid_place`, `mux_session_focus`, `mux_session_eject`, `mux_sidebar_toggle`, `mux_ui_highlight`, `mux_ui_open`, `mux_theme_set`
+**Voice/Scroll:** `mux_tts_speak` (TTS mit Priority), `mux_cell_scroll` (up/down/top/bottom/to-marker)
 **Sonstige:** `kickoff_complete`, `mux_bugreport_resolve`, `mux_input_request_create`
 
 **Wichtig für Konsumenten (Orchestrator/Clients):**
@@ -174,16 +177,22 @@ Der MCP-Server stellt 16 Tools bereit, die von Orchestrator, MPO und Worker-Sess
 STT-basierte Spracheingabe in fokussierte Sessions. Architektur:
 
 ```
-Renderer (Silero VAD) → IPC → Main (ConversationEngine → Whisper STT → VoiceInputRouter → tmux sendKeys)
+Renderer (Silero VAD) → IPC → Main (ConversationEngine → Whisper STT → VoiceInputRouter → tmux sendKeys / scroll / gridNav)
 ```
 
 - **STT:** Whisper.cpp via `@fugood/whisper.node`, Model unter `~/.config/cipher-mux/models/whisper/ggml-small.bin`
-- **VAD:** Silero ONNX im Renderer, erkennt Sprache lokal ohne Netzwerk
-- **Routing:** VoiceInputRouter dispatcht Transkription an fokussierte tmux-Session
-- **Voice-Commands:** "abschicken"/"absenden"/"senden" → Enter, "neue zeile" → Newline. Text wird ohne Enter diktiert, Submit per Sprachbefehl.
-- **TTS:** Piper (nur für Bugreport-Interview, nicht für Session-Modus)
-- **Status:** E2E funktional — VAD erkennt Sprache, Whisper transkribiert, Text erscheint in Session, Submit per Voice-Command
-- **tmux sendKeys:** Verwendet `\r` (0x0d, Carriage Return) für Enter, nicht `\n` (0x0a)
+- **VAD:** Silero ONNX im Renderer, Thresholds: positiveSpeech=0.5, minSpeechFrames=3 (optimiert fuer kurze Befehle)
+- **Routing:** VoiceInputRouter dispatcht Transkription an fokussierte tmux-Session (Pin > Focus)
+- **Voice-Commands:** "abschicken"/"absenden"/"senden" → Enter, "neue zeile" → Newline
+- **Scroll-Commands:** "hoch"/"runter"/"ganz hoch"/"ganz runter"/"zum marker" → Terminal-Scroll via IPC CELL_SCROLL
+- **Grid-Nav-Commands:** "grid rechts/links/hoch/runter" → Grid-Fokus wechseln via IPC GRID_NAV. Fuzzy-Matching fuer Whisper-Varianten (grit/gritt/great etc.)
+- **Voice Submit Mode:** auto (Enter nach STT) oder manual (BT-Clicker). Konfigurierbar in Settings.
+- **TTS:** Piper (lokal) oder macOS say (Fallback/Auswahl). Stoppbar per UI-Toggle oder stopSpeech(). Konfigurierbar: ttsEnabled, ttsVoice (local/macos)
+- **Voice Commands Toggle:** voiceCommandsEnabled Config — deaktiviert Scroll/Grid-Nav Matching
+- **MCP-Tool:** `mux_cell_scroll` (up/down/top/bottom/to-marker) — programmatisches Scrollen durch Entities
+- **Terminal-Registry:** `src/renderer/terminal-registry.ts` — globale Map fuer xterm.js Instanzen + Scroll-Marker per sessionId
+- **tmux sendKeys:** Verwendet `\r` (0x0d, Carriage Return) fuer Enter, nicht `\n` (0x0a)
+- **CODING_BIAS_PROMPT:** Whisper-Prompt mit Coding-Terminologie + Voice-Command-Woertern fuer bessere Erkennung
 
 ## AgentAdapter Interface (TP-2)
 
