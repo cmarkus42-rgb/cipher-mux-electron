@@ -43,6 +43,43 @@ export const COMPANION_SCHEMA_SQL = `
   );
 
   CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_updates(status);
+
+  CREATE TABLE IF NOT EXISTS cyber_factory_runs (
+    id TEXT PRIMARY KEY,
+    detail_spec_path TEXT NOT NULL,
+    project_path TEXT NOT NULL,
+    workspace_id TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    started_at INTEGER NOT NULL,
+    finished_at INTEGER,
+    config TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS wellen (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES cyber_factory_runs(id),
+    reihenfolge INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    started_at INTEGER,
+    finished_at INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS sub_projekte (
+    id TEXT PRIMARY KEY,
+    welle_id TEXT NOT NULL REFERENCES wellen(id),
+    name TEXT NOT NULL,
+    auftrag_path TEXT,
+    model TEXT,
+    token_budget INTEGER,
+    status TEXT NOT NULL DEFAULT 'pending',
+    tmux_session TEXT,
+    session_id TEXT,
+    current_phase TEXT,
+    last_heartbeat INTEGER
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_wellen_run ON wellen(run_id);
+  CREATE INDEX IF NOT EXISTS idx_sub_projekte_welle ON sub_projekte(welle_id);
 `
 
 /**
