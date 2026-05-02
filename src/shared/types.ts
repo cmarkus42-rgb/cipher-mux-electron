@@ -254,6 +254,21 @@ export interface AppConfig {
   ttsVoice?: 'local' | 'macos'
   /** Voice commands (scroll, grid nav) enabled. Default: true. */
   voiceCommandsEnabled?: boolean
+  /** Refinement (RE) configuration — extended requirements engineering. */
+  refinement?: {
+    enabled: boolean
+    /** Output format: 'cyber-factory' (hardwired REQ-IDs) or 'custom' (user-defined). */
+    hardwiredOutputFormat: 'cyber-factory' | 'custom'
+    /** RE audit depth: basic, standard, or deep. */
+    reAuditDepth: 'basic' | 'standard' | 'deep'
+    /** Whether to run OSS license sondierung in Phase 5. */
+    ossLicenseSondierungEnabled: boolean
+  }
+  /** Experimental feature flags. */
+  experimental?: {
+    /** Enable extended 7-phase Refinement (RE audit, REQ-IDs, structured handoffs). */
+    refinement_v2?: boolean
+  }
   /** Whether the sidebar is detached into its own window. Persisted across restarts. */
   sidebarDetached?: boolean
   /** Saved sidebar window bounds for size/position persistence. */

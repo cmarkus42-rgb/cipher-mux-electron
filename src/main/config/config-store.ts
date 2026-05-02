@@ -77,6 +77,15 @@ const defaults: AppConfig = {
   btShutter: {
     enabled: false,
   },
+  refinement: {
+    enabled: true,
+    hardwiredOutputFormat: 'cyber-factory' as const,
+    reAuditDepth: 'standard' as const,
+    ossLicenseSondierungEnabled: true,
+  },
+  experimental: {
+    refinement_v2: false,
+  },
   entitySortOrders: {} as Record<string, number>,
   entityHidden: {} as Record<string, boolean>,
   entityPersonaOverrides: {} as Record<string, string>,

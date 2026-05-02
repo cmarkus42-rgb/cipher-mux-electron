@@ -1481,4 +1481,151 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       }
     }
   )
+
+  // 37. mux_refinement_handoff_cyber_factory — Structured handoff from Refinement to Cyber Factory
+  ;(server.registerTool as any)(
+    'mux_refinement_handoff_cyber_factory',
+    {
+      description:
+        'Hand off a completed detail spec from Refinement to the Cyber Factory. '
+        + 'Creates a new session targeting the Cyber Factory entity (or a regular session '
+        + 'if Cyber Factory is not yet available) with the spec path as context.',
+      inputSchema: {
+        detailSpecPath: z.string().describe('Absolute path to the detail spec file with REQ-IDs'),
+        projectPath: z.string().describe('Project directory path for the Cyber Factory session'),
+        lifecyclePhase: z.string().optional().describe('Target lifecycle phase (default: architect)'),
+      },
+    },
+    async (args: { detailSpecPath: string; projectPath: string; lifecyclePhase?: string }) => {
+      try {
+        const phase = args.lifecyclePhase || 'architect'
+        const sessionName = `CF-${path.basename(args.projectPath)}`
+        // Try startEntity for cyber-factory; fall back to plain start if entity not registered
+        let session
+        try {
+          session = await ctx.sessionManager.startEntity('cyber-factory', {
+            name: sessionName,
+            projectPath: args.projectPath,
+          })
+        } catch {
+          session = await ctx.sessionManager.start({
+            name: sessionName,
+            projectPath: args.projectPath,
+          })
+        }
+
+        if (ctx.windowManager) {
+          ctx.windowManager.sendToMainWindow(IPC.SESSION_VISIBLE_ADD, { sessionId: session.id })
+        }
+
+        // Post handoff context to message bus
+        if (ctx.messageBus) {
+          ctx.messageBus.send({
+            topic: 'system' as Topic,
+            sender: 'refinement',
+            payload: { text: `Refinement handoff: Detail-Spec at ${args.detailSpecPath}, phase: ${phase}`, sessionId: session.id },
+          })
+        }
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({
+            ok: true,
+            sessionId: session.id,
+            sessionName,
+            detailSpecPath: args.detailSpecPath,
+            lifecyclePhase: phase,
+          }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: errMsg }) }],
+          isError: true,
+        }
+      }
+    }
+  )
+
+  // 38. mux_refinement_handoff_ideation — Send back to Ideation Partner when too many gaps
+  ;(server.registerTool as any)(
+    'mux_refinement_handoff_ideation',
+    {
+      description:
+        'Hand back to the Ideation Partner when the requirements package has too many gaps. '
+        + 'Creates or finds an existing Ideation Partner session and sends the gap summary.',
+      inputSchema: {
+        reason: z.string().describe('Why the handoff is needed (e.g. "systematic gaps in NFRs")'),
+        gaps: z.array(z.string()).describe('List of identified gaps'),
+        projectPath: z.string().optional().describe('Project directory path (optional, uses calling session context if omitted)'),
+      },
+    },
+    async (args: { reason: string; gaps: string[]; projectPath?: string }) => {
+      try {
+        // Look for existing ideation session
+        const sessions = ctx.sessionManager.list()
+        let ideationSession = sessions.find(s =>
+          s.entityId === 'ideation-partner' || s.entityId === 'ideationpartner'
+        )
+
+        if (!ideationSession && args.projectPath) {
+          // Try startEntity; fall back to plain start if entity not registered
+          try {
+            ideationSession = await ctx.sessionManager.startEntity('ideationpartner', {
+              name: 'Ideation',
+              projectPath: args.projectPath,
+            })
+          } catch {
+            ideationSession = await ctx.sessionManager.start({
+              name: 'Ideation',
+              projectPath: args.projectPath,
+            })
+          }
+          if (ctx.windowManager) {
+            ctx.windowManager.sendToMainWindow(IPC.SESSION_VISIBLE_ADD, { sessionId: ideationSession.id })
+          }
+        }
+
+        const gapSummary = `Refinement-Rueckgabe: ${args.reason}\n\nIdentifizierte Luecken:\n${args.gaps.map(g => `- ${g}`).join('\n')}`
+
+        if (ctx.messageBus && ideationSession) {
+          ctx.messageBus.send({
+            topic: 'system' as Topic,
+            sender: 'refinement',
+            payload: { text: gapSummary, sessionId: ideationSession.id },
+          })
+        }
+
+        // Also create an input request bubble for user visibility
+        if (ctx.inputRequestWatcher) {
+          const irId = `ir-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+          ctx.inputRequestWatcher.createRequest({
+            id: irId,
+            type: 'bubble' as const,
+            projectId: 'refinement',
+            question: `Refinement: Zurueck zum Ideation Partner — ${args.reason}`,
+            context: gapSummary,
+            status: 'open' as const,
+            answer: null,
+            createdAt: new Date().toISOString(),
+            answeredAt: null,
+          })
+        }
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({
+            ok: true,
+            reason: args.reason,
+            gapCount: args.gaps.length,
+            ideationSessionId: ideationSession?.id ?? null,
+          }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: errMsg }) }],
+          isError: true,
+        }
+      }
+    }
+  )
 }
