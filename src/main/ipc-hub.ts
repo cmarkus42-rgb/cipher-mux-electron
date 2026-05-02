@@ -149,7 +149,7 @@ export class IpcHub {
       syncRefinementTemplate(exp.refinement_v2 !== false)
 
       // Hide legacy entity directories (prevent scanner from picking them up)
-      for (const legacyId of ['mpo', 'watchdog']) {
+      for (const legacyId of ['mpo', 'watchdog', 'projectlauncher', 'ideationpartner']) {
         const legacyDir = path.join(entitiesBase, legacyId)
         if (fs.existsSync(legacyDir) && !fs.existsSync(path.join(legacyDir, '.hidden'))) {
           fs.writeFileSync(path.join(legacyDir, '.hidden'), 'Replaced by Cyber Factory Pack. Delete this directory to fully remove.\n', 'utf-8')
