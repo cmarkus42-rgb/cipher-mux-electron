@@ -152,13 +152,15 @@ function applyTheme(theme: ThemeName): void {
 }
 
 function applyCustomTokens(tokens: Record<string, string>): void {
+  // Must set on body (not documentElement) because theme CSS uses
+  // body[data-theme="..."] which is closer to elements than :root.
   for (const [prop, val] of Object.entries(tokens)) {
-    document.documentElement.style.setProperty(prop, val)
+    document.body.style.setProperty(prop, val)
   }
 }
 
 function clearCustomTokens(): void {
-  const style = document.documentElement.style
+  const style = document.body.style
   for (let i = style.length - 1; i >= 0; i--) {
     const prop = style[i]
     if (prop.startsWith('--color-')) {

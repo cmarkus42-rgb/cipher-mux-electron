@@ -523,7 +523,7 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
             </label>
           </div>
 
-          <div class="settings-row" style={{ marginTop: '8px' }}>
+          <div id="bt-shutter" class="settings-row" style={{ marginTop: '8px' }}>
             <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
               <input
                 type="checkbox"

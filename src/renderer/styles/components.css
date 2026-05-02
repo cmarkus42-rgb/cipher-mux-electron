@@ -2318,7 +2318,7 @@
 
 .tc-item__main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-xs);
 }
 
@@ -2346,9 +2346,8 @@
 
 .tc-item__desc {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .tc-item--pass .tc-item__desc {
@@ -2397,13 +2396,13 @@
 
 .tc-item__comment-row {
   display: flex;
-  align-items: center;
-  gap: var(--space-xs);
+  flex-direction: column;
+  gap: 2px;
   padding: 2px 0 2px 28px;
 }
 
 .tc-item__comment-input {
-  flex: 1;
+  width: 100%;
   background: transparent;
   border: 1px solid var(--color-border);
   border-radius: 2px;
@@ -2411,6 +2410,10 @@
   font-size: var(--font-size-xs);
   padding: 2px 4px;
   font-family: var(--font-mono);
+  resize: none;
+  overflow: hidden;
+  min-height: 22px;
+  box-sizing: border-box;
 }
 
 .tc-item__comment-input:focus {
@@ -2418,10 +2421,21 @@
   outline: none;
 }
 
-.tc-item__screenshot-ref {
+.tc-item__screenshot-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: var(--font-size-xs);
   color: var(--color-neon-cyan, #0cc);
   font-family: var(--font-mono);
+}
+
+.tc-item__screenshot-path {
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
 }
 
 /* Checkbox CSS Art */
@@ -2922,17 +2936,17 @@
 
 .highlight-overlay--glow {
   /* Border-only glow: edges pulse, content stays unobstructed */
-  border: 2px solid rgba(79, 195, 247, 0.8);
+  border: 2px solid var(--color-highlight, rgba(79, 195, 247, 0.8));
   box-shadow:
-    0 0 6px 1px rgba(79, 195, 247, 0.5),
-    0 0 12px 2px rgba(79, 195, 247, 0.2);
+    0 0 6px 1px var(--color-highlight, rgba(79, 195, 247, 0.5)),
+    0 0 12px 2px var(--color-highlight-dim, rgba(79, 195, 247, 0.2));
   background: transparent;
   animation: highlight-pulse 1.5s ease-in-out infinite;
 }
 
 .highlight-overlay--outline {
   /* Static border, no pulsing — visually distinct from glow */
-  border: 2px solid rgba(79, 195, 247, 0.9);
+  border: 2px solid var(--color-highlight, rgba(79, 195, 247, 0.9));
   box-shadow: none;
   background: transparent;
   animation: none;

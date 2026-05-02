@@ -263,8 +263,12 @@ const api = {
     },
   },
 
-  // ─── Grid Control ───────��──────────────────────────────
+  // ─── Grid Control ───────────────────────────────────────
   gridControl: {
+    pullKeepWorkingRestore: (): Promise<{
+      gridConfig: { cols: number; rows: number }
+      slots: Array<{ sessionId: string | null; slotIndex: number }>
+    } | null> => ipcRenderer.invoke(IPC.KEEP_WORKING_PULL),
     resize: (cols: number, rows: number): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IPC.GRID_RESIZE, { cols, rows }),
     place: (sessionId: string, col: number, row: number): Promise<{ ok: boolean }> =>
@@ -299,6 +303,14 @@ const api = {
       const handler = (_e: unknown, data: { visible?: boolean }) => cb(data)
       ipcRenderer.on(IPC.SIDEBAR_TOGGLE, handler)
       return () => ipcRenderer.removeListener(IPC.SIDEBAR_TOGGLE, handler)
+    },
+    onKeepWorkingRestore: (cb: (data: {
+      gridConfig: { cols: number; rows: number }
+      slots: Array<{ sessionId: string | null; slotIndex: number }>
+    }) => void) => {
+      const handler = (_e: unknown, data: any) => cb(data)
+      ipcRenderer.on(IPC.KEEP_WORKING_RESTORE, handler)
+      return () => ipcRenderer.removeListener(IPC.KEEP_WORKING_RESTORE, handler)
     },
   },
 

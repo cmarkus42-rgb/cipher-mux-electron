@@ -18,6 +18,7 @@ import type { PathStartOpts } from './components/LauncherCell'
 import { WorkspacePopup } from './components/WorkspacePopup'
 import { GridPlacementPopup } from './components/GridPlacementPopup'
 import { HighlightOverlay } from './components/HighlightOverlay'
+import { useGlobalTtsPlayback } from './hooks/useGlobalTtsPlayback'
 
 export function App() {
   const { t } = useTranslation()
@@ -47,6 +48,8 @@ export function App() {
   const { theme, setTheme, toggleTheme, customThemes, activeCustomThemeId, selectCustomTheme, saveCustomTheme, deleteCustomTheme } = useTheme()
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
   const [voiceComState, setVoiceComState] = useState('idle')
+  const [voiceTargetSessionId, setVoiceTargetSessionId] = useState<string | null>(null)
+  const [voicePinned, setVoicePinned] = useState(false)
 
   // Listen for voice COM state changes
   useEffect(() => {
@@ -54,6 +57,23 @@ export function App() {
     if (!api?.voice?.onComState) return
     const unsub = api.voice.onComState((state: string) => setVoiceComState(state))
     return () => unsub()
+  }, [])
+
+  // Listen for voice target / pin changes (for session-header indicators)
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    const unsubs: Array<() => void> = []
+    if (api?.voice?.onActiveSession) {
+      unsubs.push(api.voice.onActiveSession((data: { sessionId: string | null }) => {
+        setVoiceTargetSessionId(data.sessionId)
+      }))
+    }
+    if (api?.voice?.onPinStatus) {
+      unsubs.push(api.voice.onPinStatus((data: { pinned: boolean; sessionId: string | null }) => {
+        setVoicePinned(data.pinned)
+      }))
+    }
+    return () => unsubs.forEach(u => u())
   }, [])
 
   // After grid re-render from project switch, dispatch launcher-open to the now-mounted LauncherCell
@@ -100,6 +120,7 @@ export function App() {
     },
   ], [t, bugreportVisible, infoVisible, workspacesPopupVisible, placementPopup, grid.slots])
   useShortcuts(shortcutEntries)
+  useGlobalTtsPlayback()
 
   const focusedSessionName = useMemo(() => {
     if (!focusedSessionId) return null
@@ -120,13 +141,23 @@ export function App() {
   sessionsRef.current = sessions
   const initialCleanupDone = useRef(false)
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
+      // Fetch session list directly from IPC — sessionsRef.current may be stale
+      // because refreshSessions() triggers an async state update that hasn't
+      // rendered yet when we reach cleanupDeadSessions below.
+      let activeIds: Set<string>
+      try {
+        const list = await (window as any).cipherMux?.sessions?.list()
+        activeIds = new Set((list || []).map((s: any) => s.id))
+        refreshSessions()
+      } catch {
+        activeIds = new Set(sessionsRef.current.map(s => s.id))
+      }
       initialCleanupDone.current = true
-      const activeIds = new Set(sessionsRef.current.map(s => s.id))
       cleanupDeadSessions(activeIds)
-    }, 3000) // Wait 3s for recovery dialog and session restore to complete
+    }, 6000) // Wait 6s for recovery dialog and keepWorking restore to complete
     return () => clearTimeout(timer)
-  }, [cleanupDeadSessions])
+  }, [cleanupDeadSessions, refreshSessions])
 
   // A.2 fix: reactively clean up grid slots when sessions die during runtime.
   // Only runs after the initial 3s grace period to avoid interfering with recovery.
@@ -199,8 +230,13 @@ export function App() {
     // RT-X2 fix: check current grid state via ref (not stale closure).
     // If session was already placed by handleStartEntity, skip the popup.
     if (gridRef.current.slots.some(s => s.sessionId === sessionId)) return
-    setPlacementPopup({ sessionId })
-  }, [])
+    // Auto-place into empty slot if available; only show popup when grid is full
+    if (gridRef.current.slots.some(s => !s.sessionId && s.type === 'session')) {
+      addSession(sessionId)
+    } else {
+      setPlacementPopup({ sessionId })
+    }
+  }, [addSession])
 
   // Check orchestrator status on mount
   useEffect(() => {
@@ -259,12 +295,16 @@ export function App() {
   useEffect(() => {
     const api = (window as any).cipherMux
     if (!api.sessions?.onVisibleAdd) return
-    const unsub = api.sessions.onVisibleAdd(async (data: { sessionId: string }) => {
+    const unsub = api.sessions.onVisibleAdd(async (data: { sessionId: string; slotIndex?: number }) => {
       let retries = 0
       while (retries < 10) {
         const sessions = await api.sessions.list()
         if (sessions.some((s: any) => s.id === data.sessionId)) {
-          addSession(data.sessionId)
+          if (typeof data.slotIndex === 'number' && data.slotIndex >= 0) {
+            setSessionAtSlot(data.slotIndex, data.sessionId)
+          } else {
+            addSession(data.sessionId)
+          }
           setFocusedSessionId(data.sessionId)
           refreshSessions()
           return
@@ -276,6 +316,65 @@ export function App() {
     })
     return () => unsub()
   }, [addSession, refreshSessions])
+
+  // ── Keep Working restore helper ──
+  const keepWorkingApplied = useRef(false)
+  const applyKeepWorkingRestore = useCallback((data: {
+    gridConfig: { cols: number; rows: number }
+    slots: Array<{ sessionId: string | null; slotIndex: number }>
+  }) => {
+    const total = data.gridConfig.cols * data.gridConfig.rows
+    const newSlots = Array.from({ length: total }, () => ({
+      sessionId: null as string | null,
+      rowSpan: 1,
+      type: 'session' as const,
+    }))
+    for (const { sessionId, slotIndex } of data.slots) {
+      if (slotIndex >= 0 && slotIndex < total) {
+        newSlots[slotIndex] = { sessionId, rowSpan: 1, type: 'session' }
+      }
+    }
+    restoreGrid({ config: data.gridConfig, slots: newSlots })
+    const first = data.slots.find(s => s.sessionId)
+    if (first?.sessionId) setFocusedSessionId(first.sessionId)
+    keepWorkingApplied.current = true
+    setWorkspaceLoading(false)
+    refreshSessions()
+  }, [restoreGrid, refreshSessions])
+
+  // ── Keep Working: poll-based restore on mount ──
+  // The push event (KEEP_WORKING_RESTORE) may arrive before this listener is
+  // registered, and a single pull may return null if the main process init chain
+  // hasn't completed yet. Poll until we get data or timeout.
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api.gridControl?.pullKeepWorkingRestore) return
+    if (keepWorkingApplied.current) return // already restored (push beat us)
+    let cancelled = false
+    const startTime = Date.now()
+    const POLL_TIMEOUT = 10_000
+    const POLL_INTERVAL = 500
+    const poll = () => {
+      if (cancelled || keepWorkingApplied.current) return
+      api.gridControl.pullKeepWorkingRestore().then((data: any) => {
+        if (cancelled || keepWorkingApplied.current) return
+        if (data) {
+          console.log('[app] keepWorking: poll-based restore received', data.slots?.length, 'sessions')
+          applyKeepWorkingRestore(data)
+        } else if (Date.now() - startTime < POLL_TIMEOUT) {
+          setTimeout(poll, POLL_INTERVAL)
+        } else {
+          console.log('[app] keepWorking: poll timed out — no restore data received')
+        }
+      }).catch(() => {
+        if (!cancelled && !keepWorkingApplied.current && Date.now() - startTime < POLL_TIMEOUT) {
+          setTimeout(poll, POLL_INTERVAL)
+        }
+      })
+    }
+    poll()
+    return () => { cancelled = true }
+  }, [applyKeepWorkingRestore])
 
   // ── Grid Control (MCP App-Control) ──
   useEffect(() => {
@@ -329,9 +428,16 @@ export function App() {
         }
       }))
     }
+    // Push-based Keep Working restore (backup — pull-based is primary)
+    if (api.gridControl.onKeepWorkingRestore) {
+      unsubs.push(api.gridControl.onKeepWorkingRestore((data: any) => {
+        console.log('[app] keepWorking: push-based restore received')
+        applyKeepWorkingRestore(data)
+      }))
+    }
 
     return () => unsubs.forEach(fn => fn())
-  }, [resize, setSessionAtSlot, addSession, removeSession])
+  }, [resize, setSessionAtSlot, addSession, removeSession, applyKeepWorkingRestore])
 
   const handleOpenNotes = useCallback((slotIndex: number) => {
     setSlotType(slotIndex, 'notes')
@@ -486,7 +592,10 @@ export function App() {
     setWorkspacesPopupVisible((v) => !v)
   }, [])
 
+  const [workspaceLoading, setWorkspaceLoading] = useState(true)
+
   const handleWorkspaceApply = useCallback(async (workspaceId: string) => {
+    setWorkspaceLoading(true)
     try {
       const api = (window as any).cipherMux
       const workspaces = await api.workspaces.list()
@@ -510,6 +619,8 @@ export function App() {
       }
     } catch (err) {
       console.error('[App] Failed to apply workspace:', err)
+    } finally {
+      setWorkspaceLoading(false)
     }
     setWorkspacesPopupVisible(false)
   }, [resize, applyMerges, setSessionAtSlot])
@@ -517,19 +628,30 @@ export function App() {
   // Called when RecoveryDialog finishes — auto-load default workspace only if no sessions exist yet
   const handleRecoveryDone = useCallback(async () => {
     try {
+      // Keep Working already restored sessions — skip default workspace loading
+      if (keepWorkingApplied.current) {
+        setWorkspaceLoading(false)
+        return
+      }
       // Only auto-load default workspace when no sessions are active
       // (i.e., fresh start with no recovery). If sessions were recovered,
       // they are already placed and we must not overwrite them.
-      if (sessionsRef.current.length > 0) return
+      if (sessionsRef.current.length > 0) {
+        setWorkspaceLoading(false)
+        return
+      }
 
       const api = (window as any).cipherMux
       const defaultWsId: string | null = await api.config.get('defaultWorkspaceId')
       if (defaultWsId) {
         console.log(`[App] Auto-loading default workspace: ${defaultWsId}`)
         handleWorkspaceApply(defaultWsId)
+      } else {
+        setWorkspaceLoading(false)
       }
     } catch (err) {
       console.warn('[App] Failed to auto-load default workspace:', err)
+      setWorkspaceLoading(false)
     }
   }, [handleWorkspaceApply])
 
@@ -635,12 +757,18 @@ export function App() {
   const handlePathStart = useCallback(async (dirPath: string, opts: PathStartOpts, slotIndex: number) => {
     try {
       const name = dirPath.split('/').filter(Boolean).pop() ?? 'session'
+      // Shell-escape the path for cd (single-quote with escaped inner quotes)
+      const escaped = dirPath.replace(/'/g, "'\\''")
       let autoLaunch: string | undefined
       if (!opts.shellOnly) {
-        const parts = ['clear; claude']
+        const parts = [`cd '${escaped}' && clear; claude`]
         if (opts.skipPermissions) parts.push('--dangerously-skip-permissions')
+        if (opts.resume) parts.push('--resume')
         if (opts.fork) parts.push('--fork')
         autoLaunch = parts.join(' ') + '\n'
+      } else {
+        // Shell-only: ensure cwd is correct even without claude
+        autoLaunch = `cd '${escaped}' && clear\n`
       }
       const session = await startSession({
         name,
@@ -693,11 +821,24 @@ export function App() {
   const handleDropNoteOnEmpty = useCallback((note: any, slotIndex: number) => {
     setSlotType(slotIndex, 'notes')
     setSidebarVisible(true)
-    setTimeout(() => {
+    // Retry until NotesCell mounts and registers __notesCell_openNote
+    let attempts = 0
+    const tryOpen = () => {
       const openFn = (window as any).__notesCell_openNote
-      if (openFn) openFn(note)
-    }, 100)
+      if (openFn) {
+        openFn(note)
+      } else if (attempts < 10) {
+        attempts++
+        setTimeout(tryOpen, 100)
+      }
+    }
+    setTimeout(tryOpen, 50)
   }, [setSlotType])
+
+  const handleToggleVoicePin = useCallback((sessionId: string) => {
+    const api = (window as any).cipherMux
+    api.voice?.pinSession?.(sessionId)
+  }, [])
 
   const handleDropNoteOnSession = useCallback(async (note: any, sessionId: string) => {
     const api = (window as any).cipherMux
@@ -836,6 +977,12 @@ export function App() {
       </div>
 
       <div class="app-body">
+        {workspaceLoading && (
+          <div class="workspace-loading-overlay">
+            <span class="workspace-loading-spinner" />
+            <span>{t('app.workspaceLoading')}</span>
+          </div>
+        )}
         <SessionGrid
           grid={grid}
           sessions={sessions}
@@ -845,6 +992,10 @@ export function App() {
           orchestratorSessionId={orchestratorSessionId}
           activeWorkspaceId={activeWorkspaceId}
           entityStatus={entityStatus}
+          voiceTargetSessionId={voiceTargetSessionId}
+          voicePinned={voicePinned}
+          onToggleVoicePin={handleToggleVoicePin}
+          workspaceLoading={workspaceLoading}
           onFocusSession={setFocusedSessionId}
           onCloseSession={handleCloseSession}
           onSwitchProject={handleSwitchProject}

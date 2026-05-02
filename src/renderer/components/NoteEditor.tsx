@@ -144,10 +144,8 @@ export function NoteEditor({ content, onSave, onAutoSave }: NoteEditorProps) {
     }
   }, [content])
 
-  // DOM-level keyboard + clipboard handlers
-  // Electron menu roles (copy/paste) use webContents.copy() which reads the
-  // DOM Selection API, but CM6 doesn't always sync its internal selection to
-  // the DOM. We intercept Cmd+C/V/X in capture phase and bridge CM6 ↔ clipboard.
+  // Cmd+S save handler — clipboard (Cmd+C/V/X/A) is handled natively by CM6
+  // via ClipboardEvent API which works reliably in Electron without permissions.
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -162,43 +160,6 @@ export function NoteEditor({ content, onSave, onAutoSave }: NoteEditorProps) {
         if (viewRef.current) {
           onSaveRef.current(viewRef.current.state.doc.toString())
         }
-        return
-      }
-
-      const view = viewRef.current
-      if (!view) return
-      const { from, to } = view.state.selection.main
-
-      if (e.key === 'c' || e.key === 'x') {
-        if (from === to) return // no selection
-        const text = view.state.sliceDoc(from, to)
-        navigator.clipboard.writeText(text).catch(() => {})
-        if (e.key === 'x') {
-          view.dispatch({ changes: { from, to, insert: '' } })
-        }
-        e.preventDefault()
-        e.stopPropagation()
-        return
-      }
-
-      if (e.key === 'v') {
-        e.preventDefault()
-        e.stopPropagation()
-        navigator.clipboard.readText().then(text => {
-          if (text && view) {
-            view.dispatch(view.state.replaceSelection(text))
-          }
-        }).catch(() => {})
-        return
-      }
-
-      if (e.key === 'a') {
-        e.preventDefault()
-        e.stopPropagation()
-        view.dispatch({
-          selection: { anchor: 0, head: view.state.doc.length },
-        })
-        return
       }
     }
 

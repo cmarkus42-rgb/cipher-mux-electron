@@ -10,6 +10,9 @@ interface SessionCellProps {
   contextUsage?: ContextUsage
   focused: boolean
   isOrchestrator: boolean
+  isVoiceTarget: boolean
+  isVoicePinned: boolean
+  onToggleVoicePin: (sessionId: string) => void
   theme: ThemeName
   rowSpan: number
   maxRows: number
@@ -30,7 +33,7 @@ interface SessionCellProps {
 }
 
 export function SessionCell({
-  session, contextUsage, focused, isOrchestrator, theme,
+  session, contextUsage, focused, isOrchestrator, isVoiceTarget, isVoicePinned, onToggleVoicePin, theme,
   rowSpan, maxRows, slotCol, slotRow,
   onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDragStart, onDragOver, onDragLeave, onDrop, dragOver,
 }: SessionCellProps) {
@@ -63,6 +66,10 @@ export function SessionCell({
     e.stopPropagation()
     onSendToBackground(session.id)
   }, [session.id, onSendToBackground])
+  const handleVoicePin = useCallback((e: Event) => {
+    e.stopPropagation()
+    onToggleVoicePin(session.id)
+  }, [session.id, onToggleVoicePin])
 
   // Fork only available for Claude Code sessions (have adapter capabilities)
   const isClaudeSession = session.capabilities?.['status-line'] === true
@@ -125,6 +132,15 @@ export function SessionCell({
             ? <span class="neon-dot" style={{ background: entityColor, boxShadow: `0 0 4px ${entityColor}` }} />
             : <span class={`neon-dot ${dotClass}`} />}
           <span class="cell-name">{session.name}</span>
+          {isVoiceTarget && (
+            <button
+              class={`cell-btn voice-target-btn${isVoicePinned ? ' voice-target-btn--pinned' : ''}`}
+              onClick={handleVoicePin}
+              title={isVoicePinned ? t('sessionCell.unpinVoice') : t('sessionCell.pinVoice')}
+            >
+              &#x25C9;
+            </button>
+          )}
         </div>
         <div class="cell-header__right">
           {maxRows > 1 && (
@@ -140,10 +156,16 @@ export function SessionCell({
           <button class="cell-btn" onClick={handleSwitch} title={t('sessionCell.switchProject')}>⇄</button>
           <button class="cell-btn" onClick={handleSendToBackground} title={t('sessionCell.sendToBackground')}>⏏</button>
           <button class="cell-btn" onClick={handleShell} title={t('sessionCell.openShell')}>$</button>
-          <button class="cell-btn" onClick={handleClose} title={t('sessionCell.closeSession')}>✕</button>
+          <button class="cell-btn" onClick={handleClose} title={t('sessionCell.closeSession')} disabled={session.status === 'closing'}>✕</button>
         </div>
       </div>
       <div class="cell-terminal" ref={terminalRef} />
+      {session.status === 'closing' && (
+        <div class="cell-closing-overlay">
+          <span class="workspace-loading-spinner" />
+          <span>{t('sessionCell.closing', 'Session wird beendet...')}</span>
+        </div>
+      )}
     </div>
   )
 }

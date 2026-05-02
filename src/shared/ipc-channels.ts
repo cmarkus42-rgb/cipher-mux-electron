@@ -10,6 +10,7 @@ export const IPC = {
   SESSIONS_RECOVERY_ACTION: 'cipher-mux:sessions:recovery-action',
   SESSIONS_RECOVERY_DECLINE: 'cipher-mux:sessions:recovery-decline',
   SESSION_CHANGED: 'cipher-mux:session-changed',
+  SESSION_CLOSING: 'cipher-mux:session-closing',
   SESSION_STOPPED: 'cipher-mux:session-stopped',
   SESSION_VISIBLE_ADD: 'cipher-mux:session:visible-add',
   SESSION_FORK: 'cipher-mux:session:fork',
@@ -167,6 +168,9 @@ export const IPC = {
   SESSION_EJECT: 'cipher-mux:session:eject',
   SIDEBAR_TOGGLE: 'cipher-mux:sidebar:toggle',
   CELL_SCROLL: 'cipher-mux:cell:scroll',
+  GRID_NAV: 'cipher-mux:grid:nav',
+  KEEP_WORKING_RESTORE: 'cipher-mux:keep-working:restore',
+  KEEP_WORKING_PULL: 'cipher-mux:keep-working:pull',
 
   // Companion Memory
   COMPANION_RECALL: 'cipher-mux:companion:recall',

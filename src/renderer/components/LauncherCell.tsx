@@ -20,6 +20,7 @@ interface LauncherCellProps {
   onOpenNote: (note: any) => void
   entityStatus: Record<string, boolean>
   activeWorkspaceId: string | null
+  workspaceLoading?: boolean
   onDragOver: (e: DragEvent) => void
   onDragLeave: () => void
   onDrop: (e: DragEvent) => void
@@ -29,7 +30,7 @@ interface LauncherCellProps {
 export function LauncherCell({
   slotIndex, slotCol, slotRow, onStartEntity, onResumeEntity, onFocusEntity,
   onStartPath, onOpenNotes, onOpenNote, entityStatus,
-  activeWorkspaceId, onDragOver, onDragLeave, onDrop, dragOver,
+  activeWorkspaceId, workspaceLoading, onDragOver, onDragLeave, onDrop, dragOver,
 }: LauncherCellProps) {
   const [popupOpen, setPopupOpen] = useState(false)
   const [starting, setStarting] = useState<string | null>(null)
@@ -37,6 +38,7 @@ export function LauncherCell({
   // Listen for Cmd+N launcher-open event
   useEffect(() => {
     const handler = (e: Event) => {
+      if (workspaceLoading) return
       const detail = (e as CustomEvent).detail
       if (detail?.slotIndex === slotIndex) {
         setPopupOpen(true)
@@ -44,7 +46,7 @@ export function LauncherCell({
     }
     window.addEventListener('launcher-open', handler)
     return () => window.removeEventListener('launcher-open', handler)
-  }, [slotIndex])
+  }, [slotIndex, workspaceLoading])
 
   // Reset starting state when popup opens
   useEffect(() => {
@@ -54,8 +56,9 @@ export function LauncherCell({
   }, [popupOpen])
 
   const handleOpen = useCallback(() => {
+    if (workspaceLoading) return
     setPopupOpen(true)
-  }, [])
+  }, [workspaceLoading])
 
   const handleClose = useCallback(() => {
     setPopupOpen(false)

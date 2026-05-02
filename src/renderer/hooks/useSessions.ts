@@ -48,10 +48,20 @@ export function useSessions(): UseSessionsResult {
       refresh()
     })
 
+    const unsubClosing = api.sessions.onClosing?.((data: any) => {
+      // Mark session as 'closing' locally for UI feedback
+      if (data?.id) {
+        setSessions((prev) =>
+          prev.map((s) => (s.id === data.id ? { ...s, status: 'closing' as const } : s)),
+        )
+      }
+    })
+
     return () => {
       mountedRef.current = false
       unsubChanged()
       unsubStopped()
+      unsubClosing?.()
     }
   }, [refresh])
 

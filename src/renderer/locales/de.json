@@ -125,6 +125,8 @@
 
   "sessionCell.forkSession": "session forken",
   "sessionCell.forkNoId": "Keine Claude Session-ID verfügbar — Fork nicht möglich",
+  "sessionCell.pinVoice": "Voice auf diese Session fixieren",
+  "sessionCell.unpinVoice": "Voice-Fixierung aufheben",
 
   "sidebar.orphanedSessions": "VERWAISTE SESSIONS",
   "sidebar.orphanAdopt": "Übernehmen",
@@ -355,6 +357,7 @@
 
   "app.shortcut.bugreport": "bugreport dialog öffnen",
   "app.shortcut.closeOverlay": "dialog / overlay schließen",
+  "app.workspaceLoading": "Workspace wird geladen…",
 
   "statusBar.companion": "companion",
   "statusBar.refinement": "refinement",
@@ -382,6 +385,7 @@
   "workspacePopup.saveNamePlaceholder": "Workspace-Name...",
   "workspacePopup.activeSessions": "aktive Sessions",
   "workspacePopup.save": "speichern",
+  "workspacePopup.updateCurrent": "mit aktuellem Grid aktualisieren",
 
   "themeEditor.title": "theme editor",
   "themeEditor.hint": "farben des aktiven themes anpassen. änderungen wirken sofort.",
@@ -390,6 +394,7 @@
   "themeEditor.groupBorder": "rahmen",
   "themeEditor.groupAccent": "akzent & status",
   "themeEditor.groupCtx": "context-verbrauch",
+  "themeEditor.groupHighlight": "highlight / glow",
   "themeEditor.save": "speichern",
   "themeEditor.reset": "zurücksetzen",
   "themeEditor.export": "in zwischenablage",

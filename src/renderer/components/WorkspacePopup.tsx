@@ -161,6 +161,46 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     setSaveTags(prev => prev.filter(t => t !== tag))
   }, [])
 
+  const handleUpdateExisting = useCallback(async (wsId: string) => {
+    if (!currentGrid) return
+    const ws = workspaces.find(w => w.id === wsId)
+    if (!ws) return
+    setSaving(true)
+    try {
+      const api = (window as any).cipherMux
+      const sessionMap: Record<string, { name: string; projectPath?: string }> = {}
+      for (const s of currentSessions ?? []) {
+        sessionMap[s.id] = s
+      }
+
+      const cells: WorkspaceCell[] = currentGrid.slots.map(slot => {
+        const session = slot.sessionId ? sessionMap[slot.sessionId] : undefined
+        return {
+          persona: 'empty',
+          project: session?.projectPath ?? '',
+          prompt: '',
+          type: slot.type,
+        }
+      })
+
+      const updated: Workspace = {
+        ...ws,
+        cols: currentGrid.config.cols,
+        rows: currentGrid.config.rows,
+        cells,
+        merges: {},
+      }
+
+      await api.workspaces.save(updated)
+      const wsList = await api.workspaces.list() as Workspace[]
+      setWorkspaces(wsList ?? [])
+    } catch (err) {
+      console.error('[WorkspacePopup] update failed:', err)
+    } finally {
+      setSaving(false)
+    }
+  }, [currentGrid, currentSessions, workspaces])
+
   const handleSaveCurrentOpen = useCallback(() => {
     const now = new Date()
     const defaultName = `Workspace ${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
@@ -252,6 +292,16 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
                   {ws.defaultTags?.length ? ` · ${ws.defaultTags.join(', ')}` : ''}
                 </div>
               </div>
+              {currentGrid && (
+                <button
+                  class="wp-update-btn"
+                  onClick={(e) => { e.stopPropagation(); handleUpdateExisting(ws.id) }}
+                  title={t('workspacePopup.updateCurrent')}
+                  disabled={saving}
+                >
+                  {'\u21BB'}
+                </button>
+              )}
               <button
                 class={`wp-default-star${defaultWsId === ws.id ? ' wp-default-star--active' : ''}`}
                 onClick={(e) => { e.stopPropagation(); handleSetDefault(ws.id) }}

@@ -9,6 +9,8 @@ interface PresetInfo {
   color: string
   icon?: string
   projectPath: string
+  sortOrder: number
+  launcherHidden: boolean
 }
 
 /** Section keys matching CLAUDE.md headings */
@@ -174,6 +176,27 @@ export function PresetEditor() {
     setEditConfirmed(false)
   }
 
+  const handleSortOrderChange = async (id: string, value: number) => {
+    const overrides = (await api.config.get('entitySortOrders')) ?? {}
+    overrides[id] = value
+    await api.config.set('entitySortOrders', overrides)
+    setPresets(prev => {
+      const updated = prev.map(p => p.id === id ? { ...p, sortOrder: value } : p)
+      return updated.sort((a, b) => a.sortOrder - b.sortOrder)
+    })
+  }
+
+  const handleVisibilityToggle = async (id: string, hidden: boolean) => {
+    const overrides = (await api.config.get('entityHidden')) ?? {}
+    if (hidden) {
+      overrides[id] = true
+    } else {
+      delete overrides[id]
+    }
+    await api.config.set('entityHidden', overrides)
+    setPresets(prev => prev.map(p => p.id === id ? { ...p, launcherHidden: hidden } : p))
+  }
+
   const handleDelete = async () => {
     if (!selectedId) return
     const preset = presets.find(p => p.id === selectedId)
@@ -227,6 +250,7 @@ export function PresetEditor() {
                 key={p.id}
                 class={`pp-item ${p.id === selectedId ? 'pp-item--active' : ''}`}
                 onClick={() => selectPreset(p.id)}
+                style={p.launcherHidden ? { opacity: 0.5 } : undefined}
               >
                 <div
                   class="pp-dot"
@@ -259,6 +283,29 @@ export function PresetEditor() {
               disabled
               title="Name is derived from the CLAUDE.md heading"
             />
+            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-dim)', marginLeft: 'auto' }}>
+              <input
+                type="checkbox"
+                checked={!selected.launcherHidden}
+                onChange={e => handleVisibilityToggle(selected.id, !(e.target as HTMLInputElement).checked)}
+              />
+              Launcher
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-dim)' }}>
+              Rang
+              <input
+                type="number"
+                value={selected.sortOrder}
+                onInput={e => {
+                  const v = parseInt((e.target as HTMLInputElement).value, 10)
+                  if (!isNaN(v)) handleSortOrderChange(selected.id, v)
+                }}
+                style={{ width: '48px', textAlign: 'center' }}
+                class="input input--sm"
+                min={1}
+                max={999}
+              />
+            </label>
             <div class="pp-edit-actions">
               <button
                 class="pp-btn-danger"

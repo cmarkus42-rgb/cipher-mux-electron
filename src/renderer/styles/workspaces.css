@@ -1474,6 +1474,21 @@
   border-radius: 3px;
 }
 
+.wp-update-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text-dim);
+  padding: 2px 6px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.wp-row:hover .wp-update-btn { opacity: 0.7; }
+.wp-update-btn:hover { opacity: 1 !important; color: var(--color-accent, #4fc3f7); }
+
 .wp-default-star {
   background: none;
   border: none;
@@ -1481,7 +1496,7 @@
   font-size: 16px;
   color: var(--color-text-dim);
   padding: 2px 6px;
-  margin-left: auto;
+  margin-left: 0;
   opacity: 0.6;
   transition: opacity 0.15s, color 0.15s;
   flex-shrink: 0;

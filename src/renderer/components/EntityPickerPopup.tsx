@@ -14,6 +14,7 @@ const cipherApi = () => (window as any).cipherMux
 export interface PathStartOpts {
   shellOnly?: boolean
   fork?: boolean
+  resume?: boolean
   skipPermissions?: boolean
 }
 
@@ -56,6 +57,7 @@ export function EntityPickerPopup({
   const [shellOnly, setShellOnly] = useState(false)
   const [skipPermissions, setSkipPermissions] = useState(true)
   const [fork, setFork] = useState(false)
+  const [resume, setResume] = useState(false)
   const [recentPaths, setRecentPaths] = useState<string[]>([])
 
   // Notes
@@ -86,7 +88,7 @@ export function EntityPickerPopup({
   const handlePathStart = useCallback(() => {
     const p = path.trim()
     if (!p) return
-    onSelectPath(p, { shellOnly, fork, skipPermissions: !shellOnly && skipPermissions })
+    onSelectPath(p, { shellOnly, fork, resume, skipPermissions: !shellOnly && skipPermissions })
     // Save to recent paths
     cipherApi().config.get('app').then((cfg: any) => {
       const existing: string[] = cfg?.recentPaths ?? []
@@ -94,7 +96,7 @@ export function EntityPickerPopup({
       cipherApi().config.set('app', { ...cfg, recentPaths: updated }).catch(() => {})
     }).catch(() => {})
     setPath('')
-  }, [path, shellOnly, fork, skipPermissions, onSelectPath])
+  }, [path, shellOnly, fork, resume, skipPermissions, onSelectPath])
 
   const handlePathKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -161,7 +163,7 @@ export function EntityPickerPopup({
                         <span class="unified-dialog__card-status">{t('unified.starting')}</span>
                       )}
                     </button>
-                    {running && onResumePreset && (
+                    {onResumePreset && (
                       <button
                         class="unified-dialog__card-resume"
                         onClick={(e: any) => { e.stopPropagation(); onResumePreset(preset.id as EntityId) }}
@@ -218,6 +220,12 @@ export function EntityPickerPopup({
                       setSkipPermissions((e.target as HTMLInputElement).checked)
                     }} />
                     <span>{t('unified.skipPermissions')}</span>
+                  </label>
+                  <label class="unified-dialog__option">
+                    <input type="checkbox" checked={resume} onChange={(e) => {
+                      setResume((e.target as HTMLInputElement).checked)
+                    }} />
+                    <span>{t('unified.resume')}</span>
                   </label>
                   <label class="unified-dialog__option">
                     <input type="checkbox" checked={fork} onChange={(e) => {

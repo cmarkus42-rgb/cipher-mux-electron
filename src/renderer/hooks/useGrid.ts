@@ -19,6 +19,10 @@ export function useGrid(panelWidth = 0) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const panelWidthRef = useRef(panelWidth)
   panelWidthRef.current = panelWidth
+  // Guard: if restoreGrid was called (e.g. by keepWorking restore) before the
+  // async mount-load resolves, skip the mount-load's setGrid to prevent
+  // overwriting the restored state with stale config data.
+  const restoreCalledRef = useRef(false)
 
   const persist = useCallback((next: GridState) => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
@@ -34,6 +38,7 @@ export function useGrid(panelWidth = 0) {
     let mounted = true
     api().config.get('ui').then((ui: any) => {
       if (!mounted) return
+      if (restoreCalledRef.current) return // restoreGrid already applied — don't overwrite
       if (ui?.grid?.config && ui.grid.slots) {
         const expected = ui.grid.config.cols * ui.grid.config.rows
         let loadedGrid = ui.grid as GridState
@@ -192,6 +197,7 @@ export function useGrid(panelWidth = 0) {
 
   /** Restore a full grid state (e.g. from session recovery). */
   const restoreGrid = useCallback((state: GridState) => {
+    restoreCalledRef.current = true
     setGrid(state)
     persist(state)
     api().window.fitGrid(state.config.cols, state.config.rows, panelWidthRef.current).catch(() => {})

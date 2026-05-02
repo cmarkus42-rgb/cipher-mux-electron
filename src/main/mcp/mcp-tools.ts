@@ -1332,6 +1332,82 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     }
   )
 
+  // 35a. mux_ui_choreography — Client-side UI timeline
+  ;(server.registerTool as any)(
+    'mux_ui_choreography',
+    {
+      description:
+        'Play a timeline of UI actions client-side with precise timing. One call replaces many '
+        + 'sequential mux_theme_set / mux_ui_highlight calls. Actions execute in the renderer '
+        + 'with no network roundtrip between steps. '
+        + 'Supported actions: "theme" (value: theme ID), "highlight" (target, duration, style), '
+        + '"highlight_clear", "open" (target: workspace-popup|info-dialog|launcher-popup), '
+        + '"close" (same targets as open), "grid_resize" (cols, rows), '
+        + '"sidebar" (visible: true/false/omit to toggle). Times are in ms from timeline start.',
+      inputSchema: {
+        timeline: z.array(z.object({
+          at: z.number().describe('Milliseconds from timeline start'),
+          action: z.enum(['theme', 'highlight', 'highlight_clear', 'open', 'close', 'grid_resize', 'sidebar']).describe('Action type'),
+          value: z.string().optional().describe('Theme ID (for action=theme)'),
+          target: z.string().optional().describe('Element target (highlight: data-highlight attr; open/close: popup ID)'),
+          duration: z.number().optional().describe('Highlight duration in ms (default 3000)'),
+          style: z.enum(['glow', 'outline']).optional().describe('Highlight style (default glow)'),
+          cols: z.number().min(1).max(7).optional().describe('Grid columns (for action=grid_resize, 1-7)'),
+          rows: z.number().min(1).max(3).optional().describe('Grid rows (for action=grid_resize, 1-3)'),
+          visible: z.boolean().optional().describe('Sidebar visibility (for action=sidebar; omit to toggle)'),
+        })).describe('Array of timed UI actions'),
+      },
+    },
+    async (args: { timeline: Array<{ at: number; action: string; value?: string; target?: string; duration?: number; style?: string; cols?: number; rows?: number; visible?: boolean }> }) => {
+      if (!ctx.windowManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'WindowManager not available' }) }], isError: true }
+      }
+      if (!args.timeline || args.timeline.length === 0) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Empty timeline' }) }], isError: true }
+      }
+      // Cap timeline length and duration
+      const timeline = args.timeline.slice(0, 100)
+      const maxAt = Math.max(...timeline.map(e => e.at))
+      if (maxAt > 30_000) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Timeline too long (max 30s)' }) }], isError: true }
+      }
+      // Play timeline in main process — dispatch existing IPC events at scheduled times.
+      // Local IPC (main→renderer) is sub-ms, so timing is precise.
+      for (const step of timeline) {
+        setTimeout(() => {
+          if (step.action === 'theme' && step.value) {
+            ctx.windowManager!.sendToMainWindow(IPC.THEME_SET, { theme: step.value })
+          } else if (step.action === 'highlight' && step.target) {
+            ctx.windowManager!.sendToMainWindow(IPC.UI_HIGHLIGHT, {
+              target: step.target,
+              duration: step.duration ?? 3000,
+              style: step.style ?? 'glow',
+            })
+          } else if (step.action === 'highlight_clear') {
+            ctx.windowManager!.sendToMainWindow(IPC.UI_HIGHLIGHT, { clear: true })
+          } else if ((step.action === 'open' || step.action === 'close') && step.target) {
+            ctx.windowManager!.sendToMainWindow(IPC.UI_OPEN, {
+              target: step.target,
+              action: step.action,
+            })
+          } else if (step.action === 'grid_resize' && step.cols != null && step.rows != null) {
+            ctx.windowManager!.sendToMainWindow(IPC.GRID_RESIZE, {
+              cols: step.cols,
+              rows: step.rows,
+            })
+          } else if (step.action === 'sidebar') {
+            ctx.windowManager!.sendToMainWindow(IPC.SIDEBAR_TOGGLE, {
+              visible: step.visible,
+            })
+          }
+        }, step.at)
+      }
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, steps: timeline.length, durationMs: maxAt }) }],
+      }
+    }
+  )
+
   // 35. mux_tts_speak — Speak text via TTS
   ;(server.registerTool as any)(
     'mux_tts_speak',
@@ -1346,24 +1422,36 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     async (args: { text: string; priority?: 'normal' | 'interrupt' }) => {
+      // Check TTS toggle
+      const { configStore: ttsConfigStore } = require('../config/config-store')
+      if (ttsConfigStore.get('ttsEnabled') === false) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, skipped: 'tts disabled' }) }] }
+      }
       const voiceManager = ctx.getVoiceManager?.()
-      if (!voiceManager || !voiceManager.isInitialized()) {
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Voice not active. User must enable voice mode first.' }) }],
-          isError: true,
+      if (voiceManager?.isInitialized()) {
+        // Full voice pipeline — use Piper/macOS say with echo guard
+        try {
+          await voiceManager.speakText(args.text, args.priority === 'interrupt')
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, spoken: args.text.slice(0, 100) }) }],
+          }
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err)
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }],
+            isError: true,
+          }
         }
       }
+      // Fallback: macOS say (works without voice mode being active)
       try {
-        await voiceManager.speakText(args.text, args.priority === 'interrupt')
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, spoken: args.text.slice(0, 100) }) }],
-        }
+        const { execFile } = require('child_process')
+        await new Promise<void>((resolve, reject) => {
+          execFile('say', [args.text], (err: Error | null) => err ? reject(err) : resolve())
+        })
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, spoken: args.text.slice(0, 100), via: 'macos-say' }) }] }
       } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err)
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }],
-          isError: true,
-        }
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: (err as Error).message }) }], isError: true }
       }
     }
   )
