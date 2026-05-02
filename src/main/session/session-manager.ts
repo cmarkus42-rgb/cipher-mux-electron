@@ -9,6 +9,7 @@ import { BRAND } from '../../shared/brand'
 import { TmuxManager } from '../tmux/tmux-manager'
 import { generateAuditClaudeMd } from './audit-template'
 import { generateVoiceRelayClaudeMd } from './voice-relay-template'
+import { generateDebuggerClaudeMd } from '../debugger/debugger-template'
 import { EntityRegistry } from './entity-registry'
 import { deployEntityAssets, ensureTemplateSettings } from './entity-assets'
 import { SessionStore } from './session-store'
@@ -871,6 +872,11 @@ export class SessionManager extends EventEmitter {
         fs.writeFileSync(claudeMdPath, generateAuditClaudeMd(), 'utf-8')
       } else if (config.id === 'voice-relay') {
         fs.writeFileSync(claudeMdPath, generateVoiceRelayClaudeMd(), 'utf-8')
+      } else if (config.id === 'debugger') {
+        // Write-once: preserve manual edits to the debugger's CLAUDE.md
+        if (!fs.existsSync(claudeMdPath)) {
+          fs.writeFileSync(claudeMdPath, generateDebuggerClaudeMd(), 'utf-8')
+        }
       } else if (!fs.existsSync(claudeMdPath)) {
         // Generic fallback — only write once to preserve manual edits
         fs.writeFileSync(claudeMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')

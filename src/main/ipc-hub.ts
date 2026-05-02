@@ -1743,6 +1743,14 @@ export class IpcHub {
   // ─── Entity Framework ──────────────────────────────────
   private registerEntityChannels(): void {
     ipcMain.handle(IPC.ENTITY_START, async (_e, { entityId }: { entityId: EntityId }) => {
+      // Feature flag gate: debugger is opt-in (defaults to disabled)
+      if (entityId === 'debugger') {
+        const debuggerConfig = configStore.get('debugger')
+        if (!debuggerConfig?.enabled) {
+          throw new Error('Debugger is disabled. Enable it in Settings → Debugger.')
+        }
+      }
+
       const mcpConfig = configStore.get('mcp')
       // Ensure MCP config is set on session manager
       this.sessionManager.setMcpConfig({
