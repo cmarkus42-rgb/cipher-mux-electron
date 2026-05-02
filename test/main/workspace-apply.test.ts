@@ -81,19 +81,31 @@ describe('applyWorkspace', () => {
     assert.equal(result.sessionsStarted, 1)
   })
 
-  it('passes resolved prompt as workspacePrompt (not in autoLaunch CLI arg)', async () => {
+  it('passes workspace-level prompt as workspacePrompt (not in autoLaunch CLI arg)', async () => {
     const ws: Workspace = {
       id: 'test', name: 'Test', cols: 1, rows: 1,
-      cells: [{ persona: 'worker', project: '/proj/a', prompt: 'run tests' }],
+      cells: [{ persona: 'worker', project: '/proj/a', prompt: '' }],
       merges: {}, promptOverrides: {},
+      workspacePrompt: 'run tests',
     }
     const starter = makeMockStarter()
     await applyWorkspace(ws, PERSONAS, starter, () => {})
-    // Prompt is passed as workspacePrompt for CLAUDE.md injection, NOT in autoLaunch
     assert.equal(starter.started[0].workspacePrompt, 'run tests')
     assert.ok(!starter.started[0].autoLaunch?.includes('run tests'))
     assert.ok(starter.started[0].autoLaunch?.includes('--dangerously-skip-permissions'))
     assert.ok(starter.started[0].autoLaunch?.startsWith('clear;'))
+  })
+
+  it('cell prompt overrides workspace prompt', async () => {
+    const ws: Workspace = {
+      id: 'test', name: 'Test', cols: 1, rows: 1,
+      cells: [{ persona: 'worker', project: '/proj/a', prompt: 'cell prompt' }],
+      merges: {}, promptOverrides: {},
+      workspacePrompt: 'ws prompt',
+    }
+    const starter = makeMockStarter()
+    await applyWorkspace(ws, PERSONAS, starter, () => {})
+    assert.equal(starter.started[0].workspacePrompt, 'cell prompt')
   })
 
   it('returns session IDs mapped to cell indices', async () => {

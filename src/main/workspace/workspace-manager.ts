@@ -159,16 +159,22 @@ export async function applyWorkspace(
 
     if (!cell.project) continue
 
-    // Resolve prompt via 3-level priority chain
-    const resolved = resolvePrompt(workspace, cell, personas)
+    // Resolve prompt: cell-level overrides workspace-level
+    const cellPrompt = cell.prompt.trim()
+    const wsPrompt = (workspace.workspacePrompt ?? '').trim()
+    const effectivePrompt = cellPrompt || wsPrompt || undefined
+
+    // Resolve context paths: cell-level overrides workspace-level
+    const cellPaths = cell.contextPaths?.length ? cell.contextPaths : undefined
+    const wsPaths = workspace.contextPaths?.length ? workspace.contextPaths : undefined
+    const effectivePaths = cellPaths ?? wsPaths
+
     const launchCmd = `clear; claude --dangerously-skip-permissions\n`
     const sessionName = cell.project.split('/').pop() || 'session'
     const project = cell.project
-    const workspacePrompt = resolved.text || undefined
-    const contextPaths = cell.contextPaths?.length ? cell.contextPaths : undefined
     startTasks.push({
       cellIndex: i,
-      start: () => sessionStarter.start({ name: sessionName, projectPath: project, autoLaunch: launchCmd, workspacePrompt, contextPaths }),
+      start: () => sessionStarter.start({ name: sessionName, projectPath: project, autoLaunch: launchCmd, workspacePrompt: effectivePrompt, contextPaths: effectivePaths }),
     })
   }
 

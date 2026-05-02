@@ -2069,7 +2069,33 @@
   cursor: not-allowed;
 }
 
-/* ── Context Paths (Cell Inspector) ── */
+/* ── Workspace-level Prompt + Context Dirs ── */
+
+.ws-ed-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ws-ed-sections textarea {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 8px 10px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.ws-ed-sections textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+/* ── Context Paths (Cell Inspector + Workspace level) ── */
 
 .context-path-list {
   display: flex;

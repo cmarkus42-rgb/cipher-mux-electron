@@ -187,8 +187,9 @@ Personas definieren Rollen (Name, Farbe, Default-Prompt). Workspaces kombinieren
 - **Personas:** ConfigStore `personas` Key. Builtin-Personas (Orchestrator, Cyber Factory, Worker, empty) sind locked (nur Prompt editierbar). Custom Personas voll editierbar.
 - **Workspaces:** ConfigStore `workspaces` Key. Grid-Editor mit Merge-Handles (vertikale Zell-Verschmelzung), Cell Inspector, Prompt Resolution.
 - **Prompt Resolution (3-Level):** cell.prompt > workspace.promptOverrides[persona] > persona.defaultPrompt
-- **Workspace Prompt Injection:** Resolved Prompt wird beim Workspace-Apply als `## Workspace Prompt` Section in die CLAUDE.md des Projekts geschrieben (nicht als CLI-Argument — ueberlebt `/clear`). `injectSection()` / `injectWorkspaceSections()` in SessionManager.
-- **Context Directories:** Optionale Pfade pro Cell (`contextPaths` in `WorkspaceCell`), werden als `## Context Directories` Section in die CLAUDE.md injiziert. UI im Cell Inspector (Browse + Remove), nur fuer Project-Path-Cells sichtbar.
+- **Workspace Prompt Injection:** Workspace-Level `workspacePrompt` Feld auf dem Workspace-Objekt. Wird beim Apply als `## Workspace Prompt` Section in die CLAUDE.md ALLER Projekt-Cells geschrieben (nicht als CLI-Argument — ueberlebt `/clear`). `injectSection()` / `injectWorkspaceSections()` in SessionManager.
+- **Context Directories:** Workspace-Level `contextPaths` auf dem Workspace-Objekt. Werden als `## Context Directories` Section in die CLAUDE.md ALLER Projekt-Cells injiziert. UI im Workspace-Editor (zwischen Tags und Grid) mit Browse-Dialog und Remove-Buttons.
+- **Cell-Level Override:** Cell-Prompt (`cell.prompt`) und Cell-ContextPaths (`cell.contextPaths`) ueberschreiben die Workspace-Level-Werte fuer die jeweilige Cell. UI im Cell Inspector.
 - **Injection-Regeln:** Nur bei Project-Path-Cells (nicht bei Entity/Preset-Cells). Last-Write-Wins bei mehreren Cells auf gleichem Projekt. Kein Cleanup bei Session-Stop — naechster Apply ueberschreibt.
 - **Separates Fenster:** Workspaces + Personas haben ein eigenes BrowserWindow (960x720), erreichbar via Workspace-Popup oder StatusBar. NICHT mehr im Info/Settings-Popup.
 - **URL-Routing:** `index.html?view=workspaces#tab` — main.tsx routet zu WorkspacesWindow oder App basierend auf URL-Parameter.

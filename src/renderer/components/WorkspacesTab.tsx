@@ -160,6 +160,26 @@ export function WorkspacesTab() {
     updateWs({ cells })
   }
 
+  // ── Workspace-level context paths ──
+
+  const handleWsContextPathAdd = async () => {
+    if (!ws) return
+    const result = await api.dialog.openDir({ title: 'Add Context Directory' })
+    if (!result) return
+    const existing = ws.contextPaths ?? []
+    if (!existing.includes(result)) {
+      updateWs({ contextPaths: [...existing, result] })
+    }
+  }
+
+  const handleWsContextPathRemove = (pathToRemove: string) => {
+    if (!ws) return
+    const filtered = (ws.contextPaths ?? []).filter((p) => p !== pathToRemove)
+    updateWs({ contextPaths: filtered.length > 0 ? filtered : undefined })
+  }
+
+  // ── Cell-level context paths ──
+
   const handleContextPathAdd = async () => {
     if (!ws) return
     const result = await api.dialog.openDir({ title: 'Add Context Directory' })
@@ -416,6 +436,39 @@ export function WorkspacesTab() {
               </div>
             </div>
 
+            {/* Workspace Prompt + Context Directories */}
+            <div class="ws-ed-sections">
+              <div class="insp-field wide">
+                <label>WORKSPACE PROMPT</label>
+                <textarea
+                  value={ws.workspacePrompt ?? ''}
+                  placeholder="Prompt for all project cells (injected as ## Workspace Prompt in CLAUDE.md)"
+                  onInput={(e) => updateWs({ workspacePrompt: (e.target as HTMLTextAreaElement).value || undefined })}
+                  style={{ minHeight: '50px' }}
+                />
+              </div>
+              <div class="insp-field wide">
+                <label>CONTEXT DIRECTORIES</label>
+                <div class="context-path-list">
+                  {(ws.contextPaths ?? []).map((p) => (
+                    <div key={p} class="context-path-item">
+                      <span class="context-path-text" title={p}>{p}</span>
+                      <button
+                        class="context-path-remove"
+                        onClick={() => handleWsContextPathRemove(p)}
+                        title="Remove"
+                      >&times;</button>
+                    </div>
+                  ))}
+                  <button
+                    class="btn btn--sm context-path-add"
+                    onClick={handleWsContextPathAdd}
+                    style={{ fontSize: '11px', marginTop: '4px' }}
+                  >+ Add Directory</button>
+                </div>
+              </div>
+            </div>
+
             {/* Interactive grid */}
             <div class="ed-grid-wrap">
               <div class="ed-grid" style={{ '--cols': ws.cols } as any}>
@@ -548,7 +601,7 @@ export function WorkspacesTab() {
                     <label>{t('workspacesTab.cellPrompt')}</label>
                     <textarea
                       value={cellData.prompt}
-                      placeholder="Optional cell-specific prompt (injected as ## Workspace Prompt in CLAUDE.md)"
+                      placeholder="Optional cell-specific prompt (overrides workspace prompt for this cell)"
                       onInput={(e) =>
                         handleCellUpdate('prompt', (e.target as HTMLTextAreaElement).value)
                       }

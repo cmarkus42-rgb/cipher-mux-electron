@@ -27,6 +27,10 @@ export interface Workspace {
   promptOverrides: Record<string, string>  // personaId → workspace-level prompt
   /** Tags auto-applied to new notes and pre-selected as sidebar filter when workspace is active. */
   defaultTags?: string[]
+  /** Workspace-level prompt injected as ## Workspace Prompt into all project CLAUDE.md files on apply. */
+  workspacePrompt?: string
+  /** Workspace-level context directories injected as ## Context Directories into all project CLAUDE.md files on apply. */
+  contextPaths?: string[]
 }
 
 export type PromptSource = 'cell' | 'workspace-override' | 'persona-default'
