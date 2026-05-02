@@ -9,7 +9,7 @@ export interface ApplyResult {
 }
 
 export interface SessionStarter {
-  start(opts: { name: string; projectPath: string; autoLaunch?: string }): Promise<{ id: string }>
+  start(opts: { name: string; projectPath: string; autoLaunch?: string; workspacePrompt?: string; contextPaths?: string[] }): Promise<{ id: string }>
   startEntity?(entityId: string): Promise<{ id: string }>
 }
 
@@ -159,15 +159,16 @@ export async function applyWorkspace(
 
     if (!cell.project) continue
 
-    // Build launch command
-    const promptText = cell.prompt.trim()
-    const promptArg = promptText ? ` "${promptText.replace(/"/g, '\\"')}"` : ''
-    const launchCmd = `clear; claude --dangerously-skip-permissions${promptArg}\n`
+    // Resolve prompt via 3-level priority chain
+    const resolved = resolvePrompt(workspace, cell, personas)
+    const launchCmd = `clear; claude --dangerously-skip-permissions\n`
     const sessionName = cell.project.split('/').pop() || 'session'
     const project = cell.project
+    const workspacePrompt = resolved.text || undefined
+    const contextPaths = cell.contextPaths?.length ? cell.contextPaths : undefined
     startTasks.push({
       cellIndex: i,
-      start: () => sessionStarter.start({ name: sessionName, projectPath: project, autoLaunch: launchCmd }),
+      start: () => sessionStarter.start({ name: sessionName, projectPath: project, autoLaunch: launchCmd, workspacePrompt, contextPaths }),
     })
   }
 

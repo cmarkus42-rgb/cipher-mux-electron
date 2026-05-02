@@ -2,7 +2,8 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { BUILTIN_PERSONAS } from '../../src/shared/persona-types'
 import type { Persona, Workspace, WorkspaceCell } from '../../src/shared/persona-types'
-import { resolvePrompt, spanOf, resizeCells } from '../../src/main/workspace/workspace-manager'
+import { resolvePrompt, spanOf, resizeCells, applyWorkspace } from '../../src/main/workspace/workspace-manager'
+import type { SessionStarter } from '../../src/main/workspace/workspace-manager'
 
 // ── test fixtures ────────────────────────────────────────────────────────────
 
@@ -280,5 +281,104 @@ describe('resizeCells', () => {
     const { cells, merges } = resizeCells(oldCells, oldMerges, 2, 2, 2, 2)
     assert.deepStrictEqual(cells, oldCells)
     assert.deepStrictEqual(merges, oldMerges)
+  })
+})
+
+// ── applyWorkspace ───────────────────────────────────────────────────────────
+
+describe('applyWorkspace', () => {
+  it('passes resolved workspace prompt via resolvePrompt to session starter', async () => {
+    const started: Array<{ workspacePrompt?: string; contextPaths?: string[] }> = []
+    const starter: SessionStarter = {
+      start: async (opts) => {
+        started.push({ workspacePrompt: opts.workspacePrompt, contextPaths: opts.contextPaths })
+        return { id: 'sess-1' }
+      },
+    }
+
+    const ws = makeWorkspace({
+      cols: 1, rows: 1,
+      promptOverrides: { worker: 'workspace-level override' },
+      cells: [makeCell({ persona: 'worker', project: '/proj', prompt: '' })],
+    })
+
+    await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
+    assert.strictEqual(started.length, 1)
+    assert.strictEqual(started[0].workspacePrompt, 'workspace-level override')
+  })
+
+  it('passes cell-level prompt when set (priority over workspace override)', async () => {
+    const started: Array<{ workspacePrompt?: string }> = []
+    const starter: SessionStarter = {
+      start: async (opts) => {
+        started.push({ workspacePrompt: opts.workspacePrompt })
+        return { id: 'sess-1' }
+      },
+    }
+
+    const ws = makeWorkspace({
+      cols: 1, rows: 1,
+      promptOverrides: { worker: 'ws override' },
+      cells: [makeCell({ persona: 'worker', project: '/proj', prompt: 'cell wins' })],
+    })
+
+    await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
+    assert.strictEqual(started[0].workspacePrompt, 'cell wins')
+  })
+
+  it('passes contextPaths through to session starter', async () => {
+    const started: Array<{ contextPaths?: string[] }> = []
+    const starter: SessionStarter = {
+      start: async (opts) => {
+        started.push({ contextPaths: opts.contextPaths })
+        return { id: 'sess-1' }
+      },
+    }
+
+    const ws = makeWorkspace({
+      cols: 1, rows: 1,
+      cells: [makeCell({ persona: 'worker', project: '/proj', prompt: 'do it', contextPaths: ['/src', '/test'] })],
+    })
+
+    await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
+    assert.deepStrictEqual(started[0].contextPaths, ['/src', '/test'])
+  })
+
+  it('omits contextPaths when cell has none', async () => {
+    const started: Array<{ contextPaths?: string[] }> = []
+    const starter: SessionStarter = {
+      start: async (opts) => {
+        started.push({ contextPaths: opts.contextPaths })
+        return { id: 'sess-1' }
+      },
+    }
+
+    const ws = makeWorkspace({
+      cols: 1, rows: 1,
+      cells: [makeCell({ persona: 'worker', project: '/proj', prompt: 'do it' })],
+    })
+
+    await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
+    assert.strictEqual(started[0].contextPaths, undefined)
+  })
+
+  it('does not pass prompt as CLI argument (no prompt in autoLaunch)', async () => {
+    const started: Array<{ autoLaunch?: string }> = []
+    const starter: SessionStarter = {
+      start: async (opts) => {
+        started.push({ autoLaunch: opts.autoLaunch })
+        return { id: 'sess-1' }
+      },
+    }
+
+    const ws = makeWorkspace({
+      cols: 1, rows: 1,
+      cells: [makeCell({ persona: 'worker', project: '/proj', prompt: 'my prompt' })],
+    })
+
+    await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
+    // autoLaunch should NOT contain the prompt text — prompt goes via CLAUDE.md injection
+    assert.ok(!started[0].autoLaunch?.includes('my prompt'))
+    assert.ok(started[0].autoLaunch?.includes('--dangerously-skip-permissions'))
   })
 })

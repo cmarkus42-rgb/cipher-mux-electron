@@ -86,6 +86,10 @@ export interface StartSessionOpts {
   autoLaunch?: string
   /** Fork from an existing Claude Code session ID (--fork-session <id>). */
   forkFromClaudeSessionId?: string
+  /** Resolved workspace prompt — injected as ## Workspace Prompt in project CLAUDE.md. */
+  workspacePrompt?: string
+  /** Context directory paths — injected as ## Context Directories in project CLAUDE.md. */
+  contextPaths?: string[]
 }
 
 export interface RecoveryResult {

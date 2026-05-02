@@ -14,6 +14,7 @@ export interface WorkspaceCell {
   prompt: string     // per-cell prompt
   type?: 'session' | 'notes'
   presetId?: string  // entity preset id — when set, this entity is started in the cell on workspace load
+  contextPaths?: string[]  // directories injected as ## Context Directories in CLAUDE.md on workspace apply
 }
 
 export interface Workspace {

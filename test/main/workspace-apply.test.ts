@@ -10,10 +10,10 @@ const PERSONAS: Persona[] = [
 ]
 
 function makeMockStarter() {
-  const started: { name: string; projectPath: string; autoLaunch?: string }[] = []
+  const started: { name: string; projectPath: string; autoLaunch?: string; workspacePrompt?: string; contextPaths?: string[] }[] = []
   return {
     started,
-    start: async (opts: { name: string; projectPath: string; autoLaunch?: string }) => {
+    start: async (opts: { name: string; projectPath: string; autoLaunch?: string; workspacePrompt?: string; contextPaths?: string[] }) => {
       started.push(opts)
       return { id: `session-${started.length}` }
     },
@@ -81,7 +81,7 @@ describe('applyWorkspace', () => {
     assert.equal(result.sessionsStarted, 1)
   })
 
-  it('uses cell prompt as autoLaunch', async () => {
+  it('passes resolved prompt as workspacePrompt (not in autoLaunch CLI arg)', async () => {
     const ws: Workspace = {
       id: 'test', name: 'Test', cols: 1, rows: 1,
       cells: [{ persona: 'worker', project: '/proj/a', prompt: 'run tests' }],
@@ -89,7 +89,9 @@ describe('applyWorkspace', () => {
     }
     const starter = makeMockStarter()
     await applyWorkspace(ws, PERSONAS, starter, () => {})
-    assert.ok(starter.started[0].autoLaunch?.includes('run tests'))
+    // Prompt is passed as workspacePrompt for CLAUDE.md injection, NOT in autoLaunch
+    assert.equal(starter.started[0].workspacePrompt, 'run tests')
+    assert.ok(!starter.started[0].autoLaunch?.includes('run tests'))
     assert.ok(starter.started[0].autoLaunch?.includes('--dangerously-skip-permissions'))
     assert.ok(starter.started[0].autoLaunch?.startsWith('clear;'))
   })

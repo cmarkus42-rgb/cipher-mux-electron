@@ -187,9 +187,12 @@ Personas definieren Rollen (Name, Farbe, Default-Prompt). Workspaces kombinieren
 - **Personas:** ConfigStore `personas` Key. Builtin-Personas (Orchestrator, Cyber Factory, Worker, empty) sind locked (nur Prompt editierbar). Custom Personas voll editierbar.
 - **Workspaces:** ConfigStore `workspaces` Key. Grid-Editor mit Merge-Handles (vertikale Zell-Verschmelzung), Cell Inspector, Prompt Resolution.
 - **Prompt Resolution (3-Level):** cell.prompt > workspace.promptOverrides[persona] > persona.defaultPrompt
+- **Workspace Prompt Injection:** Resolved Prompt wird beim Workspace-Apply als `## Workspace Prompt` Section in die CLAUDE.md des Projekts geschrieben (nicht als CLI-Argument — ueberlebt `/clear`). `injectSection()` / `injectWorkspaceSections()` in SessionManager.
+- **Context Directories:** Optionale Pfade pro Cell (`contextPaths` in `WorkspaceCell`), werden als `## Context Directories` Section in die CLAUDE.md injiziert. UI im Cell Inspector (Browse + Remove), nur fuer Project-Path-Cells sichtbar.
+- **Injection-Regeln:** Nur bei Project-Path-Cells (nicht bei Entity/Preset-Cells). Last-Write-Wins bei mehreren Cells auf gleichem Projekt. Kein Cleanup bei Session-Stop — naechster Apply ueberschreibt.
 - **Separates Fenster:** Workspaces + Personas haben ein eigenes BrowserWindow (960x720), erreichbar via Workspace-Popup oder StatusBar. NICHT mehr im Info/Settings-Popup.
 - **URL-Routing:** `index.html?view=workspaces#tab` — main.tsx routet zu WorkspacesWindow oder App basierend auf URL-Parameter.
-- **Workspace Apply:** Grid wird auf Workspace-Dimensionen resized, Merges werden als rowSpans uebertragen, Sessions spawnen fuer non-empty Cells mit zugewiesenen Projekten.
+- **Workspace Apply:** Grid wird auf Workspace-Dimensionen resized, Merges werden als rowSpans uebertragen, Sessions spawnen fuer non-empty Cells mit zugewiesenen Projekten. Prompt geht via CLAUDE.md-Injection, autoLaunch startet nur `claude --dangerously-skip-permissions` ohne Prompt-Arg.
 - **Grid-Limits:** Max 7 Cols x 3 Rows (konsistent mit MAX_GRID_COLS/MAX_GRID_ROWS in constants.ts)
 - **Persona Skill Sync:** Generiert .claude/skills/personas/ Skills aus Persona-Prompts.
 
