@@ -58,6 +58,10 @@ export function scanAndRegisterEntities(registry: EntityRegistry): EntityConfig[
     // Skip if already registered (e.g. companion, refinement from registerBuiltinEntities)
     if (registry.get(entityId)) continue
 
+    // Skip hidden legacy entities (marked by .hidden file during cutover)
+    const hiddenPath = path.join(ENTITIES_DIR, entityId, '.hidden')
+    if (fs.existsSync(hiddenPath)) continue
+
     const claudeMdPath = path.join(ENTITIES_DIR, entityId, 'CLAUDE.md')
     if (!fs.existsSync(claudeMdPath)) continue
 

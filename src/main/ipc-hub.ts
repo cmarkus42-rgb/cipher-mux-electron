@@ -29,6 +29,10 @@ import { TestingAssistantManager } from './testing-assistant/testing-assistant-m
 import { AuditManager } from './audit/audit-manager'
 import { generateTestingAssistantClaudeMd } from './testing-assistant/testing-template'
 import { generateAuditClaudeMd } from './audit/audit-template'
+import { generateDebuggerClaudeMd } from './debugger/debugger-template'
+import { generateCyberFactoryClaudeMd } from './cyber-factory/cyber-factory-template'
+import { syncIdeationTemplate } from './ideation-partner/ideation-template'
+import { syncRefinementTemplate } from './refinement/refinement-template'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { AdapterRegistry } from './agent/registry'
 import { EntityRegistry, registerBuiltinEntities } from './session/entity-registry'
@@ -122,15 +126,35 @@ export class IpcHub {
       this.testingAssistantManager = new TestingAssistantManager(companionDb)
       this.auditManager = new AuditManager(companionDb)
 
-      // Deploy entity CLAUDE.md templates
+      // Deploy entity CLAUDE.md templates for all Welle 1-4 entities
       const entitiesBase = path.join(os.homedir(), '.config', 'cipher-mux', 'entities')
-      const taDir = path.join(entitiesBase, 'testing-assistant')
-      if (!fs.existsSync(taDir)) fs.mkdirSync(taDir, { recursive: true })
-      fs.writeFileSync(path.join(taDir, 'CLAUDE.md'), generateTestingAssistantClaudeMd())
+      const mcpHost = configStore.get('mcp')?.host ?? MCP_DEFAULT_HOST
+      const mcpPort = configStore.get('mcp')?.port ?? MCP_DEFAULT_PORT
+      const mcpApiKey = configStore.get('mcp')?.apiKey ?? ''
 
-      const auditDir = path.join(entitiesBase, 'audit')
-      if (!fs.existsSync(auditDir)) fs.mkdirSync(auditDir, { recursive: true })
-      fs.writeFileSync(path.join(auditDir, 'CLAUDE.md'), generateAuditClaudeMd())
+      const deployEntity = (id: string, content: string) => {
+        const dir = path.join(entitiesBase, id)
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+        fs.writeFileSync(path.join(dir, 'CLAUDE.md'), content, 'utf-8')
+      }
+
+      deployEntity('testing-assistant', generateTestingAssistantClaudeMd())
+      deployEntity('audit', generateAuditClaudeMd())
+      deployEntity('debugger', generateDebuggerClaudeMd())
+      deployEntity('cyber-factory', generateCyberFactoryClaudeMd({ mcpHost, mcpPort, mcpApiKey }))
+
+      // Sync experimental templates (ideation + refinement)
+      const exp = configStore.get('experimental') ?? {}
+      syncIdeationTemplate(exp.ideation_partner !== false)
+      syncRefinementTemplate(exp.refinement_v2 !== false)
+
+      // Hide legacy entity directories (prevent scanner from picking them up)
+      for (const legacyId of ['mpo', 'watchdog']) {
+        const legacyDir = path.join(entitiesBase, legacyId)
+        if (fs.existsSync(legacyDir) && !fs.existsSync(path.join(legacyDir, '.hidden'))) {
+          fs.writeFileSync(path.join(legacyDir, '.hidden'), 'Replaced by Cyber Factory Pack. Delete this directory to fully remove.\n', 'utf-8')
+        }
+      }
     } catch (err) {
       console.error('[IpcHub] MemoryStore init failed:', err)
     }
