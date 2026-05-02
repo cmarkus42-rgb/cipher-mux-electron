@@ -18,7 +18,7 @@ export type AdapterCapabilities = Record<AdapterFeature, boolean>
 // ─── Entity Framework ─────────────────────────────────────
 
 /** Well-known entity identifiers. Extensible via string for dynamic/scanned entities. */
-export type BuiltinEntityId = 'orchestrator' | 'mpo' | 'launcher' | 'companion' | 'refinement' | 'voice-relay' | 'audit'
+export type BuiltinEntityId = 'orchestrator' | 'cyber-factory' | 'launcher' | 'companion' | 'refinement' | 'voice-relay' | 'audit' | 'ideation-partner'
 export type EntityId = BuiltinEntityId | (string & {})
 
 /**
@@ -274,12 +274,26 @@ export interface AppConfig {
     /** Require 3 uncertainty markers per sub-agent note. */
     subAgentUnsicherheitspflicht: boolean
   }
+  /** Cyber Factory configuration — multi-session build orchestrator. */
+  cyber_factory?: {
+    enabled: boolean
+    maxParallelWorkers: number
+    defaultRetries: number
+    monitoringIntervalMs: number
+    budgetMultiplier: number
+    budgetEscalationThreshold: number
+    budgetAutoPauseThreshold: number
+    modelRouting: Record<string, string>
+    stuckDetection: { heartbeatTimeoutMs: number; outputPlateauMs: number; minOutputCharsInPlateau: number }
+  }
   /** Experimental feature flags. */
   experimental?: {
     /** Enable extended 7-phase Refinement (RE audit, REQ-IDs, structured handoffs). */
     refinement_v2?: boolean
     /** Enable Ideation Partner as builtin entity with brain management. */
     ideation_partner?: boolean
+    /** Enable Cyber Factory multi-session build orchestrator. */
+    cyber_factory?: boolean
   }
   /** Whether the sidebar is detached into its own window. Persisted across restarts. */
   sidebarDetached?: boolean
@@ -509,7 +523,20 @@ export interface TagRepository {
 
 // ─── Companion Memory ─────────────────────────────────────
 
-export type MemoryKind = 'fact' | 'preference' | 'interaction' | 'event'
+export type MemoryKind =
+  | 'fact'
+  | 'preference'
+  | 'interaction'
+  | 'event'
+  | 'decision'
+  | 'architecture'
+  | 'welle'
+  | 'welle-plan'
+  | 'finding'
+  | 'risk-review'
+  | 'pattern'
+  | 'convention'
+  | 'off_limit'
 
 export interface Memory {
   id: string
@@ -521,6 +548,8 @@ export interface Memory {
   salience: number
   ttlDays: number | null
   sourceExcerpt: string | null
+  scopeKind: 'user' | 'workspace' | 'session'
+  scopeId: string | null
   /** FTS5 rank score — only present in search results */
   score?: number
 }
