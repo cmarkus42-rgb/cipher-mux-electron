@@ -80,6 +80,49 @@ export const COMPANION_SCHEMA_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_wellen_run ON wellen(run_id);
   CREATE INDEX IF NOT EXISTS idx_sub_projekte_welle ON sub_projekte(welle_id);
+
+  CREATE TABLE IF NOT EXISTS debugger_runs (
+    id TEXT PRIMARY KEY,
+    bug_report_id TEXT,
+    source TEXT NOT NULL DEFAULT 'manual',
+    severity TEXT NOT NULL DEFAULT 'medium',
+    description TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'intake',
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    started_at INTEGER NOT NULL,
+    finished_at INTEGER,
+    project_path TEXT NOT NULL,
+    workspace_id TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS clarifications (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES debugger_runs(id),
+    question TEXT NOT NULL,
+    options TEXT,
+    answer TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at INTEGER NOT NULL,
+    resolved_at INTEGER
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_clarifications_run ON clarifications(run_id);
+
+  CREATE TABLE IF NOT EXISTS fix_plans (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES debugger_runs(id),
+    hypothesis TEXT NOT NULL,
+    confidence_level TEXT NOT NULL DEFAULT 'likely',
+    plan_md TEXT NOT NULL,
+    test_extension TEXT NOT NULL DEFAULT '',
+    risk_assessment TEXT NOT NULL DEFAULT '',
+    effort TEXT NOT NULL DEFAULT 'small',
+    status TEXT NOT NULL DEFAULT 'draft',
+    user_confirmed INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_fix_plans_run ON fix_plans(run_id);
 `
 
 /**
