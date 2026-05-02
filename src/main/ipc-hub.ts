@@ -28,6 +28,7 @@ import { MemoryStore } from './companion/memory-store'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { AdapterRegistry } from './agent/registry'
 import { EntityRegistry, registerBuiltinEntities } from './session/entity-registry'
+import { CyberFactoryManager } from './cyber-factory/cyber-factory-manager'
 import { scanAndRegisterEntities } from './session/entity-scanner'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
@@ -59,6 +60,7 @@ export class IpcHub {
   private noteTagging!: NoteTagging
   private memoryStore: MemoryStore | null = null
   private btShutterManager: BtShutterManager | null = null
+  private cyberFactoryManager: CyberFactoryManager | null = null
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
   private cachedRecoveryResult: RecoveryResult | null = null
   private cachedKeepWorkingRestore: {
@@ -109,6 +111,7 @@ export class IpcHub {
     try {
       const companionDbPath = path.join(os.homedir(), '.config', 'cipher-mux', 'companion.db')
       this.memoryStore = new MemoryStore(companionDbPath)
+      this.cyberFactoryManager = new CyberFactoryManager(this.memoryStore)
     } catch (err) {
       console.error('[IpcHub] MemoryStore init failed:', err)
     }
@@ -849,6 +852,18 @@ export class IpcHub {
         running: this.sessionManager.isEntityRunning('cyber-factory'),
         sessionId: this.sessionManager.getEntitySessionId('cyber-factory'),
       }
+    })
+
+    ipcMain.handle(IPC.CYBER_FACTORY_RUN_STATUS, async (_e, runId: string) => {
+      return this.cyberFactoryManager?.getRun(runId) ?? null
+    })
+
+    ipcMain.handle(IPC.CYBER_FACTORY_WELLE_LIST, async (_e, runId: string) => {
+      return this.cyberFactoryManager?.listWellen(runId) ?? []
+    })
+
+    ipcMain.handle(IPC.CYBER_FACTORY_WORKER_STATUS, async (_e, welleId: string) => {
+      return this.cyberFactoryManager?.listSubProjekte(welleId) ?? []
     })
   }
 

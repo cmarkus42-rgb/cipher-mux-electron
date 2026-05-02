@@ -90,9 +90,27 @@ const defaults: AppConfig = {
     skillsDir: `${os.homedir()}/.config/cipher-mux/skills/ideation`,
     subAgentUnsicherheitspflicht: true,
   },
+  cyber_factory: {
+    enabled: true,
+    maxParallelWorkers: 5,
+    defaultRetries: 2,
+    monitoringIntervalMs: 300000,
+    budgetMultiplier: 1.0,
+    budgetEscalationThreshold: 0.8,
+    budgetAutoPauseThreshold: 0.95,
+    modelRouting: {
+      trivial: 'haiku', boilerplate: 'haiku', tests: 'haiku', docs: 'haiku',
+      refactor: 'sonnet', business_logic: 'sonnet', bug_fix: 'sonnet',
+      architecture: 'opus', high_risk_domain: 'opus', audit_full: 'opus', adversarial: 'sonnet',
+    },
+    stuckDetection: {
+      heartbeatTimeoutMs: 420000, outputPlateauMs: 180000, minOutputCharsInPlateau: 100,
+    },
+  },
   experimental: {
     refinement_v2: false,
     ideation_partner: false,
+    cyber_factory: true,
   },
   entitySortOrders: {} as Record<string, number>,
   entityHidden: {} as Record<string, boolean>,
