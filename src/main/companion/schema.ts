@@ -123,6 +123,48 @@ export const COMPANION_SCHEMA_SQL = `
   );
 
   CREATE INDEX IF NOT EXISTS idx_fix_plans_run ON fix_plans(run_id);
+
+  CREATE TABLE IF NOT EXISTS testing_runs (
+    id TEXT PRIMARY KEY,
+    cyber_factory_run_id TEXT,
+    welle_id TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    started_at INTEGER NOT NULL,
+    finished_at INTEGER,
+    project_path TEXT NOT NULL,
+    workspace_id TEXT,
+    test_command TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS testing_findings (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES testing_runs(id),
+    severity TEXT NOT NULL DEFAULT 'medium',
+    category TEXT NOT NULL,
+    file_path TEXT,
+    line_number INTEGER,
+    description TEXT NOT NULL,
+    reproduction TEXT,
+    suggestion TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_testing_findings_run ON testing_findings(run_id);
+  CREATE INDEX IF NOT EXISTS idx_testing_findings_severity ON testing_findings(severity);
+
+  CREATE TABLE IF NOT EXISTS testing_suite_results (
+    run_id TEXT PRIMARY KEY REFERENCES testing_runs(id),
+    total INTEGER NOT NULL DEFAULT 0,
+    passed INTEGER NOT NULL DEFAULT 0,
+    failed INTEGER NOT NULL DEFAULT 0,
+    raw_output TEXT NOT NULL DEFAULT ''
+  );
+
+  CREATE TABLE IF NOT EXISTS testing_quality_reports (
+    run_id TEXT PRIMARY KEY REFERENCES testing_runs(id),
+    behavioral_count INTEGER NOT NULL DEFAULT 0,
+    implementation_count INTEGER NOT NULL DEFAULT 0,
+    problematic_tests TEXT NOT NULL DEFAULT '[]'
+  );
 `
 
 /**
