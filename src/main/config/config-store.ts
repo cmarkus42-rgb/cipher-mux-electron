@@ -109,9 +109,9 @@ const defaults: AppConfig = {
       heartbeatTimeoutMs: 420000, outputPlateauMs: 180000, minOutputCharsInPlateau: 100,
     },
   },
-  debugger: { ...DEBUGGER_DEFAULTS },
+  debugger: { ...DEBUGGER_DEFAULTS, enabled: true },
   testing_assistant: {
-    enabled: false,
+    enabled: true,
     adversarialDepth: 'standard' as const,
     owaspChecks: true,
     offLimitsAudit: true,
@@ -119,16 +119,18 @@ const defaults: AppConfig = {
     autoHandoffOnSeverityHigh: true,
   },
   audit_config: {
-    enabled: false,
+    enabled: true,
     scopeDefault: 'welle' as const,
     owaspDepth: 'full' as const,
     cognitiveDebtThreshold: 5,
     blockOnHighSeverity: true,
   },
   experimental: {
-    refinement_v2: false,
-    ideation_partner: false,
+    refinement_v2: true,
+    ideation_partner: true,
     cyber_factory: true,
+    testing_assistant: true,
+    audit_full: true,
   },
   memory: {
     enabled: true,
