@@ -163,4 +163,16 @@ export function registerBuiltinEntities(
     visible: true,
     sortOrder: 70,
   })
+
+  registry.register({
+    id: 'debugger',
+    displayName: 'Debugger',
+    icon: '🔧',
+    color: '#ff7043',
+    projectPath: `${entitiesBase}/debugger`,
+    features: ['mcp', 'memory'],
+    visible: true,
+    sortOrder: 75,
+    singleInstance: true,
+  })
 }
