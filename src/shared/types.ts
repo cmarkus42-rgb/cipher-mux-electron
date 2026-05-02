@@ -264,10 +264,22 @@ export interface AppConfig {
     /** Whether to run OSS license sondierung in Phase 5. */
     ossLicenseSondierungEnabled: boolean
   }
+  /** Ideation Partner configuration. */
+  ideation_partner?: {
+    enabled: boolean
+    /** Base directory for ideation brain files. */
+    brainBaseDir: string
+    /** Directory for ideation skill markdown files. */
+    skillsDir: string
+    /** Require 3 uncertainty markers per sub-agent note. */
+    subAgentUnsicherheitspflicht: boolean
+  }
   /** Experimental feature flags. */
   experimental?: {
     /** Enable extended 7-phase Refinement (RE audit, REQ-IDs, structured handoffs). */
     refinement_v2?: boolean
+    /** Enable Ideation Partner as builtin entity with brain management. */
+    ideation_partner?: boolean
   }
   /** Whether the sidebar is detached into its own window. Persisted across restarts. */
   sidebarDetached?: boolean
