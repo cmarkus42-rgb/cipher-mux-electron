@@ -1,0 +1,79 @@
+/* theme-gruvbox-dark.css — Gruvbox Dark
+ * Coder classic · Warm retro dark
+ * Mode: dark · Font preset: Rajdhani + Fira Code
+ * Generated from cipher-mux theme-playground. Do not edit by hand.
+ */
+
+body[data-theme="gruvbox-dark"] {
+  /* surfaces */
+  --color-bg:               #282828;
+  --color-bg-elevated:      #32302F;
+  --color-bg-sunken:        #1D2021;
+  --color-bg-terminal:      #1D2021;
+
+  /* borders */
+  --color-border:           #504945;
+  --color-border-light:     #665C54;
+  --color-border-focus:     #b8bb26;
+
+  /* text */
+  --color-text:             #EBDBB2;
+  --color-text-secondary:   #D5C4A1;
+  --color-text-dim:         #928374;
+  --color-text-accent:      #B8BB26;
+
+  /* accents — neon */
+  --color-neon-green:       #B8BB26;
+  --color-neon-red:         #FB4934;
+  --color-neon-orange:      #FE8019;
+  --color-neon-cyan:        #8EC07C;
+
+  /* status dots */
+  --color-dot-ok:           #B8BB26;
+  --color-dot-warn:         #FE8019;
+  --color-dot-error:        #FB4934;
+  --color-dot-info:         #83A598;
+
+  /* semantic */
+  --color-accent:           #FABD2F;
+  --color-accent-soft:      rgba(250, 189, 47, 0.10);
+  --color-success:          #B8BB26;
+  --color-error:            #FB4934;
+  --color-warning:          #FE8019;
+  --color-info:             #83A598;
+
+  /* context usage */
+  --color-ctx-ok:           #B8BB26;
+  --color-ctx-warn:         #FE8019;
+  --color-ctx-error:        #FB4934;
+
+  /* overlay */
+  --color-bg-overlay:       rgba(40, 40, 40, 0.85);
+
+  /* scanline */
+  --scanline-opacity:       0.025;
+
+  /* shadows */
+  --shadow-sm:              0 1px 2px rgba(0,0,0,0.20), 0 2px 6px rgba(0,0,0,0.16);
+  --shadow-md:              0 2px 4px rgba(0,0,0,0.24), 0 4px 16px rgba(0,0,0,0.20);
+  --shadow-lg:              0 4px 8px rgba(0,0,0,0.28), 0 8px 32px rgba(0,0,0,0.24);
+  --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.16);
+
+  /* ANSI terminal palette 0-15 */
+  --ansi-0:                 #282828;
+  --ansi-1:                 #CC241D;
+  --ansi-2:                 #98971A;
+  --ansi-3:                 #D79921;
+  --ansi-4:                 #458588;
+  --ansi-5:                 #B16286;
+  --ansi-6:                 #689D6A;
+  --ansi-7:                 #A89984;
+  --ansi-8:                 #928374;
+  --ansi-9:                 #FB4934;
+  --ansi-10:                #B8BB26;
+  --ansi-11:                #FABD2F;
+  --ansi-12:                #83A598;
+  --ansi-13:                #D3869B;
+  --ansi-14:                #8EC07C;
+  --ansi-15:                #EBDBB2;
+}

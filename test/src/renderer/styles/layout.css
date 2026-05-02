@@ -1,0 +1,348 @@
+/*
+ * layout.css — cipher-mux-electron App Layout
+ *
+ * Main shell structure:
+ *   ┌──────────────────────────────────────────────┐
+ *   │  Drag Region / Title Bar (38px)              │
+ *   ├─────┬────────────────────────┬───────────────┤
+ *   │     │                        │  Chatroom     │
+ *   │  A  │    Main Content        │  Panel        │
+ *   │  c  │    (flex: 1)           │  (280px,      │
+ *   │  t  │                        │   hidden by   │
+ *   │  i  │                        │   default)    │
+ *   │  v  │                        │               │
+ *   │  i  │                        │               │
+ *   │  t  │                        │               │
+ *   │  y  │                        │               │
+ *   │     │                        │               │
+ *   │ 48  │                        │               │
+ *   ├─────┴────────────────────────┴───────────────┤
+ *   │  Status Bar (28px)                           │
+ *   └──────────────────────────────────────────────┘
+ */
+
+/* ================================================================
+   App Shell
+   ================================================================ */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ================================================================
+   Drag Region / Title Bar
+   ================================================================ */
+
+.drag-region {
+  -webkit-app-region: drag;
+  height: 38px;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-lg);
+  padding-left: 80px; /* macOS traffic lights */
+  background: var(--color-bg-sunken);
+  border-bottom: 1px solid var(--color-border);
+  position: relative;
+  user-select: none;
+}
+
+.drag-region .title {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  color: var(--color-text-dim);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.drag-region .title-version {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+  opacity: 0.5;
+  letter-spacing: 0.05em;
+  -webkit-app-region: no-drag;
+  pointer-events: none;
+}
+
+/* ================================================================
+   Body Area (Rail + Content + Panel)
+   ================================================================ */
+
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0; /* allow flex children to shrink */
+  overflow: hidden;
+}
+
+/* ================================================================
+   Activity Rail — Left
+   ================================================================ */
+
+.activity-rail {
+  width: 48px;
+  min-width: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-sm) 0;
+  gap: var(--space-xs);
+  background: var(--color-bg-sunken);
+  border-right: 1px solid var(--color-border);
+  user-select: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.activity-rail__item {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-text-dim);
+  border: 1px solid transparent;
+  transition:
+    color var(--transition-base),
+    border-color var(--transition-base),
+    background var(--transition-base);
+  position: relative;
+}
+
+.activity-rail__item:hover {
+  color: var(--color-text-secondary);
+  border-color: var(--color-border-light);
+}
+
+.activity-rail__item--active {
+  color: var(--color-text-accent);
+  border-color: var(--color-neon-green);
+  background: var(--color-accent-soft);
+}
+
+/* Active indicator bar on left edge */
+.activity-rail__item--active::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--color-neon-green);
+}
+
+.activity-rail__spacer {
+  flex: 1;
+}
+
+/* Badge on rail item */
+.activity-rail__badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-bg);
+  background: var(--color-neon-green);
+  padding: 0 3px;
+}
+
+/* ================================================================
+   Main Content
+   ================================================================ */
+
+.main-content {
+  flex: 1;
+  min-width: 0; /* prevent flex blowout */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Tab Bar (above terminal / content area) ── */
+.tab-bar {
+  display: flex;
+  align-items: stretch;
+  height: 32px;
+  min-height: 32px;
+  background: var(--color-bg-sunken);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  user-select: none;
+}
+
+.tab-bar__tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-dim);
+  border-right: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: color var(--transition-base), background var(--transition-base);
+  white-space: nowrap;
+}
+
+.tab-bar__tab:hover {
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+}
+
+.tab-bar__tab--active {
+  color: var(--color-text);
+  background: var(--color-bg);
+  border-bottom: 2px solid var(--color-neon-green);
+}
+
+.tab-bar__close {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--color-text-dim);
+  padding: 0 2px;
+  cursor: pointer;
+  transition: color var(--transition-base);
+}
+
+.tab-bar__close:hover {
+  color: var(--color-neon-red);
+}
+
+/* ── Content Viewport (terminals live here) ── */
+.content-viewport {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ================================================================
+   Chatroom Panel — Right (hidden by default)
+   ================================================================ */
+
+.chatroom-panel {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--color-bg-sunken);
+  border-left: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  transition: width var(--transition-slow), min-width var(--transition-slow);
+}
+
+.chatroom-panel--open {
+  width: 280px;
+  min-width: 280px;
+}
+
+.chatroom-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-dim);
+  user-select: none;
+}
+
+.chatroom-panel__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-sm);
+}
+
+.chatroom-panel__input {
+  display: flex;
+  padding: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+  gap: var(--space-xs);
+}
+
+.chatroom-panel__input input {
+  flex: 1;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  padding: var(--space-xs) var(--space-sm);
+  outline: none;
+  transition: border-color var(--transition-base);
+}
+
+.chatroom-panel__input input:focus {
+  border-color: var(--color-border-focus);
+}
+
+/* ================================================================
+   Status Bar — Bottom
+   ================================================================ */
+
+.status-bar {
+  height: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-lg);
+  gap: var(--space-md);
+  background: var(--color-bg-sunken);
+  border-top: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+  user-select: none;
+}
+
+.status-bar__segment {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.status-bar__spacer {
+  flex: 1;
+}
+
+.status-bar__segment--right {
+  margin-left: auto;
+}
+
+/* ================================================================
+   Resize Handle (between main content and chatroom)
+   ================================================================ */
+
+.resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background var(--transition-base);
+  flex-shrink: 0;
+}
+
+.resize-handle:hover,
+.resize-handle--active {
+  background: var(--color-border-light);
+}

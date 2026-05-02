@@ -1,0 +1,43 @@
+# Build
+build/
+dist/
+out/
+*.apk
+*.aab
+*.class
+*.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Gradle
+.gradle/
+local.properties
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Secrets
+*.env
+*.keystore
+
+# Superpowers brainstorm sessions
+.superpowers/
+
+# VAD assets (binary, ~38MB, not tracked in git)
+src/renderer/public/vad-assets/
+
+# Private profile (never commit)
+profile.cipher.yaml
+.claude/worktrees/

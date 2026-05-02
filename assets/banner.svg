@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" role="img" aria-label="cipher-mux — terminal cockpit for parallel Claude Code sessions">
+  <defs>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4"/>
+      <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.08 0"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+    </filter>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#1a1a1a" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="420" fill="#000000"/>
+  <rect width="1280" height="420" fill="url(#grid)" opacity="0.6"/>
+
+  <!-- Brutalist frame -->
+  <rect x="32" y="32" width="1216" height="356" fill="none" stroke="#F5F5EC" stroke-width="2"/>
+  <rect x="40" y="40" width="1200" height="340" fill="none" stroke="#F5F5EC" stroke-width="1" opacity="0.35"/>
+
+  <!-- Top-left session tag -->
+  <rect x="56" y="56" width="14" height="14" fill="#00FF88"/>
+  <text x="80" y="68" font-family="'Fira Code','Courier New',monospace" font-size="14" fill="#F5F5EC">orchestrator · 0%</text>
+
+  <!-- Top-right meta -->
+  <text x="1224" y="68" text-anchor="end" font-family="'Fira Code','Courier New',monospace" font-size="12" fill="#8a8a82">v0.8.3-beta · MIT</text>
+
+  <!-- Wordmark -->
+  <g transform="translate(96, 210)">
+    <text font-family="'Rajdhani','Impact','Arial Narrow',sans-serif" font-size="150" font-weight="700" fill="#F5F5EC" letter-spacing="6">CIPHER-MUX</text>
+    <text y="44" font-family="'Fira Code','Courier New',monospace" font-size="18" fill="#0088A0" letter-spacing="4">&gt; TERMINAL COCKPIT FOR PARALLEL CLAUDE CODE SESSIONS</text>
+  </g>
+
+  <!-- ASCII grid motif (bottom-right) -->
+  <g transform="translate(960, 100)" font-family="'Fira Code','Courier New',monospace" font-size="13" fill="#F5F5EC" opacity="0.7">
+    <text y="0">┌──────────┬──────────┐</text>
+    <text y="18">│ session·1 │ session·2 │</text>
+    <text y="36">│  ▓▓▓▓▓░  │  ▓▓▓░░░  │</text>
+    <text y="54">├──────────┼──────────┤</text>
+    <text y="72">│ session·3 │ session·4 │</text>
+    <text y="90">│  ▓▓░░░░  │  ▓▓▓▓▓▓  │</text>
+    <text y="108">└──────────┴──────────┘</text>
+  </g>
+
+  <!-- Bottom bar -->
+  <line x1="56" y1="340" x2="1224" y2="340" stroke="#F5F5EC" stroke-width="1" opacity="0.4"/>
+  <text x="56" y="364" font-family="'Fira Code','Courier New',monospace" font-size="12" fill="#8a8a82">tmux · MCP · voice · SQLite message-bus</text>
+  <text x="1224" y="364" text-anchor="end" font-family="'Fira Code','Courier New',monospace" font-size="12" fill="#8a8a82">macOS · Linux</text>
+
+  <!-- Grain overlay -->
+  <rect width="1280" height="420" filter="url(#grain)" opacity="0.5"/>
+</svg>

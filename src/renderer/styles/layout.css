@@ -1,0 +1,346 @@
+/*
+ * layout.css — cipher-mux-electron App Layout
+ *
+ * Main shell structure:
+ *   ┌──────────────────────────────────────────────┐
+ *   │  Drag Region / Title Bar (38px)              │
+ *   ├──────────────────────────────┬───────────────┤
+ *   │                              │  Chatroom     │
+ *   │    Session Grid              │  Panel        │
+ *   │    (flex: 1)                 │  (280px,      │
+ *   │                              │   hidden by   │
+ *   │                              │   default)    │
+ *   │                              │               │
+ *   ├──────────────────────────────┴───────────────┤
+ *   │  Status Bar (28px)                           │
+ *   └──────────────────────────────────────────────┘
+ */
+
+@import './grid.css';
+
+/* ================================================================
+   App Shell
+   ================================================================ */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ================================================================
+   Drag Region / Title Bar
+   ================================================================ */
+
+.drag-region {
+  -webkit-app-region: drag;
+  height: 38px;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-lg);
+  padding-left: 80px; /* macOS traffic lights */
+  background: var(--color-bg-sunken);
+  border-bottom: 1px solid var(--color-border);
+  position: relative;
+  user-select: none;
+}
+
+.drag-region .title {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  color: var(--color-text-dim);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.drag-region .title-version {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+  opacity: 0.5;
+  letter-spacing: 0.05em;
+  -webkit-app-region: no-drag;
+  pointer-events: none;
+}
+
+/* ================================================================
+   Body Area (Grid + Panel)
+   ================================================================ */
+
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0; /* allow flex children to shrink */
+  overflow: hidden;
+  position: relative;
+}
+
+.workspace-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  pointer-events: all;
+}
+.workspace-loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-text-dim);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: ws-spin 0.8s linear infinite;
+}
+@keyframes ws-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ================================================================
+   Main Content
+   ================================================================ */
+
+.main-content {
+  flex: 1;
+  min-width: 0; /* prevent flex blowout */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ================================================================
+   Status Bar — Bottom
+   ================================================================ */
+
+.status-bar {
+  height: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-lg);
+  gap: var(--space-md);
+  background: var(--color-bg-sunken);
+  border-top: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+  user-select: none;
+}
+
+.status-bar__segment {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.status-bar__spacer {
+  flex: 1;
+}
+
+.status-bar__segment--right {
+  margin-left: auto;
+}
+
+
+.request-bubble__project {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: lowercase;
+  letter-spacing: 0.06em;
+  color: var(--color-neon-cyan);
+  margin-bottom: 2px;
+}
+
+.request-bubble__question {
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  line-height: 1.4;
+  margin-bottom: var(--space-xs);
+}
+
+.request-bubble__context {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-dim);
+  font-style: italic;
+  margin-bottom: var(--space-sm);
+  line-height: 1.4;
+}
+
+/* Options */
+.request-bubble__options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--space-sm);
+}
+
+.request-bubble__option {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  padding: 2px var(--space-xs);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-base);
+}
+
+.request-bubble__option:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.request-bubble__option--recommended {
+  border-left: 2px solid var(--color-neon-orange);
+  padding-left: calc(var(--space-xs) - 2px);
+}
+
+.request-bubble__option-key {
+  font-weight: 700;
+  color: var(--color-text-accent);
+  min-width: 12px;
+}
+
+.request-bubble__option-label {
+  color: var(--color-text);
+}
+
+.request-bubble__option-desc {
+  color: var(--color-text-dim);
+  font-size: var(--font-size-xs);
+}
+
+.request-bubble__recommended-tag {
+  font-family: var(--font-heading);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-neon-orange);
+  margin-left: auto;
+}
+
+/* Answer display */
+.request-bubble__answer {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-neon-green);
+  padding: var(--space-xs) 0;
+}
+
+/* Inline editing */
+.request-bubble__edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.request-bubble__textarea {
+  width: 100%;
+  background: var(--color-bg-sunken);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  padding: var(--space-xs) var(--space-sm);
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--transition-base);
+}
+
+.request-bubble__textarea:focus {
+  border-color: var(--color-border-focus);
+}
+
+/* Review link bubble */
+.request-bubble--review {
+  border-color: var(--color-neon-cyan);
+}
+
+.request-bubble--review:hover {
+  background: rgba(80, 144, 168, 0.08);
+}
+
+.request-bubble__review-title {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  color: var(--color-text);
+  font-style: italic;
+  margin-bottom: 2px;
+}
+
+.request-bubble__review-path {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+}
+
+/* Timestamp */
+.request-bubble__time {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+  margin-top: var(--space-xs);
+  text-align: right;
+}
+
+/* Status bar badge for request count */
+.status-bar__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  margin-left: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-heading);
+  background: var(--color-neon-red);
+  color: var(--color-bg);
+  border-radius: 7px;
+  line-height: 1;
+}
+
+/* Status bar LED indicator for sidebar activity */
+.status-bar__led {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-neon);
+  margin-right: 4px;
+  animation: led-pulse 2s ease-in-out infinite;
+}
+
+@keyframes led-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ================================================================
+   Resize Handle (between main content and chatroom)
+   ================================================================ */
+
+.resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background var(--transition-base);
+  flex-shrink: 0;
+}
+
+.resize-handle:hover,
+.resize-handle--active {
+  background: var(--color-border-light);
+}
