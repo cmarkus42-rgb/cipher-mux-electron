@@ -4,12 +4,12 @@
 
 <p align="center">
   <b>A terminal cockpit for parallel Claude Code sessions.</b><br>
-  Voice input · Pluggable agent adapters · SQLite message bus · MCP server.
+  Voice input · 7 entity types · 37 MCP tools · SQLite message bus · Companion memory.
 </p>
 
 <p align="center">
   <a href="https://github.com/cmarkus42/cipher-mux-electron/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cmarkus42/cipher-mux-electron/ci.yml?branch=main&label=CI&style=flat-square&labelColor=000000&color=F5F5EC"></a>
-  <a href="https://github.com/cmarkus42/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.8.9--beta-0088A0?style=flat-square&labelColor=000000"></a>
+  <a href="https://github.com/cmarkus42/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.9.9-0088A0?style=flat-square&labelColor=000000"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="#"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="CONTRIBUTING.md#maintenance-status"><img alt="Maintenance" src="https://img.shields.io/badge/maintenance-active-00FF88?style=flat-square&labelColor=000000"></a>
@@ -46,11 +46,11 @@
 
 ## Background
 
-cipher-mux orchestrates multiple Claude Code CLI sessions in embedded tmux panes inside an Electron window. It ships its own MCP server, a SQLite-backed message bus for inter-session communication, voice input for prompts, a task outbox for structured delegation, and a unified project launcher UX. Sessions share context through the message bus; an orchestrator session can delegate work across workers via MCP tools.
+cipher-mux orchestrates multiple Claude Code CLI sessions in embedded tmux panes inside an Electron window. It ships 37 MCP tools across 9 categories, a SQLite-backed message bus for inter-session communication, an entity system with 7 built-in entity types (orchestrator, MPO, launcher, companion, refinement, voice-relay, audit), voice input with scroll commands and grid navigation, a task outbox for structured delegation, persistent companion memory (SQLite FTS5) for learning entities, a markdown notes system with MCP API and handoff notes for session-to-session knowledge transfer, text-to-speech for entities, UI choreography for demos and onboarding, and a unified project launcher UX. Sessions share context through the message bus; an orchestrator session can delegate work across workers via MCP tools.
 
 The primary audience is developers who run multiple parallel Claude Code sessions and want to eliminate the manual coordination overhead. You should be comfortable with tmux and use Claude Code daily. macOS and Linux are supported; Windows is not planned for v1.
 
-cipher-mux is **not** an editor, not an IDE plugin, not a multi-LLM router, and not an autonomous agent platform. It is a cockpit: you see your sessions, you talk to them, you coordinate them. An Aider adapter is available as a Tier-2 integration with visibly reduced features (no context usage display, no MCP participation, no message bus) - details in the [FAQ](#faq). The full feature set is built for Claude Code.
+cipher-mux is **not** an editor, not an IDE plugin, not a multi-LLM router, and not an autonomous agent platform. It is a cockpit: you see your sessions, you talk to them, you coordinate them. The full feature set is built for Claude Code.
 
 ## Install
 
@@ -97,19 +97,41 @@ npm run dist      # Package as DMG (macOS) or AppImage (Linux)
 
 ### The Grid
 
-The main window shows a grid of terminal panes - each one is a Claude Code session running inside tmux. Click a cell to focus it. The activity rail on the left shows session status, unread messages, and context usage at a glance.
+The main window shows a grid of terminal panes - each one is a Claude Code session running inside tmux. Click a cell to focus it. The activity rail on the left shows session status, unread messages, and context usage at a glance. Entities can be launched directly from the LauncherCell in the grid.
 
 ### Starting Sessions
 
-Use the **+** button or the project launcher to start new sessions. The launcher scans your configured project directories, shows available projects, and can kick off sessions with pre-configured instructions.
+Use the **+** button or the project launcher to start new sessions. The launcher scans your configured project directories, shows available projects, and can kick off sessions with pre-configured instructions. The EntityPickerPopup lets you choose from entity presets when starting a new session, applying the right CLAUDE.md, persona, and tools automatically.
 
 ### Orchestrator
 
-The orchestrator is a dedicated Claude Code session with access to MCP tools (`mux_create_session`, `mux_send`, `mux_read`, `mux_status`, etc.). It can spawn worker sessions, delegate tasks, and coordinate multi-project work. Start it from the activity rail.
+The orchestrator is one of 7 built-in entity types - a dedicated Claude Code session with access to MCP tools (`mux_create_session`, `mux_send`, `mux_read`, `mux_status`, etc.). It can spawn worker sessions, delegate tasks, and coordinate multi-project work. Start it from the activity rail.
+
+### Entities
+
+cipher-mux ships 7 built-in entity types, each with specialized behaviors, instructions, and tool access:
+
+- **Orchestrator** — coordinates worker sessions, delegates tasks
+- **MPO** (Multi-Party Orchestrator) — manages input requests across sessions
+- **Launcher** — project kickoff and session bootstrapping
+- **Companion** — how-to advisor with persistent memory
+- **Refinement** — iterative code review and improvement, with memory
+- **Voice-Relay** — voice-driven session control, with memory
+- **Audit** — compliance and quality checks
+
+Entities are registered via the entity registry and launched through the EntityPickerPopup or workspace presets.
+
+### Notes
+
+A built-in markdown notes system accessible through MCP tools (`mux_notes_create`, `mux_notes_search`, `mux_notes_read`, etc.). Notes support auto-tagging, full-text search, and handoff notes — a mechanism for transferring knowledge from one session to the next. Entities use notes for bug reports, feature requests, and persistent documentation.
+
+### Companion Memory
+
+Entities with memory (companion, refinement, voice-relay) have access to a persistent SQLite FTS5 memory store. They can write, recall, search, and forget memories across sessions. This enables learning entities that remember user preferences, project context, and past interactions without relying on conversation history.
 
 ### Voice Input
 
-Toggle voice input (bottom-left) to dictate prompts into the focused session. Uses local Whisper for speech-to-text. Push-to-talk by default. The voice pipeline also powers the bug report interview flow - speak a bug report and the system extracts structured data via a local LLM.
+Toggle voice input (bottom-left) to dictate prompts into the focused session. Uses local Whisper for speech-to-text with Silero VAD for voice activity detection. Push-to-talk by default, with STT pin mode for hands-free dictation. Voice scroll commands let you scroll session output by voice, and grid navigation commands let you switch between cells verbally. A Bluetooth remote (BT Shutter) is supported for push-to-talk without touching the keyboard. The voice pipeline also powers the bug report interview flow - speak a bug report and the system extracts structured data via a local LLM.
 
 ### Task Outbox
 
@@ -117,7 +139,7 @@ Capture tasks via voice interview, chatroom, or hotkey. Tasks are stored in SQLi
 
 ### Workspaces & Personas
 
-Define **personas** (named roles with colors and default prompts) and arrange them in **workspaces** (grid layouts with project assignments). Load a workspace to resize the grid, apply vertical cell merges, and spawn sessions in one click. Prompt resolution follows a 3-level priority: per-cell prompt > workspace override > persona default. Manage everything in a dedicated editor window.
+Define **personas** (named roles with colors and default prompts) and arrange them in **workspaces** (grid layouts with project assignments). Load a workspace to resize the grid, apply vertical cell merges, and spawn sessions in one click. Prompt resolution follows a 3-level priority: per-cell prompt > workspace override > persona default. Workspaces integrate with the entity system - assign entity types to cells for pre-configured behaviors. Manage everything in a dedicated editor window.
 
 ### Message Bus
 
@@ -137,23 +159,13 @@ All of these are valid choices. Pick what fits your workflow.
 
 ## FAQ
 
-### Why does an Aider session look different from a Claude Code session?
+### How many MCP tools are there?
 
-Aider is integrated as a **Tier-2 adapter** with intentionally reduced features. Aider sessions show no context percentage (Aider does not report token usage), no message bus badge (Aider has no MCP support), and the orchestrator delegates to Aider via `send_keys` instead of MCP tools. This is not a bug - it is the honest representation of what Aider can and cannot do.
+37 tools across 9 categories: Session Management, Context Monitoring, Project Launcher, Bug Reports, Task Queue, MPO, Notes, Companion Memory, and App Control. Every tool is callable by any entity that has MCP access. See [ref/mcp-tools.md](ref/mcp-tools.md) for the full reference.
 
-The features that define cipher-mux (message bus, MCP integration, context usage display) are built for Claude Code. If you primarily use Aider, plain `tmux` plus `git worktree` or tools like Claude Squad are more pragmatic.
+### What are entities?
 
-| Capability | Claude Code | Aider |
-|-----------|-------------|-------|
-| MCP injection | Yes | No |
-| Real-time context usage | Yes | No |
-| Skip-permissions mode | Yes | Yes (`--yes`) |
-| Message bus participation | Yes | No |
-| Project instructions | `CLAUDE.md` | `.aider.conf.yml` / `AGENTS.md` |
-
-### What models does Aider use?
-
-Aider brings its own model configuration. You can run it against local models via Ollama (e.g., Qwen2.5-Coder-32B) - no quality guarantee from cipher-mux's side. Configure Aider's model settings in `.aider.conf.yml` in your project.
+Entities are specialized session types with pre-configured instructions, persona settings, and tool access. Think of them as roles: an orchestrator coordinates, a companion teaches, a refinement entity reviews code. Each entity type gets its own `CLAUDE.md`, and some (companion, refinement, voice-relay) have persistent memory across sessions. You pick an entity type when launching a session, or assign them in workspace presets.
 
 ### Does cipher-mux work on Linux?
 
@@ -177,9 +189,13 @@ src/main/          — Electron main process
   message-bus/     — SQLite CRUD, schema, typed messages
   mcp/             — Streamable HTTP MCP server, tools, auth
   session/         — SessionManager, recovery, orchestrator template
+    entity-registry — Entity registration, preset definitions
   workspace/       — Personas, workspaces, prompt resolution, skill sync
   voice/           — Whisper STT, Piper TTS, Silero VAD, interview engine
   task/            — Task state machine, watcher, hooks, MCP tools
+  notes/           — NoteManager, tagging, handoff notes
+  companion/       — MemoryStore (SQLite FTS5), entity memory
+  bluetooth/       — BtShutterManager, BT remote integration
 src/renderer/      — Preact UI
   components/      — Grid, TerminalPane, ActivityRail, Chatroom, Cockpit
   hooks/           — useTerminal, useSessions, useMessages, useGrid, ...

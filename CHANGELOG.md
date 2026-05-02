@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — v0.11 Wave 3
+## [0.9.9] — 2026-05-02 (Pre-Cyberfactory Plateau)
 
 ### Added
 - **Multi-Instance Presets:** Entity presets can now run multiple simultaneous sessions. Companion, Refinement, Voice, Audit, and custom presets are multi-instance by default. Orchestrator, MPO, and Launcher remain singletons (`singleInstance: true`). Each new instance gets a unique tmux session name (ULID suffix) and numbered display name (e.g. "Coding Companion #2"). `ENTITY_STOP` accepts optional `sessionId` for targeted instance shutdown. `ENTITY_STATUS` returns `sessionIds[]` array.
@@ -96,6 +96,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session Fork (SP-5):** Fork button in SessionCell for Claude Code sessions.
 - **Orphan Detection (SP-5):** Periodic scan for orphaned tmux sessions with Adopt/Terminate UI.
 - **30 new tests** covering SP-2 and SP-5 quality gates
+
+## [0.9.9] - 2026-05-02
+
+### Highlights
+v0.9.9 is the **"more-as-more" milestone** — the last iteration before public release. CipherMux is now a fully functional multi-session cockpit for Claude Code with voice control, entity presets, workspace management, and multi-instance support.
+
+### Added
+- **Multi-Instance Presets:** Entity presets (Companion, Refinement, Voice, Audit, custom) can run multiple simultaneous sessions. Each instance gets a unique tmux session name and numbered display name (e.g. "Coding Companion #2"). Orchestrator, MPO, Launcher remain singletons via `singleInstance: true`. UI shows "+" for startable multi-instance presets vs. "running" for singletons.
+- **Voice & TTS:** Global TTS playback, conversation engine voice commands, BT Shutter integration
+- **UI Polish:** Highlight overlay border-glow, workspace popup improvements, session cell context bar, testcase view with screenshots, theme editor preview/revert, drag-and-drop sidebar→grid
+- **MCP Tools:** `mux_ui_highlight` border-glow, `mux_ui_open` toggle/close, `mux_tts_speak`
+- **Preset Editor:** 4-tab CLAUDE.md editor (Rolle/Fähigkeiten/Arbeitsregeln/Scope) in Workspaces window
+- **Dynamic Entity Scanner:** Scans `~/.config/cipher-mux/entities/` for custom presets
+- **Universal Persona Injection:** Active character injected into all entity CLAUDE.md at start
+
+### Changed
+- `EntityConfig` gains `singleInstance` boolean — `entitySessionIds` refactored to `Map<EntityId, Set<string>>`
+- Entity templates follow unified format (Role, Persona, Memory, Capabilities, Rules, Scope, TTS)
+- Workspace project selector uses datalist instead of Finder
+
+### Fixed
+- Multi-instance presets blocked by frontend singleton logic — EntityPickerPopup now respects `singleInstance` flag
+- MCP HTTP timeout, drag-and-drop race, stale grid slots, orphaned entity session IDs
+- Keep Working restore 3-layer bug (race condition + stale IDs + tmux malformed lines)
+- Various voice, BT Shutter, sidebar, workspace, and grid fixes
+
+---
 
 ## [0.9.10] - 2026-05-02
 
