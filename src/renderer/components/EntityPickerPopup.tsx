@@ -142,11 +142,13 @@ export function EntityPickerPopup({
               {entityPresets.map(preset => {
                 const running = entityStatus?.[preset.id] ?? false
                 const isStarting = startingEntity === preset.id
+                // Multi-instance presets: always start new, never focus-only
+                const effectiveRunning = running && (preset.singleInstance ?? false)
                 return (
                   <div key={preset.id} class="unified-dialog__card-row">
                     <button
                       class={`unified-dialog__card${running ? ' unified-dialog__card--running' : ''}`}
-                      onClick={() => onSelectPreset(preset.id as EntityId, running)}
+                      onClick={() => onSelectPreset(preset.id as EntityId, effectiveRunning)}
                       disabled={isStarting}
                       style={{ '--entity-color': preset.color } as any}
                     >
@@ -156,8 +158,11 @@ export function EntityPickerPopup({
                           {preset.displayName}
                         </span>
                       </div>
-                      {running && (
+                      {running && preset.singleInstance && (
                         <span class="unified-dialog__card-status">{t('unified.running')}</span>
+                      )}
+                      {running && !preset.singleInstance && (
+                        <span class="unified-dialog__card-status">+</span>
                       )}
                       {isStarting && (
                         <span class="unified-dialog__card-status">{t('unified.starting')}</span>

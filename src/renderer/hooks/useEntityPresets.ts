@@ -7,6 +7,7 @@ export interface EntityPresetItem {
   color: string
   icon?: string
   sortOrder: number
+  singleInstance?: boolean
 }
 
 const api = () => (window as any).cipherMux
@@ -29,6 +30,7 @@ export function useEntityPresets(): EntityPresetItem[] {
             color: c.color,
             icon: c.icon,
             sortOrder: c.sortOrder ?? 100,
+            singleInstance: c.singleInstance ?? false,
           }))
           .sort((a: EntityPresetItem, b: EntityPresetItem) => a.sortOrder - b.sortOrder)
       )
