@@ -9,6 +9,7 @@ import { BRAND } from '../../shared/brand'
 import { BUILTIN_PERSONAS, SEED_CUSTOM_PERSONAS, SEED_WORKSPACES } from '../../shared/persona-types'
 import { SEED_CHARACTERS, DEFAULT_CHARACTER_ID } from '../character/character-defaults'
 import { DEBUGGER_DEFAULTS } from '../debugger/types'
+import { TESTING_ASSISTANT_DEFAULTS } from '../testing-assistant/types'
 import {
   DEFAULT_SCAN_DEPTH,
   MAX_SESSIONS,
@@ -109,6 +110,14 @@ const defaults: AppConfig = {
     },
   },
   debugger: { ...DEBUGGER_DEFAULTS },
+  testing_assistant: {
+    enabled: false,
+    adversarialDepth: 'standard' as const,
+    owaspChecks: true,
+    offLimitsAudit: true,
+    testQualityAudit: true,
+    autoHandoffOnSeverityHigh: true,
+  },
   experimental: {
     refinement_v2: false,
     ideation_partner: false,
