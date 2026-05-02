@@ -68,6 +68,15 @@ export const IPC = {
   CYBER_FACTORY_WELLE_LIST: 'cipher-mux:cyber-factory:welle-list',
   CYBER_FACTORY_WORKER_STATUS: 'cipher-mux:cyber-factory:worker-status',
 
+  // Debugger
+  DEBUGGER_RUN_START: 'cipher-mux:debugger:run-start',
+  DEBUGGER_RUN_STATUS: 'cipher-mux:debugger:run-status',
+  DEBUGGER_RUN_CANCEL: 'cipher-mux:debugger:run-cancel',
+  DEBUGGER_CLARIFICATION_NEW: 'cipher-mux:debugger:clarification-new',
+  DEBUGGER_CLARIFICATION_RESOLVE: 'cipher-mux:debugger:clarification-resolve',
+  DEBUGGER_FIX_PLAN_CONFIRM: 'cipher-mux:debugger:fix-plan-confirm',
+  DEBUGGER_WALKTHROUGH_REQUEST: 'cipher-mux:debugger:walkthrough-request',
+
   // Window
   WINDOW_FIT_GRID: 'cipher-mux:window:fit-grid',
   WINDOW_OPEN_WORKSPACES: 'cipher-mux:window:open-workspaces',
