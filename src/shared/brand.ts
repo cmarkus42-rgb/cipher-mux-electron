@@ -25,8 +25,8 @@ export interface BrandConfig {
   readonly defaultProjectDir: string
   /** Orchestrator config/state directory. */
   readonly orchestratorDir: string
-  /** MPO (Multi-Project Orchestrator) config/state directory. */
-  readonly mpoDir: string
+  /** Cyber Factory config/state directory. */
+  readonly cyberFactoryDir: string
   /** Directory for statusLine context JSON files. */
   readonly statusLineDir: string
   /** Path to the projectlauncher working directory. Empty = feature disabled. */
@@ -35,7 +35,7 @@ export interface BrandConfig {
   readonly qualityBaselineDir: string
   /** IPC channel prefix — always "cipher-mux". */
   readonly ipcPrefix: string
-  /** Path to MPO input-requests.json file. Empty = feature disabled. */
+  /** Path to Cyber Factory input-requests.json file. Empty = feature disabled. */
   readonly inputRequestsPath: string
 }
 
@@ -44,7 +44,7 @@ const COMMUNITY_DEFAULTS: BrandConfig = {
   scanPaths: [],
   defaultProjectDir: '',
   orchestratorDir: '~/.config/cipher-mux/orchestrator',
-  mpoDir: '~/.config/cipher-mux/mpo',
+  cyberFactoryDir: '~/.config/cipher-mux/cyber-factory',
   statusLineDir: '/tmp/cipher-mux/context',
   projectLauncherDir: '',
   qualityBaselineDir: '',
@@ -113,7 +113,7 @@ export function loadProfile(filePath: string): BrandConfig {
       scanPaths: Array.isArray(parsed.scanPaths) ? parsed.scanPaths : COMMUNITY_DEFAULTS.scanPaths,
       defaultProjectDir: typeof parsed.defaultProjectDir === 'string' ? parsed.defaultProjectDir : COMMUNITY_DEFAULTS.defaultProjectDir,
       orchestratorDir: typeof parsed.orchestratorDir === 'string' ? parsed.orchestratorDir : COMMUNITY_DEFAULTS.orchestratorDir,
-      mpoDir: typeof parsed.mpoDir === 'string' ? parsed.mpoDir : COMMUNITY_DEFAULTS.mpoDir,
+      cyberFactoryDir: typeof parsed.cyberFactoryDir === 'string' ? parsed.cyberFactoryDir : COMMUNITY_DEFAULTS.cyberFactoryDir,
       statusLineDir: typeof parsed.statusLineDir === 'string' ? parsed.statusLineDir : COMMUNITY_DEFAULTS.statusLineDir,
       projectLauncherDir: typeof parsed.projectLauncherDir === 'string' ? parsed.projectLauncherDir : COMMUNITY_DEFAULTS.projectLauncherDir,
       qualityBaselineDir: typeof parsed.qualityBaselineDir === 'string' ? parsed.qualityBaselineDir : COMMUNITY_DEFAULTS.qualityBaselineDir,

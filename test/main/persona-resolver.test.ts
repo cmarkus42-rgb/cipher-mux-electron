@@ -75,7 +75,7 @@ describe('resolvePersonaForPreset', () => {
     const expected = [
       'companion', 'cyber-factory', 'refinement', 'ideation-partner',
       'debugger', 'testing-assistant', 'audit', 'voice-relay',
-      'orchestrator', 'mpo', 'launcher',
+      'orchestrator', 'launcher',
     ]
     for (const preset of expected) {
       assert.ok(

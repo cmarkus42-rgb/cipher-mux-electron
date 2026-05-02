@@ -75,7 +75,7 @@ function getMcpPermissionsForEntity(entityId: EntityId): string[] {
         `${MCP_PREFIX}companion_memory_forget`,
       ]
     case 'orchestrator':
-    case 'mpo':
+    case 'cyber-factory':
     case 'launcher':
       return [
         `${MCP_PREFIX}mux_sessions`,
@@ -142,7 +142,7 @@ export class SessionManager extends EventEmitter {
   private adapterRegistry: AdapterRegistry
   private sessionAdapters: Map<string, AgentAdapter> = new Map()
   private orchestratorSessionId: string | null = null
-  private mpoSessionId: string | null = null
+  private cyberFactorySessionId: string | null = null
   private mcpConfig: OrchestratorConfig | null = null
   /** Entity registry for functional entities. */
   private entityRegistry: EntityRegistry
@@ -349,7 +349,7 @@ export class SessionManager extends EventEmitter {
       this.removeEntitySession(entityId, sessionId)
       this.entityRegistry.unlinkSession(sessionId)
       if (entityId === 'orchestrator') this.orchestratorSessionId = null
-      if (entityId === 'mpo') this.mpoSessionId = null
+      if (entityId === 'cyber-factory') this.cyberFactorySessionId = null
     }
     this.sessionStore.removeSession(sessionId)
     this._cleanupGridSlot(sessionId)
@@ -454,7 +454,7 @@ export class SessionManager extends EventEmitter {
       this.removeEntitySession(entityId, sessionId)
       this.entityRegistry.unlinkSession(sessionId)
       if (entityId === 'orchestrator') this.orchestratorSessionId = null
-      if (entityId === 'mpo') this.mpoSessionId = null
+      if (entityId === 'cyber-factory') this.cyberFactorySessionId = null
     }
 
     // Remove from persistent store — must happen AFTER in-memory cleanup
@@ -530,7 +530,7 @@ export class SessionManager extends EventEmitter {
             this.addEntitySession(ps.entityId, session.id)
             this.entityRegistry.linkSession(session.id, ps.entityId)
             if (ps.entityId === 'orchestrator') this.orchestratorSessionId = session.id
-            if (ps.entityId === 'mpo') this.mpoSessionId = session.id
+            if (ps.entityId === 'cyber-factory') this.cyberFactorySessionId = session.id
           }
         } else {
           // tmux session gone → clean up from store
@@ -586,7 +586,7 @@ export class SessionManager extends EventEmitter {
     if (!hasStore) {
       const entityNameMap: Record<string, EntityId> = {
         'Orchestrator': 'orchestrator',
-        'MPO': 'mpo',
+        'Cyber Factory': 'cyber-factory',
         'Coding Companion': 'companion',
         'Refinement': 'refinement',
         'Voice': 'voice-relay',
@@ -598,7 +598,7 @@ export class SessionManager extends EventEmitter {
           this.addEntitySession(entityId, session.id)
           this.entityRegistry.linkSession(session.id, entityId)
           if (entityId === 'orchestrator') this.orchestratorSessionId = session.id
-          if (entityId === 'mpo') this.mpoSessionId = session.id
+          if (entityId === 'cyber-factory') this.cyberFactorySessionId = session.id
         }
       }
     }
@@ -862,7 +862,7 @@ export class SessionManager extends EventEmitter {
     // Each entity gets a role-specific CLAUDE.md so it overrides the global
     // Mimir persona from ~/.claude/CLAUDE.md (fixes B07 persona distribution).
     // Code-generated templates (voice-relay, audit) are always refreshed so
-    // updates propagate on next session start. Orchestrator and MPO use
+    // updates propagate on next session start. Orchestrator and Cyber Factory use
     // pre-authored CLAUDE.md in their entity directories (no code generation).
     // Only truly generic fallback CLAUDE.md is write-once (preserves manual edits).
     if (!config.templatePath) {
@@ -965,9 +965,9 @@ export class SessionManager extends EventEmitter {
     this.addEntitySession(entityId, session.id)
     this.entityRegistry.linkSession(session.id, entityId)
 
-    // Backward compat: update orchestrator/mpo session ID refs
+    // Backward compat: update orchestrator/cyber-factory session ID refs
     if (entityId === 'orchestrator') this.orchestratorSessionId = session.id
-    if (entityId === 'mpo') this.mpoSessionId = session.id
+    if (entityId === 'cyber-factory') this.cyberFactorySessionId = session.id
 
     // Re-persist with entity ID and notify renderer so entityStatus updates
     this.persistSession(session)
@@ -998,7 +998,7 @@ export class SessionManager extends EventEmitter {
       projectPath: config.projectPath,
       sessionName: config.displayName,
       isOrchestrator: entityId === 'orchestrator',
-      isMpo: entityId === 'mpo',
+      isCyberFactory: entityId === 'cyber-factory',
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
     this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
@@ -1029,7 +1029,7 @@ export class SessionManager extends EventEmitter {
       projectPath: config.projectPath,
       sessionName: config.displayName,
       isOrchestrator: entityId === 'orchestrator',
-      isMpo: entityId === 'mpo',
+      isCyberFactory: entityId === 'cyber-factory',
       resume: true,
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
@@ -1082,7 +1082,7 @@ export class SessionManager extends EventEmitter {
 
     // Backward compat
     if (entityId === 'orchestrator') this.orchestratorSessionId = null
-    if (entityId === 'mpo') this.mpoSessionId = null
+    if (entityId === 'cyber-factory') this.cyberFactorySessionId = null
 
     this.emit('entity-stopped', { entityId })
   }
@@ -1126,7 +1126,7 @@ export class SessionManager extends EventEmitter {
       this.entityRegistry.linkSession(sessionId, entityId as EntityId)
     }
     if (entityId === 'orchestrator') this.orchestratorSessionId = sessionId
-    if (entityId === 'mpo') this.mpoSessionId = sessionId
+    if (entityId === 'cyber-factory') this.cyberFactorySessionId = sessionId
     this.persistSession(session)
     this.emit('session-changed', session)
   }

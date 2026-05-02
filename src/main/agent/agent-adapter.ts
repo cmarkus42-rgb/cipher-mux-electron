@@ -36,8 +36,8 @@ export interface LaunchOpts {
   sessionName: string
   /** Whether this is an orchestrator session */
   isOrchestrator?: boolean
-  /** Whether this is an MPO session */
-  isMpo?: boolean
+  /** Whether this is a Cyber Factory session */
+  isCyberFactory?: boolean
   /** Fork from an existing Claude session (--fork-session <id>) */
   forkFromClaudeSessionId?: string
   /** Resume the most recent conversation (--resume) */
@@ -103,6 +103,6 @@ export interface AgentAdapter {
   buildOrchestratorPromptFragment(lang: 'de' | 'en'): string
   /** Agent-specific launcher suffix (e.g. '/launch' for Claude Code). */
   buildLauncherPromptFragment(lang: 'de' | 'en'): string
-  /** Agent-specific instructions injected into the MPO template. */
-  buildMpoPromptFragment(lang: 'de' | 'en'): string
+  /** Agent-specific instructions injected into the Cyber Factory template. */
+  buildCyberFactoryPromptFragment(lang: 'de' | 'en'): string
 }

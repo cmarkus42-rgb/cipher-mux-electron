@@ -59,11 +59,14 @@ export const IPC = {
   ORCHESTRATOR_STATUS: 'cipher-mux:orchestrator:status',
   ORCHESTRATOR_STARTED: 'cipher-mux:orchestrator:started',
 
-  // MPO (Multi-Project Orchestrator)
-  MPO_START: 'cipher-mux:mpo:start',
-  MPO_STOP: 'cipher-mux:mpo:stop',
-  MPO_STATUS: 'cipher-mux:mpo:status',
-  MPO_STARTED: 'cipher-mux:mpo:started',
+  // Cyber Factory
+  CYBER_FACTORY_START: 'cipher-mux:cyber-factory:start',
+  CYBER_FACTORY_STOP: 'cipher-mux:cyber-factory:stop',
+  CYBER_FACTORY_STATUS: 'cipher-mux:cyber-factory:status',
+  CYBER_FACTORY_STARTED: 'cipher-mux:cyber-factory:started',
+  CYBER_FACTORY_RUN_STATUS: 'cipher-mux:cyber-factory:run-status',
+  CYBER_FACTORY_WELLE_LIST: 'cipher-mux:cyber-factory:welle-list',
+  CYBER_FACTORY_WORKER_STATUS: 'cipher-mux:cyber-factory:worker-status',
 
   // Window
   WINDOW_FIT_GRID: 'cipher-mux:window:fit-grid',
@@ -93,11 +96,11 @@ export const IPC = {
   VOICE_GENERATION_DONE: 'cipher-mux:voice:generation-done',
   VOICE_STOP_PLAYBACK: 'cipher-mux:voice:stop-playback',
 
-  // Input Requests (MPO)
-  MPO_INPUT_REQUESTS: 'cipher-mux:mpo:input-requests',
-  MPO_REQUEST_ANSWERED: 'cipher-mux:mpo:request-answered',
-  MPO_OPEN_REVIEW: 'cipher-mux:mpo:open-review',
-  MPO_REQUEST_UPDATE: 'cipher-mux:mpo:request-update',
+  // Input Requests (Cyber Factory)
+  CF_INPUT_REQUESTS: 'cipher-mux:cf:input-requests',
+  CF_REQUEST_ANSWERED: 'cipher-mux:cf:request-answered',
+  CF_OPEN_REVIEW: 'cipher-mux:cf:open-review',
+  CF_REQUEST_UPDATE: 'cipher-mux:cf:request-update',
 
   // Voice Session Input
   VOICE_START_SESSION: 'cipher-mux:voice:start-session',

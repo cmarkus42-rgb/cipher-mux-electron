@@ -204,7 +204,7 @@ export function CompanionTab() {
           <div class="pp-field">
             <label>Persona Prompt</label>
             <div class="pp-hint">
-              This prompt is injected into all entity sessions (Orchestrator, MPO, Companion, Audit, etc.)
+              This prompt is injected into all entity sessions (Orchestrator, Cyber Factory, Companion, Audit, etc.)
             </div>
             <textarea
               value={draftPrompt}

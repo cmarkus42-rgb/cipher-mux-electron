@@ -39,8 +39,8 @@ export const MESSAGE_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000
 /** Orchestrator max retries */
 export const ORCHESTRATOR_MAX_RETRIES = 2
 
-/** MPO max retries per sub-project session */
-export const MPO_MAX_RETRIES = 2
+/** Cyber Factory max retries per sub-project session */
+export const CF_MAX_RETRIES = 2
 
 /** Default scan depth (directory levels below each scanPath that are inspected). */
 export const DEFAULT_SCAN_DEPTH = 1

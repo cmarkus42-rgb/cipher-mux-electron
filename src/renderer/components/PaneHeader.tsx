@@ -10,7 +10,7 @@ interface PaneHeaderProps {
 /** Entity color mapping — matches EntityConfig.color values. */
 const ENTITY_COLORS: Record<EntityId, string> = {
   orchestrator: '#4fc3f7',
-  mpo: '#ab47bc',
+  'cyber-factory': '#ab47bc',
   companion: '#ffb74d',
   refinement: '#ef5350',
   launcher: '#66bb6a',

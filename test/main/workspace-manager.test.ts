@@ -200,7 +200,7 @@ describe('resizeCells', () => {
     const oldCells: WorkspaceCell[] = [
       { persona: 'orchestrator', project: '', prompt: '' },
       { persona: 'worker',       project: '', prompt: '' },
-      { persona: 'mpo',          project: '', prompt: '' },
+      { persona: 'cyber-factory',          project: '', prompt: '' },
       { persona: 'auditor',      project: '', prompt: '' },
     ]
     // 2x2 → 1x2
@@ -264,7 +264,7 @@ describe('resizeCells', () => {
     const oldCells: WorkspaceCell[] = [
       { persona: 'orchestrator', project: '/x', prompt: 'p' },
       { persona: 'worker',       project: '/y', prompt: '' },
-      { persona: 'mpo',          project: '/z', prompt: '' },
+      { persona: 'cyber-factory',          project: '/z', prompt: '' },
       { persona: 'empty',        project: '',   prompt: '' },
     ]
     // 2×2 grid: merge at col 0, row 0 (merges down to row 1) — valid because rows=2

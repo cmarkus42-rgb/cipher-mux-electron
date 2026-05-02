@@ -15,7 +15,7 @@ export function SidebarWindow() {
   const contextUsages = useContextUsage()
 
   const orchestratorActive = sessions.some(s => s.name === 'Orchestrator' && s.status === 'active')
-  const mpoActive = sessions.some(s => s.name === 'MPO' && s.status === 'active')
+  const cyberFactoryActive = sessions.some(s => s.name === 'Cyber Factory' && s.status === 'active')
   const [voiceComState, setVoiceComState] = useState('idle')
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export function SidebarWindow() {
         <SidebarPanel
           visible={true}
           orchestratorActive={orchestratorActive}
-          mpoActive={mpoActive}
+          cyberFactoryActive={cyberFactoryActive}
           sessions={sessions}
           gridSessionIds={[]}
           contextUsages={contextUsages}

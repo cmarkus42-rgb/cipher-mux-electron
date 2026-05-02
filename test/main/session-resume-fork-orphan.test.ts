@@ -72,7 +72,7 @@ function mockAdapter() {
       return { cmd: 'claude', args }
     },
     buildOrchestratorPromptFragment: () => '',
-    buildMpoPromptFragment: () => '',
+    buildCyberFactoryPromptFragment: () => '',
     buildLauncherPromptFragment: () => '',
     getProjectMarkers: () => ['CLAUDE.md'],
     readProjectInstructions: () => Promise.resolve(null),

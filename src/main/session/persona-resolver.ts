@@ -19,7 +19,6 @@ export const PRESET_PERSONA_DEFAULTS: Record<string, string> = {
   audit: 'relay',
   'voice-relay': 'relay',
   orchestrator: 'relay',
-  mpo: 'relay',
   launcher: 'relay',
 }
 

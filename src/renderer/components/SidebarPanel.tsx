@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next'
 interface SidebarPanelProps {
   visible: boolean
   orchestratorActive: boolean
-  mpoActive: boolean
+  cyberFactoryActive: boolean
   sessions: Array<{ id: string; name: string; status: string; projectPath?: string }>
   gridSessionIds: string[]
   contextUsages: Record<string, { usedPercentage: number; used?: number; total?: number }>
@@ -39,7 +39,7 @@ function displayName(name: string, projectPath?: string | null): string {
 }
 
 export function SidebarPanel({
-  visible, orchestratorActive, mpoActive, sessions, gridSessionIds,
+  visible, orchestratorActive, cyberFactoryActive, sessions, gridSessionIds,
   contextUsages, onAddToGrid, onKillSession, onDetach, onReattach, activeWorkspaceId, hasNotesCell,
   onOpenNoteInGrid, voiceComState,
 }: SidebarPanelProps) {
@@ -162,7 +162,7 @@ export function SidebarPanel({
   const hasNotes = notes.length > 0
   const hasBackground = backgroundSessions.length > 0
   const hasOrphans = orphans.length > 0
-  const hasRequests = mpoActive && requests.length > 0
+  const hasRequests = cyberFactoryActive && requests.length > 0
   const hasMessages = messages.length > 0
 
   if (!visible) return null
