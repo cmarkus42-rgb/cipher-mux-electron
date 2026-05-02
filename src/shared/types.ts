@@ -311,6 +311,8 @@ export interface AppConfig {
   sidebarWindowBounds?: { x: number; y: number; width: number; height: number } | null
   /** Persisted collapse states for sidebar sections. */
   sidebarCollapsed?: Record<string, boolean>
+  /** Workspace-scoped memory configuration. */
+  memory?: MemoryConfig
 }
 
 // ─── Kickoff ───────────────────────────────────────────────
@@ -529,6 +531,16 @@ export interface TagEntry {
 
 export interface TagRepository {
   tags: Record<string, TagEntry>
+}
+
+// ─── Memory Config ────────────────────────────────────────
+
+export interface MemoryConfig {
+  enabled: boolean
+  ftsEnabled: boolean
+  retentionDays: number
+  sessionScopeAutoDelete: boolean
+  archiveOnWorkspaceDelete: boolean
 }
 
 // ─── Companion Memory ─────────────────────────────────────
