@@ -1,0 +1,26 @@
+{
+  "name": "cipher-mux-electron",
+  "lifecycle_phase": "pack-implementation",
+  "base_version": "0.9.9",
+  "archived_origin": "/Users/Shared/Nextcloud/Claude/ClaudeCode01/cipher-mux-electron",
+  "migration_date": "2026-05-02",
+  "freigetestete_bereiche": [
+    "kern",
+    "tmux",
+    "message-bus",
+    "mcp-server",
+    "ipc-hub",
+    "session-manager",
+    "renderer-grid",
+    "voice-pipeline",
+    "notes-editor",
+    "bt-shutter",
+    "config-store",
+    "theme-system",
+    "context-usage"
+  ],
+  "nicht_freigetestet": [
+    "presets",
+    "multi-instance-presets"
+  ]
+}
