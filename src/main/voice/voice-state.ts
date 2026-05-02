@@ -10,7 +10,7 @@ export enum VoiceState {
 
 const VALID_TRANSITIONS: Record<VoiceState, VoiceState[]> = {
   [VoiceState.IDLE]: [VoiceState.READY],
-  [VoiceState.READY]: [VoiceState.RECORDING, VoiceState.USER_SPEAKING, VoiceState.IDLE],
+  [VoiceState.READY]: [VoiceState.RECORDING, VoiceState.USER_SPEAKING, VoiceState.AGENT_SPEAKING, VoiceState.IDLE],
   [VoiceState.RECORDING]: [VoiceState.PROCESSING, VoiceState.READY, VoiceState.IDLE],
   [VoiceState.USER_SPEAKING]: [VoiceState.PROCESSING, VoiceState.READY, VoiceState.IDLE],
   [VoiceState.PROCESSING]: [VoiceState.AGENT_SPEAKING, VoiceState.READY, VoiceState.IDLE, VoiceState.ERROR],

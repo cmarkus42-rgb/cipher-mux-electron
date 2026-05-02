@@ -72,7 +72,7 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
     const api = (window as any).cipherMux
 
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 16000 },
     })
     streamRef.current = stream
 

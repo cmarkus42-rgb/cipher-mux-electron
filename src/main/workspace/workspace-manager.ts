@@ -136,7 +136,9 @@ export async function applyWorkspace(
   // 1. Set grid dimensions
   gridCallback(workspace.cols, workspace.rows)
 
-  // 2. For each cell with a project or preset, spawn a session
+  // 2. Collect all cells that need sessions, then start them in parallel
+  const startTasks: Array<{ cellIndex: number; start: () => Promise<{ id: string }> }> = []
+
   for (let i = 0; i < workspace.cells.length; i++) {
     const cell = workspace.cells[i]
 
@@ -150,35 +152,37 @@ export async function applyWorkspace(
 
     // Preset-based entity start takes priority
     if (cell.presetId && sessionStarter.startEntity) {
-      try {
-        const session = await sessionStarter.startEntity(cell.presetId)
-        startedSessions.push({ cellIndex: i, sessionId: session.id })
-        sessionsStarted++
-      } catch (err) {
-        warnings.push(`Failed to start entity ${cell.presetId}: ${(err as Error).message}`)
-      }
+      const presetId = cell.presetId
+      startTasks.push({ cellIndex: i, start: () => sessionStarter.startEntity!(presetId) })
       continue
     }
 
-    if (!cell.project) {
-      continue
-    }
+    if (!cell.project) continue
 
-    // Build launch command: clear + claude with skip-permissions + optional prompt
+    // Build launch command
     const promptText = cell.prompt.trim()
     const promptArg = promptText ? ` "${promptText.replace(/"/g, '\\"')}"` : ''
     const launchCmd = `clear; claude --dangerously-skip-permissions${promptArg}\n`
     const sessionName = cell.project.split('/').pop() || 'session'
-    try {
-      const session = await sessionStarter.start({
-        name: sessionName,
-        projectPath: cell.project,
-        autoLaunch: launchCmd,
-      })
-      startedSessions.push({ cellIndex: i, sessionId: session.id })
+    const project = cell.project
+    startTasks.push({
+      cellIndex: i,
+      start: () => sessionStarter.start({ name: sessionName, projectPath: project, autoLaunch: launchCmd }),
+    })
+  }
+
+  // Start all sessions in parallel
+  const results = await Promise.allSettled(startTasks.map(async (task) => {
+    const session = await task.start()
+    return { cellIndex: task.cellIndex, sessionId: session.id }
+  }))
+
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      startedSessions.push(result.value)
       sessionsStarted++
-    } catch (err) {
-      warnings.push(`Failed to start session for ${cell.project}: ${(err as Error).message}`)
+    } else {
+      warnings.push(`Failed to start session: ${result.reason?.message ?? result.reason}`)
     }
   }
 

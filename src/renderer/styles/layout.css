@@ -76,6 +76,32 @@
   flex: 1;
   min-height: 0; /* allow flex children to shrink */
   overflow: hidden;
+  position: relative;
+}
+
+.workspace-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  pointer-events: all;
+}
+.workspace-loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-text-dim);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: ws-spin 0.8s linear infinite;
+}
+@keyframes ws-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ================================================================

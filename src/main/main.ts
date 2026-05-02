@@ -9,6 +9,10 @@ import { patchEnvPath } from './util/exec-util'
 // before any child_process spawns (tmux, claude, etc.)
 patchEnvPath()
 
+// Prevent BT shutter media-key events from leaking to macOS volume/media controls.
+// Must be called before app.whenReady().
+app.commandLine.appendSwitch('disable-features', 'HardwareMediaKeyHandling')
+
 // Single instance lock — always enforce, only one cipher-mux instance at a time
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {

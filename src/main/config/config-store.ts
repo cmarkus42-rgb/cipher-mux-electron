@@ -72,6 +72,12 @@ const defaults: AppConfig = {
   windows: {
     main: { x: 0, y: 0, width: DEFAULT_WINDOW_WIDTH, height: DEFAULT_WINDOW_HEIGHT },
   },
+  btShutter: {
+    enabled: false,
+  },
+  entitySortOrders: {} as Record<string, number>,
+  entityHidden: {} as Record<string, boolean>,
+  voiceSubmitMode: 'auto' as const,
   sidebarDetached: false,
   sidebarWindowBounds: null as { x: number; y: number; width: number; height: number } | null,
   sidebarCollapsed: {} as Record<string, boolean>,

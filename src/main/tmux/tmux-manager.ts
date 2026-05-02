@@ -278,8 +278,11 @@ export class TmuxManager extends EventEmitter {
       const seen = new Set<string>()
       const sessions: TmuxSessionInfo[] = []
       for (const line of output.split('\n')) {
-        if (!line) continue
-        const [id, name, width, height, created, paneCwd, paneIndex] = line.split(sep)
+        if (!line.trim()) continue
+        const parts = line.split(sep)
+        if (parts.length < 6) continue // skip malformed lines
+        const [id, name, width, height, created, paneCwd, paneIndex] = parts
+        if (!name) continue // skip entries with missing session name
         // Take first pane (index 0) per session for dedup
         if (seen.has(name)) continue
         seen.add(name)

@@ -77,11 +77,12 @@ export function parseTestcaseItem(line: string, lineIndex: number): TestcaseItem
     comment = rest.slice(commentSep + 4).trim()
   }
 
-  // Screenshot ref: ![screenshot](path)
+  // Screenshot ref: ![screenshot](path) — extract and strip from comment
   let screenshotRef: string | undefined
   const imgMatch = comment.match(/!\[.*?\]\((.+?)\)/)
   if (imgMatch) {
     screenshotRef = imgMatch[1]
+    comment = comment.replace(imgMatch[0], '').trim()
   }
 
   return { id, description, status, comment, screenshotRef, lineIndex }
@@ -131,7 +132,8 @@ export function parseTestcase(raw: string): ParsedTestcase | null {
   }
 
   const fm = parsed.data as Record<string, unknown>
-  if (fm.type !== 'testcase') return null
+  const tags = Array.isArray(fm.tags) ? fm.tags : []
+  if (fm.type !== 'testcase' && !tags.includes('testcase')) return null
 
   const frontmatter: TestcaseFrontmatter = {
     title: (fm.title as string) ?? 'Untitled Testcase',
@@ -178,8 +180,11 @@ function statusToCheckbox(status: TestcaseStatus): string {
 
 export function serializeTestcaseItem(item: TestcaseItem): string {
   let line = `- ${statusToCheckbox(item.status)} **${item.id}** ${item.description}`
-  if (item.comment) {
-    line += ` // ${item.comment}`
+  const commentParts: string[] = []
+  if (item.comment) commentParts.push(item.comment)
+  if (item.screenshotRef) commentParts.push(`![screenshot](${item.screenshotRef})`)
+  if (commentParts.length > 0) {
+    line += ` // ${commentParts.join(' ')}`
   }
   return line
 }

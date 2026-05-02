@@ -412,10 +412,41 @@ export class ConversationEngine extends EventEmitter {
 
   // ── Echo guard ──
 
-  /** Block VAD events to avoid speaker echo triggering false barge-ins or recordings. */
+  /**
+   * Block VAD events to avoid speaker echo triggering false barge-ins or recordings.
+   *
+   * During AGENT_SPEAKING: guard stays active indefinitely (no timer) because TTS
+   * output lasts much longer than any fixed timeout. The guard only gets a timed
+   * deactivation when called AFTER playback ends (tail echo protection).
+   */
   private _activateEchoGuard(): void {
     this._echoGuardActive = true
     this._bargeInMisfireTimestamps = []
+    if (this._echoGuardTimer) clearTimeout(this._echoGuardTimer)
+    this._echoGuardTimer = null
+
+    // During playback: keep guard active until state leaves AGENT_SPEAKING.
+    // After playback (tail echo): use timed deactivation.
+    if (this.state !== VoiceState.AGENT_SPEAKING) {
+      this._echoGuardTimer = setTimeout(() => {
+        this._echoGuardActive = false
+      }, this._echoGuardDurationMs)
+    }
+  }
+
+  /**
+   * Activate echo guard without changing voice state — used by VoiceManager
+   * for TTS paths that bypass ConversationEngine (e.g. macOS `say`).
+   */
+  speakEchoGuardOnly(): void {
+    this._echoGuardActive = true
+    this._bargeInMisfireTimestamps = []
+    if (this._echoGuardTimer) clearTimeout(this._echoGuardTimer)
+    this._echoGuardTimer = null
+  }
+
+  /** Release echo guard after external TTS completes (with tail echo protection). */
+  releaseEchoGuard(): void {
     if (this._echoGuardTimer) clearTimeout(this._echoGuardTimer)
     this._echoGuardTimer = setTimeout(() => {
       this._echoGuardActive = false
@@ -481,23 +512,24 @@ export class ConversationEngine extends EventEmitter {
    * Speak a complete response via TTS.
    * If streaming TTS already started (via feedResponseChunk), signals stream-done instead.
    */
-  async speakResponse(text: string): Promise<void> {
+  async speakResponse(text: string): Promise<boolean> {
     if (this._processingTimeout) clearTimeout(this._processingTimeout)
 
     if (!this.tts) {
       this.stateMachine.transition(VoiceState.READY)
-      return
+      return false
     }
 
     if (this._speakingStarted) {
       this._streamDone = true
-      return
+      return false
     }
 
     if (!this.stateMachine.transition(VoiceState.AGENT_SPEAKING)) {
-      return
+      return false
     }
 
+    let produced = false
     try {
       this._lastSpokenText = text
       for await (const wavChunk of this.tts.speak(text)) {
@@ -505,6 +537,7 @@ export class ConversationEngine extends EventEmitter {
         if (this.state !== VoiceState.AGENT_SPEAKING) {
           break
         }
+        produced = true
         const base64 = wavChunk.toString('base64')
         this.transport.sendAudioPlayback(base64)
       }
@@ -516,6 +549,7 @@ export class ConversationEngine extends EventEmitter {
     if (this.state === VoiceState.AGENT_SPEAKING) {
       this.transport.sendGenerationDone()
     }
+    return produced
   }
 
   /** Called by the renderer when audio playback finishes. Transitions back to READY. */

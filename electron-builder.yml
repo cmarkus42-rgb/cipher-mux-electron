@@ -14,8 +14,12 @@ mac:
   darkModeSupport: true
   extendInfo:
     NSAppleEventsUsageDescription: "cipher-mux needs Apple Events for tmux integration."
+    NSAccessibilityUsageDescription: "cipher-mux needs Accessibility access for BT Shutter remote control (exclusive HID capture)."
 dmg:
   icon: assets/icon.icns
+extraResources:
+  - from: assets/bin/ab-shutter-bridge
+    to: bin/ab-shutter-bridge
 asarUnpack:
   - "**/node_modules/better-sqlite3/**"
   - "**/node_modules/sherpa-onnx-node/**"

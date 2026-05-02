@@ -170,9 +170,11 @@ export class NoteManager {
     const now = new Date().toISOString()
     await fs.mkdir(this.notesDir, { recursive: true })
 
-    const fm = {
+    const tagList = tags ?? ([] as string[])
+    const fm: Record<string, unknown> = {
       title,
-      tags: tags ?? ([] as string[]),
+      ...(tagList.includes('testcase') ? { type: 'testcase' } : {}),
+      tags: tagList,
       created: now,
       modified: now,
     }
@@ -183,7 +185,7 @@ export class NoteManager {
     return {
       id,
       title,
-      tags: fm.tags,
+      tags: tagList,
       scope: 'global',
       relativePath: `${id}.md`,
       createdAt: now,
@@ -235,7 +237,7 @@ export class NoteManager {
     const filePath = this.filePath(id)
     const existing = await this.parseFile(filePath)
     const now = new Date().toISOString()
-    const title = this.extractTitle(body)
+    const extractedTitle = this.extractTitle(body)
 
     // Read existing frontmatter to preserve custom fields (type, from_session, etc.)
     let existingFm: Record<string, unknown> = {}
@@ -243,6 +245,11 @@ export class NoteManager {
       const raw = await fs.readFile(filePath, 'utf-8')
       existingFm = matter(raw).data as Record<string, unknown>
     } catch { /* new file, no existing frontmatter */ }
+
+    // Preserve existing title when body has no H1 heading (e.g. testcase saves)
+    const title = extractedTitle !== 'Untitled'
+      ? extractedTitle
+      : (existingFm.title as string) ?? existing?.info.title ?? 'Untitled'
 
     const fm: Record<string, unknown> = {
       ...existingFm,

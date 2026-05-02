@@ -59,6 +59,7 @@ export function HighlightOverlay() {
     return () => unsub()
   }, [addHighlight, clearAll])
 
+
   // Reposition on resize/scroll
   useEffect(() => {
     if (highlights.length === 0) return

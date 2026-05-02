@@ -25,8 +25,8 @@ export interface ChatTurn {
 /**
  * Preact hook managing the voice bugreport interview lifecycle.
  *
- * Handles microphone access, VAD initialization, IPC event wiring,
- * and audio playback queue. Returns reactive state for the UI.
+ * Handles microphone access, VAD initialization, and IPC event wiring.
+ * Audio playback is handled globally by useGlobalTtsPlayback (mounted in App).
  */
 export function useVoiceBugreport() {
   const [voiceState, setVoiceState] = useState<VoiceBugreportState>('idle')
@@ -37,30 +37,12 @@ export function useVoiceBugreport() {
   const vadRef = useRef<MicVADInstance | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const audioQueueRef = useRef<string[]>([])
-  const playingRef = useRef(false)
   /** Whether session voice was active before bugreport took over */
   const sessionVoiceWasActiveRef = useRef(false)
 
-  // ── Audio playback queue: drains base64 WAV chunks sequentially ──
-
-  const playNextAudio = useCallback(() => {
-    const queue = audioQueueRef.current
-    if (queue.length === 0) {
-      playingRef.current = false
-      api().voice.playbackDone()
-      return
-    }
-
-    playingRef.current = true
-    const base64Wav = queue.shift()!
-    const audio = new Audio(`data:audio/wav;base64,${base64Wav}`)
-    audio.onended = () => playNextAudio()
-    audio.onerror = () => playNextAudio()
-    audio.play().catch(() => playNextAudio())
-  }, [])
-
   // ── IPC event listeners: wire main-process voice events to React state ──
+  // Note: Audio playback (onAgentAudio, onStopPlayback, onGenerationDone)
+  // is handled by the global useGlobalTtsPlayback hook in App.
 
   useEffect(() => {
     const voice = api()?.voice
@@ -78,10 +60,6 @@ export function useVoiceBugreport() {
       cleanups.push(voice.onAgentText((text: string) => {
         setTurns((prev) => [...prev, { role: 'assistant', text }])
       }))
-      cleanups.push(voice.onAgentAudio((base64Wav: string) => {
-        audioQueueRef.current.push(base64Wav)
-        if (!playingRef.current) playNextAudio()
-      }))
       cleanups.push(voice.onInterviewDone((reportText: string) => {
         setReport(reportText)
         setVoiceState('complete')
@@ -90,15 +68,6 @@ export function useVoiceBugreport() {
         setError(msg)
         setVoiceState('error')
       }))
-      cleanups.push(voice.onStopPlayback(() => {
-        audioQueueRef.current = []
-        playingRef.current = false
-      }))
-      cleanups.push(voice.onGenerationDone(() => {
-        if (!playingRef.current && audioQueueRef.current.length === 0) {
-          api().voice.playbackDone()
-        }
-      }))
     } catch (err) {
       console.warn('[useVoiceBugreport] Failed to register listeners:', err)
     }
@@ -106,7 +75,7 @@ export function useVoiceBugreport() {
     return () => {
       for (const cleanup of cleanups) cleanup()
     }
-  }, [playNextAudio])
+  }, [])
 
   // ── Start voice interview: mic access -> main-process init -> VAD ──
 
@@ -116,9 +85,6 @@ export function useVoiceBugreport() {
       setTurns([])
       setReport(null)
       setError(null)
-      audioQueueRef.current = []
-      playingRef.current = false
-
       // Suspend session voice mode if it's active — bugreport takes over the pipeline.
       // Check the global flag set by useVoiceSession when session voice is active.
       const w = window as any
@@ -185,8 +151,6 @@ export function useVoiceBugreport() {
       streamRef.current = null
     }
 
-    audioQueueRef.current = []
-    playingRef.current = false
 
     // Restore session voice mode if it was active before bugreport
     if (sessionVoiceWasActiveRef.current) {

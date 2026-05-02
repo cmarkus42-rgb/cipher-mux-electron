@@ -3,7 +3,7 @@
 // status bar, screenshot support, feature-request export.
 
 import { h } from 'preact'
-import { useState, useMemo, useCallback } from 'preact/hooks'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type {
   ParsedTestcase,
@@ -89,18 +89,24 @@ function TestcaseItemRow({ item, onToggle, onCommentChange, onScreenshot, onFeat
       </div>
       {showComment && (
         <div class="tc-item__comment-row">
-          <input
-            type="text"
+          <textarea
             class="tc-item__comment-input"
             value={item.comment}
             placeholder="Comment..."
-            onInput={(e) => onCommentChange(item.id, (e.target as HTMLInputElement).value)}
+            rows={1}
+            onInput={(e) => {
+              const el = e.target as HTMLTextAreaElement
+              el.style.height = 'auto'
+              el.style.height = el.scrollHeight + 'px'
+              onCommentChange(item.id, el.value)
+            }}
             disabled={readOnly}
           />
           {item.screenshotRef && (
-            <span class="tc-item__screenshot-ref" title={item.screenshotRef}>
-              [img]
-            </span>
+            <div class="tc-item__screenshot-row" title={item.screenshotRef}>
+              <span class="tc-action-icon">[:]</span>
+              <span class="tc-item__screenshot-path">{item.screenshotRef.replace(/^.*[\\/]/, '')}</span>
+            </div>
           )}
         </div>
       )}
@@ -149,6 +155,50 @@ export function TestcaseView({
 }: TestcaseViewProps) {
   const { t } = useTranslation()
   const readOnly = !!testcase.frontmatter.archived
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Register as STT target when a comment input is focused
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const api = (window as any).cipherMux
+    const onFocusIn = (e: FocusEvent) => {
+      if ((e.target as HTMLElement)?.tagName === 'TEXTAREA' && (e.target as HTMLElement)?.classList?.contains('tc-item__comment-input')) {
+        api?.voice?.setNotesFocus?.(true)
+      }
+    }
+    const onFocusOut = (e: FocusEvent) => {
+      if ((e.target as HTMLElement)?.tagName === 'TEXTAREA' && (e.target as HTMLElement)?.classList?.contains('tc-item__comment-input')) {
+        api?.voice?.setNotesFocus?.(false)
+      }
+    }
+    el.addEventListener('focusin', onFocusIn)
+    el.addEventListener('focusout', onFocusOut)
+    return () => {
+      el.removeEventListener('focusin', onFocusIn)
+      el.removeEventListener('focusout', onFocusOut)
+      api?.voice?.setNotesFocus?.(false)
+    }
+  }, [])
+
+  // Handle STT text insertion into focused comment input
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.voice?.onNotesInsert) return
+    const unsub = api.voice.onNotesInsert((data: { text: string }) => {
+      const active = document.activeElement
+      if (active instanceof HTMLTextAreaElement && active.classList.contains('tc-item__comment-input')) {
+        const start = active.selectionStart ?? active.value.length
+        const before = active.value.slice(0, start)
+        const after = active.value.slice(active.selectionEnd ?? start)
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+        nativeInputValueSetter?.call(active, before + data.text + after)
+        active.dispatchEvent(new Event('input', { bubbles: true }))
+        active.setSelectionRange(start + data.text.length, start + data.text.length)
+      }
+    })
+    return () => unsub()
+  }, [])
 
   const summary = useMemo(() => {
     let total = 0, pass = 0, fail = 0, open = 0
@@ -193,7 +243,7 @@ export function TestcaseView({
   const allDone = summary.open === 0 && summary.total > 0
 
   return (
-    <div class="tc-view">
+    <div class="tc-view" ref={containerRef}>
       {/* Header */}
       <div class="tc-view__header">
         <div class="tc-view__title">

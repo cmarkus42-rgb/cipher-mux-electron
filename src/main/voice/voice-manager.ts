@@ -180,15 +180,8 @@ export class VoiceManager extends EventEmitter {
     this.inputRouter = new VoiceInputRouter({ sessionManager })
     this.inputRouter.setMode('session')
 
-    // Set up voice output router for TTS playback of voice-relay responses
-    this.outputRouter = new VoiceOutputRouter(sessionManager)
-    if (this.conversation) {
-      this.outputRouter.setConversationEngine(this.conversation)
-    }
-    // Start output polling if voice-relay entity is already running
-    if (sessionManager.isEntityRunning('voice-relay')) {
-      this.outputRouter.start()
-    }
+    // VoiceOutputRouter disabled — voice-relay session uses mux_tts_speak
+    // directly (like all other sessions), so terminal-polling TTS is not needed.
 
     // Wire: conversation transcription -> input router (session dispatch)
     // In session mode there's no TTS/LLM, so we must transition back to READY
@@ -275,20 +268,46 @@ export class VoiceManager extends EventEmitter {
   /**
    * Speak text via TTS (used by mux_tts_speak MCP tool).
    * Tries PiperTTS first (with lazy-init), falls back to macOS `say` if unavailable.
+   *
+   * Serialized: each call waits for the previous one to complete, preventing
+   * dual-voice overlap. With interrupt=true, the previous call is stopped first.
    */
+  private _speakChain: Promise<void> = Promise.resolve()
+
   async speakText(text: string, interrupt = false): Promise<void> {
     if (!this._initialized) {
       throw new Error('VoiceManager not initialized')
     }
-
-    // Check TTS toggle
     if (configStore.get('ttsEnabled') === false) return
 
+    if (interrupt) {
+      this.stopSpeech()
+      // Reset chain so we don't wait for the killed playback
+      this._speakChain = Promise.resolve()
+    }
+
+    // Chain: wait for previous speak to finish, then run ours
+    const prev = this._speakChain
+    let release!: () => void
+    this._speakChain = new Promise<void>(r => { release = r })
+
+    await prev
+
+    try {
+      await this._speakTextInner(text)
+    } finally {
+      release()
+    }
+  }
+
+  /** Inner speak logic — always runs serialized via _speakChain. */
+  private async _speakTextInner(text: string): Promise<void> {
     // Check voice preference — skip Piper and go straight to macOS if preferred
     const voicePref = configStore.get('ttsVoice') ?? 'local'
     if (voicePref === 'macos') {
-      if (interrupt) this.stopMacosSay()
+      this.conversation?.speakEchoGuardOnly()
       await this.speakViaMacosSay(text)
+      this.conversation?.releaseEchoGuard()
       return
     }
 
@@ -305,14 +324,6 @@ export class VoiceManager extends EventEmitter {
         await this.piperTTS.init()
         if (this.conversation) {
           this.conversation.setTTS(this.piperTTS)
-        }
-      }
-
-      if (interrupt) {
-        this.piperTTS.stop()
-        this.stopMacosSay()
-        if (this.transport) {
-          this.transport.sendStopPlayback()
         }
       }
 
@@ -337,7 +348,9 @@ export class VoiceManager extends EventEmitter {
     }
 
     // Fallback: macOS say (direct, no renderer pipeline needed)
+    this.conversation?.speakEchoGuardOnly()
     await this.speakViaMacosSay(text)
+    this.conversation?.releaseEchoGuard()
   }
 
   /** Fallback TTS via macOS `say` command — simple and reliable. */
