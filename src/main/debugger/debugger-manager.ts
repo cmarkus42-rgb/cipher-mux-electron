@@ -73,20 +73,60 @@ interface RawPlanRow {
 
 // --- Terminal statuses ---
 
-const TERMINAL_STATUSES: DebuggerRunStatus[] = ['completed', 'failed', 'cancelled']
+const TERMINAL_STATUSES: ReadonlySet<DebuggerRunStatus> = new Set(['completed', 'failed', 'cancelled'])
 
 // --- Manager ---
 
 export class DebuggerManager {
-  constructor(private db: Database.Database) {}
+  private stmts: {
+    insertRun: Database.Statement
+    getRun: Database.Statement
+    updateRunStatus: Database.Statement
+    incrementRetry: Database.Statement
+    listByStatus: Database.Statement
+    insertClarification: Database.Statement
+    getClarification: Database.Statement
+    answerClarification: Database.Statement
+    listClarifications: Database.Statement
+    insertFixPlan: Database.Statement
+    getFixPlan: Database.Statement
+    getFixPlanForRun: Database.Statement
+    confirmFixPlan: Database.Statement
+    rejectFixPlan: Database.Statement
+  }
+
+  constructor(private db: Database.Database) {
+    this.stmts = {
+      insertRun: db.prepare(`
+        INSERT INTO debugger_runs (id, bug_report_id, source, severity, description, status, retry_count, started_at, project_path, workspace_id)
+        VALUES (?, ?, ?, ?, ?, 'intake', 0, ?, ?, ?)
+      `),
+      getRun: db.prepare('SELECT * FROM debugger_runs WHERE id = ?'),
+      updateRunStatus: db.prepare('UPDATE debugger_runs SET status = ?, finished_at = COALESCE(?, finished_at) WHERE id = ?'),
+      incrementRetry: db.prepare('UPDATE debugger_runs SET retry_count = retry_count + 1 WHERE id = ?'),
+      listByStatus: db.prepare('SELECT * FROM debugger_runs WHERE status = ? ORDER BY started_at DESC'),
+      insertClarification: db.prepare(`
+        INSERT INTO clarifications (id, run_id, question, options, status, created_at)
+        VALUES (?, ?, ?, ?, 'pending', ?)
+      `),
+      getClarification: db.prepare('SELECT * FROM clarifications WHERE id = ?'),
+      answerClarification: db.prepare("UPDATE clarifications SET answer = ?, status = 'answered', resolved_at = ? WHERE id = ?"),
+      listClarifications: db.prepare('SELECT * FROM clarifications WHERE run_id = ? ORDER BY created_at ASC'),
+      insertFixPlan: db.prepare(`
+        INSERT INTO fix_plans (id, run_id, hypothesis, confidence_level, plan_md, test_extension, risk_assessment, effort, status, user_confirmed, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', 0, ?)
+      `),
+      getFixPlan: db.prepare('SELECT * FROM fix_plans WHERE id = ?'),
+      getFixPlanForRun: db.prepare('SELECT * FROM fix_plans WHERE run_id = ? ORDER BY created_at DESC LIMIT 1'),
+      confirmFixPlan: db.prepare("UPDATE fix_plans SET status = 'confirmed', user_confirmed = 1 WHERE id = ?"),
+      rejectFixPlan: db.prepare("UPDATE fix_plans SET status = 'rejected' WHERE id = ?"),
+    }
+  }
 
   createRun(opts: CreateRunOpts): DebuggerRun {
-    const id = ulid()
+    const id = 'dbg-' + ulid()
     const now = Date.now()
-    this.db.prepare(`
-      INSERT INTO debugger_runs (id, bug_report_id, source, severity, description, status, retry_count, started_at, project_path, workspace_id)
-      VALUES (?, ?, ?, ?, ?, 'intake', 0, ?, ?, ?)
-    `).run(id, opts.bugReportId ?? null, opts.source, opts.severity, opts.description, now, opts.projectPath, opts.workspaceId ?? null)
+    this.stmts.insertRun.run(id, opts.bugReportId ?? null, opts.source, opts.severity, opts.description, now, opts.projectPath, opts.workspaceId ?? null)
 
     return {
       id,
@@ -104,63 +144,55 @@ export class DebuggerManager {
   }
 
   getRun(id: string): DebuggerRun | null {
-    const row = this.db.prepare('SELECT * FROM debugger_runs WHERE id = ?').get(id) as RawRunRow | undefined
+    const row = this.stmts.getRun.get(id) as RawRunRow | undefined
     return row ? this.mapRun(row) : null
   }
 
   updateRunStatus(id: string, status: DebuggerRunStatus): void {
-    const finishedAt = TERMINAL_STATUSES.includes(status) ? Date.now() : null
-    this.db.prepare('UPDATE debugger_runs SET status = ?, finished_at = COALESCE(?, finished_at) WHERE id = ?')
-      .run(status, finishedAt, id)
+    const finishedAt = TERMINAL_STATUSES.has(status) ? Date.now() : null
+    this.stmts.updateRunStatus.run(status, finishedAt, id)
   }
 
   incrementRetry(id: string): void {
-    this.db.prepare('UPDATE debugger_runs SET retry_count = retry_count + 1 WHERE id = ?').run(id)
+    this.stmts.incrementRetry.run(id)
   }
 
   listRunsByStatus(status: DebuggerRunStatus): DebuggerRun[] {
-    const rows = this.db.prepare('SELECT * FROM debugger_runs WHERE status = ? ORDER BY started_at DESC').all(status) as RawRunRow[]
+    const rows = this.stmts.listByStatus.all(status) as RawRunRow[]
     return rows.map(r => this.mapRun(r))
   }
 
   // --- Clarifications ---
 
   createClarification(runId: string, question: string, options: string[] | null): Clarification {
-    const id = ulid()
+    const id = 'clar-' + ulid()
     const now = Date.now()
-    this.db.prepare(`
-      INSERT INTO clarifications (id, run_id, question, options, status, created_at)
-      VALUES (?, ?, ?, ?, 'pending', ?)
-    `).run(id, runId, question, options ? JSON.stringify(options) : null, now)
+    this.stmts.insertClarification.run(id, runId, question, options ? JSON.stringify(options) : null, now)
 
     return { id, runId, question, options, answer: null, status: 'pending', createdAt: now, resolvedAt: null }
   }
 
   getClarification(id: string): Clarification | null {
-    const row = this.db.prepare('SELECT * FROM clarifications WHERE id = ?').get(id) as RawClarRow | undefined
+    const row = this.stmts.getClarification.get(id) as RawClarRow | undefined
     return row ? this.mapClarification(row) : null
   }
 
   answerClarification(id: string, answer: string): void {
     const now = Date.now()
-    this.db.prepare("UPDATE clarifications SET answer = ?, status = 'answered', resolved_at = ? WHERE id = ?")
-      .run(answer, now, id)
+    this.stmts.answerClarification.run(answer, now, id)
   }
 
   listClarifications(runId: string): Clarification[] {
-    const rows = this.db.prepare('SELECT * FROM clarifications WHERE run_id = ? ORDER BY created_at ASC').all(runId) as RawClarRow[]
+    const rows = this.stmts.listClarifications.all(runId) as RawClarRow[]
     return rows.map(r => this.mapClarification(r))
   }
 
   // --- Fix Plans ---
 
   createFixPlan(runId: string, opts: CreateFixPlanOpts): FixPlan {
-    const id = ulid()
+    const id = 'fp-' + ulid()
     const now = Date.now()
-    this.db.prepare(`
-      INSERT INTO fix_plans (id, run_id, hypothesis, confidence_level, plan_md, test_extension, risk_assessment, effort, status, user_confirmed, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', 0, ?)
-    `).run(id, runId, opts.hypothesis, opts.confidenceLevel, opts.planMd, opts.testExtension, opts.riskAssessment, opts.effort, now)
+    this.stmts.insertFixPlan.run(id, runId, opts.hypothesis, opts.confidenceLevel, opts.planMd, opts.testExtension, opts.riskAssessment, opts.effort, now)
 
     return {
       id, runId,
@@ -177,21 +209,21 @@ export class DebuggerManager {
   }
 
   getFixPlan(id: string): FixPlan | null {
-    const row = this.db.prepare('SELECT * FROM fix_plans WHERE id = ?').get(id) as RawPlanRow | undefined
+    const row = this.stmts.getFixPlan.get(id) as RawPlanRow | undefined
     return row ? this.mapFixPlan(row) : null
   }
 
   getFixPlanForRun(runId: string): FixPlan | null {
-    const row = this.db.prepare('SELECT * FROM fix_plans WHERE run_id = ? ORDER BY created_at DESC LIMIT 1').get(runId) as RawPlanRow | undefined
+    const row = this.stmts.getFixPlanForRun.get(runId) as RawPlanRow | undefined
     return row ? this.mapFixPlan(row) : null
   }
 
   confirmFixPlan(id: string): void {
-    this.db.prepare("UPDATE fix_plans SET status = 'confirmed', user_confirmed = 1 WHERE id = ?").run(id)
+    this.stmts.confirmFixPlan.run(id)
   }
 
   rejectFixPlan(id: string): void {
-    this.db.prepare("UPDATE fix_plans SET status = 'rejected' WHERE id = ?").run(id)
+    this.stmts.rejectFixPlan.run(id)
   }
 
   // --- Mappers ---
@@ -213,11 +245,19 @@ export class DebuggerManager {
   }
 
   private mapClarification(row: RawClarRow): Clarification {
+    let options: string[] | null = null
+    if (row.options) {
+      try {
+        options = JSON.parse(row.options)
+      } catch {
+        options = null
+      }
+    }
     return {
       id: row.id,
       runId: row.run_id,
       question: row.question,
-      options: row.options ? JSON.parse(row.options) : null,
+      options,
       answer: row.answer,
       status: row.status as ClarificationStatus,
       createdAt: row.created_at,
