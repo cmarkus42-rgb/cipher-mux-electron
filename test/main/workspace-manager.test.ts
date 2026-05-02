@@ -287,38 +287,39 @@ describe('resizeCells', () => {
 // ── applyWorkspace ───────────────────────────────────────────────────────────
 
 describe('applyWorkspace', () => {
-  it('passes resolved workspace prompt via resolvePrompt to session starter', async () => {
-    const started: Array<{ workspacePrompt?: string; contextPaths?: string[] }> = []
+  function mockStarter() {
+    const started: Array<{ workspacePrompt?: string; contextPaths?: string[]; autoLaunch?: string }> = []
     const starter: SessionStarter = {
       start: async (opts) => {
-        started.push({ workspacePrompt: opts.workspacePrompt, contextPaths: opts.contextPaths })
-        return { id: 'sess-1' }
+        started.push({ workspacePrompt: opts.workspacePrompt, contextPaths: opts.contextPaths, autoLaunch: opts.autoLaunch })
+        return { id: `sess-${started.length}` }
       },
     }
+    return { started, starter }
+  }
 
+  it('workspace-level prompt is passed to all project cells', async () => {
+    const { started, starter } = mockStarter()
     const ws = makeWorkspace({
-      cols: 1, rows: 1,
-      promptOverrides: { worker: 'workspace-level override' },
-      cells: [makeCell({ persona: 'worker', project: '/proj', prompt: '' })],
+      cols: 2, rows: 1,
+      workspacePrompt: 'global workspace instruction',
+      cells: [
+        makeCell({ persona: 'worker', project: '/proj-a', prompt: '' }),
+        makeCell({ persona: 'worker', project: '/proj-b', prompt: '' }),
+      ],
     })
 
     await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
-    assert.strictEqual(started.length, 1)
-    assert.strictEqual(started[0].workspacePrompt, 'workspace-level override')
+    assert.strictEqual(started.length, 2)
+    assert.strictEqual(started[0].workspacePrompt, 'global workspace instruction')
+    assert.strictEqual(started[1].workspacePrompt, 'global workspace instruction')
   })
 
-  it('passes cell-level prompt when set (priority over workspace override)', async () => {
-    const started: Array<{ workspacePrompt?: string }> = []
-    const starter: SessionStarter = {
-      start: async (opts) => {
-        started.push({ workspacePrompt: opts.workspacePrompt })
-        return { id: 'sess-1' }
-      },
-    }
-
+  it('cell-level prompt overrides workspace-level prompt', async () => {
+    const { started, starter } = mockStarter()
     const ws = makeWorkspace({
       cols: 1, rows: 1,
-      promptOverrides: { worker: 'ws override' },
+      workspacePrompt: 'ws prompt',
       cells: [makeCell({ persona: 'worker', project: '/proj', prompt: 'cell wins' })],
     })
 
@@ -326,36 +327,39 @@ describe('applyWorkspace', () => {
     assert.strictEqual(started[0].workspacePrompt, 'cell wins')
   })
 
-  it('passes contextPaths through to session starter', async () => {
-    const started: Array<{ contextPaths?: string[] }> = []
-    const starter: SessionStarter = {
-      start: async (opts) => {
-        started.push({ contextPaths: opts.contextPaths })
-        return { id: 'sess-1' }
-      },
-    }
-
+  it('workspace-level contextPaths are passed to all project cells', async () => {
+    const { started, starter } = mockStarter()
     const ws = makeWorkspace({
-      cols: 1, rows: 1,
-      cells: [makeCell({ persona: 'worker', project: '/proj', prompt: 'do it', contextPaths: ['/src', '/test'] })],
+      cols: 2, rows: 1,
+      contextPaths: ['/shared/lib', '/shared/types'],
+      cells: [
+        makeCell({ persona: 'worker', project: '/proj-a', prompt: '' }),
+        makeCell({ persona: 'worker', project: '/proj-b', prompt: '' }),
+      ],
     })
 
     await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
-    assert.deepStrictEqual(started[0].contextPaths, ['/src', '/test'])
+    assert.deepStrictEqual(started[0].contextPaths, ['/shared/lib', '/shared/types'])
+    assert.deepStrictEqual(started[1].contextPaths, ['/shared/lib', '/shared/types'])
   })
 
-  it('omits contextPaths when cell has none', async () => {
-    const started: Array<{ contextPaths?: string[] }> = []
-    const starter: SessionStarter = {
-      start: async (opts) => {
-        started.push({ contextPaths: opts.contextPaths })
-        return { id: 'sess-1' }
-      },
-    }
-
+  it('cell-level contextPaths override workspace-level', async () => {
+    const { started, starter } = mockStarter()
     const ws = makeWorkspace({
       cols: 1, rows: 1,
-      cells: [makeCell({ persona: 'worker', project: '/proj', prompt: 'do it' })],
+      contextPaths: ['/ws-dir'],
+      cells: [makeCell({ persona: 'worker', project: '/proj', prompt: '', contextPaths: ['/cell-dir'] })],
+    })
+
+    await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
+    assert.deepStrictEqual(started[0].contextPaths, ['/cell-dir'])
+  })
+
+  it('omits contextPaths when neither workspace nor cell has any', async () => {
+    const { started, starter } = mockStarter()
+    const ws = makeWorkspace({
+      cols: 1, rows: 1,
+      cells: [makeCell({ persona: 'worker', project: '/proj', prompt: '' })],
     })
 
     await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
@@ -363,21 +367,14 @@ describe('applyWorkspace', () => {
   })
 
   it('does not pass prompt as CLI argument (no prompt in autoLaunch)', async () => {
-    const started: Array<{ autoLaunch?: string }> = []
-    const starter: SessionStarter = {
-      start: async (opts) => {
-        started.push({ autoLaunch: opts.autoLaunch })
-        return { id: 'sess-1' }
-      },
-    }
-
+    const { started, starter } = mockStarter()
     const ws = makeWorkspace({
       cols: 1, rows: 1,
-      cells: [makeCell({ persona: 'worker', project: '/proj', prompt: 'my prompt' })],
+      workspacePrompt: 'my prompt',
+      cells: [makeCell({ persona: 'worker', project: '/proj', prompt: '' })],
     })
 
     await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
-    // autoLaunch should NOT contain the prompt text — prompt goes via CLAUDE.md injection
     assert.ok(!started[0].autoLaunch?.includes('my prompt'))
     assert.ok(started[0].autoLaunch?.includes('--dangerously-skip-permissions'))
   })
