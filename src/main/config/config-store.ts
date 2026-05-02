@@ -8,6 +8,7 @@ import { deepMerge } from '../util/deep-merge'
 import { BRAND } from '../../shared/brand'
 import { BUILTIN_PERSONAS, SEED_CUSTOM_PERSONAS, SEED_WORKSPACES } from '../../shared/persona-types'
 import { SEED_CHARACTERS, DEFAULT_CHARACTER_ID } from '../character/character-defaults'
+import { DEBUGGER_DEFAULTS } from '../debugger/types'
 import {
   DEFAULT_SCAN_DEPTH,
   MAX_SESSIONS,
@@ -107,6 +108,7 @@ const defaults: AppConfig = {
       heartbeatTimeoutMs: 420000, outputPlateauMs: 180000, minOutputCharsInPlateau: 100,
     },
   },
+  debugger: { ...DEBUGGER_DEFAULTS },
   experimental: {
     refinement_v2: false,
     ideation_partner: false,
