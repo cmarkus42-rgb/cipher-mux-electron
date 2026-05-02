@@ -30,17 +30,22 @@ import * as path from 'node:path'
 
 /** Resolve default binary path: packaged app → Resources/bin/, dev → assets/bin/ */
 function getDefaultBinaryPath(): string {
+  const fs = require('node:fs')
   // In packaged app: process.resourcesPath = <app>/Contents/Resources
-  // In dev: process.resourcesPath = <project>/node_modules/electron/dist/Electron.app/Contents/Resources
   const resourcePath = path.join(process.resourcesPath, 'bin', 'ab-shutter-bridge')
-  // Dev fallback: check project assets
-  const devPath = path.join(__dirname, '..', '..', '..', 'assets', 'bin', 'ab-shutter-bridge')
   try {
-    require('node:fs').accessSync(resourcePath)
+    fs.accessSync(resourcePath)
     return resourcePath
-  } catch {
+  } catch { /* not packaged */ }
+  // Dev mode: use app.getAppPath() which points to the project root
+  try {
+    const { app } = require('electron')
+    const devPath = path.join(app.getAppPath(), 'assets', 'bin', 'ab-shutter-bridge')
+    fs.accessSync(devPath)
     return devPath
-  }
+  } catch { /* fallback */ }
+  // Last resort: __dirname-based (works when dist structure matches)
+  return path.join(__dirname, '..', '..', '..', 'assets', 'bin', 'ab-shutter-bridge')
 }
 
 export class BtShutterManager extends EventEmitter {

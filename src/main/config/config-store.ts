@@ -91,14 +91,27 @@ function getConfigPath(): string {
 }
 
 function migrateConfig(config: AppConfig): AppConfig {
+  let changed = false
+
   // Remove Worker built-in persona (removed in v0.9.1)
   if (config.personas) {
     const before = config.personas.length
     config.personas = config.personas.filter((p: any) => p.id !== 'worker') as AppConfig['personas']
-    if (config.personas.length !== before) {
-      saveConfig(config)
+    if (config.personas.length !== before) changed = true
+  }
+
+  // Add missing seed characters (Welle 1a: 6 personas from Pack spec)
+  if (config.characters) {
+    const existingIds = new Set(config.characters.map(c => c.id))
+    for (const seed of SEED_CHARACTERS) {
+      if (!existingIds.has(seed.id)) {
+        config.characters.push({ ...seed })
+        changed = true
+      }
     }
   }
+
+  if (changed) saveConfig(config)
   return config
 }
 
