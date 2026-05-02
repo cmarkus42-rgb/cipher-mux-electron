@@ -347,6 +347,8 @@ const api = {
     save: (c: unknown): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.CHARACTERS_SAVE, c),
     delete: (id: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke(IPC.CHARACTERS_DELETE, id),
     switch: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.CHARACTERS_SWITCH, id),
+    getGlobalPersona: (): Promise<string | null> => ipcRenderer.invoke(IPC.CHARACTERS_GLOBAL_PERSONA_GET),
+    setGlobalPersona: (id: string | null): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.CHARACTERS_GLOBAL_PERSONA_SET, id),
   },
 
   // ─── Workspaces ──────────────────────────────────────────

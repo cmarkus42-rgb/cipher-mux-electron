@@ -1452,6 +1452,15 @@ export class IpcHub {
       this.syncActiveCharacterSkill()
       return { ok: true }
     })
+
+    ipcMain.handle(IPC.CHARACTERS_GLOBAL_PERSONA_GET, () => {
+      return configStore.get('globalActivePersonaId')
+    })
+
+    ipcMain.handle(IPC.CHARACTERS_GLOBAL_PERSONA_SET, (_e, personaId: string | null) => {
+      configStore.set('globalActivePersonaId', personaId)
+      return { ok: true }
+    })
   }
 
   /** Sync the active character's prompt as a SKILL.md to all project skills directories. */
