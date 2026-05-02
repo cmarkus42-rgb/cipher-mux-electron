@@ -90,18 +90,22 @@ describe('EntityRegistry', () => {
 })
 
 describe('registerBuiltinEntities()', () => {
-  it('registers all 8 builtin entities', () => {
+  it('registers all 10 builtin entities', () => {
     const registry = new EntityRegistry()
-    registerBuiltinEntities(registry, '~/.config/cipher-mux/orchestrator', '~/.config/cipher-mux/cyber-factory')
+    registerBuiltinEntities(registry)
     const entities = registry.list()
-    assert.strictEqual(entities.length, 8)
+    assert.strictEqual(entities.length, 10)
     const ids = entities.map((e: any) => e.id).sort()
-    assert.deepStrictEqual(ids, ['audit', 'companion', 'cyber-factory', 'ideation-partner', 'launcher', 'orchestrator', 'refinement', 'voice-relay'])
+    assert.deepStrictEqual(ids, [
+      'audit', 'companion', 'cyber-factory', 'debugger',
+      'ideation-partner', 'launcher', 'orchestrator',
+      'refinement', 'testing-assistant', 'voice-relay',
+    ])
   })
 
   it('companion has correct display name and color', () => {
     const registry = new EntityRegistry()
-    registerBuiltinEntities(registry, '~/.config/cipher-mux/orchestrator', '~/.config/cipher-mux/cyber-factory')
+    registerBuiltinEntities(registry)
     const companion = registry.get('companion')
     assert.strictEqual(companion?.displayName, 'Coding Companion')
     assert.strictEqual(companion?.color, '#ffb74d')
@@ -112,18 +116,18 @@ describe('registerBuiltinEntities()', () => {
 
   it('refinement has correct display name and color', () => {
     const registry = new EntityRegistry()
-    registerBuiltinEntities(registry, '~/.config/cipher-mux/orchestrator', '~/.config/cipher-mux/cyber-factory')
+    registerBuiltinEntities(registry)
     const refinement = registry.get('refinement')
     assert.strictEqual(refinement?.displayName, 'Refinement')
     assert.strictEqual(refinement?.color, '#ef5350')
   })
 
-  it('orchestrator gets correct projectPath from BRAND', () => {
+  it('orchestrator gets correct projectPath from entitiesBase', () => {
     const registry = new EntityRegistry()
-    registerBuiltinEntities(registry, '/custom/orch', '/custom/cyber-factory')
+    registerBuiltinEntities(registry)
     const orch = registry.get('orchestrator')
-    assert.strictEqual(orch?.projectPath, '/custom/orch')
+    assert.ok(orch?.projectPath.endsWith('/entities/orchestrator'))
     const cf = registry.get('cyber-factory')
-    assert.strictEqual(cf?.projectPath, '/custom/cyber-factory')
+    assert.ok(cf?.projectPath.endsWith('/entities/cyber-factory'))
   })
 })

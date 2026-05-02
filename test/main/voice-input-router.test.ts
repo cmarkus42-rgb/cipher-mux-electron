@@ -7,6 +7,11 @@ function makeStubSessionManager(sessions: Map<string, { id: string; name: string
     sendKeys: async (_id: string, _keys: string) => {},
     get: (id: string) => sessions.get(id) ?? undefined,
     getEntitySessionId: (_entityId: string) => null,
+    getSessionStore: () => ({
+      getGridState: () => ({
+        slots: Array.from(sessions.keys()).map((id) => ({ sessionId: id })),
+      }),
+    }),
   }
 }
 
@@ -31,8 +36,9 @@ describe('VoiceInputRouter', () => {
     assert.equal(sentKeys.length, 0)
   })
 
-  it('dispatches text to focused session in session mode (no Enter)', async () => {
+  it('dispatches text to focused session in session mode (manual, no Enter)', async () => {
     router.setMode('session')
+    router.setSubmitMode('manual')
     router.setFocusedSession('sess-1')
     await router.routeTranscription('hello world')
     assert.equal(sentKeys.length, 1)
@@ -97,8 +103,9 @@ describe('VoiceInputRouter', () => {
     assert.equal(sentKeys.length, 0)
   })
 
-  it('avoids double space when transcript already ends with space', async () => {
+  it('avoids double space when transcript already ends with space (manual mode)', async () => {
     router.setMode('session')
+    router.setSubmitMode('manual')
     router.setFocusedSession('sess-1')
     await router.routeTranscription('hello world ')
     assert.equal(sentKeys.length, 1)
