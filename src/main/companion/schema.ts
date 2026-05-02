@@ -165,6 +165,47 @@ export const COMPANION_SCHEMA_SQL = `
     implementation_count INTEGER NOT NULL DEFAULT 0,
     problematic_tests TEXT NOT NULL DEFAULT '[]'
   );
+
+  CREATE TABLE IF NOT EXISTS audit_runs (
+    id TEXT PRIMARY KEY,
+    scope TEXT NOT NULL DEFAULT 'welle',
+    scope_detail TEXT,
+    started_at INTEGER NOT NULL,
+    finished_at INTEGER,
+    status TEXT NOT NULL DEFAULT 'pending',
+    project_path TEXT NOT NULL,
+    workspace_id TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS audit_findings (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES audit_runs(id),
+    severity TEXT NOT NULL DEFAULT 'medium',
+    category TEXT NOT NULL,
+    file_path TEXT,
+    line_number INTEGER,
+    description TEXT NOT NULL,
+    recommendation TEXT NOT NULL DEFAULT ''
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_audit_findings_run ON audit_findings(run_id);
+
+  CREATE TABLE IF NOT EXISTS audit_cognitive_debt (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES audit_runs(id),
+    area TEXT NOT NULL,
+    suggestion TEXT NOT NULL,
+    line_count INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS audit_recommendations (
+    run_id TEXT PRIMARY KEY REFERENCES audit_runs(id),
+    verdict TEXT NOT NULL,
+    rationale TEXT NOT NULL,
+    high_count INTEGER NOT NULL DEFAULT 0,
+    medium_count INTEGER NOT NULL DEFAULT 0,
+    low_count INTEGER NOT NULL DEFAULT 0
+  );
 `
 
 /**
