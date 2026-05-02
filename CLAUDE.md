@@ -269,6 +269,20 @@ Companion-Memory (`companion.db`) unterstuetzt scope-aware Eintraege:
 - Cyber Factory schreibt workspace-skopierte Memories (Welle-Plaene, Decisions, Risk-Reviews)
 - `companion_memory_write/recall` MCP-Tools akzeptieren `scope_kind`/`scope_id` Parameter
 
+## Debugger
+
+Spezialisierte Phase nach Build-Run. Empfaengt Findings (Testing Assistant oder User Bug-Reports), klaert mit User, plant Fix, dispatcht Worker Sub-Session, verifiziert Ergebnis.
+
+- **Modul:** `src/main/debugger/` (9 Module: types, manager, findings-parser, clarification-router, fix-planner, worker-launcher, verification-runner, walkthrough-renderer, template)
+- **DB:** 3 Tabellen in companion.db (debugger_runs, clarifications, fix_plans)
+- **Entity:** `debugger` (Builtin, singleInstance, Feature-Flag `debugger.enabled`)
+- **MCP-Tool:** `mux_debugger_findings_intake`
+- **IPC:** DEBUGGER_RUN_START, DEBUGGER_RUN_STATUS, DEBUGGER_RUN_CANCEL, DEBUGGER_CLARIFICATION_NEW, DEBUGGER_CLARIFICATION_RESOLVE, DEBUGGER_FIX_PLAN_CONFIRM, DEBUGGER_WALKTHROUGH_REQUEST
+- **Lifecycle:** 8 Phasen (Intake > Clarify > Plan > Confirm > Worker > Verify > Review > Handoff)
+- **Retries:** Max 2 (konfigurierbar via `debugger.maxRetries`)
+- **Quality Gate:** strict (Test-Pflicht) oder permissive
+- **Parallel zum Launcher:** Feature-Flag default off, bestehender projectlauncher bleibt verfuegbar
+
 ## Notes Editor
 
 Minimalistischer Markdown-Editor als dritte Grid-Cell-Option (neben Session und Launcher).
