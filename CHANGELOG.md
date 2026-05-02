@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] — v0.11 Wave 3
 
 ### Added
+- **Multi-Instance Presets:** Entity presets can now run multiple simultaneous sessions. Companion, Refinement, Voice, Audit, and custom presets are multi-instance by default. Orchestrator, MPO, and Launcher remain singletons (`singleInstance: true`). Each new instance gets a unique tmux session name (ULID suffix) and numbered display name (e.g. "Coding Companion #2"). `ENTITY_STOP` accepts optional `sessionId` for targeted instance shutdown. `ENTITY_STATUS` returns `sessionIds[]` array.
 - **Universal Persona Injection (E.1):** Active companion persona (character block) injected into ALL entity CLAUDE.md at session start. Character definitions split into tone/style block and companion-specific tasks.
 - **Dynamic Entity Scanner (E.3):** `EntityScanner` scans `~/.config/cipher-mux/entities/` for CLAUDE.md dirs, registers them as launchable presets. Hardcoded `ENTITY_PRESETS` replaced by `useEntityPresets` hook.
 - **New Entities: Watchdog + Project Launcher:** Watchdog (adversarial testing assistant) and Project Launcher (autonomous sub-project worker) with full CLAUDE.md.
@@ -27,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Human-readable tmux session names:** `cmux-orchestrator-a1b2` instead of `cmux-q3r8x7m1`.
 
 ### Changed
+- **EntityConfig `singleInstance` flag:** New optional boolean on `EntityConfig`. When `true`, only one session per entity allowed. Default `false` enables multi-instance. `entitySessionIds` refactored from `Map<EntityId, string>` to `Map<EntityId, Set<string>>`.
 - **Entity CLAUDE.md Template Rewrite (E.4):** All templates follow unified format: Role, Persona, Memory, Capabilities, Working Rules, Scope, TTS instruction.
 - **EntityId type extensible:** `BuiltinEntityId | (string & {})` supports dynamically scanned entities.
 - **Border-Glow Highlight Redesign (B.7):** `mux_ui_highlight` uses border-glow (box-shadow) instead of outline. Theme-aware colors.
@@ -94,6 +96,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session Fork (SP-5):** Fork button in SessionCell for Claude Code sessions.
 - **Orphan Detection (SP-5):** Periodic scan for orphaned tmux sessions with Adopt/Terminate UI.
 - **30 new tests** covering SP-2 and SP-5 quality gates
+
+## [0.9.10] - 2026-05-02
+
+### Fixed
+- **Keep Working Restore: 3-Layer Bug (critical).** Grid zeigte nach Restart korrekte Dimensionen aber leere Zellen. Drei unabhängige Bug-Layer, die sich gegenseitig maskierten:
+  - **Layer 1 (v0.9.9):** Race Condition `useGrid` mount vs. `applyKeepWorkingRestore` — `restoreCalledRef` Guard
+  - **Layer 2:** Stale Session-IDs in `ui.grid` Config + einmaliger Pull der `null` bekam weil Init-Chain noch nicht fertig — synchroner Startup-Clear + Poll mit Retry (500ms/10s)
+  - **Layer 3 (Root Crash):** `tmux list-panes -a` lieferte gelegentlich malformed Lines → `tmuxSession.name` war `undefined` → `TypeError` in `recover()` crashte die gesamte Init-Chain still. Erst Error-Diagnostik im `.catch()` machte den Crash sichtbar.
+  - Defensive Fixes: Malformed-Line Filter in `listSessions()`, undefined-Guard in `recover()`, Error-Logging nach `/tmp/kw-debug.json`
 
 ## [0.9.5-beta] - 2026-04-24
 

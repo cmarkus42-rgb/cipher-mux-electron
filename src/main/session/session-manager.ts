@@ -12,6 +12,7 @@ import { generateVoiceRelayClaudeMd } from './voice-relay-template'
 import { EntityRegistry } from './entity-registry'
 import { deployEntityAssets, ensureTemplateSettings } from './entity-assets'
 import { SessionStore } from './session-store'
+import { runCommand } from '../util/exec-util'
 import type { PersistedSession, PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
@@ -144,8 +145,8 @@ export class SessionManager extends EventEmitter {
   private mcpConfig: OrchestratorConfig | null = null
   /** Entity registry for functional entities. */
   private entityRegistry: EntityRegistry
-  /** Maps entity IDs to their active session IDs. */
-  private entitySessionIds: Map<EntityId, string> = new Map()
+  /** Maps entity IDs to their active session IDs (supports multi-instance). */
+  private entitySessionIds: Map<EntityId, Set<string>> = new Map()
   /** Mutex: entities currently being started (prevents double-start race). */
   private startingEntities: Set<EntityId> = new Set()
   /** App root for resolving template paths during asset deployment. */
@@ -166,6 +167,34 @@ export class SessionManager extends EventEmitter {
     this.entityRegistry = entityRegistry ?? new EntityRegistry()
     this.appRoot = appRoot ?? process.cwd()
     this.sessionStore = new SessionStore()
+  }
+
+  // ─── Entity Session Tracking Helpers ─────────────────────
+  private addEntitySession(entityId: EntityId, sessionId: string): void {
+    let set = this.entitySessionIds.get(entityId)
+    if (!set) {
+      set = new Set()
+      this.entitySessionIds.set(entityId, set)
+    }
+    set.add(sessionId)
+  }
+
+  private removeEntitySession(entityId: EntityId, sessionId: string): void {
+    const set = this.entitySessionIds.get(entityId)
+    if (!set) return
+    set.delete(sessionId)
+    if (set.size === 0) this.entitySessionIds.delete(entityId)
+  }
+
+  private getFirstEntitySessionId(entityId: EntityId): string | undefined {
+    const set = this.entitySessionIds.get(entityId)
+    if (!set || set.size === 0) return undefined
+    return set.values().next().value as string
+  }
+
+  private getAllEntitySessionIds(entityId: EntityId): string[] {
+    const set = this.entitySessionIds.get(entityId)
+    return set ? Array.from(set) : []
   }
 
   /** Get the session store for external grid-state persistence. */
@@ -296,6 +325,97 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
+   * Graceful stop: immediately removes the session from the grid (cell becomes
+   * free), then sends a shutdown prompt to the tmux session in the background.
+   * The session has up to timeoutMs to clean up before a hard kill.
+   */
+  async gracefulStop(sessionId: string, timeoutMs = 30_000): Promise<void> {
+    const session = this.sessions.get(sessionId)
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found`)
+    }
+
+    // 1. Immediately free the cell — stop watching, remove from grid + state
+    this.tmux.unwatchSession(session.tmuxSession)
+    const tmuxName = session.tmuxSession
+    session.status = 'stopped'
+    session.updatedAt = Date.now()
+    this.emit('session-stopped', session)
+    this.sessions.delete(sessionId)
+    this.sessionAdapters.delete(sessionId)
+    if (session.entityId) {
+      const entityId = session.entityId as EntityId
+      this.removeEntitySession(entityId, sessionId)
+      this.entityRegistry.unlinkSession(sessionId)
+      if (entityId === 'orchestrator') this.orchestratorSessionId = null
+      if (entityId === 'mpo') this.mpoSessionId = null
+    }
+    this.sessionStore.removeSession(sessionId)
+    this._cleanupGridSlot(sessionId)
+
+    // 2. Send shutdown prompt and wait in background — fire-and-forget
+    this._backgroundGracefulKill(tmuxName, timeoutMs).catch((err) => {
+      console.error(`[SessionManager] Background graceful kill error:`, (err as Error).message)
+    })
+  }
+
+  /** Background: send shutdown prompt, poll, then hard-kill on timeout. */
+  private async _backgroundGracefulKill(tmuxName: string, timeoutMs: number): Promise<void> {
+    const shutdownPrompt = [
+      'Deine Session wird beendet. Bevor du gehst:',
+      '1. Gibt es ungespeicherte Ergebnisse? → Als Note anlegen oder ins Memory schreiben',
+      '2. Gibt es offene Findings? → Dokumentieren',
+      '3. Gibt es laufende Aufgaben? → Status melden',
+      'Wenn alles erledigt ist, beende dich mit /exit.',
+    ].join('\n')
+
+    try {
+      await this.tmux.sendKeys(tmuxName, shutdownPrompt + '\r')
+    } catch {
+      // Can't send keys — just kill it
+      console.warn(`[SessionManager] Could not send graceful prompt to tmux "${tmuxName}", hard-killing`)
+      try { await this.tmux.killSession(tmuxName) } catch { /* already gone */ }
+      return
+    }
+
+    // Poll until tmux session disappears or timeout
+    const pollInterval = 2_000
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, pollInterval))
+      try {
+        await runCommand('tmux', ['has-session', '-t', tmuxName])
+        // Still alive, keep waiting
+      } catch {
+        // Session exited gracefully
+        console.log(`[SessionManager] tmux "${tmuxName}" exited gracefully`)
+        return
+      }
+    }
+
+    // Timeout — hard kill
+    console.warn(`[SessionManager] Graceful shutdown timed out for tmux "${tmuxName}", hard-killing`)
+    try { await this.tmux.killSession(tmuxName) } catch { /* already gone */ }
+  }
+
+  /** Clean up grid slots referencing a session. */
+  private _cleanupGridSlot(sessionId: string): void {
+    const gridState = this.sessionStore.getGridState()
+    if (gridState) {
+      let dirty = false
+      for (const slot of gridState.slots) {
+        if (slot.sessionId === sessionId) {
+          slot.sessionId = null
+          dirty = true
+        }
+      }
+      if (dirty) {
+        this.sessionStore.saveGridState(gridState)
+      }
+    }
+  }
+
+  /**
    * Stop a session and kill its tmux session.
    */
   async stop(sessionId: string): Promise<void> {
@@ -330,7 +450,7 @@ export class SessionManager extends EventEmitter {
     // Clean up entity links if this was an entity session
     if (session.entityId) {
       const entityId = session.entityId as EntityId
-      this.entitySessionIds.delete(entityId)
+      this.removeEntitySession(entityId, sessionId)
       this.entityRegistry.unlinkSession(sessionId)
       if (entityId === 'orchestrator') this.orchestratorSessionId = null
       if (entityId === 'mpo') this.mpoSessionId = null
@@ -340,22 +460,7 @@ export class SessionManager extends EventEmitter {
     // so that any concurrent persistGridState() call (debounced from renderer)
     // will also filter this session out via the this.sessions.has() check.
     this.sessionStore.removeSession(sessionId)
-
-    // Also clean up grid state slots that reference this session to prevent
-    // stale session IDs from persisting in sessions.json gridState.
-    const gridState = this.sessionStore.getGridState()
-    if (gridState) {
-      let dirty = false
-      for (const slot of gridState.slots) {
-        if (slot.sessionId === sessionId) {
-          slot.sessionId = null
-          dirty = true
-        }
-      }
-      if (dirty) {
-        this.sessionStore.saveGridState(gridState)
-      }
-    }
+    this._cleanupGridSlot(sessionId)
   }
 
   /**
@@ -421,7 +526,7 @@ export class SessionManager extends EventEmitter {
 
           // Restore entity links
           if (ps.entityId) {
-            this.entitySessionIds.set(ps.entityId, session.id)
+            this.addEntitySession(ps.entityId, session.id)
             this.entityRegistry.linkSession(session.id, ps.entityId)
             if (ps.entityId === 'orchestrator') this.orchestratorSessionId = session.id
             if (ps.entityId === 'mpo') this.mpoSessionId = session.id
@@ -436,6 +541,7 @@ export class SessionManager extends EventEmitter {
 
     // ── Step 2: Find orphaned tmux sessions (not in sessions.json) ──
     for (const tmuxSession of tmuxSessions) {
+      if (!tmuxSession.name) continue // skip entries with missing/undefined name
       if (tmuxSession.name === 'cipher-mux-control') continue
       if (!tmuxSession.name.startsWith('cmux-')) continue
       if (claimedTmuxNames.has(tmuxSession.name)) continue
@@ -488,7 +594,7 @@ export class SessionManager extends EventEmitter {
         const entityId = entityNameMap[session.name]
         if (entityId) {
           session.entityId = entityId
-          this.entitySessionIds.set(entityId, session.id)
+          this.addEntitySession(entityId, session.id)
           this.entityRegistry.linkSession(session.id, entityId)
           if (entityId === 'orchestrator') this.orchestratorSessionId = session.id
           if (entityId === 'mpo') this.mpoSessionId = session.id
@@ -715,15 +821,17 @@ export class SessionManager extends EventEmitter {
     this.startingEntities.add(entityId)
 
     try {
-    // Check if already running
-    const existingId = this.entitySessionIds.get(entityId)
-    if (existingId) {
-      const existing = this.sessions.get(existingId)
-      if (existing && existing.status === 'active') {
-        throw new Error(`${config.displayName} is already running`)
+    // Singleton check — only block multi-start for singleInstance entities
+    if (config.singleInstance) {
+      const existingIds = this.getAllEntitySessionIds(entityId)
+      for (const eid of existingIds) {
+        const existing = this.sessions.get(eid)
+        if (existing && existing.status === 'active') {
+          throw new Error(`${config.displayName} is already running`)
+        }
+        this.removeEntitySession(entityId, eid)
+        this.entityRegistry.unlinkSession(eid)
       }
-      this.entitySessionIds.delete(entityId)
-      this.entityRegistry.unlinkSession(existingId)
     }
 
     // Deploy assets if this entity has a template
@@ -821,16 +929,25 @@ export class SessionManager extends EventEmitter {
       }
     }
 
+    // For multi-instance entities, append instance number to display name
+    let displayName = config.displayName
+    if (!config.singleInstance) {
+      const existingCount = this.getAllEntitySessionIds(entityId).length
+      if (existingCount > 0) {
+        displayName = `${config.displayName} #${existingCount + 1}`
+      }
+    }
+
     // Start session
     const session = await this.start({
-      name: config.displayName,
+      name: displayName,
       projectPath: config.projectPath,
       ...opts,
     })
 
     // Tag session with entity
     session.entityId = entityId
-    this.entitySessionIds.set(entityId, session.id)
+    this.addEntitySession(entityId, session.id)
     this.entityRegistry.linkSession(session.id, entityId)
 
     // Backward compat: update orchestrator/mpo session ID refs
@@ -850,9 +967,11 @@ export class SessionManager extends EventEmitter {
 
   /**
    * Queue Claude Code launch for an entity session.
+   * For multi-instance entities, targets the most recently added session.
+   * Use queueEntityClaudeForSession() to target a specific session.
    */
-  queueEntityClaude(entityId: EntityId): void {
-    const sessionId = this.entitySessionIds.get(entityId)
+  queueEntityClaude(entityId: EntityId, targetSessionId?: string): void {
+    const sessionId = targetSessionId ?? this.getFirstEntitySessionId(entityId)
     if (!sessionId) {
       throw new Error(`${entityId} is not running`)
     }
@@ -884,7 +1003,7 @@ export class SessionManager extends EventEmitter {
     const session = await this.startEntity(entityId)
 
     // Queue Claude launch with --resume flag
-    const sessionId = this.entitySessionIds.get(entityId)
+    const sessionId = this.getFirstEntitySessionId(entityId)
     if (!sessionId) throw new Error(`${entityId} is not running after restart`)
 
     const config = this.entityRegistry.get(entityId)
@@ -912,7 +1031,7 @@ export class SessionManager extends EventEmitter {
     const config = this.entityRegistry.get(entityId)
     if (!config?.startupGreeting) return
 
-    const sessionId = this.entitySessionIds.get(entityId)
+    const sessionId = this.getFirstEntitySessionId(entityId)
     if (!sessionId) return
 
     setTimeout(async () => {
@@ -927,18 +1046,24 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
-   * Stop an entity session.
+   * Stop an entity session. For singleInstance entities, stops the one session.
+   * For multi-instance, stops a specific session (by targetSessionId) or ALL sessions.
    */
-  async stopEntity(entityId: EntityId): Promise<void> {
-    const sessionId = this.entitySessionIds.get(entityId)
-    if (!sessionId) return // already stopped
-    try {
-      await this.stop(sessionId)
-    } catch {
-      // Session may already be gone
+  async stopEntity(entityId: EntityId, targetSessionId?: string): Promise<void> {
+    const sessionIds = targetSessionId
+      ? [targetSessionId]
+      : this.getAllEntitySessionIds(entityId)
+    if (sessionIds.length === 0) return // already stopped
+
+    for (const sessionId of sessionIds) {
+      try {
+        await this.stop(sessionId)
+      } catch {
+        // Session may already be gone
+      }
+      // stop() already calls removeEntitySession via the entity cleanup block,
+      // but unlinkSession is also called there — no extra cleanup needed.
     }
-    this.entitySessionIds.delete(entityId)
-    this.entityRegistry.unlinkSession(sessionId)
 
     // Backward compat
     if (entityId === 'orchestrator') this.orchestratorSessionId = null
@@ -948,20 +1073,47 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
-   * Check if an entity is currently running.
+   * Check if an entity is currently running (any instance).
    */
   isEntityRunning(entityId: EntityId): boolean {
-    const sessionId = this.entitySessionIds.get(entityId)
-    if (!sessionId) return false
-    const session = this.sessions.get(sessionId)
-    return (session?.status === 'active') || false
+    for (const sid of this.getAllEntitySessionIds(entityId)) {
+      const session = this.sessions.get(sid)
+      if (session?.status === 'active') return true
+    }
+    return false
   }
 
   /**
-   * Get the session ID for an entity (or null).
+   * Get the first session ID for an entity (or null).
+   * For multi-instance entities, returns the most recently tracked session.
    */
   getEntitySessionId(entityId: EntityId): string | null {
-    return this.entitySessionIds.get(entityId) ?? null
+    return this.getFirstEntitySessionId(entityId) ?? null
+  }
+
+  /**
+   * Get all session IDs for an entity.
+   */
+  getEntitySessionIds(entityId: EntityId): string[] {
+    return this.getAllEntitySessionIds(entityId)
+  }
+
+  /**
+   * Link an existing session to an entity (used by keepWorking restore to
+   * re-establish entity links on recovered sessions).
+   */
+  linkEntity(sessionId: string, entityId: string): void {
+    const session = this.sessions.get(sessionId)
+    if (!session) return
+    session.entityId = entityId
+    this.addEntitySession(entityId as EntityId, sessionId)
+    if (this.entityRegistry) {
+      this.entityRegistry.linkSession(sessionId, entityId as EntityId)
+    }
+    if (entityId === 'orchestrator') this.orchestratorSessionId = sessionId
+    if (entityId === 'mpo') this.mpoSessionId = sessionId
+    this.persistSession(session)
+    this.emit('session-changed', session)
   }
 
   // ─── Session Resume / Fork ──────────────────────────────

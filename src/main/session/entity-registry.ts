@@ -77,6 +77,8 @@ export function registerBuiltinEntities(
     projectPath: `${entitiesBase}/orchestrator`,
     features: ['mcp'],
     visible: true,
+    sortOrder: 10,
+    singleInstance: true,
   })
 
   registry.register({
@@ -87,6 +89,8 @@ export function registerBuiltinEntities(
     projectPath: `${entitiesBase}/mpo`,
     features: ['mcp'],
     visible: true,
+    sortOrder: 20,
+    singleInstance: true,
   })
 
   registry.register({
@@ -97,6 +101,8 @@ export function registerBuiltinEntities(
     projectPath: expandHome('~/.config/cipher-mux/launcher'),
     features: ['mcp'],
     visible: true,
+    sortOrder: 30,
+    singleInstance: true,
   })
 
   registry.register({
@@ -106,9 +112,9 @@ export function registerBuiltinEntities(
     color: '#ffb74d',
     projectPath: `${entitiesBase}/companion`,
     templatePath: 'the how-to-session',
-    startupGreeting: 'Wach auf. Lies dein Profil, check dein Gedaechtnis, und sag hallo.',
     features: ['mcp', 'memory'],
     visible: true,
+    sortOrder: 40,
   })
 
   registry.register({
@@ -120,6 +126,7 @@ export function registerBuiltinEntities(
     templatePath: 'the refinement session',
     features: ['mcp', 'memory'],
     visible: true,
+    sortOrder: 50,
   })
 
   registry.register({
@@ -131,6 +138,7 @@ export function registerBuiltinEntities(
     startupGreeting: 'Session gestartet. Warte auf Voice-Input.',
     features: ['mcp', 'memory'],
     visible: true,
+    sortOrder: 60,
   })
 
   registry.register({
@@ -141,5 +149,6 @@ export function registerBuiltinEntities(
     projectPath: `${entitiesBase}/audit`,
     features: ['mcp'],
     visible: true,
+    sortOrder: 70,
   })
 }
