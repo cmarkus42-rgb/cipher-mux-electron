@@ -1,5 +1,5 @@
 // src/renderer/components/PresetEditor.tsx — Entity preset CLAUDE.md editor
-import { useCallback, useEffect, useState } from 'preact/hooks'
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import type { Character } from '../../shared/types'
 
 const api = (window as any).cipherMux
@@ -14,95 +14,34 @@ interface PresetInfo {
   launcherHidden: boolean
 }
 
-/** Section keys matching CLAUDE.md headings */
-const SECTION_KEYS = ['rolle', 'faehigkeiten', 'arbeitsregeln', 'scope'] as const
-type SectionKey = (typeof SECTION_KEYS)[number]
-
-const SECTION_LABELS: Record<SectionKey, string> = {
-  rolle: 'Rolle',
-  faehigkeiten: 'Faehigkeiten',
-  arbeitsregeln: 'Arbeitsregeln',
-  scope: 'Scope',
+/** Extract title from first h1 heading in content. */
+function extractTitle(content: string): string {
+  const line = content.split('\n').find(l => /^#\s/.test(l))
+  return line ? line.replace(/^#\s*/, '').trim() : ''
 }
 
-/** Parse a CLAUDE.md into sections keyed by h2 headings. */
-function parseSections(content: string): { title: string; sections: Record<SectionKey, string>; raw: string } {
+/** Extract H2 headings with their line indices for navigation. */
+function extractH2Headings(content: string): { label: string; lineIndex: number }[] {
+  const headings: { label: string; lineIndex: number }[] = []
   const lines = content.split('\n')
-  let title = ''
-  const sections: Record<SectionKey, string> = {
-    rolle: '',
-    faehigkeiten: '',
-    arbeitsregeln: '',
-    scope: '',
-  }
-
-  // Extract title from first h1
-  const h1Idx = lines.findIndex(l => /^#\s/.test(l))
-  if (h1Idx >= 0) {
-    title = lines[h1Idx].replace(/^#\s*/, '').trim()
-  }
-
-  // Find h2 sections
-  let currentKey: SectionKey | null = null
-  let currentLines: string[] = []
-
-  const flushSection = () => {
-    if (currentKey) {
-      sections[currentKey] = currentLines.join('\n').trim()
-    }
-    currentLines = []
-  }
-
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    const h2Match = line.match(/^##\s+(.+)/)
-    if (h2Match) {
-      flushSection()
-      const heading = h2Match[1].trim().toLowerCase()
-        .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue')
-      // Match known sections
-      const matched = SECTION_KEYS.find(k => heading.includes(k))
-      currentKey = matched ?? null
-      continue
-    }
-    if (currentKey) {
-      currentLines.push(line)
-    }
+    const m = lines[i].match(/^##\s+(.+)/)
+    if (m) headings.push({ label: m[1].trim(), lineIndex: i })
   }
-  flushSection()
-
-  return { title, sections, raw: content }
-}
-
-/** Reassemble a CLAUDE.md from title + sections. */
-function assembleSections(title: string, sections: Record<SectionKey, string>): string {
-  const parts: string[] = [`# ${title}`]
-  for (const key of SECTION_KEYS) {
-    parts.push('')
-    parts.push(`## ${SECTION_LABELS[key]}`)
-    parts.push('')
-    parts.push(sections[key])
-  }
-  return parts.join('\n') + '\n'
+  return headings
 }
 
 export function PresetEditor() {
   const [presets, setPresets] = useState<PresetInfo[]>([])
   const [selectedId, setSelectedId] = useState('')
-  const [activeTab, setActiveTab] = useState<SectionKey>('rolle')
   const [dirty, setDirty] = useState(false)
   const [loading, setLoading] = useState(true)
   const [editConfirmed, setEditConfirmed] = useState(false)
 
-  // Draft state
+  // Draft state — single textarea for full CLAUDE.md
   const [draftTitle, setDraftTitle] = useState('')
-  const [draftSections, setDraftSections] = useState<Record<SectionKey, string>>({
-    rolle: '',
-    faehigkeiten: '',
-    arbeitsregeln: '',
-    scope: '',
-  })
-  const [rawContent, setRawContent] = useState('')
+  const [draftContent, setDraftContent] = useState('')
+  const [savedContent, setSavedContent] = useState('')
 
   // Persona assignment
   const [characters, setCharacters] = useState<Character[]>([])
@@ -143,10 +82,9 @@ export function PresetEditor() {
     }).catch(() => setPersonaOverrideId(null))
     api.presets.read(selectedId).then((res: { ok: boolean; content: string }) => {
       if (res.ok) {
-        const parsed = parseSections(res.content)
-        setDraftTitle(parsed.title)
-        setDraftSections({ ...parsed.sections })
-        setRawContent(res.content)
+        setDraftTitle(extractTitle(res.content))
+        setDraftContent(res.content)
+        setSavedContent(res.content)
         setDirty(false)
       }
     }).catch(() => {})
@@ -158,34 +96,32 @@ export function PresetEditor() {
       if (!ok) return
     }
     setSelectedId(id)
-    setActiveTab('rolle')
   }
 
-  const handleSectionChange = (key: SectionKey, value: string) => {
+  const handleContentChange = (value: string) => {
     if (!editConfirmed) {
       const ok = confirm('Preset definitions affect the behavior of all sessions using this preset. Continue?')
       if (!ok) return
       setEditConfirmed(true)
     }
-    setDraftSections(prev => ({ ...prev, [key]: value }))
+    setDraftContent(value)
+    setDraftTitle(extractTitle(value))
     setDirty(true)
   }
 
   const handleSave = async () => {
     if (!selectedId) return
-    const content = assembleSections(draftTitle, draftSections)
-    const res = await api.presets.save(selectedId, content)
+    const res = await api.presets.save(selectedId, draftContent)
     if (res.ok) {
-      setRawContent(content)
+      setSavedContent(draftContent)
       setDirty(false)
     }
   }
 
   const handleRevert = () => {
-    if (!rawContent) return
-    const parsed = parseSections(rawContent)
-    setDraftTitle(parsed.title)
-    setDraftSections({ ...parsed.sections })
+    if (!savedContent) return
+    setDraftContent(savedContent)
+    setDraftTitle(extractTitle(savedContent))
     setDirty(false)
     setEditConfirmed(false)
   }
@@ -358,32 +294,54 @@ export function PresetEditor() {
             </div>
           )}
 
-          {/* Tab bar */}
-          <div class="preset-tabs">
-            {SECTION_KEYS.map(key => (
-              <button
-                key={key}
-                class={`preset-tab ${activeTab === key ? 'preset-tab--active' : ''}`}
-                onClick={() => setActiveTab(key)}
-              >
-                {SECTION_LABELS[key]}
-              </button>
-            ))}
-          </div>
-
-          {/* Active section editor */}
-          <div class="pp-field" style={{ flex: 1 }}>
-            <label>{SECTION_LABELS[activeTab]}</label>
-            <div class="pp-hint">
-              Section from entity CLAUDE.md &mdash; changes affect all sessions with this preset
-            </div>
-            <textarea
-              value={draftSections[activeTab]}
-              onInput={e => handleSectionChange(activeTab, (e.target as HTMLTextAreaElement).value)}
-              placeholder={`Write ${SECTION_LABELS[activeTab].toLowerCase()} definition here...`}
-              style={{ minHeight: '280px', flex: 1 }}
-            />
-          </div>
+          {/* CLAUDE.md editor — full content with H2 navigation */}
+          {(() => {
+            const headings = extractH2Headings(draftContent)
+            const textareaRef = useRef<HTMLTextAreaElement>(null)
+            const scrollToHeading = (lineIndex: number) => {
+              const ta = textareaRef.current
+              if (!ta) return
+              const lines = draftContent.split('\n')
+              let charPos = 0
+              for (let i = 0; i < lineIndex && i < lines.length; i++) {
+                charPos += lines[i].length + 1
+              }
+              ta.focus()
+              ta.setSelectionRange(charPos, charPos)
+              // Scroll textarea so the heading line is near the top
+              const lineHeight = 18 // approximate
+              ta.scrollTop = Math.max(0, lineIndex * lineHeight - 20)
+            }
+            return (
+              <div class="pp-field" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <label>CLAUDE.md</label>
+                <div class="pp-hint">
+                  Entity-Definition (Markdown) — definiert Rolle, Regeln und Tools fuer alle Sessions dieses Presets
+                </div>
+                {headings.length > 0 && (
+                  <div class="preset-tabs" style={{ marginBottom: '4px', flexWrap: 'wrap' }}>
+                    {headings.map((h, i) => (
+                      <button
+                        key={i}
+                        class="preset-tab"
+                        onClick={() => scrollToHeading(h.lineIndex)}
+                        title={`Go to ## ${h.label}`}
+                      >
+                        {h.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <textarea
+                  ref={textareaRef}
+                  value={draftContent}
+                  onInput={e => handleContentChange((e.target as HTMLTextAreaElement).value)}
+                  placeholder="# Entity Name&#10;&#10;Rolle, Lifecycle, MCP-Tools, Regeln..."
+                  style={{ minHeight: '360px', flex: 1, fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: '1.5' }}
+                />
+              </div>
+            )
+          })()}
 
           <div class="pp-foot-actions">
             <button onClick={handleRevert} disabled={!dirty}>Revert</button>
