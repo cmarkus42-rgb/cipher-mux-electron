@@ -25,6 +25,10 @@ import { BugreportTaskSource } from './task/sources/bugreport-source'
 import { NoteManager } from './notes/note-manager'
 import { NoteTagging } from './notes/note-tagging'
 import { MemoryStore } from './companion/memory-store'
+import { TestingAssistantManager } from './testing-assistant/testing-assistant-manager'
+import { AuditManager } from './audit/audit-manager'
+import { generateTestingAssistantClaudeMd } from './testing-assistant/testing-template'
+import { generateAuditClaudeMd } from './audit/audit-template'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { AdapterRegistry } from './agent/registry'
 import { EntityRegistry, registerBuiltinEntities } from './session/entity-registry'
@@ -61,6 +65,8 @@ export class IpcHub {
   private memoryStore: MemoryStore | null = null
   private btShutterManager: BtShutterManager | null = null
   private cyberFactoryManager: CyberFactoryManager | null = null
+  private testingAssistantManager: TestingAssistantManager | null = null
+  private auditManager: AuditManager | null = null
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
   private cachedRecoveryResult: RecoveryResult | null = null
   private cachedKeepWorkingRestore: {
@@ -112,6 +118,19 @@ export class IpcHub {
       const companionDbPath = path.join(os.homedir(), '.config', 'cipher-mux', 'companion.db')
       this.memoryStore = new MemoryStore(companionDbPath)
       this.cyberFactoryManager = new CyberFactoryManager(this.memoryStore)
+      const companionDb = this.memoryStore.getDatabase()
+      this.testingAssistantManager = new TestingAssistantManager(companionDb)
+      this.auditManager = new AuditManager(companionDb)
+
+      // Deploy entity CLAUDE.md templates
+      const entitiesBase = path.join(os.homedir(), '.config', 'cipher-mux', 'entities')
+      const taDir = path.join(entitiesBase, 'testing-assistant')
+      if (!fs.existsSync(taDir)) fs.mkdirSync(taDir, { recursive: true })
+      fs.writeFileSync(path.join(taDir, 'CLAUDE.md'), generateTestingAssistantClaudeMd())
+
+      const auditDir = path.join(entitiesBase, 'audit')
+      if (!fs.existsSync(auditDir)) fs.mkdirSync(auditDir, { recursive: true })
+      fs.writeFileSync(path.join(auditDir, 'CLAUDE.md'), generateAuditClaudeMd())
     } catch (err) {
       console.error('[IpcHub] MemoryStore init failed:', err)
     }
@@ -243,6 +262,8 @@ export class IpcHub {
       noteManager: this.noteManager,
       memoryStore: this.memoryStore,
       getVoiceManager: () => this.voiceManager,
+      testingAssistantManager: this.testingAssistantManager ?? undefined,
+      auditManager: this.auditManager ?? undefined,
     }).then(() => {
       // MCP ready → connect tmux, recover sessions, then auto-start defaults
       return this.tmux.connect()
