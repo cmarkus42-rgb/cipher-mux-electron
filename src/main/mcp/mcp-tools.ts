@@ -28,6 +28,7 @@ export interface ToolContext {
   memoryStore: MemoryStore | null
   getVoiceManager?: () => import('../voice/voice-manager').VoiceManager | null
   testingAssistantManager?: import('../testing-assistant/testing-assistant-manager').TestingAssistantManager
+  auditManager?: import('../audit/audit-manager').AuditManager
 }
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']
@@ -2009,6 +2010,54 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       const { decideHandoff } = await import('../testing-assistant/handoff-debugger')
       const decision = decideHandoff(findings)
       return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, decision, findingsCount: findings.length }) }] }
+    }
+  )
+
+  // --- Audit Tools ---
+
+  ;(server.registerTool as any)(
+    'mux_audit_run_start',
+    {
+      description: 'Start an audit run with a scope parameter.',
+      inputSchema: {
+        projectPath: z.string().describe('Project path to audit'),
+        scope: z.enum(['welle', 'komplett', 'modul']).optional().describe('Audit scope (default: welle)'),
+        scopeDetail: z.string().optional().describe('Detail for scope (e.g. git range for welle, directory for modul)'),
+        workspaceId: z.string().optional().describe('Workspace scope'),
+      },
+    },
+    async (args: { projectPath: string; scope?: string; scopeDetail?: string; workspaceId?: string }) => {
+      if (!ctx.auditManager) {
+        return { content: [{ type: 'text' as const, text: 'AuditManager not available' }], isError: true }
+      }
+      const run = ctx.auditManager.createRun({
+        scope: (args.scope as any) || 'welle',
+        scopeDetail: args.scopeDetail,
+        projectPath: args.projectPath,
+        workspaceId: args.workspaceId,
+      })
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, runId: run.id }) }] }
+    }
+  )
+
+  ;(server.registerTool as any)(
+    'mux_audit_run_complete',
+    {
+      description: 'Complete an audit run and generate the release recommendation.',
+      inputSchema: {
+        runId: z.string().describe('Audit run ID to complete'),
+      },
+    },
+    async (args: { runId: string }) => {
+      if (!ctx.auditManager) {
+        return { content: [{ type: 'text' as const, text: 'AuditManager not available' }], isError: true }
+      }
+      const findings = ctx.auditManager.listFindings(args.runId)
+      const { generateReleaseRecommendation } = await import('../audit/release-recommender')
+      const rec = generateReleaseRecommendation(args.runId, findings)
+      ctx.auditManager.saveRecommendation(rec)
+      ctx.auditManager.updateStatus(args.runId, 'completed')
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, ...rec }) }] }
     }
   )
 }
