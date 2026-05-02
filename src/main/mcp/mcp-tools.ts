@@ -951,9 +951,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         session_id: z.string().optional().describe('Session that created this memory (auto-filled if omitted)'),
         context_tags: z.array(z.string()).optional().describe('Optional context tags'),
         salience: z.number().min(0).max(1).optional().describe('Importance 0..1 (default 0.5)'),
+        scope_kind: z.enum(['user', 'workspace', 'session']).optional().describe('Memory scope kind (default: user)'),
+        scope_id: z.string().optional().describe('Scope identifier (workspace ID or session ID)'),
       },
     },
-    async (args: { text: string; kind: 'fact' | 'preference' | 'interaction' | 'event'; session_id?: string; context_tags?: string[]; salience?: number }) => {
+    async (args: { text: string; kind: 'fact' | 'preference' | 'interaction' | 'event'; session_id?: string; context_tags?: string[]; salience?: number; scope_kind?: 'user' | 'workspace' | 'session'; scope_id?: string }) => {
       if (!ctx.memoryStore) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'MemoryStore not available' }) }], isError: true }
       }
@@ -964,6 +966,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           sessionId: args.session_id,
           salience: args.salience,
           sourceExcerpt: args.context_tags ? args.context_tags.join(', ') : undefined,
+          scopeKind: args.scope_kind,
+          scopeId: args.scope_id,
         })
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: memory.id }) }],
@@ -986,9 +990,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         limit: z.number().optional().describe('Max results (default 20)'),
         entity_filter: z.string().optional().describe('Filter by memory kind'),
         since_hours: z.number().optional().describe('Only memories from the last N hours'),
+        scope_kind: z.enum(['user', 'workspace', 'session']).optional().describe('Filter by scope kind'),
+        scope_id: z.string().optional().describe('Filter by scope identifier'),
       },
     },
-    async (args: { limit?: number; entity_filter?: string; since_hours?: number }) => {
+    async (args: { limit?: number; entity_filter?: string; since_hours?: number; scope_kind?: 'user' | 'workspace' | 'session'; scope_id?: string }) => {
       if (!ctx.memoryStore) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'MemoryStore not available' }) }], isError: true }
       }
@@ -999,6 +1005,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           limit: args.limit,
           kindFilter,
           since,
+          scopeKind: args.scope_kind,
+          scopeId: args.scope_id,
         })
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(memories, null, 2) }],
@@ -1058,6 +1066,141 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         }
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // ─── Cyber Factory Tools ─────────────────────────────────
+
+  // CF-1. mux_cyber_factory_diagnose — Health report for a CF run
+  ;(server.registerTool as any)(
+    'mux_cyber_factory_diagnose',
+    {
+      description:
+        'Generate a health/diagnose report for a Cyber Factory run. '
+        + 'Returns a markdown document with run status, wellen status, worker status, and escalation backlog.',
+      inputSchema: {
+        run_id: z.string().describe('Cyber Factory run ID'),
+      },
+    },
+    async (args: { run_id: string }) => {
+      if (!ctx.memoryStore) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'MemoryStore not available' }) }], isError: true }
+      }
+      try {
+        const { CyberFactoryManager } = await import('../cyber-factory/cyber-factory-manager.js')
+        const { generateDiagnoseReport, formatDiagnoseMarkdown } = await import('../cyber-factory/diagnose.js')
+
+        const cfm = new CyberFactoryManager(ctx.memoryStore)
+        const run = cfm.getRun(args.run_id)
+        if (!run) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Run not found: ${args.run_id}` }) }], isError: true }
+        }
+
+        const wellen = cfm.listWellen(args.run_id)
+        const workers = wellen.flatMap(w => cfm.listSubProjekte(w.id)).map(sp => ({
+          subProjektId: sp.id,
+          name: sp.name,
+          status: sp.status,
+          tmuxSession: sp.tmuxSession,
+          contextUsagePercent: null,
+          lastOutput: null,
+          lastHeartbeat: sp.lastHeartbeat,
+        }))
+
+        const report = generateDiagnoseReport({ run, wellen, workers, escalationBacklog: 0 })
+        const markdown = formatDiagnoseMarkdown(report)
+
+        return {
+          content: [{ type: 'text' as const, text: markdown }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // CF-2. mux_cyber_factory_handoff_testing — Create a testing handoff note
+  ;(server.registerTool as any)(
+    'mux_cyber_factory_handoff_testing',
+    {
+      description:
+        'Create a testing handoff note for a Cyber Factory welle. '
+        + 'The note contains the test summary and is tagged for the testing pipeline.',
+      inputSchema: {
+        run_id: z.string().describe('Cyber Factory run ID'),
+        welle_id: z.string().describe('Welle ID that completed'),
+        summary: z.string().describe('Testing summary / handoff body (markdown)'),
+      },
+    },
+    async (args: { run_id: string; welle_id: string; summary: string }) => {
+      if (!ctx.noteManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
+      }
+      try {
+        // Resolve welle reihenfolge for a readable title
+        let welleLabel = args.welle_id
+        if (ctx.memoryStore) {
+          try {
+            const { CyberFactoryManager } = await import('../cyber-factory/cyber-factory-manager.js')
+            const cfm = new CyberFactoryManager(ctx.memoryStore)
+            const wellen = cfm.listWellen(args.run_id)
+            const welle = wellen.find(w => w.id === args.welle_id)
+            if (welle) welleLabel = String(welle.reihenfolge)
+          } catch { /* fallback to welle_id */ }
+        }
+
+        const title = `Testing Handoff — Welle ${welleLabel}`
+        const fullBody = `# ${title}\n\n${args.summary}`
+        const note = await ctx.noteManager.create(title, fullBody, ['cyber-factory', 'testing-handoff'])
+
+        if (ctx.windowManager) {
+          ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created', note })
+        }
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, noteId: note.id }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // CF-3. mux_cyber_factory_handoff_debugger — Create a debugger handoff note
+  ;(server.registerTool as any)(
+    'mux_cyber_factory_handoff_debugger',
+    {
+      description:
+        'Create a debugger handoff note for the Cyber Factory. '
+        + 'Contains findings from testing or monitoring that need debugging attention.',
+      inputSchema: {
+        run_id: z.string().describe('Cyber Factory run ID'),
+        findings_report: z.string().describe('Detailed findings report (markdown)'),
+        severity_summary: z.string().describe('Short severity summary for the title'),
+      },
+    },
+    async (args: { run_id: string; findings_report: string; severity_summary: string }) => {
+      if (!ctx.noteManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
+      }
+      try {
+        const title = `Debugger Handoff — ${args.severity_summary}`
+        const fullBody = `# ${title}\n\n${args.findings_report}`
+        const note = await ctx.noteManager.create(title, fullBody, ['cyber-factory', 'debugger-handoff'])
+
+        if (ctx.windowManager) {
+          ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created', note })
+        }
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, noteId: note.id }) }],
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
