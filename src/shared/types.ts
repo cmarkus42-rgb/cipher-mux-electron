@@ -286,6 +286,8 @@ export interface AppConfig {
     modelRouting: Record<string, string>
     stuckDetection: { heartbeatTimeoutMs: number; outputPlateauMs: number; minOutputCharsInPlateau: number }
   }
+  /** Debugger module configuration. */
+  debugger?: import('../main/debugger/types').DebuggerConfig
   /** Experimental feature flags. */
   experimental?: {
     /** Enable extended 7-phase Refinement (RE audit, REQ-IDs, structured handoffs). */
