@@ -14,6 +14,7 @@ export function CompanionTab() {
 
   const [draftName, setDraftName] = useState('')
   const [draftPrompt, setDraftPrompt] = useState('')
+  const [globalPersonaId, setGlobalPersonaId] = useState<string | null>(null)
 
   const loadAll = useCallback(async () => {
     const list: Character[] = await api.characters.list()
@@ -26,6 +27,11 @@ export function CompanionTab() {
       const c = list.find(x => x.id === sel)
       if (c) applyDraft(c)
     }
+    // Load global persona override
+    try {
+      const gp = await api.characters.getGlobalPersona()
+      setGlobalPersonaId(gp)
+    } catch { /* older backend without this channel */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadAll() }, [loadAll])
@@ -136,7 +142,8 @@ export function CompanionTab() {
                     {preview || 'No prompt'}
                   </div>
                 </div>
-                {c.id === activeId && <div class="pp-badge">ACTIVE</div>}
+                {c.id === globalPersonaId && <div class="pp-badge" style={{ background: 'var(--color-accent, #4fc3f7)' }}>GLOBAL</div>}
+                {c.id === activeId && c.id !== globalPersonaId && <div class="pp-badge">ACTIVE</div>}
                 {c.isDefault && <div class="pp-badge" style={{ opacity: 0.5 }}>DEFAULT</div>}
               </div>
             )
@@ -171,6 +178,27 @@ export function CompanionTab() {
                 Delete
               </button>
             </div>
+          </div>
+
+          {/* Global persona override toggle */}
+          <div class="pp-field" style={{ paddingBottom: '8px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={globalPersonaId === selected.id}
+                onChange={async () => {
+                  const newVal = globalPersonaId === selected.id ? null : selected.id
+                  await api.characters.setGlobalPersona(newVal)
+                  setGlobalPersonaId(newVal)
+                }}
+              />
+              <span>Global override — use this persona for ALL presets</span>
+            </label>
+            {globalPersonaId && globalPersonaId === selected.id && (
+              <div class="pp-hint" style={{ color: 'var(--color-accent)', marginTop: '4px' }}>
+                This persona overrides all preset-specific persona assignments.
+              </div>
+            )}
           </div>
 
           <div class="pp-field">

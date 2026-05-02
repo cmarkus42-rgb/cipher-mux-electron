@@ -184,6 +184,8 @@ export const IPC = {
   CHARACTERS_DELETE: 'cipher-mux:characters:delete',
   CHARACTERS_SWITCH: 'cipher-mux:characters:switch',
   CHARACTERS_ACTIVE: 'cipher-mux:characters:active',
+  CHARACTERS_GLOBAL_PERSONA_GET: 'cipher-mux:characters:global-persona:get',
+  CHARACTERS_GLOBAL_PERSONA_SET: 'cipher-mux:characters:global-persona:set',
 
   // LLM Provider
   LLM_TEST_CONNECTION: 'cipher-mux:llm:test-connection',
