@@ -27,6 +27,7 @@ export interface ToolContext {
   noteManager: NoteManager | null
   memoryStore: MemoryStore | null
   getVoiceManager?: () => import('../voice/voice-manager').VoiceManager | null
+  testingAssistantManager?: import('../testing-assistant/testing-assistant-manager').TestingAssistantManager
 }
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']
@@ -1940,6 +1941,74 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           isError: true,
         }
       }
+    }
+  )
+
+  // --- Testing Assistant Tools ---
+
+  ;(server.registerTool as any)(
+    'mux_testing_run_start',
+    {
+      description: 'Start a testing assistant run against a project/welle.',
+      inputSchema: {
+        projectPath: z.string().describe('Absolute path to the project'),
+        testCommand: z.string().optional().describe('Override test command (default: from CLAUDE.md)'),
+        cyberFactoryRunId: z.string().optional().describe('Associated CF run ID'),
+        welleId: z.string().optional().describe('Associated welle ID'),
+        workspaceId: z.string().optional().describe('Workspace scope'),
+      },
+    },
+    async (args: { projectPath: string; testCommand?: string; cyberFactoryRunId?: string; welleId?: string; workspaceId?: string }) => {
+      if (!ctx.testingAssistantManager) {
+        return { content: [{ type: 'text' as const, text: 'TestingAssistantManager not available' }], isError: true }
+      }
+      const run = ctx.testingAssistantManager.createRun({
+        projectPath: args.projectPath,
+        testCommand: args.testCommand,
+        cyberFactoryRunId: args.cyberFactoryRunId,
+        welleId: args.welleId,
+        workspaceId: args.workspaceId,
+      })
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, runId: run.id }) }] }
+    }
+  )
+
+  ;(server.registerTool as any)(
+    'mux_testing_findings_handoff_debugger',
+    {
+      description: 'Hand off testing findings to the debugger for fixing.',
+      inputSchema: {
+        runId: z.string().describe('Testing run ID to hand off'),
+      },
+    },
+    async (args: { runId: string }) => {
+      if (!ctx.testingAssistantManager) {
+        return { content: [{ type: 'text' as const, text: 'TestingAssistantManager not available' }], isError: true }
+      }
+      const findings = ctx.testingAssistantManager.listFindings(args.runId)
+      const { buildDebuggerHandoff } = await import('../testing-assistant/handoff-debugger')
+      const handoff = buildDebuggerHandoff(findings, args.runId)
+      return { content: [{ type: 'text' as const, text: JSON.stringify(handoff) }] }
+    }
+  )
+
+  ;(server.registerTool as any)(
+    'mux_testing_run_complete',
+    {
+      description: 'Mark a testing run as complete and get the handoff recommendation.',
+      inputSchema: {
+        runId: z.string().describe('Testing run ID to complete'),
+      },
+    },
+    async (args: { runId: string }) => {
+      if (!ctx.testingAssistantManager) {
+        return { content: [{ type: 'text' as const, text: 'TestingAssistantManager not available' }], isError: true }
+      }
+      ctx.testingAssistantManager.updateStatus(args.runId, 'completed')
+      const findings = ctx.testingAssistantManager.listFindings(args.runId)
+      const { decideHandoff } = await import('../testing-assistant/handoff-debugger')
+      const decision = decideHandoff(findings)
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, decision, findingsCount: findings.length }) }] }
     }
   )
 }
