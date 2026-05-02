@@ -83,6 +83,11 @@ export const IPC = {
   TESTING_RUN_COMPLETE: 'cipher-mux:testing:run-complete',
   TESTING_FINDINGS_LIST: 'cipher-mux:testing:findings-list',
 
+  // Audit
+  AUDIT_RUN_START: 'cipher-mux:audit:run-start',
+  AUDIT_RUN_STATUS: 'cipher-mux:audit:run-status',
+  AUDIT_RUN_COMPLETE: 'cipher-mux:audit:run-complete',
+
   // Window
   WINDOW_FIT_GRID: 'cipher-mux:window:fit-grid',
   WINDOW_OPEN_WORKSPACES: 'cipher-mux:window:open-workspaces',

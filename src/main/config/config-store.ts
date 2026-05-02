@@ -118,6 +118,13 @@ const defaults: AppConfig = {
     testQualityAudit: true,
     autoHandoffOnSeverityHigh: true,
   },
+  audit_config: {
+    enabled: false,
+    scopeDefault: 'welle' as const,
+    owaspDepth: 'full' as const,
+    cognitiveDebtThreshold: 5,
+    blockOnHighSeverity: true,
+  },
   experimental: {
     refinement_v2: false,
     ideation_partner: false,

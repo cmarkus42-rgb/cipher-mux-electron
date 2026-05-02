@@ -290,6 +290,8 @@ export interface AppConfig {
   debugger?: import('../main/debugger/types').DebuggerConfig
   /** Testing Assistant module configuration. */
   testing_assistant?: import('../main/testing-assistant/types').TestingAssistantConfig
+  /** Audit module configuration. */
+  audit_config?: import('../main/audit/types').AuditConfig
   /** Experimental feature flags. */
   experimental?: {
     /** Enable extended 7-phase Refinement (RE audit, REQ-IDs, structured handoffs). */
@@ -300,6 +302,8 @@ export interface AppConfig {
     cyber_factory?: boolean
     /** Enable Testing Assistant (replaces watchdog). */
     testing_assistant?: boolean
+    /** Enable full Audit with release recommendation. */
+    audit_full?: boolean
   }
   /** Whether the sidebar is detached into its own window. Persisted across restarts. */
   sidebarDetached?: boolean
