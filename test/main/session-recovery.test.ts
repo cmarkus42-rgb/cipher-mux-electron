@@ -66,7 +66,7 @@ function mockAdapter() {
     }),
     buildLaunchCommand: () => ({ cmd: 'test', args: [] }),
     buildOrchestratorPromptFragment: () => '',
-    buildMpoPromptFragment: () => '',
+    buildCyberFactoryPromptFragment: () => '',
   }
 }
 
@@ -211,24 +211,24 @@ describe('SessionManager.recover()', () => {
       status: 'active',
     })
     store.upsertSession({
-      id: 'mpo-id',
-      name: 'MPO',
-      tmuxSession: 'cmux-mpompo00',
-      entityId: 'mpo',
-      projectPath: '/tmp/mpo',
+      id: 'cf-id',
+      name: 'Cyber Factory',
+      tmuxSession: 'cmux-cyberfactory00',
+      entityId: 'cyber-factory',
+      projectPath: '/tmp/cyber-factory',
       gridSlot: 1,
       status: 'active',
     })
 
     tmux.sessions = [
       { id: '$1', name: 'cmux-orchorch', width: 80, height: 24, created: 1000, paneCwd: '' },
-      { id: '$2', name: 'cmux-mpompo00', width: 80, height: 24, created: 1000, paneCwd: '' },
+      { id: '$2', name: 'cmux-cyberfactory00', width: 80, height: 24, created: 1000, paneCwd: '' },
     ]
 
     const result = await sm.recover()
     assert.equal(result.recovered.length, 2)
     assert.equal(sm.getEntitySessionId('orchestrator'), 'orch-id')
-    assert.equal(sm.getEntitySessionId('mpo'), 'mpo-id')
+    assert.equal(sm.getEntitySessionId('cyber-factory'), 'cf-id')
   })
 
   it('sets createdAt from tmux session creation timestamp', async () => {

@@ -22,7 +22,7 @@ export type BuiltinEntityId = 'orchestrator' | 'cyber-factory' | 'launcher' | 'c
 export type EntityId = BuiltinEntityId | (string & {})
 
 /**
- * Configuration for a functional entity (Orchestrator, MPO, Companion, etc.).
+ * Configuration for a functional entity (Orchestrator, Cyber Factory, Companion, etc.).
  * Entities are special sessions with predefined behavior, assets, and UI styling.
  */
 export interface EntityConfig {
@@ -352,7 +352,7 @@ export interface KickoffCompletedEvent {
   reason: KickoffCompleteReason
 }
 
-// ─── Input Requests (MPO) ──────────────────────────────
+// ─── Input Requests (Cyber Factory) ──────────────────────────────
 
 export interface InputRequestOption {
   key: string

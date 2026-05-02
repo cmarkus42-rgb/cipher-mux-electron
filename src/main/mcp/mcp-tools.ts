@@ -558,11 +558,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     }
   )
 
-  // 14. mux_input_request_create — Create an input request for the MPO sidebar
+  // 14. mux_input_request_create — Create an input request for the Cyber Factory sidebar
   ;(server.registerTool as any)(
     'mux_input_request_create',
     {
-      description: 'Create an input request bubble for the cipher-mux sidebar (used by MPO to ask the user questions)',
+      description: 'Create an input request bubble for the cipher-mux sidebar (used by Cyber Factory to ask the user questions)',
       inputSchema: {
         projectId: z.string().describe('Project identifier'),
         question: z.string().describe('The question to ask the user'),

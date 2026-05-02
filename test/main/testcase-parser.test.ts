@@ -95,7 +95,7 @@ title: "v0.11 Tests"
 type: testcase
 version: "0.11"
 created: 2026-04-26
-source: mpo
+source: cyber-factory
 ---
 
 ## UI
@@ -108,7 +108,7 @@ source: mpo
     assert.equal(tc.frontmatter.title, 'v0.11 Tests')
     assert.equal(tc.frontmatter.type, 'testcase')
     assert.equal(tc.frontmatter.version, '0.11')
-    assert.equal(tc.frontmatter.source, 'mpo')
+    assert.equal(tc.frontmatter.source, 'cyber-factory')
     assert.equal(tc.sections.length, 1)
     assert.equal(tc.sections[0].items.length, 3)
   })

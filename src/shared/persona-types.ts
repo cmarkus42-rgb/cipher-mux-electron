@@ -103,11 +103,11 @@ export const SEED_WORKSPACES: readonly Workspace[] = [
     cols: 3,
     rows: 2,
     promptOverrides: {
-      orchestrator: 'You coordinate a triage. Read the latest failing CI run, split into a repro task and a code-read task. Gate merges via MPO.',
+      orchestrator: 'You coordinate a triage. Read the latest failing CI run, split into a repro task and a code-read task. Gate merges via Cyber Factory.',
     },
     cells: [
       { persona: 'orchestrator', project: '', prompt: '', presetId: 'orchestrator' },
-      { persona: 'mpo',          project: '', prompt: '', presetId: 'mpo' },
+      { persona: 'cyber-factory', project: '', prompt: '', presetId: 'cyber-factory' },
       { persona: 'empty',        project: '', prompt: 'grep stacktrace' },
       { persona: 'empty',        project: '', prompt: 'read changelog' },
       { persona: 'auditor',      project: '', prompt: 'review open PR' },

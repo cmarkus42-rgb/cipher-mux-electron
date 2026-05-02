@@ -155,15 +155,15 @@ const api = {
     },
   },
 
-  // ─── MPO ─────────────────────────────────────────────────
-  mpo: {
-    start: () => ipcRenderer.invoke(IPC.MPO_START),
-    stop: () => ipcRenderer.invoke(IPC.MPO_STOP),
-    status: () => ipcRenderer.invoke(IPC.MPO_STATUS),
+  // ─── Cyber Factory ─────────────────────────────────────────
+  cyberFactory: {
+    start: () => ipcRenderer.invoke(IPC.CYBER_FACTORY_START),
+    stop: () => ipcRenderer.invoke(IPC.CYBER_FACTORY_STOP),
+    status: () => ipcRenderer.invoke(IPC.CYBER_FACTORY_STATUS),
     onStarted: (cb: (data: unknown) => void) => {
       const handler = (_e: unknown, data: unknown) => cb(data)
-      ipcRenderer.on(IPC.MPO_STARTED, handler)
-      return () => ipcRenderer.removeListener(IPC.MPO_STARTED, handler)
+      ipcRenderer.on(IPC.CYBER_FACTORY_STARTED, handler)
+      return () => ipcRenderer.removeListener(IPC.CYBER_FACTORY_STARTED, handler)
     },
   },
 
@@ -314,22 +314,22 @@ const api = {
     },
   },
 
-  // ─── Input Requests (MPO) ──────────────────────────────
+  // ─── Input Requests (Cyber Factory) ──────────────────────
   inputRequests: {
-    get: () => ipcRenderer.invoke(IPC.MPO_INPUT_REQUESTS),
+    get: () => ipcRenderer.invoke(IPC.CF_INPUT_REQUESTS),
     answer: (id: string, answer: string) =>
-      ipcRenderer.invoke(IPC.MPO_REQUEST_ANSWERED, { id, answer }),
+      ipcRenderer.invoke(IPC.CF_REQUEST_ANSWERED, { id, answer }),
     openReview: (filePath: string) =>
-      ipcRenderer.invoke(IPC.MPO_OPEN_REVIEW, { filePath }),
+      ipcRenderer.invoke(IPC.CF_OPEN_REVIEW, { filePath }),
     onChanged: (cb: (data: unknown) => void) => {
       const handler = (_e: unknown, data: unknown) => cb(data)
-      ipcRenderer.on(IPC.MPO_INPUT_REQUESTS, handler)
-      return () => ipcRenderer.removeListener(IPC.MPO_INPUT_REQUESTS, handler)
+      ipcRenderer.on(IPC.CF_INPUT_REQUESTS, handler)
+      return () => ipcRenderer.removeListener(IPC.CF_INPUT_REQUESTS, handler)
     },
     onUpdate: (cb: (data: unknown) => void) => {
       const handler = (_e: unknown, data: unknown) => cb(data)
-      ipcRenderer.on(IPC.MPO_REQUEST_UPDATE, handler)
-      return () => ipcRenderer.removeListener(IPC.MPO_REQUEST_UPDATE, handler)
+      ipcRenderer.on(IPC.CF_REQUEST_UPDATE, handler)
+      return () => ipcRenderer.removeListener(IPC.CF_REQUEST_UPDATE, handler)
     },
   },
 

@@ -4,7 +4,7 @@ import * as path from 'path'
 import type { InputRequest, InputRequestsFile, InputRequestUpdate } from '../../shared/types'
 
 /**
- * Watches a JSON file written by the Multi-Project Orchestrator (MPO)
+ * Watches a JSON file written by the Cyber Factory
  * for input requests. Emits events when requests change and supports
  * answering requests via atomic write-back.
  */

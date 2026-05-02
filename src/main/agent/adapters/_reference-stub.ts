@@ -131,13 +131,13 @@ export class ReferenceStubAdapter implements AgentAdapter {
   }
 
   /**
-   * TODO (optional): Return agent-specific instructions for the MPO template.
+   * TODO (optional): Return agent-specific instructions for the Cyber Factory template.
    *
-   * This fragment is injected into the MPO (Multi-Project Orchestrator) session's CLAUDE.md.
+   * This fragment is injected into the Cyber Factory session's CLAUDE.md.
    * Use it to provide worker-startup instructions and delegation semantics.
-   * Return empty string if your agent needs no special MPO guidance.
+   * Return empty string if your agent needs no special Cyber Factory guidance.
    */
-  buildMpoPromptFragment(_lang: 'de' | 'en'): string {
+  buildCyberFactoryPromptFragment(_lang: 'de' | 'en'): string {
     return ''
   }
 }

@@ -129,7 +129,7 @@ export function App() {
   }, [focusedSessionId, sessions])
 
   const [orchestratorSessionId, setOrchestratorSessionId] = useState<string | null>(null)
-  const [mpoSessionId, setMpoSessionId] = useState<string | null>(null)
+  const [cyberFactorySessionId, setCyberFactorySessionId] = useState<string | null>(null)
   const [companionSessionId, setCompanionSessionId] = useState<string | null>(null)
   const [refinementSessionId, setRefinementSessionId] = useState<string | null>(null)
   const [voiceRelaySessionId, setVoiceRelaySessionId] = useState<string | null>(null)
@@ -169,7 +169,7 @@ export function App() {
 
   const gridSessionIds = grid.slots.filter(s => s.sessionId).map(s => s.sessionId!)
 
-  const sidebarHasContent = !!orchestratorSessionId || !!mpoSessionId ||
+  const sidebarHasContent = !!orchestratorSessionId || !!cyberFactorySessionId ||
     sessions.some(s => s.status === 'active' && !gridSessionIds.includes(s.id)) ||
     grid.slots.some(s => s.type === 'notes')
 
@@ -188,12 +188,12 @@ export function App() {
     if (!initialCleanupDone.current) return
     const activeIds = new Set(sessions.map(s => s.id))
     if (orchestratorSessionId && !activeIds.has(orchestratorSessionId)) setOrchestratorSessionId(null)
-    if (mpoSessionId && !activeIds.has(mpoSessionId)) setMpoSessionId(null)
+    if (cyberFactorySessionId && !activeIds.has(cyberFactorySessionId)) setCyberFactorySessionId(null)
     if (companionSessionId && !activeIds.has(companionSessionId)) setCompanionSessionId(null)
     if (refinementSessionId && !activeIds.has(refinementSessionId)) setRefinementSessionId(null)
     if (voiceRelaySessionId && !activeIds.has(voiceRelaySessionId)) setVoiceRelaySessionId(null)
     if (auditSessionId && !activeIds.has(auditSessionId)) setAuditSessionId(null)
-  }, [sessions, orchestratorSessionId, mpoSessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
+  }, [sessions, orchestratorSessionId, cyberFactorySessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
 
   // Entity status map for unified dialog — computed dynamically from active sessions
   // so that ANY entity (including dynamic ones like watchdog, projectlauncher, etc.)
@@ -211,8 +211,8 @@ export function App() {
     setSessionAtSlot(0, sessionId)
   }, [setSessionAtSlot])
 
-  const placeMpo = useCallback((sessionId: string) => {
-    setMpoSessionId((prev) => {
+  const placeCyberFactory = useCallback((sessionId: string) => {
+    setCyberFactorySessionId((prev) => {
       if (prev === sessionId) return prev
       // Try auto-placement first; only show popup if grid is full
       if (gridRef.current.slots.some(s => s.sessionId === sessionId)) {
@@ -257,24 +257,24 @@ export function App() {
     return () => { mounted = false; unsub() }
   }, [placeOrchestrator])
 
-  // Check MPO status on mount
+  // Check Cyber Factory status on mount
   useEffect(() => {
     let mounted = true
     const api = (window as any).cipherMux
-    api.mpo.status().then((s: { running: boolean; sessionId?: string }) => {
+    api.cyberFactory.status().then((s: { running: boolean; sessionId?: string }) => {
       if (!mounted) return
-      if (s.running && s.sessionId) placeMpo(s.sessionId)
+      if (s.running && s.sessionId) placeCyberFactory(s.sessionId)
     })
-    const unsub = api.mpo.onStarted((data: any) => {
-      if (inFlightEntityStarts.current.has('mpo')) {
-        inFlightEntityStarts.current.delete('mpo')
+    const unsub = api.cyberFactory.onStarted((data: any) => {
+      if (inFlightEntityStarts.current.has('cyber-factory')) {
+        inFlightEntityStarts.current.delete('cyber-factory')
         return
       }
       const sid = data?.sessionId ?? data?.id
-      if (sid) placeMpo(sid)
+      if (sid) placeCyberFactory(sid)
     })
     return () => { mounted = false; unsub() }
-  }, [placeMpo])
+  }, [placeCyberFactory])
 
   useEffect(() => {
     const api = (window as any).cipherMux
@@ -510,7 +510,7 @@ export function App() {
     }
     for (const session of result.recovered) {
       if (session.entityId === 'orchestrator') setOrchestratorSessionId(session.id)
-      if (session.entityId === 'mpo') setMpoSessionId(session.id)
+      if (session.entityId === 'cyber-factory') setCyberFactorySessionId(session.id)
       if (session.entityId === 'companion') setCompanionSessionId(session.id)
       if (session.entityId === 'refinement') setRefinementSessionId(session.id)
       if (session.entityId === 'voice-relay') setVoiceRelaySessionId(session.id)
@@ -665,14 +665,14 @@ export function App() {
   const getEntitySessionId = useCallback((entityId: EntityId): string | null => {
     switch (entityId) {
       case 'orchestrator': return orchestratorSessionId
-      case 'mpo': return mpoSessionId
+      case 'cyber-factory': return cyberFactorySessionId
       case 'companion': return companionSessionId
       case 'refinement': return refinementSessionId
       case 'voice-relay': return voiceRelaySessionId
       case 'audit': return auditSessionId
       default: return null
     }
-  }, [orchestratorSessionId, mpoSessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
+  }, [orchestratorSessionId, cyberFactorySessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
 
   const handleStartEntity = useCallback(async (entityId: EntityId, slotIndex: number) => {
     const api = (window as any).cipherMux
@@ -690,11 +690,11 @@ export function App() {
         }
         return
       }
-      if (entityId === 'mpo') {
-        const session = await api.mpo.start()
+      if (entityId === 'cyber-factory') {
+        const session = await api.cyberFactory.start()
         const sid = session?.sessionId ?? session?.id
         if (sid) {
-          setMpoSessionId(sid)
+          setCyberFactorySessionId(sid)
           setSessionAtSlot(slotIndex, sid)
           setFocusedSessionId(sid)
         }
@@ -728,7 +728,7 @@ export function App() {
       if (sid) {
         switch (entityId) {
           case 'orchestrator': setOrchestratorSessionId(sid); break
-          case 'mpo': setMpoSessionId(sid); break
+          case 'cyber-factory': setCyberFactorySessionId(sid); break
           case 'companion': setCompanionSessionId(sid); break
           case 'refinement': setRefinementSessionId(sid); break
           case 'voice-relay': setVoiceRelaySessionId(sid); break
@@ -1020,7 +1020,7 @@ export function App() {
           <SidebarPanel
             visible={sidebarVisible}
             orchestratorActive={!!orchestratorSessionId}
-            mpoActive={!!mpoSessionId}
+            cyberFactoryActive={!!cyberFactorySessionId}
             sessions={sessions}
             gridSessionIds={gridSessionIds}
             contextUsages={contextUsages}

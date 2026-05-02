@@ -71,7 +71,7 @@ export class IpcHub {
   constructor(private windowManager: WindowManager) {
     this.adapterRegistry = new AdapterRegistry()
     const entityRegistry = new EntityRegistry()
-    registerBuiltinEntities(entityRegistry, BRAND.orchestratorDir, BRAND.mpoDir)
+    registerBuiltinEntities(entityRegistry, BRAND.orchestratorDir, BRAND.cyberFactoryDir)
     // Scan ~/.config/cipher-mux/entities/ for additional entity directories
     const scanned = scanAndRegisterEntities(entityRegistry)
     if (scanned.length > 0) {
@@ -135,7 +135,7 @@ export class IpcHub {
     this.registerWindowChannels()
     this.registerDialogChannels()
     this.registerOrchestratorChannels()
-    this.registerMpoChannels()
+    this.registerCyberFactoryChannels()
     this.registerBugreportChannels()
     this.registerLlmChannels()
     this.registerVoiceChannels()
@@ -385,8 +385,8 @@ export class IpcHub {
       this.windowManager.sendToMainWindow(IPC.SESSION_STOPPED, session)
     })
 
-    this.sessionManager.on('mpo-started', (session) => {
-      this.windowManager.sendToMainWindow(IPC.MPO_STARTED, session)
+    this.sessionManager.on('cyber-factory-started', (session) => {
+      this.windowManager.sendToMainWindow(IPC.CYBER_FACTORY_STARTED, session)
     })
 
     this.sessionManager.on('entity-started', (data: { entityId: string; session: unknown }) => {
@@ -827,27 +827,27 @@ export class IpcHub {
     })
   }
 
-  // ─── MPO ─────────────────────────────────────────────
-  private registerMpoChannels(): void {
-    ipcMain.handle(IPC.MPO_START, async () => {
-      const session = await this.sessionManager.startEntity('mpo')
+  // ─── Cyber Factory ──────────────────────────────────────
+  private registerCyberFactoryChannels(): void {
+    ipcMain.handle(IPC.CYBER_FACTORY_START, async () => {
+      const session = await this.sessionManager.startEntity('cyber-factory')
       try {
-        this.sessionManager.queueEntityClaude('mpo', session.id)
+        this.sessionManager.queueEntityClaude('cyber-factory', session.id)
       } catch (err) {
-        console.error('[IpcHub] Failed to queue MPO claude:', err)
+        console.error('[IpcHub] Failed to queue Cyber Factory claude:', err)
       }
       return session
     })
 
-    ipcMain.handle(IPC.MPO_STOP, async () => {
-      await this.sessionManager.stopEntity('mpo')
+    ipcMain.handle(IPC.CYBER_FACTORY_STOP, async () => {
+      await this.sessionManager.stopEntity('cyber-factory')
       return { ok: true }
     })
 
-    ipcMain.handle(IPC.MPO_STATUS, async () => {
+    ipcMain.handle(IPC.CYBER_FACTORY_STATUS, async () => {
       return {
-        running: this.sessionManager.isEntityRunning('mpo'),
-        sessionId: this.sessionManager.getEntitySessionId('mpo'),
+        running: this.sessionManager.isEntityRunning('cyber-factory'),
+        sessionId: this.sessionManager.getEntitySessionId('cyber-factory'),
       }
     })
   }
@@ -1315,15 +1315,15 @@ export class IpcHub {
     })
   }
 
-  // ─── Input Requests (MPO) ─────────────────────────────
+  // ─── Input Requests (Cyber Factory) ─────────────────────
   private registerInputRequestChannels(): void {
     const INPUT_REQUESTS_PATH = BRAND.inputRequestsPath
-      || path.join(BRAND.mpoDir.replace(/^~/, os.homedir()), 'input-requests.json')
+      || path.join(BRAND.cyberFactoryDir.replace(/^~/, os.homedir()), 'input-requests.json')
 
     // Always register the handler so renderer doesn't get "No handler" errors
     if (!INPUT_REQUESTS_PATH) {
       console.warn('[IpcHub] inputRequestsPath is empty — InputRequestWatcher disabled. Check BUILD_PROFILE env var.')
-      ipcMain.handle(IPC.MPO_INPUT_REQUESTS, () => ({ requests: [] }))
+      ipcMain.handle(IPC.CF_INPUT_REQUESTS, () => ({ requests: [] }))
       return
     }
 
@@ -1331,28 +1331,28 @@ export class IpcHub {
 
     // Forward changes to renderer
     this.inputRequestWatcher.on('requests-changed', (requests: any[]) => {
-      this.windowManager.sendToMainWindow(IPC.MPO_INPUT_REQUESTS, { requests })
+      this.windowManager.sendToMainWindow(IPC.CF_INPUT_REQUESTS, { requests })
     })
 
     this.inputRequestWatcher.on('request-update', (update: any) => {
-      this.windowManager.sendToMainWindow(IPC.MPO_REQUEST_UPDATE, update)
+      this.windowManager.sendToMainWindow(IPC.CF_REQUEST_UPDATE, update)
     })
 
     this.inputRequestWatcher.start()
 
     // Get all requests
-    ipcMain.handle(IPC.MPO_INPUT_REQUESTS, () => {
+    ipcMain.handle(IPC.CF_INPUT_REQUESTS, () => {
       return { requests: this.inputRequestWatcher?.getRequests() ?? [] }
     })
 
     // Answer a request
-    ipcMain.handle(IPC.MPO_REQUEST_ANSWERED, (_e, { id, answer }: { id: string; answer: string }) => {
+    ipcMain.handle(IPC.CF_REQUEST_ANSWERED, (_e, { id, answer }: { id: string; answer: string }) => {
       this.inputRequestWatcher?.answerRequest(id, answer)
       return { ok: true }
     })
 
     // Open review file in system editor (platform-aware)
-    ipcMain.handle(IPC.MPO_OPEN_REVIEW, async (_e, { filePath }: { filePath: string }) => {
+    ipcMain.handle(IPC.CF_OPEN_REVIEW, async (_e, { filePath }: { filePath: string }) => {
       const { execFile } = await import('child_process')
       return new Promise((resolve) => {
         if (process.platform === 'darwin') {
