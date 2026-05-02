@@ -23,7 +23,18 @@ Phasen-Übersicht:
 14. ~~v0.9.9: Keep Working Restore Fix, BT Shutter App-Bundle~~ ✅ (2026-05-02)
 15. ~~v0.9.10: Keep Working Restore Fix v2 — 3-Layer Bug~~ ✅ (2026-05-02)
 
-**Status:** Cyber-Factory-Pack Welle 2 komplett. 913 Tests (60+ Test-Dateien). MPO durch Cyber Factory ersetzt, Workspace-Memory scope-Spalten implementiert.
+**Status:** Cyber-Factory-Pack Welle 4 komplett. Tests: 47 neue (Welle 4) + bestehende Baseline. Testing Assistant, Audit (Vollausbau), Workspace-Memory Session-Cleanup, Credential-Filter implementiert.
+
+### Cyber-Factory-Pack Wellen-Status
+
+| Welle | Status | Inhalt |
+|-------|--------|--------|
+| 1a/1b/1c | ✅ | Personas, Global Rules, Refinement, Ideation Partner |
+| 2 | ✅ | Cyber Factory (MPO-Ersatz), Companion-DB CF-Tabellen, scope-Spalten |
+| 3 | ✅ | Debugger (9 Module, 43 Tests) |
+| 4 | ✅ | Testing Assistant (10 Module), Audit Vollausbau (8 Module), Workspace-Memory Cleanup+Filter |
+| 5 | ausstehend | Cutover (Feature-Flags auf true, Migrations-Skript) |
+| 6 | ausstehend | Cleanup (alte Module entfernen, v1.0) |
 
 ### Keep Working Restore — Fragile Zone
 
@@ -102,7 +113,9 @@ cipher-mux-electron/
 │   │   ├── companion/     ← MemoryStore (scope-aware), Schema (CF-Tabellen)
 │   │   ├── refinement/    ← RE-Audit, Purpose-Check, REQ-IDs, Handoff-Tools
 │   │   ├── ideation-partner/ ← BrainManager, SkillRegistry, AnforderungspaketGenerator
-│   │   ├── audit/         ← AuditManager (Skeleton, Vollausbau Welle 4)
+│   │   ├── testing-assistant/ ← TestingAssistantManager, TestRunner, QualityAudit, AdversarialProber, OWASP, OffLimits, FindingsReporter, Handoff, Template
+│   │   ├── audit/         ← AuditManager, CodeReview, SecurityAudit, AdrConsistency, CognitiveDebt, ReleaseRecommender, FindingsReporter, Template
+│   │   ├── workspace-memory/ ← SessionScopeCleanup, Archive
 │   │   ├── character/     ← CharacterDefaults (6 Seed-Personas)
 │   │   ├── notes/         ← NoteManager (Filesystem CRUD), NoteTagging (Ollama Auto-Tagging)
 │   │   ├── workspace/     ← WorkspaceManager (Apply, Prompt Resolution, Persona Skill Sync)
