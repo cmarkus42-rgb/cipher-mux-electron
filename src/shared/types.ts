@@ -244,6 +244,8 @@ export interface AppConfig {
   entitySortOrders?: Record<string, number>
   /** Hidden entity presets — hidden entities are not shown in the launcher (entityId → true). */
   entityHidden?: Record<string, boolean>
+  /** Persona override per entity preset (entityId → characterId). Overrides PRESET_PERSONA_DEFAULTS. */
+  entityPersonaOverrides?: Record<string, string>
   /** Voice submit mode: 'auto' sends Enter after STT, 'manual' waits for BT clicker. */
   voiceSubmitMode?: 'auto' | 'manual'
   /** TTS enabled — if false, mux_tts_speak is silently ignored. Default: true. */

@@ -1,5 +1,6 @@
 // src/renderer/components/PresetEditor.tsx — Entity preset CLAUDE.md editor
 import { useCallback, useEffect, useState } from 'preact/hooks'
+import type { Character } from '../../shared/types'
 
 const api = (window as any).cipherMux
 
@@ -103,6 +104,10 @@ export function PresetEditor() {
   })
   const [rawContent, setRawContent] = useState('')
 
+  // Persona assignment
+  const [characters, setCharacters] = useState<Character[]>([])
+  const [personaOverrideId, setPersonaOverrideId] = useState<string | null>(null)
+
   // New preset creation
   const [showCreate, setShowCreate] = useState(false)
   const [newId, setNewId] = useState('')
@@ -115,6 +120,11 @@ export function PresetEditor() {
       if (!selectedId && list.length > 0) {
         setSelectedId(list[0].id)
       }
+      // Load characters for persona dropdown
+      try {
+        const chars: Character[] = await api.characters.list()
+        setCharacters(chars)
+      } catch { /* older backend */ }
     } catch {
       // empty
     }
@@ -123,10 +133,14 @@ export function PresetEditor() {
 
   useEffect(() => { loadPresets() }, [loadPresets])
 
-  // Load CLAUDE.md when selection changes
+  // Load CLAUDE.md + persona override when selection changes
   useEffect(() => {
     if (!selectedId) return
     setEditConfirmed(false)
+    // Load persona override for this entity
+    api.characters.getEntityPersonaOverride(selectedId).then((id: string | null) => {
+      setPersonaOverrideId(id)
+    }).catch(() => setPersonaOverrideId(null))
     api.presets.read(selectedId).then((res: { ok: boolean; content: string }) => {
       if (res.ok) {
         const parsed = parseSections(res.content)
@@ -315,6 +329,34 @@ export function PresetEditor() {
               </button>
             </div>
           </div>
+
+          {/* Persona assignment */}
+          {characters.length > 0 && (
+            <div class="pp-field" style={{ paddingBottom: '4px', paddingTop: '4px' }}>
+              <label style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-text-dim)' }}>
+                Persona
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <select
+                  value={personaOverrideId ?? ''}
+                  onChange={async (e) => {
+                    const val = (e.target as HTMLSelectElement).value || null
+                    await api.characters.setEntityPersonaOverride(selectedId, val)
+                    setPersonaOverrideId(val)
+                  }}
+                  style={{ flex: 1, padding: '4px 8px', fontSize: '12px', background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
+                >
+                  <option value="">Default (from matrix)</option>
+                  {characters.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div class="pp-hint" style={{ marginTop: '2px' }}>
+                Personas are created in the Companion tab. Changes apply on next session start.
+              </div>
+            </div>
+          )}
 
           {/* Tab bar */}
           <div class="preset-tabs">

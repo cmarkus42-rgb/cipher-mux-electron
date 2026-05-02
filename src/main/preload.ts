@@ -349,6 +349,8 @@ const api = {
     switch: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.CHARACTERS_SWITCH, id),
     getGlobalPersona: (): Promise<string | null> => ipcRenderer.invoke(IPC.CHARACTERS_GLOBAL_PERSONA_GET),
     setGlobalPersona: (id: string | null): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.CHARACTERS_GLOBAL_PERSONA_SET, id),
+    getEntityPersonaOverride: (entityId: string): Promise<string | null> => ipcRenderer.invoke(IPC.ENTITY_PERSONA_OVERRIDE_GET, entityId),
+    setEntityPersonaOverride: (entityId: string, characterId: string | null): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.ENTITY_PERSONA_OVERRIDE_SET, entityId, characterId),
   },
 
   // ─── Workspaces ──────────────────────────────────────────
