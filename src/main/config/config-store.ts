@@ -130,6 +130,13 @@ const defaults: AppConfig = {
     ideation_partner: false,
     cyber_factory: true,
   },
+  memory: {
+    enabled: true,
+    ftsEnabled: true,
+    retentionDays: 365,
+    sessionScopeAutoDelete: true,
+    archiveOnWorkspaceDelete: true,
+  },
   entitySortOrders: {} as Record<string, number>,
   entityHidden: {} as Record<string, boolean>,
   entityPersonaOverrides: {} as Record<string, string>,
