@@ -1831,6 +1831,67 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     }
   )
 
+  // D-1. mux_debugger_findings_intake — Submit structured bug findings to the Debugger
+  ;(server.registerTool as any)(
+    'mux_debugger_findings_intake',
+    {
+      description: 'Submit structured bug findings to the Debugger. Creates a new debugger run and identifies clarification gaps.',
+      inputSchema: {
+        symptom: z.string().describe('What is happening (bug description)'),
+        reproduction: z.string().describe('Steps to reproduce'),
+        severity: z.enum(['high', 'medium', 'low']),
+        suspectedCause: z.string().optional().describe('Optional hypothesis about root cause'),
+        affectedAreas: z.array(z.string()).optional().describe('File paths likely involved'),
+        source: z.enum(['testing-assistant', 'bugreport', 'manual']).optional().default('manual'),
+        bugReportId: z.string().optional().describe('Optional link to existing bugreport'),
+        projectPath: z.string().describe('Project path for the debugger run'),
+      },
+    },
+    async (args: {
+      symptom: string
+      reproduction: string
+      severity: 'high' | 'medium' | 'low'
+      suspectedCause?: string
+      affectedAreas?: string[]
+      source?: 'testing-assistant' | 'bugreport' | 'manual'
+      bugReportId?: string
+      projectPath: string
+    }) => {
+      if (!ctx.messageBus) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'MessageBus (DB) not available' }) }], isError: true }
+      }
+      try {
+        const { parseFindings } = await import('../debugger/findings-parser.js')
+        const { DebuggerManager } = await import('../debugger/debugger-manager.js')
+        const { ClarificationRouter } = await import('../debugger/clarification-router.js')
+        const db = ctx.messageBus.getDatabase()
+        const findings = parseFindings({
+          symptom: args.symptom,
+          reproduction: args.reproduction,
+          severity: args.severity,
+          suspectedCause: args.suspectedCause ?? null,
+          affectedAreas: args.affectedAreas ?? [],
+          source: args.source ?? 'manual',
+          bugReportId: args.bugReportId,
+        })
+        const debuggerMgr = new DebuggerManager(db)
+        const run = debuggerMgr.createRun({
+          source: findings.source,
+          severity: findings.severity,
+          description: findings.symptom,
+          projectPath: args.projectPath,
+          bugReportId: findings.bugReportId,
+        })
+        const router = new ClarificationRouter(debuggerMgr)
+        const gaps = router.identifyGaps(findings)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ runId: run.id, status: run.status, gaps }) }] }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
   // 40. mux_ideation_skill_run — Run an ideation skill with brain context
   ;(server.registerTool as any)(
     'mux_ideation_skill_run',
