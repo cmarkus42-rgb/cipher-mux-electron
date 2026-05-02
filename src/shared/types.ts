@@ -164,8 +164,12 @@ export interface AppConfig {
   defaultWorkspaceId: string | null
   /** Active companion character ID. */
   activeCharacterId: string
+  /** Global persona override — when set, this persona applies to ALL presets. */
+  globalActivePersonaId: string | null
   /** Available companion characters. */
   characters: Character[]
+  /** Global base rules injected into every entity session. */
+  globalRules: string
   app: {
     scanPaths: string[]
     /** Directory levels below each scanPath that are inspected (1 = children only). */
