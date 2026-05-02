@@ -1,8 +1,22 @@
 # Spec: QA-Entity — Systematisches Testing als eigenstaendige Rolle
 
-**Status:** Draft
-**Datum:** 2026-04-27
-**Kontext:** cipher-mux hat Entities fuer Ideation (Refinement), Entwicklung (Orchestrator/MPO/Launcher), Begleitung (Companion) und Code-Qualitaet (Audit). Zwischen "Code ist sauber" und "Feature funktioniert fuer den User" klafft eine Luecke. Ein dedizierter QA-Entity schliesst den Loop.
+**Status:** SUPERSEDED am 2026-04-30
+**Ersetzt durch:** [`moreismore/cyber-factory-pack/09-testing-assistant.md`](cyber-factory-pack/09-testing-assistant.md)
+**Datum (Original):** 2026-04-27
+**Datum (Supersede):** 2026-04-30
+
+> **Hinweis:** Diese Spec ist abgeloest. Der Watchdog-Begriff und die hier definierte QA-Rolle sind durch den **Testing Assistant** des Cyber-Factory-Packs ersetzt — vollstaendiger Cut, kein Parallel-Lauf. Die Spec bleibt lesbar fuer Historie, wird aber nicht weiterentwickelt. Operative Quelle ist `cyber-factory-pack/09-testing-assistant.md`.
+>
+> Inhaltliches Mapping:
+> - Spec-Conformance-Checking, Reviewer-Checkliste, Findings-Format → uebernommen in den Testing Assistant
+> - Checklisten-getriebener Hauptmodus → Phase-Inhalt im Testing Assistant, aber nicht mehr Selbstverstaendnis
+> - Neu im Testing Assistant: Adversarial Probing, OWASP-Spotcheck, Off-Limits-Audit, Test-Qualitaets-Audit (Behavioral vs. Implementations-Tests)
+>
+> Begruendung: Pre-Alpha-Phase ist die Zeit fuer den scharfen Schnitt; "Eleganz ist ein Metaziel" (User-Vorgabe 2026-04-30).
+
+---
+
+**Kontext (historisch):** cipher-mux hat Entities fuer Ideation (Refinement), Entwicklung (Orchestrator/MPO/Launcher), Begleitung (Companion) und Code-Qualitaet (Audit). Zwischen "Code ist sauber" und "Feature funktioniert fuer den User" klafft eine Luecke. Ein dedizierter QA-Entity schliesst den Loop.
 
 ---
 
