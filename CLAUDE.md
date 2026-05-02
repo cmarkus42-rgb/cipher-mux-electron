@@ -23,7 +23,7 @@ Phasen-Übersicht:
 14. ~~v0.9.9: Keep Working Restore Fix, BT Shutter App-Bundle~~ ✅ (2026-05-02)
 15. ~~v0.9.10: Keep Working Restore Fix v2 — 3-Layer Bug~~ ✅ (2026-05-02)
 
-**Status:** Cyber-Factory-Pack Welle 4 komplett. Tests: 47 neue (Welle 4) + bestehende Baseline. Testing Assistant, Audit (Vollausbau), Workspace-Memory Session-Cleanup, Credential-Filter implementiert.
+**Status:** Cyber-Factory-Pack Welle 5 (Cutover) Infrastruktur komplett. 858 Tests (0 Failures). Feature-Flags auf production, Migrations-Skript mit Forward/Reverse, Rollback-Skript. E2E-Validierung ausstehend.
 
 ### Cyber-Factory-Pack Wellen-Status
 
@@ -33,7 +33,7 @@ Phasen-Übersicht:
 | 2 | ✅ | Cyber Factory (MPO-Ersatz), Companion-DB CF-Tabellen, scope-Spalten |
 | 3 | ✅ | Debugger (9 Module, 43 Tests) |
 | 4 | ✅ | Testing Assistant (10 Module), Audit Vollausbau (8 Module), Workspace-Memory Cleanup+Filter |
-| 5 | ausstehend | Cutover (Feature-Flags auf true, Migrations-Skript) |
+| 5 | infra ✅ | Feature-Flags auf true, Migrations-Skript, Rollback, 12 Test-Regressions gefixt. E2E-Runs ausstehend |
 | 6 | ausstehend | Cleanup (alte Module entfernen, v1.0) |
 
 ### Keep Working Restore — Fragile Zone
