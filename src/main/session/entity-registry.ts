@@ -175,4 +175,16 @@ export function registerBuiltinEntities(
     sortOrder: 75,
     singleInstance: true,
   })
+
+  registry.register({
+    id: 'testing-assistant',
+    displayName: 'Testing Assistant',
+    icon: '\uD83E\uDDEA',
+    color: '#2ecc71',
+    projectPath: `${entitiesBase}/testing-assistant`,
+    features: ['mcp', 'memory'],
+    visible: true,
+    sortOrder: 76,
+    singleInstance: true,
+  })
 }

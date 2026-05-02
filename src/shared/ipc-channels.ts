@@ -77,6 +77,12 @@ export const IPC = {
   DEBUGGER_FIX_PLAN_CONFIRM: 'cipher-mux:debugger:fix-plan-confirm',
   DEBUGGER_WALKTHROUGH_REQUEST: 'cipher-mux:debugger:walkthrough-request',
 
+  // Testing Assistant
+  TESTING_RUN_START: 'cipher-mux:testing:run-start',
+  TESTING_RUN_STATUS: 'cipher-mux:testing:run-status',
+  TESTING_RUN_COMPLETE: 'cipher-mux:testing:run-complete',
+  TESTING_FINDINGS_LIST: 'cipher-mux:testing:findings-list',
+
   // Window
   WINDOW_FIT_GRID: 'cipher-mux:window:fit-grid',
   WINDOW_OPEN_WORKSPACES: 'cipher-mux:window:open-workspaces',
