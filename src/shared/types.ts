@@ -46,6 +46,8 @@ export interface EntityConfig {
   visible?: boolean
   /** Sort order for display in menus (lower = first, default 100). */
   sortOrder?: number
+  /** If true, only one session of this entity can run at a time. Default: false (multi-instance). */
+  singleInstance?: boolean
 }
 
 // ─── Session ───────────────────────────────────────────────
@@ -236,6 +238,8 @@ export interface AppConfig {
   }
   /** Persisted sort order overrides for entity presets (entityId → sortOrder). */
   entitySortOrders?: Record<string, number>
+  /** Hidden entity presets — hidden entities are not shown in the launcher (entityId → true). */
+  entityHidden?: Record<string, boolean>
   /** Voice submit mode: 'auto' sends Enter after STT, 'manual' waits for BT clicker. */
   voiceSubmitMode?: 'auto' | 'manual'
   /** TTS enabled — if false, mux_tts_speak is silently ignored. Default: true. */

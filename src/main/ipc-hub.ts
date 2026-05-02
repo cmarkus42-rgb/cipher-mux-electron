@@ -61,6 +61,10 @@ export class IpcHub {
   private btShutterManager: BtShutterManager | null = null
   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
   private cachedRecoveryResult: RecoveryResult | null = null
+  private cachedKeepWorkingRestore: {
+    gridConfig: { cols: number; rows: number }
+    slots: Array<{ sessionId: string | null; slotIndex: number }>
+  } | null = null
 
   private adapterRegistry: AdapterRegistry
 
@@ -192,6 +196,25 @@ export class IpcHub {
       this.messageBus.clearAll()
     }
 
+    // Clear stale activeWorkspaceId SYNCHRONOUSLY on startup — the renderer
+    // reads this value immediately on mount (before the async init chain).
+    if (configStore.get('activeWorkspaceId')) {
+      console.log(`[IpcHub] Clearing stale activeWorkspaceId on startup`)
+      configStore.set('activeWorkspaceId', null)
+    }
+
+    // Clear stale session IDs from ui.grid SYNCHRONOUSLY on startup.
+    // These IDs are from the previous app run and won't match recovered sessions.
+    // The keepWorking restore (or RecoveryDialog) will set correct IDs once
+    // recovery completes. Without this, the renderer loads stale IDs that don't
+    // match any live session → empty cells despite correct grid dimensions.
+    const startupUi = configStore.get('ui')
+    if (startupUi?.grid?.slots?.some((s: any) => s.sessionId)) {
+      const clearedSlots = startupUi.grid.slots.map((s: any) => ({ ...s, sessionId: null }))
+      configStore.set('ui', { ...startupUi, grid: { ...startupUi.grid, slots: clearedSlots } })
+      console.log('[IpcHub] Cleared stale session IDs from ui.grid on startup')
+    }
+
     // Start MCP server first — sessions need MCP config injected.
     const mcpConfig = configStore.get('mcp')
     const port = mcpConfig?.port ?? MCP_DEFAULT_PORT
@@ -226,14 +249,26 @@ export class IpcHub {
       // Cache for pull-based retrieval by the renderer
       this.cachedRecoveryResult = result
       console.log(`[IpcHub] recovery complete: ${result.recovered.length} recovered, ${result.orphaned.length} orphaned, gridState=${!!result.gridState}`)
-      if (result.orphaned.length > 0 || result.recovered.length > 0) {
-        this.windowManager.sendToMainWindow(IPC.SESSIONS_RECOVERY_RESULT, result)
-      }
       this.sessionManager.startOrphanDetection()
       this.sessionManager.startExitDetection()
 
-      // Keep Working: restore sessions from snapshot (overrides recovery + default start)
+      // Keep Working: restore grid layout from snapshot.
+      // If sessions survived in tmux (recovered), reuse them — don't kill/recreate.
+      // Only start new sessions with --resume for snapshot entries without a match.
+      const kwEnabled = configStore.get('keepWorking')
       const rawSnapshot = configStore.get('keepWorkingSnapshot')
+      // Debug: write keepWorking state to file for post-mortem analysis
+      try {
+        const debugInfo = {
+          ts: new Date().toISOString(),
+          kwEnabled,
+          hasSnapshot: !!rawSnapshot,
+          snapshotSessions: rawSnapshot && !Array.isArray(rawSnapshot) ? rawSnapshot.sessions?.length : (Array.isArray(rawSnapshot) ? rawSnapshot.length : 0),
+          recovered: result.recovered.map(r => ({ id: r.id, name: r.name })),
+          orphaned: result.orphaned.length,
+        }
+        fs.writeFileSync('/tmp/kw-debug.json', JSON.stringify(debugInfo, null, 2))
+      } catch { /* ignore */ }
       // Support both old (Array) and new ({ sessions, gridConfig }) formats
       const snapshotSessions = rawSnapshot
         ? (Array.isArray(rawSnapshot) ? rawSnapshot : rawSnapshot.sessions)
@@ -242,19 +277,41 @@ export class IpcHub {
         ? rawSnapshot.gridConfig
         : undefined
       if (snapshotSessions && snapshotSessions.length > 0) {
-        console.log(`[IpcHub] keepWorking: restoring ${snapshotSessions.length} sessions from snapshot`)
-        // Kill any recovered sessions — we'll recreate with --resume
-        for (const session of result.recovered) {
-          try { await this.sessionManager.stop(session.id) } catch { /* ok */ }
+        // keepWorking mode: skip Recovery Dialog, silently kill orphans, restore seamlessly
+        console.log(`[IpcHub] keepWorking: restoring ${snapshotSessions.length} sessions from snapshot (${result.recovered.length} recovered, ${result.orphaned.length} orphaned — auto-cleaning)`)
+        // Auto-kill orphaned tmux sessions silently
+        for (const orphan of result.orphaned) {
+          this.sessionManager.killOrphan(orphan.tmuxSession).catch(() => {})
         }
+        await this.restoreKeepWorkingFromRecovery(snapshotSessions, snapshotGridConfig, result.recovered)
         configStore.set('keepWorkingSnapshot', undefined as any)
-        this.restoreKeepWorkingSnapshot(snapshotSessions, snapshotGridConfig)
-      } else if (result.recovered.length === 0) {
-        // Only auto-start if no sessions were recovered
-        this.autoStartDefault()
+        // Set empty recovery result so RecoveryDialog resolves immediately
+        // (null would cause 15s poll timeout before onDone fires)
+        this.cachedRecoveryResult = { recovered: [], orphaned: [], killed: [], gridState: null }
+      } else {
+        // No keepWorking snapshot — show Recovery Dialog if there are sessions to handle
+        if (result.orphaned.length > 0 || result.recovered.length > 0) {
+          this.windowManager.sendToMainWindow(IPC.SESSIONS_RECOVERY_RESULT, result)
+        }
+        if (result.recovered.length === 0) {
+          // Only auto-start if no sessions were recovered
+          this.autoStartDefault()
+        }
       }
+      // Start BT Shutter if enabled (independent of voice mode)
+      this.startBtShutter()
     }).catch((err) => {
       console.error('[IpcHub] startup failed:', err)
+      // Debug: log startup failures for post-mortem
+      try {
+        const errorDebug = {
+          ts: new Date().toISOString(),
+          phase: 'startup-error',
+          error: err?.message ?? String(err),
+          stack: err?.stack?.split('\n').slice(0, 5),
+        }
+        fs.writeFileSync('/tmp/kw-debug.json', JSON.stringify(errorDebug, null, 2))
+      } catch { /* ignore */ }
       const msg = err?.message ?? String(err)
       if (msg.includes('EADDRINUSE') || msg.includes('already in use')) {
         dialog.showErrorBox(
@@ -276,17 +333,7 @@ export class IpcHub {
    * started manually via the StatusBar button.
    */
   private autoStartDefault(): void {
-    const activeWorkspaceId = configStore.get('activeWorkspaceId')
     const defaultWorkspaceId = configStore.get('defaultWorkspaceId')
-
-    // Always clear activeWorkspaceId on startup — it represents "currently applied",
-    // not "should auto-apply". The apply flow (WORKSPACES_APPLY handler) sets it again
-    // when a workspace is actually applied. This prevents stale "AKTIV" badges in the
-    // workspace popup after restart (RT-6).
-    if (activeWorkspaceId) {
-      console.log(`[IpcHub] Clearing stale activeWorkspaceId "${activeWorkspaceId}" on startup`)
-      configStore.set('activeWorkspaceId', null)
-    }
 
     if (defaultWorkspaceId) {
       // Default workspace configured — renderer will load it via handleRecoveryDone.
@@ -302,7 +349,7 @@ export class IpcHub {
       // Note: ENTITY_STARTED is already sent by setupEventForwarding when
       // startEntity emits 'entity-started'. No manual send here (RT-X2 double-event fix).
       try {
-        this.sessionManager.queueEntityClaude('companion')
+        this.sessionManager.queueEntityClaude('companion', session.id)
         this.sessionManager.scheduleStartupGreeting('companion')
       } catch (err) {
         console.error('[IpcHub] Failed to queue companion claude:', err)
@@ -344,17 +391,13 @@ export class IpcHub {
 
     this.sessionManager.on('entity-started', (data: { entityId: string; session: unknown }) => {
       this.windowManager.sendToMainWindow(IPC.ENTITY_STARTED, data)
-      // Start voice output routing when voice-relay entity starts
-      if (data.entityId === 'voice-relay' && this.voiceManager) {
-        this.voiceManager.startOutputRouting()
-      }
+      // Voice-relay uses mux_tts_speak for TTS (like all other sessions).
+      // VoiceOutputRouter (terminal-polling) is disabled — it caused duplicate
+      // readback of everything visible in the relay pane.
     })
 
     this.sessionManager.on('entity-stopped', (data: { entityId: string }) => {
-      // Stop voice output routing when voice-relay entity stops
-      if (data.entityId === 'voice-relay' && this.voiceManager) {
-        this.voiceManager.stopOutputRouting()
-      }
+      // (VoiceOutputRouter disabled — voice-relay uses mux_tts_speak directly)
     })
 
     this.tmux.on('output', (paneId: string, data: string) => {
@@ -764,7 +807,7 @@ export class IpcHub {
       const session = await this.sessionManager.startEntity('orchestrator')
       // Queue Claude launch — fires when renderer reports real terminal size
       try {
-        this.sessionManager.queueEntityClaude('orchestrator')
+        this.sessionManager.queueEntityClaude('orchestrator', session.id)
       } catch (err) {
         console.error('[IpcHub] Failed to queue orchestrator claude:', err)
       }
@@ -789,7 +832,7 @@ export class IpcHub {
     ipcMain.handle(IPC.MPO_START, async () => {
       const session = await this.sessionManager.startEntity('mpo')
       try {
-        this.sessionManager.queueEntityClaude('mpo')
+        this.sessionManager.queueEntityClaude('mpo', session.id)
       } catch (err) {
         console.error('[IpcHub] Failed to queue MPO claude:', err)
       }
@@ -1135,18 +1178,17 @@ export class IpcHub {
         // Start voice-relay entity as background session (no grid placement)
         if (!this.sessionManager.isEntityRunning('voice-relay')) {
           console.log('[Voice] Starting voice-relay entity...')
-          await this.sessionManager.startEntity('voice-relay')
+          const vrSession = await this.sessionManager.startEntity('voice-relay')
           // Queue Claude launch + startup greeting for background entity
           try {
-            this.sessionManager.queueEntityClaude('voice-relay')
+            this.sessionManager.queueEntityClaude('voice-relay', vrSession.id)
             this.sessionManager.scheduleStartupGreeting('voice-relay')
           } catch (err) {
             console.error('[Voice] Failed to queue voice-relay claude:', err)
           }
-          // Output routing is auto-started by entity-started event handler
+          // Voice-relay uses mux_tts_speak — no VoiceOutputRouter polling needed
         } else {
-          // Already running — just start output routing
-          this.voiceManager.startOutputRouting()
+          // Already running — no additional setup needed
         }
 
         this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'idle')
@@ -1206,6 +1248,7 @@ export class IpcHub {
     })
 
     ipcMain.on(IPC.VOICE_SESSION_TARGET, (_event, { sessionId }: { sessionId: string | null }) => {
+      this.focusedSessionId = sessionId
       this.voiceManager?.getInputRouter()?.setFocusedSession(sessionId)
     })
 
@@ -1624,6 +1667,13 @@ export class IpcHub {
 
   // ─── Grid Control (MCP App-Control) ─────────────────────
   private registerGridControlChannels(): void {
+    // Pull-based Keep Working restore — renderer polls this until it gets data or times out.
+    // Don't null the cache on read — the renderer may poll multiple times if the init chain
+    // hasn't completed yet. The cache is cleared when keepWorkingSnapshot is consumed (line ~275).
+    ipcMain.handle(IPC.KEEP_WORKING_PULL, () => {
+      return this.cachedKeepWorkingRestore // null if no restore pending (yet)
+    })
+
     ipcMain.handle(IPC.GRID_RESIZE, (_e, { cols, rows }: { cols: number; rows: number }) => {
       this.windowManager.sendToMainWindow(IPC.GRID_RESIZE, { cols, rows })
       return { ok: true }
@@ -1661,9 +1711,9 @@ export class IpcHub {
         mcpApiKey: mcpConfig?.apiKey ?? '',
       })
       const session = await this.sessionManager.startEntity(entityId)
-      // Queue Claude launch for entity
+      // Queue Claude launch for entity — pass session.id for multi-instance support
       try {
-        this.sessionManager.queueEntityClaude(entityId)
+        this.sessionManager.queueEntityClaude(entityId, session.id)
         this.sessionManager.scheduleStartupGreeting(entityId)
       } catch (err) {
         console.error(`[IpcHub] Failed to queue ${entityId} claude:`, err)
@@ -1682,8 +1732,8 @@ export class IpcHub {
       return session
     })
 
-    ipcMain.handle(IPC.ENTITY_STOP, async (_e, { entityId }: { entityId: EntityId }) => {
-      await this.sessionManager.stopEntity(entityId)
+    ipcMain.handle(IPC.ENTITY_STOP, async (_e, { entityId, sessionId }: { entityId: EntityId; sessionId?: string }) => {
+      await this.sessionManager.stopEntity(entityId, sessionId)
       return { ok: true }
     })
 
@@ -1691,15 +1741,18 @@ export class IpcHub {
       return {
         running: this.sessionManager.isEntityRunning(entityId),
         sessionId: this.sessionManager.getEntitySessionId(entityId),
+        sessionIds: this.sessionManager.getEntitySessionIds(entityId),
       }
     })
 
     ipcMain.handle(IPC.ENTITY_LIST, async () => {
       const configs = this.sessionManager.getEntityRegistry().list()
       const overrides = configStore.get('entitySortOrders') ?? {}
+      const hidden = configStore.get('entityHidden') ?? {}
       return configs.map(c => ({
         ...c,
         sortOrder: overrides[c.id] ?? c.sortOrder ?? 100,
+        launcherHidden: hidden[c.id] ?? false,
       }))
     })
   }
@@ -1713,6 +1766,7 @@ export class IpcHub {
       const registry = this.sessionManager.getEntityRegistry()
       const all = registry.list()
       const overrides = configStore.get('entitySortOrders') ?? {}
+      const hidden = configStore.get('entityHidden') ?? {}
       return all
         .filter(e => e.projectPath.startsWith(entitiesDir))
         .map(e => ({
@@ -1722,6 +1776,7 @@ export class IpcHub {
           icon: e.icon,
           projectPath: e.projectPath,
           sortOrder: overrides[e.id] ?? e.sortOrder ?? 100,
+          launcherHidden: hidden[e.id] ?? false,
         }))
         .sort((a, b) => a.sortOrder - b.sortOrder)
     })
@@ -1813,6 +1868,7 @@ export class IpcHub {
    *  duplicate HID keystroke that the shutter also sends to macOS. */
   private btShutterLastEventTs = 0
   private btShutterInputGuard: ((e: Electron.Event, input: Electron.Input) => void) | null = null
+  private focusedSessionId: string | null = null
 
   private startBtShutter(): void {
     const btConfig = configStore.get('btShutter')
@@ -1829,16 +1885,21 @@ export class IpcHub {
       // duplicate HID keystroke that arrives ~0-50ms later.
       this.btShutterLastEventTs = Date.now()
 
-      // Route shutter events through VoiceInputRouter (same target as STT)
+      // Route shutter events: VoiceInputRouter (if voice active) → focused session (fallback)
+      let targetId: string | null = null
       const router = this.voiceManager?.getInputRouter()
       if (router) {
-        const targetId = router.getActiveSessionId()
-        if (targetId) {
-          const keys = event.action === 'submit' ? '\r' : '\x15'
-          this.sessionManager.sendKeys(targetId, keys).catch(err => {
-            console.error('[BtShutter] sendKeys failed:', (err as Error).message)
-          })
-        }
+        targetId = router.getActiveSessionId()
+      }
+      if (!targetId) {
+        // Fallback: send to focused session (tracked via VOICE_SESSION_TARGET IPC)
+        targetId = this.focusedSessionId
+      }
+      if (targetId) {
+        const keys = event.action === 'submit' ? '\r' : '\x15'
+        this.sessionManager.sendKeys(targetId, keys).catch(err => {
+          console.error('[BtShutter] sendKeys failed:', (err as Error).message)
+        })
       }
       // Still notify renderer for UI feedback
       this.windowManager.sendToMainWindow(IPC.BT_SHUTTER_EVENT, event)
@@ -1886,23 +1947,54 @@ export class IpcHub {
 
   }
 
-  private restoreKeepWorkingSnapshot(
+  /**
+   * Restore Keep Working state by reusing recovered tmux sessions where possible.
+   * Only creates new sessions (with --resume) for snapshot entries that have no
+   * matching recovered session. This avoids killing live Claude sessions and
+   * eliminates the race condition where new session IDs wouldn't match the
+   * persisted ui.grid config.
+   */
+  private async restoreKeepWorkingFromRecovery(
     snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string }>,
-    gridConfig?: { cols: number; rows: number },
-  ): void {
-    // Restore grid dimensions BEFORE placing sessions
-    if (gridConfig) {
-      console.log(`[IpcHub] keepWorking: restoring grid ${gridConfig.cols}x${gridConfig.rows}`)
-      this.windowManager.sendToMainWindow(IPC.GRID_RESIZE, gridConfig)
-    }
-
+    gridConfig: { cols: number; rows: number } | undefined,
+    recovered: Array<{ id: string; name: string; projectPath: string | null; entityId?: string }>,
+  ): Promise<void> {
+    const effectiveGrid = gridConfig ?? { cols: 1, rows: 1 }
     const adapter = this.sessionManager['adapterRegistry'].getDefault()
-    // Start sessions sequentially with small delay to avoid overwhelming tmux
-    let delay = gridConfig ? 200 : 0 // small delay after grid resize to let renderer settle
+
+    // Build lookup of recovered sessions by name (primary) and projectPath (fallback)
+    const recoveredByName = new Map<string, typeof recovered[0]>()
+    const recoveredByPath = new Map<string, typeof recovered[0]>()
+    for (const r of recovered) {
+      if (r.name) recoveredByName.set(r.name, r)
+      if (r.projectPath) recoveredByPath.set(r.projectPath, r)
+    }
+    const claimed = new Set<string>() // recovered session IDs already matched
+
+    const slotMap: Array<{ sessionId: string | null; slotIndex: number }> = []
+
     for (const entry of snapshot) {
-      setTimeout(async () => {
+      // Try to find a matching recovered session
+      let match = recoveredByName.get(entry.name)
+      if (match && claimed.has(match.id)) match = undefined
+      if (!match) {
+        match = recoveredByPath.get(entry.projectPath)
+        if (match && claimed.has(match.id)) match = undefined
+      }
+
+      if (match) {
+        // Reuse recovered session — it's still alive in tmux with Claude running
+        claimed.add(match.id)
+        slotMap.push({ sessionId: match.id, slotIndex: entry.gridSlot })
+
+        // Restore entity link from snapshot if missing
+        if (entry.entityId && !match.entityId) {
+          this.sessionManager.linkEntity(match.id, entry.entityId)
+        }
+        console.log(`[IpcHub] keepWorking: reusing recovered "${match.name}" (${match.id}) → slot ${entry.gridSlot}`)
+      } else {
+        // No matching recovered session — start new with --resume
         try {
-          // Build launch command with --resume
           const escaped = entry.projectPath.replace(/'/g, "'\\''")
           const launchCmd = adapter.buildLaunchCommand({
             projectPath: entry.projectPath,
@@ -1917,19 +2009,48 @@ export class IpcHub {
             projectPath: entry.projectPath,
             autoLaunch,
           })
-
-          // Place in grid via renderer
-          this.windowManager.sendToMainWindow(IPC.SESSION_VISIBLE_ADD, {
-            sessionId: session.id,
-            slotIndex: entry.gridSlot,
-          })
-          console.log(`[IpcHub] keepWorking: restored "${entry.name}" at slot ${entry.gridSlot}`)
+          // Restore entity link for newly created sessions too
+          if (entry.entityId) {
+            this.sessionManager.linkEntity(session.id, entry.entityId)
+          }
+          slotMap.push({ sessionId: session.id, slotIndex: entry.gridSlot })
+          console.log(`[IpcHub] keepWorking: started new "${entry.name}" (--resume) → slot ${entry.gridSlot}`)
         } catch (err) {
-          console.error(`[IpcHub] keepWorking: failed to restore "${entry.name}":`, (err as Error).message)
+          console.error(`[IpcHub] keepWorking: failed to start "${entry.name}":`, (err as Error).message)
         }
-      }, delay)
-      delay += 500
+      }
     }
+
+    // Persist grid state to ui.grid in configStore so that useGrid's mount load
+    // gets the correct session IDs — eliminates the race condition entirely.
+    const total = effectiveGrid.cols * effectiveGrid.rows
+    const newSlots = Array.from({ length: total }, () => ({
+      sessionId: null as string | null,
+      rowSpan: 1,
+      type: 'session' as const,
+    }))
+    for (const { sessionId, slotIndex } of slotMap) {
+      if (slotIndex >= 0 && slotIndex < total) {
+        newSlots[slotIndex] = { sessionId, rowSpan: 1, type: 'session' }
+      }
+    }
+    const gridState = { config: effectiveGrid, slots: newSlots }
+    const ui = configStore.get('ui')
+    configStore.set('ui', { ...ui, grid: gridState })
+
+    // Also update SessionStore grid state for consistency
+    this.sessionManager.persistGridState(gridState)
+
+    // Cache + push for renderer (belt-and-suspenders with config persistence above)
+    const payload = { gridConfig: effectiveGrid, slots: slotMap }
+    this.cachedKeepWorkingRestore = payload
+    this.windowManager.sendToMainWindow(IPC.KEEP_WORKING_RESTORE, payload)
+    console.log(`[IpcHub] keepWorking: restore complete — ${slotMap.length} sessions (${claimed.size} reused, ${slotMap.length - claimed.size} new), grid ${effectiveGrid.cols}x${effectiveGrid.rows}`)
+    // Debug: append restore result to file
+    try {
+      const restoreDebug = { ts: new Date().toISOString(), slotMap, gridConfig: effectiveGrid, claimed: claimed.size }
+      fs.appendFileSync('/tmp/kw-debug.json', '\n--- RESTORE ---\n' + JSON.stringify(restoreDebug, null, 2))
+    } catch { /* ignore */ }
   }
 
   /** Live-update Keep Working snapshot when grid changes (called on every CONFIG_SAVE_GRID). */

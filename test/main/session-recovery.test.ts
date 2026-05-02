@@ -227,8 +227,8 @@ describe('SessionManager.recover()', () => {
 
     const result = await sm.recover()
     assert.equal(result.recovered.length, 2)
-    assert.equal(sm.getOrchestratorSessionId(), 'orch-id')
-    assert.equal(sm.getMpoSessionId(), 'mpo-id')
+    assert.equal(sm.getEntitySessionId('orchestrator'), 'orch-id')
+    assert.equal(sm.getEntitySessionId('mpo'), 'mpo-id')
   })
 
   it('sets createdAt from tmux session creation timestamp', async () => {
