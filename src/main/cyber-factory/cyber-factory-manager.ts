@@ -210,7 +210,7 @@ export class CyberFactoryManager {
       status: 'pending',
       startedAt,
       finishedAt: null,
-      config: opts.config ? (opts.config as CyberFactoryRun['config']) : null,
+      config: opts.config ? (opts.config as unknown as CyberFactoryRun['config']) : null,
     }
   }
 
