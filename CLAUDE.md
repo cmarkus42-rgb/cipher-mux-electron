@@ -14,7 +14,7 @@ Phasen-Übersicht:
 5. ~~Autonome Implementierung (Autonom) → Code~~ ✅ (2026-04-14)
 6. ~~Review, Test & Iteration → Feedback-Loop~~ ✅ (2026-04-17)
 7. ~~Voice-Pipeline (VAD + STT + TTS) + Bugreport-Interview~~ ✅ (2026-04-19)
-8. ~~AgentAdapter (TP-2) + Task-System + MPO~~ ✅ (2026-04-23)
+8. ~~AgentAdapter (TP-2) + Task-System + Cyber Factory~~ ✅ (2026-04-23)
 9. ~~Phase A (Theme-System) + Phase B (MCP/Terminal/StatusLine Polish)~~ ✅ (2026-04-23)
 10. ~~Phase C4 (Session Coloring) + Phase D (Workspaces + Personas) + Phase E (Communication) + Phase G1 (Shell Button)~~ ✅ (2026-04-24)
 11. ~~v0.9.1–0.9.5: Unified Sidebar, Workspace Apply E2E, Bugfixes, Cell Split, Terminal Width~~ ✅ (2026-04-24)
@@ -23,7 +23,7 @@ Phasen-Übersicht:
 14. ~~v0.9.9: Keep Working Restore Fix, BT Shutter App-Bundle~~ ✅ (2026-05-02)
 15. ~~v0.9.10: Keep Working Restore Fix v2 — 3-Layer Bug~~ ✅ (2026-05-02)
 
-**Status:** v0.9.11, 591 Tests (54 Test-Dateien). BT Shutter Fix: macOS 26 blockiert `kIOHIDOptionsTypeSeizeDevice` fuer adhoc-signierte Binaries — umgestellt auf non-exclusive HID + CGEventTap Volume-Suppression.
+**Status:** Cyber-Factory-Pack Welle 2 komplett. 913 Tests (60+ Test-Dateien). MPO durch Cyber Factory ersetzt, Workspace-Memory scope-Spalten implementiert.
 
 ### Keep Working Restore — Fragile Zone
 
@@ -89,15 +89,21 @@ cipher-mux-electron/
 │   │   ├── tmux/          ← TmuxManager (Control Mode), Parser, Batcher
 │   │   ├── message-bus/   ← SQLite CRUD, Schema
 │   │   ├── mcp/           ← Streamable HTTP Server, Tools, Auth
-│   │   ├── session/       ← SessionManager, OrchestratorTemplate, MpoTemplate
+│   │   ├── session/       ← SessionManager, OrchestratorTemplate, PersonaResolver
 │   │   ├── project/       ← ProjectScanner, KickoffOrchestrator, LauncherPrompt, KickoffWatcher
-│   │   ├── config/        ← ConfigStore (JSON-File Store)
+│   │   ├── config/        ← ConfigStore (JSON-File Store), GlobalRules
 │   │   ├── monitoring/    ← StatusLineMonitor, StatusLineHook
 │   │   ├── bugreport/     ← BugreportManager, BugreportResolve, OllamaClient
 │   │   ├── voice/         ← VoiceManager, ConversationEngine, STT (Whisper), TTS (Piper), VoiceInputRouter
 │   │   ├── agent/         ← AgentAdapter Interface, ClaudeCodeAdapter, AdapterRegistry
 │   │   ├── task/          ← TaskManager, TaskWatcher, TaskHooks, BugreportSource
-│   │   ├── mpo/           ← InputRequestWatcher (MPO Input Requests)
+│   │   ├── cyber-factory/ ← CyberFactoryManager, Escalation, Monitor, RiskReview, Diagnose, Template
+│   │   ├── mpo/           ← InputRequestWatcher (entity-agnostisch, von Cyber Factory genutzt)
+│   │   ├── companion/     ← MemoryStore (scope-aware), Schema (CF-Tabellen)
+│   │   ├── refinement/    ← RE-Audit, Purpose-Check, REQ-IDs, Handoff-Tools
+│   │   ├── ideation-partner/ ← BrainManager, SkillRegistry, AnforderungspaketGenerator
+│   │   ├── audit/         ← AuditManager (Skeleton, Vollausbau Welle 4)
+│   │   ├── character/     ← CharacterDefaults (6 Seed-Personas)
 │   │   ├── notes/         ← NoteManager (Filesystem CRUD), NoteTagging (Ollama Auto-Tagging)
 │   │   ├── workspace/     ← WorkspaceManager (Apply, Prompt Resolution, Persona Skill Sync)
 │   │   └── util/          ← exec-util, dependency-check, deep-merge
@@ -165,7 +171,7 @@ cipher-mux-electron/
 
 Personas definieren Rollen (Name, Farbe, Default-Prompt). Workspaces kombinieren Personas in einem Grid-Layout mit Projekt-Zuweisungen.
 
-- **Personas:** ConfigStore `personas` Key. Builtin-Personas (Orchestrator, MPO, Worker, empty) sind locked (nur Prompt editierbar). Custom Personas voll editierbar.
+- **Personas:** ConfigStore `personas` Key. Builtin-Personas (Orchestrator, Cyber Factory, Worker, empty) sind locked (nur Prompt editierbar). Custom Personas voll editierbar.
 - **Workspaces:** ConfigStore `workspaces` Key. Grid-Editor mit Merge-Handles (vertikale Zell-Verschmelzung), Cell Inspector, Prompt Resolution.
 - **Prompt Resolution (3-Level):** cell.prompt > workspace.promptOverrides[persona] > persona.defaultPrompt
 - **Separates Fenster:** Workspaces + Personas haben ein eigenes BrowserWindow (960x720), erreichbar via Workspace-Popup oder StatusBar. NICHT mehr im Info/Settings-Popup.
@@ -176,13 +182,15 @@ Personas definieren Rollen (Name, Farbe, Default-Prompt). Workspaces kombinieren
 
 ## MCP-Server: Worker-Session-Handling
 
-Der MCP-Server stellt 20+ Tools bereit, die von Orchestrator, MPO und Worker-Sessions genutzt werden:
+Der MCP-Server stellt 40+ Tools bereit, die von Orchestrator, Cyber Factory und Worker-Sessions genutzt werden:
 
 **Session-Tools:** `mux_create_session`, `mux_kill_session`, `mux_sessions`, `mux_send`, `mux_read`, `mux_status`, `mux_context_usage`
 **Task-Tools:** `mux_task_create`, `mux_task_update`, `mux_task_list`, `mux_task_get`
 **Notes-Tools:** `mux_notes_create`, `mux_notes_list` — erlauben MCP-Clients Notes in der Sidebar anzulegen
 **UI-Control:** `mux_grid_resize`, `mux_grid_place`, `mux_session_focus`, `mux_session_eject`, `mux_sidebar_toggle`, `mux_ui_highlight`, `mux_ui_open`, `mux_theme_set`
 **Voice/Scroll:** `mux_tts_speak` (TTS mit Priority), `mux_cell_scroll` (up/down/top/bottom/to-marker)
+**Cyber Factory:** `mux_cyber_factory_diagnose`, `mux_cyber_factory_handoff_testing`, `mux_cyber_factory_handoff_debugger`
+**Memory:** `companion_memory_write` (scope-aware), `companion_memory_recall` (scope-filter), `companion_memory_search`, `companion_memory_forget`
 **Sonstige:** `kickoff_complete`, `mux_bugreport_resolve`, `mux_input_request_create`
 
 **Wichtig für Konsumenten (Orchestrator/Clients):**
@@ -237,17 +245,29 @@ Abstraktion für verschiedene AI-Agent-Backends:
 - `ReferenceStubAdapter` (Tier-2): Stub für Dokumentation
 - `AdapterRegistry`: Discovery + Registrierung
 
-## MPO (Multi-Project Orchestrator)
+## Cyber Factory (Multi-Session-Orchestrator, ersetzt MPO)
 
-Eingebaute Funktion von cipher-mux. Empfaengt Anforderungspakete, zerlegt sie in Teilprojekte, startet N parallele Launcher-Sessions und koordiniert deren Arbeit.
+Eingebaute Funktion von cipher-mux. Empfaengt Detail-Specs vom Refinement, zerlegt sie in Subsysteme (Architekt-Phase), plant Wellen, startet parallele Worker-Sessions und koordiniert deren Arbeit.
 
-- **Managed Dir:** `~/.config/cipher-mux/mpo` (CLAUDE.md + .mcp.json generiert)
-- **Session-Name:** `MPO` (recovery-faehig)
-- **Template:** `src/main/session/mpo-template.ts` (Persona, 10-Phase-Lifecycle, 5-Level-Eskalation, Monitoring)
-- **MCP-Tool:** `mux_input_request_create` fuer Bubble-Requests an die Sidebar
-- **StatusBar:** `mpo`-Button mit Active-State
+- **Managed Dir:** `~/.config/cipher-mux/entities/cyber-factory` (CLAUDE.md + .mcp.json generiert)
+- **Session-Name:** `Cyber Factory` (recovery-faehig)
+- **Template:** `src/main/cyber-factory/cyber-factory-template.ts` (11-Phasen-Lifecycle, 5-Level-Eskalation)
+- **Code-Module:** `src/main/cyber-factory/` (8 Dateien: Manager, Escalation, Monitor, RiskReview, Diagnose, Template, ModelResolver, Types)
+- **DB-Tabellen:** `cyber_factory_runs`, `wellen`, `sub_projekte` in companion.db
+- **MCP-Tools:** `mux_cyber_factory_diagnose`, `mux_cyber_factory_handoff_testing`, `mux_cyber_factory_handoff_debugger`, `mux_input_request_create`
+- **ConfigStore:** `cyber_factory` Sektion mit ModelRouting, Budget-Thresholds, Stuck-Detection
+- **Model-Routing:** haiku/sonnet/opus pro Sub-Projekt-Typ (trivial→haiku, business_logic→sonnet, architecture→opus)
+- **StatusBar:** `cyber-factory`-Button mit Active-State
 - **Kein Auto-Start** — manuell per Button
 - **Grid-Placement:** Naechster freier Slot; bei vollem Grid oeffnet PlacementPopup zur Slot-Auswahl
+
+### Workspace-scoped Memory
+
+Companion-Memory (`companion.db`) unterstuetzt scope-aware Eintraege:
+- `scope_kind`: 'user' (global), 'workspace' (projekt-bezogen), 'session' (ephemer)
+- `scope_id`: Workspace-ID oder Session-ID
+- Cyber Factory schreibt workspace-skopierte Memories (Welle-Plaene, Decisions, Risk-Reviews)
+- `companion_memory_write/recall` MCP-Tools akzeptieren `scope_kind`/`scope_id` Parameter
 
 ## Notes Editor
 
