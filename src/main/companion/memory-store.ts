@@ -66,6 +66,29 @@ interface RawPendingRow {
   status: string
 }
 
+/** Patterns that indicate credentials — block these from being stored. */
+const CREDENTIAL_PATTERNS = [
+  /password\s*[:=]\s*['"][^'"]+['"]/i,
+  /secret\s*[:=]\s*['"][^'"]+['"]/i,
+  /api[_-]?key\s*[:=]\s*['"][^'"]+['"]/i,
+  /token\s*[:=]\s*['"][^'"]+['"]/i,
+  /Bearer\s+ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/,
+  /-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----/,
+  /AKIA[0-9A-Z]{16}/,  // AWS access key
+]
+
+/**
+ * Check if text contains credential patterns. Returns the matched pattern name or null.
+ */
+export function containsCredentials(text: string): string | null {
+  for (const pattern of CREDENTIAL_PATTERNS) {
+    if (pattern.test(text)) {
+      return pattern.source.slice(0, 30) + '...'
+    }
+  }
+  return null
+}
+
 /**
  * Companion Memory Store — SQLite CRUD + FTS5 for the companion subsystem.
  * DB path: ~/.config/cipher-mux/companion.db
@@ -193,6 +216,10 @@ export class MemoryStore {
 
   /** Write a new memory. FTS5 is updated via trigger. */
   write(opts: WriteMemoryOpts): Memory {
+    const credentialMatch = containsCredentials(opts.text)
+    if (credentialMatch) {
+      throw new Error(`Memory write blocked: text contains credential pattern (${credentialMatch}). Never store secrets in memory.`)
+    }
     const id = ulid()
     const ts = Date.now()
     this.stmtInsert.run(
