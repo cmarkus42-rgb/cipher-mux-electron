@@ -234,20 +234,26 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     }
   )
 
-  // 6. mux_kill_session — Kill a session
+  // 6. mux_kill_session — Kill a session (graceful by default for Claude sessions)
   ;(server.registerTool as any)(
     'mux_kill_session',
     {
-      description: 'Kill a cipher-mux session',
+      description: 'Kill a cipher-mux session. Graceful shutdown sends a cleanup prompt to Claude sessions before killing.',
       inputSchema: {
         sessionId: z.string().describe('Session ID (ULID)'),
+        graceful: z.boolean().optional().describe('Graceful shutdown (default true). Sends cleanup prompt to Claude sessions before kill.'),
       },
     },
-    async (args: { sessionId: string }) => {
+    async (args: { sessionId: string; graceful?: boolean }) => {
       try {
-        await ctx.sessionManager.stop(args.sessionId)
+        const useGraceful = args.graceful !== false && ctx.sessionManager.isAutoLaunched(args.sessionId)
+        if (useGraceful) {
+          await ctx.sessionManager.gracefulStop(args.sessionId)
+        } else {
+          await ctx.sessionManager.stop(args.sessionId)
+        }
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, graceful: useGraceful }) }],
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
@@ -1569,8 +1575,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, skipped: 'tts disabled' }) }] }
       }
       const voiceManager = ctx.getVoiceManager?.()
-      if (voiceManager?.isInitialized()) {
-        // Full voice pipeline — use Piper/macOS say with echo guard
+      if (voiceManager?.isInitialized() || voiceManager?.isPiperReady()) {
+        // Full voice pipeline or Piper-only — use Piper/macOS say with echo guard
         try {
           await voiceManager.speakText(args.text, args.priority === 'interrupt')
           return {
@@ -1582,6 +1588,16 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
             content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }],
             isError: true,
           }
+        }
+      }
+      // Lazy-init Piper if configured for local TTS but voice mode not active
+      if (voiceManager && ttsConfigStore.get('ttsVoice') !== 'macos') {
+        try {
+          await voiceManager.initPiperOnly()
+          await voiceManager.speakText(args.text, args.priority === 'interrupt')
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, spoken: args.text.slice(0, 100), via: 'piper-lazy' }) }] }
+        } catch (err) {
+          console.warn('[mux_tts_speak] Piper lazy-init failed, falling back to macOS say:', (err as Error).message)
         }
       }
       // Fallback: macOS say (works without voice mode being active)

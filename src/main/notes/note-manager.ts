@@ -203,9 +203,10 @@ export class NoteManager {
     const now = new Date().toISOString()
     await fs.mkdir(this.notesDir, { recursive: true })
 
+    const finalTitle = title || this.extractTitle(body)
     const tagList = tags ?? ([] as string[])
     const fm: Record<string, unknown> = {
-      title,
+      title: finalTitle,
       ...(tagList.includes('testcase') ? { type: 'testcase' } : {}),
       tags: tagList,
       created: now,
@@ -217,7 +218,7 @@ export class NoteManager {
 
     return {
       id,
-      title,
+      title: finalTitle,
       tags: tagList,
       scope: 'global',
       relativePath: `${id}.md`,
