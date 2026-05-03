@@ -308,6 +308,40 @@ body::after {
 }
 
 /* ================================================================
+   Voice Status Dot (session header indicator)
+   ================================================================ */
+
+.voice-dot {
+  width: 6px;
+  height: 6px;
+  display: inline-block;
+  border-radius: 50%;
+  margin-left: 5px;
+  flex-shrink: 0;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.voice-dot--idle {
+  background: var(--color-text-dim);
+  box-shadow: none;
+}
+
+.voice-dot--listening {
+  background: #43a047;
+  box-shadow: 0 0 4px #43a047;
+}
+
+.voice-dot--processing {
+  background: #fdd835;
+  box-shadow: 0 0 4px #fdd835;
+}
+
+.voice-dot--speaking {
+  background: #29b6f6;
+  box-shadow: 0 0 4px #29b6f6;
+}
+
+/* ================================================================
    Utility Classes
    ================================================================ */
 

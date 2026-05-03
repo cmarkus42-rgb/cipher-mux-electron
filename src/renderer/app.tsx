@@ -48,15 +48,21 @@ export function App() {
   const { theme, setTheme, toggleTheme, customThemes, activeCustomThemeId, selectCustomTheme, saveCustomTheme, deleteCustomTheme } = useTheme()
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
   const [voiceComState, setVoiceComState] = useState('idle')
+  const [voiceState, setVoiceState] = useState('idle')
   const [voiceTargetSessionId, setVoiceTargetSessionId] = useState<string | null>(null)
   const [voicePinned, setVoicePinned] = useState(false)
 
-  // Listen for voice COM state changes
+  // Listen for voice state changes (FSM + COM)
   useEffect(() => {
     const api = (window as any).cipherMux
-    if (!api?.voice?.onComState) return
-    const unsub = api.voice.onComState((state: string) => setVoiceComState(state))
-    return () => unsub()
+    const unsubs: Array<() => void> = []
+    if (api?.voice?.onState) {
+      unsubs.push(api.voice.onState((state: string) => setVoiceState(state)))
+    }
+    if (api?.voice?.onComState) {
+      unsubs.push(api.voice.onComState((state: string) => setVoiceComState(state)))
+    }
+    return () => unsubs.forEach(u => u())
   }, [])
 
   // Listen for voice target / pin changes (for session-header indicators)
@@ -84,6 +90,8 @@ export function App() {
     }
   }, [pendingLauncherSlot])
 
+  const { isSpeaking, stopSpeech } = useGlobalTtsPlayback()
+
   // Global keyboard shortcuts
   const shortcutEntries = useMemo(() => [
     {
@@ -109,18 +117,27 @@ export function App() {
       label: t('app.shortcut.closeOverlay'),
       category: 'Navigation' as const,
       action: () => {
+        // Priority 1: close overlays
         const anyOverlayOpen = bugreportVisible || infoVisible ||
           workspacesPopupVisible || !!placementPopup
-        if (!anyOverlayOpen) return false
-        setBugreportVisible(false)
-        setInfoVisible(false)
-        setWorkspacesPopupVisible(false)
-        setPlacementPopup(null)
+        if (anyOverlayOpen) {
+          setBugreportVisible(false)
+          setInfoVisible(false)
+          setWorkspacesPopupVisible(false)
+          setPlacementPopup(null)
+          return
+        }
+        // Priority 2: TTS barge-in — stop playing speech
+        if (isSpeaking) {
+          stopSpeech()
+          return
+        }
+        // Nothing to do — let event propagate
+        return false
       },
     },
-  ], [t, bugreportVisible, infoVisible, workspacesPopupVisible, placementPopup, grid.slots])
+  ], [t, bugreportVisible, infoVisible, workspacesPopupVisible, placementPopup, grid.slots, isSpeaking, stopSpeech])
   useShortcuts(shortcutEntries)
-  useGlobalTtsPlayback()
 
   const focusedSessionName = useMemo(() => {
     if (!focusedSessionId) return null
@@ -1002,6 +1019,8 @@ export function App() {
           entityStatus={entityStatus}
           voiceTargetSessionId={voiceTargetSessionId}
           voicePinned={voicePinned}
+          voiceState={voiceState}
+          isSpeaking={isSpeaking}
           onToggleVoicePin={handleToggleVoicePin}
           workspaceLoading={workspaceLoading}
           onFocusSession={setFocusedSessionId}
