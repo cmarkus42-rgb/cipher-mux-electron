@@ -2891,6 +2891,87 @@
   color: var(--color-text-secondary);
 }
 
+/* ── Testcase Filter Bar ─────────────────────────────── */
+
+.tc-filter-bar {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tc-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-dim);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.tc-filter-btn:hover {
+  border-color: var(--color-text-secondary);
+}
+
+.tc-filter-btn__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--color-border);
+  font-size: 10px;
+}
+
+/* Positive: filled background = "show only this" */
+.tc-filter-btn--pass.tc-filter-btn--positive {
+  background: var(--color-neon-green, #0a0);
+  color: #000;
+  border-color: var(--color-neon-green, #0a0);
+}
+.tc-filter-btn--pass.tc-filter-btn--positive .tc-filter-btn__badge {
+  background: rgba(0, 0, 0, 0.2);
+  color: #000;
+}
+
+.tc-filter-btn--fail.tc-filter-btn--positive {
+  background: var(--color-neon-red, #c33);
+  color: #fff;
+  border-color: var(--color-neon-red, #c33);
+}
+.tc-filter-btn--fail.tc-filter-btn--positive .tc-filter-btn__badge {
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
+}
+
+.tc-filter-btn--open.tc-filter-btn--positive {
+  background: var(--color-text-secondary);
+  color: var(--color-bg);
+  border-color: var(--color-text-secondary);
+}
+.tc-filter-btn--open.tc-filter-btn--positive .tc-filter-btn__badge {
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--color-bg);
+}
+
+/* Negative: strikethrough + dim = "exclude this" */
+.tc-filter-btn--negative {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+.tc-filter-btn--negative .tc-filter-btn__badge {
+  text-decoration: line-through;
+}
+
 /* ================================================================
    Unified Session Dialog
    ================================================================ */
