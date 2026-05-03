@@ -418,7 +418,7 @@
   "unified.tabPath": "Pfad",
   "unified.desc.companion": "Interaktiver Coding-Companion mit Gedaechtnis",
   "unified.desc.refinement": "Tiefenanalyse und Verfeinerung",
-  "unified.desc.orchestrator": "Session-Orchestrator mit MCP-Steuerung",
+  "unified.desc.orchestrator": "Kleine Jobs, Wartung, Einzelaufgaben",
   "unified.desc.mpo": "Multi-Projekt-Orchestrator fuer parallele Arbeit",
   "unified.desc.voice": "Sprach-Konversation (Hintergrund-Session)",
   "unified.desc.audit": "Sicherheits- und Code-Qualitaets-Audit",

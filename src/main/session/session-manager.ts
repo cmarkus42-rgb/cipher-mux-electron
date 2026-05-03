@@ -609,6 +609,7 @@ export class SessionManager extends EventEmitter {
     // ── Step 3: Fallback entity name matching for sessions recovered without store ──
     if (!hasStore) {
       const entityNameMap: Record<string, EntityId> = {
+        'Workshop': 'orchestrator',
         'Orchestrator': 'orchestrator',
         'Cyber Factory': 'cyber-factory',
         'Coding Companion': 'companion',
