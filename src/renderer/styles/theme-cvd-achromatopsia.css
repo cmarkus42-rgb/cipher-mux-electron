@@ -22,7 +22,7 @@ body[data-theme="cvd-achromatopsia"] {
   /* text — high contrast grayscale, all >4.5:1 on #1A1A1A */
   --color-text:             #E8E8E8;
   --color-text-secondary:   #B0B0B0;
-  --color-text-dim:         #787878;
+  --color-text-dim:         #949494;
   --color-text-accent:      #FFFFFF;
 
   /* "accents" are grayscale — status conveyed by shapes/text, not color */
