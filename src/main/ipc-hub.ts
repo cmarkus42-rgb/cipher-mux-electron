@@ -34,6 +34,7 @@ import { generateCyberFactoryClaudeMd } from './cyber-factory/cyber-factory-temp
 import { syncIdeationTemplate } from './ideation-partner/ideation-template'
 import { syncRefinementTemplate } from './refinement/refinement-template'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
+import { getGlobalRules, setGlobalRules, ensureGlobalRulesFile, invalidateGlobalRulesCache } from './config/global-rules'
 import { AdapterRegistry } from './agent/registry'
 import { EntityRegistry, registerBuiltinEntities } from './session/entity-registry'
 import { CyberFactoryManager } from './cyber-factory/cyber-factory-manager'
@@ -194,6 +195,7 @@ export class IpcHub {
     this.registerGridControlChannels()
     this.registerEntityChannels()
     this.registerPresetChannels()
+    this.registerGlobalRulesChannels()
     this.registerCompanionChannels()
     this.setupEventForwarding()
 
@@ -1920,6 +1922,30 @@ export class IpcHub {
           return { ok: false, error: 'Preset directory not found' }
         }
         fs.rmSync(dir, { recursive: true, force: true })
+        return { ok: true }
+      } catch (err: any) {
+        return { ok: false, error: err.message }
+      }
+    })
+  }
+
+  // ─── Global Rules (global-rules.md Editor) ─────────────
+  private registerGlobalRulesChannels(): void {
+    ensureGlobalRulesFile()
+
+    ipcMain.handle(IPC.GLOBAL_RULES_READ, async () => {
+      try {
+        const content = getGlobalRules()
+        return { ok: true, content }
+      } catch (err: any) {
+        return { ok: false, content: '', error: err.message }
+      }
+    })
+
+    ipcMain.handle(IPC.GLOBAL_RULES_SAVE, async (_e, { content }: { content: string }) => {
+      try {
+        setGlobalRules(content)
+        invalidateGlobalRulesCache()
         return { ok: true }
       } catch (err: any) {
         return { ok: false, error: err.message }

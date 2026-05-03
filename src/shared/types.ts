@@ -90,6 +90,8 @@ export interface StartSessionOpts {
   workspacePrompt?: string
   /** Context directory paths — injected as ## Context Directories in project CLAUDE.md. */
   contextPaths?: string[]
+  /** Internal flag: global rules already injected by startEntity(). */
+  _entityInjected?: boolean
 }
 
 export interface RecoveryResult {

@@ -385,6 +385,12 @@ const api = {
     delete: (entityId: string) => ipcRenderer.invoke(IPC.PRESETS_DELETE, { entityId }),
   },
 
+  // ─── Global Rules ──────────────────────────────────────
+  globalRules: {
+    read: () => ipcRenderer.invoke(IPC.GLOBAL_RULES_READ),
+    save: (content: string) => ipcRenderer.invoke(IPC.GLOBAL_RULES_SAVE, { content }),
+  },
+
   // ─── Voice ──────────────────────────────────────────────
   voice: {
     available: () => ipcRenderer.invoke(IPC.VOICE_AVAILABLE),

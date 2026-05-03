@@ -18,6 +18,7 @@ import type { PersistedSession, PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
 import { configStore } from '../config/config-store'
+import { getCachedGlobalRules } from '../config/global-rules'
 import { extractCharacterBlock } from '../character/character-defaults'
 import { resolvePersonaForPreset } from './persona-resolver'
 
@@ -286,6 +287,12 @@ export class SessionManager extends EventEmitter {
       } catch (err) {
         console.warn('[SessionManager] Workspace section injection failed:', err)
       }
+    }
+
+    // REQ-GLOBAL-002: Inject global rules into manual (non-entity) sessions.
+    // Entity sessions are handled in startEntity() before this point.
+    if (opts.projectPath && !opts._entityInjected) {
+      this.injectGlobalRulesSection(opts.projectPath)
     }
 
     // Create tmux session (empty projectPath → home dir)
@@ -857,6 +864,23 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
+   * Inject global rules (Layer 1) into a project's CLAUDE.md.
+   * REQ-GLOBAL-002: Content from ~/.config/cipher-mux/global-rules.md is injected
+   * as ## Global Rules section before persona/entity content.
+   */
+  private injectGlobalRulesSection(projectPath: string): void {
+    const globalRules = getCachedGlobalRules()
+    if (!globalRules.trim()) return
+
+    const claudeMdPath = path.join(projectPath, 'CLAUDE.md')
+    if (!fs.existsSync(claudeMdPath)) return
+
+    const content = fs.readFileSync(claudeMdPath, 'utf-8')
+    const updated = this.injectSection(content, 'Global Rules', globalRules.trim())
+    fs.writeFileSync(claudeMdPath, updated, 'utf-8')
+  }
+
+  /**
    * Inject workspace prompt and context directories into a project's CLAUDE.md.
    * Called during workspace apply for project-path cells.
    */
@@ -1005,6 +1029,11 @@ export class SessionManager extends EventEmitter {
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2), 'utf-8')
     }
 
+    // ─── Global Rules Injection (Layer 1) ──────────────────
+    // REQ-GLOBAL-002: Inject global-rules.md content into EVERY session's CLAUDE.md
+    // before persona/entity content. This is Layer 1 in the 5-layer prompt model.
+    this.injectGlobalRulesSection(config.projectPath)
+
     // ─── Universal Persona Injection ───────────────────────
     // Inject the resolved character block (tone, style, rules) into every
     // entity's CLAUDE.md. Uses persona-resolver: global > preset override > default matrix > fallback.
@@ -1032,6 +1061,7 @@ export class SessionManager extends EventEmitter {
       name: displayName,
       projectPath: config.projectPath,
       ...opts,
+      _entityInjected: true,
     })
 
     // Tag session with entity
