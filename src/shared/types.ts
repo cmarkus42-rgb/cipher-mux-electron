@@ -515,6 +515,8 @@ export interface NoteInfo {
   relativePath: string
   createdAt: string
   modifiedAt: string
+  /** First non-empty, non-heading body line (truncated to 80 chars). */
+  preview?: string
   /** Note type from frontmatter (e.g. 'testcase'). Undefined for regular notes. */
   noteType?: string
   /** Session name that created this handoff note */

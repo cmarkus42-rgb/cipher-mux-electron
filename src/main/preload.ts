@@ -240,6 +240,18 @@ const api = {
       ipcRenderer.invoke(IPC.NOTES_CREATE, { title, body, tags }),
     delete: (id: string) =>
       ipcRenderer.invoke(IPC.NOTES_DELETE, { id }),
+    trash: (id: string) =>
+      ipcRenderer.invoke(IPC.NOTES_TRASH, { id }),
+    trashMany: (ids: string[]): Promise<{ trashed: string[] }> =>
+      ipcRenderer.invoke(IPC.NOTES_TRASH_MANY, { ids }),
+    restore: (id: string) =>
+      ipcRenderer.invoke(IPC.NOTES_RESTORE, { id }),
+    restoreMany: (ids: string[]): Promise<{ restored: string[] }> =>
+      ipcRenderer.invoke(IPC.NOTES_RESTORE_MANY, { ids }),
+    bulkTagAdd: (ids: string[], tag: string): Promise<{ updated: string[] }> =>
+      ipcRenderer.invoke(IPC.NOTES_BULK_TAG_ADD, { ids, tag }),
+    bulkTagRemove: (ids: string[], tag: string): Promise<{ updated: string[] }> =>
+      ipcRenderer.invoke(IPC.NOTES_BULK_TAG_REMOVE, { ids, tag }),
     screenshot: (noteId: string, itemId: string): Promise<{ path: string } | null> =>
       ipcRenderer.invoke(IPC.NOTES_SCREENSHOT, { noteId, itemId }),
     parseTestcase: (id: string) =>

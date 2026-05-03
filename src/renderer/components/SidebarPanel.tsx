@@ -81,7 +81,10 @@ export function SidebarPanel({
   const [tagFilter, setTagFilter] = useState<TagFilterState>({})
   const [searchTerm, setSearchTerm] = useState('')
 
-  const { notes, tagRepo, deleteNote, searchNotes } = useNotes()
+  const { notes, tagRepo, tagClassRepo, tagIndex, deleteNote, trashMany, restoreMany, bulkTagAdd, bulkTagRemove, searchNotes } = useNotes()
+
+  // Undo toast state (REQ-NOTES-006)
+  const [undoState, setUndoState] = useState<{ ids: string[]; timer: ReturnType<typeof setTimeout> } | null>(null)
 
   // Pre-select workspace defaultTags as include-filters when workspace changes
   useEffect(() => {
@@ -148,6 +151,40 @@ export function SidebarPanel({
     await deleteNote(note.id)
   }, [deleteNote])
 
+  // REQ-NOTES-006: Bulk delete with undo
+  const handleBulkDelete = useCallback(async (noteIds: string[]) => {
+    const titles = notes.filter(n => noteIds.includes(n.id)).map(n => n.title || 'Untitled')
+    const msg = `${noteIds.length} Notes loeschen?\n\n${titles.slice(0, 5).join('\n')}${titles.length > 5 ? `\n...+${titles.length - 5}` : ''}`
+    if (!confirm(msg)) return
+
+    const { trashed } = await trashMany(noteIds)
+    if (trashed.length === 0) return
+
+    // Undo toast: 15s window
+    if (undoState?.timer) clearTimeout(undoState.timer)
+    const timer = setTimeout(() => setUndoState(null), 15000)
+    setUndoState({ ids: trashed, timer })
+  }, [notes, trashMany, undoState])
+
+  const handleUndo = useCallback(async () => {
+    if (!undoState) return
+    clearTimeout(undoState.timer)
+    await restoreMany(undoState.ids)
+    setUndoState(null)
+  }, [undoState, restoreMany])
+
+  // REQ-NOTES-005: Bulk tag operations
+  const handleBulkTagAdd = useCallback(async (noteIds: string[], tag: string) => {
+    await bulkTagAdd(noteIds, tag)
+  }, [bulkTagAdd])
+
+  const handleBulkTagRemove = useCallback(async (noteIds: string[], tag: string) => {
+    await bulkTagRemove(noteIds, tag)
+  }, [bulkTagRemove])
+
+  // All known tags for auto-complete
+  const allKnownTags = Object.keys(tagRepo.tags)
+
   const handleNoteDragStart = useCallback((note: any, e: DragEvent) => {
     if (!e.dataTransfer) return
     e.dataTransfer.setData('application/x-cipher-type', 'note')
@@ -197,12 +234,19 @@ export function SidebarPanel({
               notes={notes}
               searchTerm={searchTerm}
               tagFilter={tagFilter}
+              tagClassRepo={tagClassRepo}
+              tagIndex={tagIndex}
+              activeWorkspaceId={activeWorkspaceId}
               onSearchChange={setSearchTerm}
               onTagFilterChange={setTagFilter}
               onNoteDoubleClick={handleNoteDoubleClick}
               onNoteDelete={handleNoteDelete}
               onNoteDragStart={handleNoteDragStart}
               onSearch={searchNotes}
+              onBulkDelete={handleBulkDelete}
+              onBulkTagAdd={handleBulkTagAdd}
+              onBulkTagRemove={handleBulkTagRemove}
+              allKnownTags={allKnownTags}
             />
           </div>
         )}
@@ -311,6 +355,13 @@ export function SidebarPanel({
           </div>
         )}
       </section>
+      {/* Undo Toast (REQ-NOTES-006) */}
+      {undoState && (
+        <div class="sidebar-panel__undo-toast">
+          <span>{undoState.ids.length} Notes geloescht</span>
+          <button onClick={handleUndo}>Undo</button>
+        </div>
+      )}
     </aside>
   )
 }
