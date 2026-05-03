@@ -30,7 +30,16 @@ export function useContextUsage() {
       }
     )
 
-    return () => { mountedRef.current = false; unsubUpdated(); unsubWarning() }
+    // Clean up usage when session stops (resets bar to 0% for new sessions)
+    const unsubStopped = api().sessions?.onStopped?.((session: { id: string }) => {
+      setUsages((prev) => {
+        const next = { ...prev }
+        delete next[session.id]
+        return next
+      })
+    })
+
+    return () => { mountedRef.current = false; unsubUpdated(); unsubWarning(); unsubStopped?.() }
   }, [])
 
   return usages

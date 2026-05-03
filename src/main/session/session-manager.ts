@@ -45,86 +45,55 @@ const MCP_PREFIX = 'mcp__cipher-mux__'
  * Entities WITH a templatePath get permissions from their template's
  * settings.local.json. This function covers template-less entities only.
  */
+/** Base permissions every entity gets. */
+const BASE_PERMISSIONS = [
+  `${MCP_PREFIX}mux_sessions`,
+  `${MCP_PREFIX}mux_status`,
+  `${MCP_PREFIX}mux_read`,
+  `${MCP_PREFIX}mux_send`,
+  `${MCP_PREFIX}mux_context_usage`,
+  `${MCP_PREFIX}mux_create_session`,
+  `${MCP_PREFIX}mux_kill_session`,
+  `${MCP_PREFIX}mux_task_create`,
+  `${MCP_PREFIX}mux_task_update`,
+  `${MCP_PREFIX}mux_task_list`,
+  `${MCP_PREFIX}mux_task_get`,
+  `${MCP_PREFIX}mux_input_request_create`,
+  `${MCP_PREFIX}mux_notes_create`,
+  `${MCP_PREFIX}mux_notes_list`,
+  `${MCP_PREFIX}mux_notes_search`,
+  `${MCP_PREFIX}mux_notes_read`,
+  `${MCP_PREFIX}mux_notes_update`,
+  `${MCP_PREFIX}mux_notes_delete`,
+  `${MCP_PREFIX}mux_notes_handoff_create`,
+  `${MCP_PREFIX}mux_notes_handoff_search`,
+  `${MCP_PREFIX}mux_bugreport_resolve`,
+  `${MCP_PREFIX}mux_grid_resize`,
+  `${MCP_PREFIX}mux_grid_place`,
+  `${MCP_PREFIX}mux_session_focus`,
+  `${MCP_PREFIX}mux_session_eject`,
+  `${MCP_PREFIX}mux_sidebar_toggle`,
+  `${MCP_PREFIX}mux_tts_speak`,
+  `${MCP_PREFIX}mux_ui_open`,
+  `${MCP_PREFIX}mux_ui_highlight`,
+  `${MCP_PREFIX}mux_theme_set`,
+  `${MCP_PREFIX}companion_memory_write`,
+  `${MCP_PREFIX}companion_memory_recall`,
+  `${MCP_PREFIX}companion_memory_search`,
+  `${MCP_PREFIX}companion_memory_forget`,
+]
+
 function getMcpPermissionsForEntity(entityId: EntityId): string[] {
+  // All entities get the full base set. Orchestrators also get tmux + kickoff.
+  const perms = [...BASE_PERMISSIONS]
   switch (entityId) {
-    case 'voice-relay':
-      return [
-        `${MCP_PREFIX}mux_sessions`,
-        `${MCP_PREFIX}mux_status`,
-        `${MCP_PREFIX}mux_read`,
-        `${MCP_PREFIX}mux_send`,
-        `${MCP_PREFIX}mux_context_usage`,
-        `${MCP_PREFIX}mux_create_session`,
-        `${MCP_PREFIX}mux_kill_session`,
-        `${MCP_PREFIX}mux_task_list`,
-        `${MCP_PREFIX}mux_task_get`,
-        `${MCP_PREFIX}mux_notes_create`,
-        `${MCP_PREFIX}mux_notes_list`,
-        `${MCP_PREFIX}mux_notes_search`,
-        `${MCP_PREFIX}mux_notes_read`,
-        `${MCP_PREFIX}mux_grid_resize`,
-        `${MCP_PREFIX}mux_grid_place`,
-        `${MCP_PREFIX}mux_session_focus`,
-        `${MCP_PREFIX}mux_session_eject`,
-        `${MCP_PREFIX}mux_sidebar_toggle`,
-        `${MCP_PREFIX}mux_tts_speak`,
-        `${MCP_PREFIX}mux_ui_open`,
-        `${MCP_PREFIX}mux_ui_highlight`,
-        `${MCP_PREFIX}mux_theme_set`,
-        `${MCP_PREFIX}mux_bugreport_resolve`,
-        `${MCP_PREFIX}companion_memory_write`,
-        `${MCP_PREFIX}companion_memory_recall`,
-        `${MCP_PREFIX}companion_memory_search`,
-        `${MCP_PREFIX}companion_memory_forget`,
-      ]
     case 'orchestrator':
     case 'cyber-factory':
     case 'launcher':
-      return [
-        `${MCP_PREFIX}mux_sessions`,
-        `${MCP_PREFIX}mux_status`,
-        `${MCP_PREFIX}mux_read`,
-        `${MCP_PREFIX}mux_send`,
-        `${MCP_PREFIX}mux_context_usage`,
-        `${MCP_PREFIX}mux_create_session`,
-        `${MCP_PREFIX}mux_kill_session`,
-        `${MCP_PREFIX}mux_task_create`,
-        `${MCP_PREFIX}mux_task_update`,
-        `${MCP_PREFIX}mux_task_list`,
-        `${MCP_PREFIX}mux_task_get`,
-        `${MCP_PREFIX}mux_input_request_create`,
-        `${MCP_PREFIX}mux_notes_create`,
-        `${MCP_PREFIX}mux_notes_list`,
-        `${MCP_PREFIX}mux_notes_search`,
-        `${MCP_PREFIX}mux_notes_read`,
-        `${MCP_PREFIX}mux_notes_update`,
-        `${MCP_PREFIX}mux_notes_delete`,
-        `${MCP_PREFIX}mux_notes_handoff_create`,
-        `${MCP_PREFIX}mux_notes_handoff_search`,
-        `${MCP_PREFIX}mux_bugreport_resolve`,
-        `${MCP_PREFIX}mux_grid_resize`,
-        `${MCP_PREFIX}mux_grid_place`,
-        `${MCP_PREFIX}mux_session_focus`,
-        `${MCP_PREFIX}mux_session_eject`,
-        `${MCP_PREFIX}mux_sidebar_toggle`,
-        `${MCP_PREFIX}mux_tts_speak`,
-        `${MCP_PREFIX}kickoff_complete`,
-        'Bash(tmux:*)',
-      ]
-    case 'audit':
-      return [
-        `${MCP_PREFIX}mux_sessions`,
-        `${MCP_PREFIX}mux_status`,
-        `${MCP_PREFIX}mux_read`,
-        `${MCP_PREFIX}mux_context_usage`,
-        `${MCP_PREFIX}mux_notes_create`,
-        `${MCP_PREFIX}mux_notes_list`,
-        `${MCP_PREFIX}mux_notes_search`,
-        `${MCP_PREFIX}mux_notes_read`,
-      ]
-    default:
-      return []
+      perms.push(`${MCP_PREFIX}kickoff_complete`, 'Bash(tmux:*)')
+      break
   }
+  return perms
 }
 
 /**
@@ -1008,13 +977,13 @@ export class SessionManager extends EventEmitter {
           settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
         } catch { /* doesn't exist yet */ }
 
-        // Only inject permissions if none are set (don't override user customization)
-        if (!settings.permissions) {
-          const mcpPerms = getMcpPermissionsForEntity(config.id)
-          if (mcpPerms.length > 0) {
-            settings.permissions = { allow: mcpPerms }
-            fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
-          }
+        // Always ensure full permissions via union-merge (new tools propagate automatically)
+        const mcpPerms = getMcpPermissionsForEntity(config.id)
+        if (mcpPerms.length > 0) {
+          const existing = ((settings.permissions as any)?.allow as string[]) ?? []
+          const union = [...new Set([...mcpPerms, ...existing])]
+          settings.permissions = { ...((settings.permissions as any) ?? {}), allow: union }
+          fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
         }
       }
     }

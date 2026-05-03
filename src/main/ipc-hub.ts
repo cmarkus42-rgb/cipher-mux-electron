@@ -450,6 +450,8 @@ export class IpcHub {
 
     this.sessionManager.on('session-stopped', (session) => {
       this.windowManager.sendToMainWindow(IPC.SESSION_STOPPED, session)
+      // Clean up context-usage cache so bar resets to 0% on new session
+      this.statusLineMonitor?.remove(session.id)
     })
 
     this.sessionManager.on('cyber-factory-started', (session) => {
