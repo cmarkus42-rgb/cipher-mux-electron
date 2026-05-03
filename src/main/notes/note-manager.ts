@@ -12,12 +12,29 @@ import type { NoteInfo, NoteContent, HandoffStatus } from '../../shared/types'
 
 export class NoteManager {
   private notesDir: string
+  private trashDir: string
 
   constructor(notesDir: string) {
     this.notesDir = notesDir
+    this.trashDir = path.join(notesDir, '.trash')
     void fs.mkdir(this.notesDir, { recursive: true })
     // Run migration from scope-based dirs (P.3) — synchronous, runs once
     this.migrateFromScopes()
+    // Clean trash on startup (REQ-NOTES-006)
+    this.cleanTrash()
+  }
+
+  /** Remove all files from .trash/ on startup */
+  private cleanTrash(): void {
+    try {
+      if (!fsSync.existsSync(this.trashDir)) return
+      const entries = fsSync.readdirSync(this.trashDir)
+      for (const entry of entries) {
+        try {
+          fsSync.unlinkSync(path.join(this.trashDir, entry))
+        } catch { /* ignore individual failures */ }
+      }
+    } catch { /* trash dir doesn't exist — fine */ }
   }
 
   // ─── P.3 Migration ───────────────────────────────────────
@@ -114,6 +131,19 @@ export class NoteManager {
     return match ? match[1].trim() : 'Untitled'
   }
 
+  /** Extract first non-empty, non-heading body line as preview (max 80 chars). */
+  private extractPreview(body: string): string | undefined {
+    const lines = body.split('\n')
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      if (trimmed.startsWith('#')) continue
+      if (trimmed.startsWith('---')) continue
+      return trimmed.length > 80 ? trimmed.slice(0, 80) + '...' : trimmed
+    }
+    return undefined
+  }
+
   /** Parse a .md file into NoteInfo + body */
   private async parseFile(filePath: string): Promise<NoteContent | null> {
     let raw: string
@@ -141,12 +171,15 @@ export class NoteManager {
     }
 
     const id = path.basename(filePath, '.md')
+    const body = parsed.content.trimStart()
+    const preview = this.extractPreview(body)
     const info: NoteInfo = {
       id,
       title: fm.title ?? 'Untitled',
       tags: fm.tags ?? [],
       scope: 'global',
       relativePath: `${id}.md`,
+      ...(preview ? { preview } : {}),
       ...(fm.type ? { noteType: fm.type } : {}),
       createdAt: fm.created ?? new Date().toISOString(),
       modifiedAt: fm.modified ?? new Date().toISOString(),
@@ -155,7 +188,7 @@ export class NoteManager {
       ...(fm.handoff_status ? { handoffStatus: fm.handoff_status } : {}),
     }
 
-    return { info, body: parsed.content.trimStart() }
+    return { info, body }
   }
 
   /** Serialize note to markdown with frontmatter */
@@ -275,6 +308,35 @@ export class NoteManager {
     }
   }
 
+  /** Add a tag to multiple notes, respecting MAX_MANUAL_TAGS limit. REQ-NOTES-005 */
+  async bulkAddTag(ids: string[], tag: string, maxTags: number = 5): Promise<string[]> {
+    const updated: string[] = []
+    for (const id of ids) {
+      const content = await this.parseFile(this.filePath(id))
+      if (!content) continue
+      if (content.info.tags.length >= maxTags) continue
+      if (content.info.tags.includes(tag)) continue
+      const newTags = [...content.info.tags, tag]
+      await this.save(id, content.body, newTags)
+      updated.push(id)
+    }
+    return updated
+  }
+
+  /** Remove a tag from multiple notes. REQ-NOTES-005 */
+  async bulkRemoveTag(ids: string[], tag: string): Promise<string[]> {
+    const updated: string[] = []
+    for (const id of ids) {
+      const content = await this.parseFile(this.filePath(id))
+      if (!content) continue
+      if (!content.info.tags.includes(tag)) continue
+      const newTags = content.info.tags.filter(t => t !== tag)
+      await this.save(id, content.body, newTags)
+      updated.push(id)
+    }
+    return updated
+  }
+
   /** Create a handoff note with extended frontmatter fields. */
   async createHandoff(
     title: string,
@@ -361,6 +423,60 @@ export class NoteManager {
     })
 
     return results.slice(0, 50)
+  }
+
+  /** Move note to .trash/ (soft delete with undo support). REQ-NOTES-006 */
+  async trash(id: string): Promise<boolean> {
+    try {
+      await fs.mkdir(this.trashDir, { recursive: true })
+      const src = this.filePath(id)
+      const dest = path.join(this.trashDir, `${id}.md`)
+      await fs.rename(src, dest)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** Bulk trash — moves multiple notes to .trash/. Returns IDs that were trashed. */
+  async trashMany(ids: string[]): Promise<string[]> {
+    await fs.mkdir(this.trashDir, { recursive: true })
+    const trashed: string[] = []
+    for (const id of ids) {
+      try {
+        const src = this.filePath(id)
+        const dest = path.join(this.trashDir, `${id}.md`)
+        await fs.rename(src, dest)
+        trashed.push(id)
+      } catch { /* skip failures */ }
+    }
+    return trashed
+  }
+
+  /** Restore note from .trash/ back to notes dir. REQ-NOTES-006 */
+  async restore(id: string): Promise<boolean> {
+    try {
+      const src = path.join(this.trashDir, `${id}.md`)
+      const dest = this.filePath(id)
+      await fs.rename(src, dest)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** Bulk restore from .trash/. Returns IDs that were restored. */
+  async restoreMany(ids: string[]): Promise<string[]> {
+    const restored: string[] = []
+    for (const id of ids) {
+      try {
+        const src = path.join(this.trashDir, `${id}.md`)
+        const dest = this.filePath(id)
+        await fs.rename(src, dest)
+        restored.push(id)
+      } catch { /* skip */ }
+    }
+    return restored
   }
 
   async delete(id: string): Promise<boolean> {

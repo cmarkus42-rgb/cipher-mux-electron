@@ -1762,6 +1762,166 @@
   border-left: 2px solid var(--color-border);
 }
 
+/* --- Note Selection + Bulk Bar (REQ-NOTES-004/005/006) --- */
+.note-card--selected {
+  border-color: var(--color-neon);
+  background: color-mix(in srgb, var(--color-neon) 10%, var(--color-surface));
+}
+
+.note-card--focused {
+  outline: 1px dashed var(--color-neon);
+  outline-offset: -1px;
+}
+
+.notes-tree-view__list:focus {
+  outline: none;
+}
+
+.bulk-notes-bar {
+  padding: var(--space-sm);
+  margin: var(--space-xs) var(--space-sm);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-neon);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+}
+
+.bulk-notes-bar__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bulk-notes-bar__count {
+  font-weight: 600;
+  color: var(--color-neon);
+}
+
+.bulk-notes-bar__clear {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.bulk-notes-bar__input-wrap {
+  position: relative;
+}
+
+.bulk-notes-bar__input {
+  width: 100%;
+  padding: 2px 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
+}
+
+.bulk-notes-bar__input:disabled {
+  opacity: 0.5;
+}
+
+.bulk-notes-bar__suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  z-index: 10;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.bulk-notes-bar__suggestion {
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+}
+
+.bulk-notes-bar__suggestion:hover {
+  background: var(--color-surface-sunken);
+}
+
+.bulk-notes-bar__toggle {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  padding: 0;
+}
+
+.bulk-notes-bar__common-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: var(--space-xxs);
+}
+
+.bulk-notes-bar__removable-tag {
+  padding: 1px 5px;
+  background: color-mix(in srgb, var(--color-neon) 15%, transparent);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+}
+
+.bulk-notes-bar__removable-tag:hover {
+  background: color-mix(in srgb, var(--color-error, red) 20%, transparent);
+  border-color: var(--color-error, red);
+}
+
+.bulk-notes-bar__delete {
+  background: color-mix(in srgb, var(--color-error, #ef4444) 15%, var(--color-surface));
+  border: 1px solid var(--color-error, #ef4444);
+  color: var(--color-error, #ef4444);
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+}
+
+.bulk-notes-bar__delete:hover {
+  background: var(--color-error, #ef4444);
+  color: var(--color-bg);
+}
+
+/* Undo toast */
+.sidebar-panel__undo-toast {
+  position: absolute;
+  bottom: var(--space-md);
+  left: var(--space-md);
+  right: var(--space-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-neon);
+  font-size: var(--font-size-sm);
+  z-index: 20;
+  animation: toast-in 0.2s ease-out;
+}
+
+.sidebar-panel__undo-toast button {
+  background: var(--color-neon);
+  color: var(--color-bg);
+  border: none;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--font-size-xs);
+}
+
+@keyframes toast-in {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
 /* --- Grid Placement Popup --- */
 .grid-placement-overlay {
   position: fixed;
@@ -2155,11 +2315,56 @@
   gap: var(--space-xs);
 }
 
+.notes-tree-view__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.notes-tree-view__toolbar .sidebar-notes__search {
+  flex: 1;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.notes-tree-view__toggles {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.notes-toggle {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-dim);
+  font-size: 12px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 2px;
+  padding: 0;
+}
+
+.notes-toggle:hover {
+  color: var(--color-text-secondary);
+  border-color: var(--color-text-dim);
+}
+
+.notes-toggle--active {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
 .notes-tree-view__tree {
   display: flex;
   flex-direction: column;
-  max-height: 180px;
+  max-height: 220px;
   overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .notes-tree-view__sep {
@@ -2174,58 +2379,198 @@
   gap: var(--space-xs);
 }
 
-.tree-node {
+/* ─── Class:Value Tag Tree (REQ-NOTES-001) ─────────────── */
+
+.tree-class {
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 2px 4px;
   cursor: pointer;
   font-size: var(--font-size-sm);
+  font-weight: 700;
   color: var(--color-text-secondary);
   border-radius: 2px;
   user-select: none;
 }
 
-.tree-node:hover {
+.tree-class:hover {
   background: var(--color-accent-soft);
 }
 
-.tree-node--include {
+.tree-class--include {
   color: var(--color-neon-green, #0a0);
   background: rgba(0, 170, 0, 0.10);
 }
 
-.tree-node--exclude {
+.tree-class--exclude {
   color: var(--color-neon-red, #c33);
   background: rgba(204, 51, 51, 0.10);
 }
 
-.tree-node--exclude .tree-node__label {
-  text-decoration: line-through;
+.tree-class--partial {
+  background: rgba(99, 102, 241, 0.08);
 }
 
-.tree-node--clear {
+.tree-class--clear {
   color: var(--color-text-dim);
   font-style: italic;
+  font-weight: 400;
 }
 
-.tree-node__arrow {
+.tree-class__arrow {
   width: 10px;
   flex-shrink: 0;
   font-size: 10px;
 }
 
-.tree-node__label {
+.tree-class__label {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tree-node__count {
+.tree-class__count {
   flex-shrink: 0;
   font-size: var(--font-size-xs);
   color: var(--color-text-dim);
+}
+
+.tree-value {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 2px 20px;
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+  border-radius: 2px;
+  user-select: none;
+}
+
+.tree-value:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-text-secondary);
+}
+
+.tree-value--include {
+  color: var(--color-neon-green, #0a0);
+  background: rgba(0, 170, 0, 0.10);
+}
+
+.tree-value--exclude {
+  color: var(--color-neon-red, #c33);
+  background: rgba(204, 51, 51, 0.10);
+}
+
+.tree-value--exclude .tree-value__label {
+  text-decoration: line-through;
+}
+
+.tree-value__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-value__count {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+}
+
+/* ─── Note Card (REQ-NOTES-003) ────────────────────────── */
+
+.note-card {
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.note-card:hover {
+  border-color: var(--color-accent);
+}
+
+.note-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.note-card__title {
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.note-card__delete {
+  background: none;
+  border: none;
+  color: transparent;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.note-card:hover .note-card__delete {
+  color: var(--color-text-dim);
+}
+
+.note-card__delete:hover {
+  color: var(--color-neon-red, #c33);
+}
+
+.note-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.note-card__tag {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--color-text-dim);
+  border: 1px solid var(--color-border);
+  padding: 0 4px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.note-card__tag-warning {
+  color: var(--color-warning, #f0a000);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.note-card__preview {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+  opacity: 0.6;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: none;
+}
+
+.note-card:hover .note-card__preview,
+.note-card__preview--visible {
+  display: block;
+}
+
+.note-card--extended .note-card__preview {
+  display: block;
 }
 
 /* ─── Testcase View ─────────────────────────────────────── */

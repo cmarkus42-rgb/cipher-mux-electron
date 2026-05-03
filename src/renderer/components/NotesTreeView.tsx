@@ -1,11 +1,11 @@
 // src/renderer/components/NotesTreeView.tsx
-// Hierarchical tag tree + filtered note list for the sidebar Notes section.
-// Tag filter is tri-state: neutral → include (green) → exclude (red) → neutral.
+// Two-level class:value tag tree + filtered note list for the sidebar Notes section.
+// REQ-NOTES-001 (Tag-Baum), REQ-NOTES-003 (Note-List), REQ-NOTES-009 (Alle-Notes-Toggle).
 
 import { h } from 'preact'
 import { useState, useMemo, useCallback, useEffect, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
-import type { NoteInfo } from '../../shared/types'
+import type { NoteInfo, TagClassRepository, TagIndexData } from '../../shared/types'
 import { MAX_MANUAL_TAGS } from '../../shared/constants'
 
 // ─── Types ─────────────────────────────────────────────────
@@ -13,49 +13,78 @@ import { MAX_MANUAL_TAGS } from '../../shared/constants'
 export type TagFilterMode = 'include' | 'exclude'
 export type TagFilterState = Record<string, TagFilterMode>
 
-// ─── Tag Tree Node ──────────────────────────────────────────
+// ─── Class:Value Tree ──────────────────────────────────────
 
-interface TagNode {
-  name: string          // leaf segment, e.g. "ui"
-  fullPath: string      // full slash path, e.g. "bugs/ui"
-  count: number         // notes with this exact tag or any child tag
-  children: TagNode[]
+interface ClassNode {
+  className: string   // e.g. "kind", "domain", "Unklassifiziert"
+  color?: string      // from TagClassRepository
+  values: ValueNode[]
+  totalCount: number  // sum of all value counts
 }
 
-function buildTagTree(tags: string[], noteTags: Map<string, number>): TagNode[] {
-  const root: TagNode[] = []
-  const nodeMap = new Map<string, TagNode>()
+interface ValueNode {
+  value: string       // e.g. "bugreport"
+  fullTag: string     // e.g. "kind:bugreport" or legacy tag
+  count: number
+}
 
-  for (const tag of tags) {
-    const parts = tag.split('/')
-    let parentList = root
-    let pathSoFar = ''
+const UNCLASSIFIED = 'Unklassifiziert'
 
-    for (let i = 0; i < parts.length; i++) {
-      pathSoFar = pathSoFar ? `${pathSoFar}/${parts[i]}` : parts[i]
+/** Build a two-level tree from class:value tags. Legacy tags go under UNCLASSIFIED. */
+export function buildClassTree(
+  notes: NoteInfo[],
+  tagClassRepo: TagClassRepository,
+  _tagIndex: TagIndexData,
+): ClassNode[] {
+  // Count tags from notes (more reliable than tagIndex which may lag)
+  const tagCounts = new Map<string, number>()
+  for (const note of notes) {
+    for (const tag of note.tags) {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1)
+    }
+  }
 
-      let node = nodeMap.get(pathSoFar)
-      if (!node) {
-        node = { name: parts[i], fullPath: pathSoFar, count: 0, children: [] }
-        nodeMap.set(pathSoFar, node)
-        parentList.push(node)
+  // Group by class
+  const classMap = new Map<string, ValueNode[]>()
+  const classColors = new Map<string, string | undefined>()
+
+  for (const [tag, count] of tagCounts) {
+    const colonIdx = tag.indexOf(':')
+    if (colonIdx === -1) {
+      // Legacy tag — goes under Unklassifiziert
+      if (!classMap.has(UNCLASSIFIED)) classMap.set(UNCLASSIFIED, [])
+      classMap.get(UNCLASSIFIED)!.push({ value: tag, fullTag: tag, count })
+    } else {
+      const cls = tag.slice(0, colonIdx)
+      const val = tag.slice(colonIdx + 1)
+      if (!classMap.has(cls)) classMap.set(cls, [])
+      classMap.get(cls)!.push({ value: val, fullTag: tag, count })
+      if (!classColors.has(cls) && tagClassRepo.classes[cls]?.color) {
+        classColors.set(cls, tagClassRepo.classes[cls].color)
       }
-      parentList = node.children
     }
   }
 
-  // Count: for each tag, count notes that have this tag or any descendant
-  for (const [tag, count] of noteTags) {
-    const parts = tag.split('/')
-    let pathSoFar = ''
-    for (const part of parts) {
-      pathSoFar = pathSoFar ? `${pathSoFar}/${part}` : part
-      const node = nodeMap.get(pathSoFar)
-      if (node) node.count += count
-    }
+  // Build ClassNode array, sorted alphabetically, Unklassifiziert last
+  const result: ClassNode[] = []
+  const sortedClasses = [...classMap.keys()].sort((a, b) => {
+    if (a === UNCLASSIFIED) return 1
+    if (b === UNCLASSIFIED) return -1
+    return a.localeCompare(b)
+  })
+
+  for (const cls of sortedClasses) {
+    const values = classMap.get(cls)!.sort((a, b) => a.value.localeCompare(b.value))
+    const totalCount = values.reduce((sum, v) => sum + v.count, 0)
+    result.push({
+      className: cls,
+      color: classColors.get(cls),
+      values,
+      totalCount,
+    })
   }
 
-  return root
+  return result
 }
 
 // ─── Tri-state cycle ────────────────────────────────────────
@@ -68,7 +97,7 @@ function cycleFilterMode(current: TagFilterMode | undefined): TagFilterMode | un
 
 // ─── Filter logic ───────────────────────────────────────────
 
-function matchesTagPrefix(noteTag: string, filterTag: string): boolean {
+function matchesTag(noteTag: string, filterTag: string): boolean {
   return noteTag === filterTag || noteTag.startsWith(filterTag + '/')
 }
 
@@ -78,84 +107,88 @@ export function applyTagFilter(notes: NoteInfo[], filter: TagFilterState): NoteI
 
   let result = notes
 
-  // Include: note must match at least one include tag (prefix)
   if (includes.length > 0) {
     result = result.filter(n =>
-      n.tags.some(t => includes.some(f => matchesTagPrefix(t, f)))
+      n.tags.some(t => includes.some(f => matchesTag(t, f)))
     )
   }
 
-  // Exclude: note must NOT match any exclude tag (prefix)
   if (excludes.length > 0) {
     result = result.filter(n =>
-      !n.tags.some(t => excludes.some(f => matchesTagPrefix(t, f)))
+      !n.tags.some(t => excludes.some(f => matchesTag(t, f)))
     )
   }
 
   return result
 }
 
-// ─── Tree Node Renderer ────────────────────────────────────
-
-interface TreeNodeProps {
-  node: TagNode
-  depth: number
-  expanded: Set<string>
-  filterState: TagFilterState
-  onToggleExpand: (path: string) => void
-  onCycleFilter: (path: string) => void
+/** Filter notes by workspace scope tag. */
+export function filterByWorkspace(notes: NoteInfo[], workspaceId: string): NoteInfo[] {
+  const scopeTag = `scope:${workspaceId}`
+  return notes.filter(n => n.tags.some(t => t === scopeTag))
 }
 
-function TreeNodeItem({ node, depth, expanded, filterState, onToggleExpand, onCycleFilter }: TreeNodeProps) {
-  const hasChildren = node.children.length > 0
-  const isExpanded = expanded.has(node.fullPath)
-  const mode = filterState[node.fullPath]
+// ─── Class Node Renderer ────────────────────────────────────
 
-  const modeClass = mode === 'include' ? ' tree-node--include'
-    : mode === 'exclude' ? ' tree-node--exclude'
+interface ClassNodeItemProps {
+  node: ClassNode
+  expanded: boolean
+  filterState: TagFilterState
+  onToggleExpand: (className: string) => void
+  onCycleClassFilter: (className: string, values: ValueNode[]) => void
+  onCycleValueFilter: (fullTag: string) => void
+}
+
+function ClassNodeItem({ node, expanded, filterState, onToggleExpand, onCycleClassFilter, onCycleValueFilter }: ClassNodeItemProps) {
+  const classFilterMode = useMemo(() => {
+    const modes = node.values.map(v => filterState[v.fullTag])
+    if (modes.length > 0 && modes.every(m => m === 'include')) return 'include' as const
+    if (modes.length > 0 && modes.every(m => m === 'exclude')) return 'exclude' as const
+    if (modes.some(m => m != null)) return 'partial' as const
+    return undefined
+  }, [node.values, filterState])
+
+  const modeClass = classFilterMode === 'include' ? ' tree-class--include'
+    : classFilterMode === 'exclude' ? ' tree-class--exclude'
+    : classFilterMode === 'partial' ? ' tree-class--partial'
     : ''
 
   return (
     <>
       <div
-        class={`tree-node${modeClass}`}
-        style={{ paddingLeft: `${depth * 12 + 4}px` }}
-        onClick={(e) => {
-          // Arrow area: toggle expand. Label area: cycle filter.
-          if (hasChildren && (e.target as HTMLElement).classList.contains('tree-node__arrow')) {
-            onToggleExpand(node.fullPath)
-          } else {
-            onCycleFilter(node.fullPath)
-          }
-        }}
+        class={`tree-class${modeClass}`}
+        onClick={() => onCycleClassFilter(node.className, node.values)}
       >
         <span
-          class="tree-node__arrow"
+          class="tree-class__arrow"
           onClick={(e) => {
-            if (hasChildren) {
-              e.stopPropagation()
-              onToggleExpand(node.fullPath)
-            }
+            e.stopPropagation()
+            onToggleExpand(node.className)
           }}
         >
-          {hasChildren ? (isExpanded ? '▾' : '▸') : ' '}
+          {expanded ? '▾' : '▸'}
         </span>
-        <span class="tree-node__label">{node.name}/</span>
-        {node.count > 0 && (
-          <span class="tree-node__count">({node.count})</span>
-        )}
+        <span class="tree-class__label" style={node.color ? { color: node.color } : undefined}>
+          {node.className}
+        </span>
+        <span class="tree-class__count">({node.totalCount})</span>
       </div>
-      {hasChildren && isExpanded && node.children.map(child => (
-        <TreeNodeItem
-          key={child.fullPath}
-          node={child}
-          depth={depth + 1}
-          expanded={expanded}
-          filterState={filterState}
-          onToggleExpand={onToggleExpand}
-          onCycleFilter={onCycleFilter}
-        />
-      ))}
+      {expanded && node.values.map(v => {
+        const mode = filterState[v.fullTag]
+        const valClass = mode === 'include' ? ' tree-value--include'
+          : mode === 'exclude' ? ' tree-value--exclude'
+          : ''
+        return (
+          <div
+            key={v.fullTag}
+            class={`tree-value${valClass}`}
+            onClick={() => onCycleValueFilter(v.fullTag)}
+          >
+            <span class="tree-value__label">{v.value}</span>
+            <span class="tree-value__count">({v.count})</span>
+          </div>
+        )
+      })}
     </>
   )
 }
@@ -166,30 +199,76 @@ interface NotesTreeViewProps {
   notes: NoteInfo[]
   searchTerm: string
   tagFilter: TagFilterState
+  tagClassRepo: TagClassRepository
+  tagIndex: TagIndexData
+  activeWorkspaceId: string | null
   onSearchChange: (term: string) => void
   onTagFilterChange: (filter: TagFilterState) => void
   onNoteDoubleClick: (note: NoteInfo) => void
   onNoteDelete: (note: NoteInfo, e: Event) => void
   onNoteDragStart: (note: NoteInfo, e: DragEvent) => void
-  /** FlexSearch backend search function (optional — falls back to client-side) */
   onSearch?: (query: string, tags?: string[]) => Promise<NoteInfo[]>
+  /** Bulk delete handler — moves notes to trash with undo support (REQ-NOTES-006) */
+  onBulkDelete?: (noteIds: string[]) => void
+  /** Bulk tag add handler (REQ-NOTES-005) */
+  onBulkTagAdd?: (noteIds: string[], tag: string) => void
+  /** Bulk tag remove handler (REQ-NOTES-005) */
+  onBulkTagRemove?: (noteIds: string[], tag: string) => void
+  /** All known tags for auto-complete */
+  allKnownTags?: string[]
 }
 
 export function NotesTreeView({
   notes,
   searchTerm,
   tagFilter,
+  tagClassRepo,
+  tagIndex,
+  activeWorkspaceId,
   onSearchChange,
   onTagFilterChange,
   onNoteDoubleClick,
   onNoteDelete,
   onNoteDragStart,
   onSearch,
+  onBulkDelete,
+  onBulkTagAdd,
+  onBulkTagRemove,
+  allKnownTags,
 }: NotesTreeViewProps) {
   const { t } = useTranslation()
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const [searchResults, setSearchResults] = useState<NoteInfo[] | null>(null)
+  const [showAll, setShowAll] = useState(false)
+  const [extendedMode, setExtendedMode] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ─── Selection state (REQ-NOTES-004) ─────────────────────
+  const [selection, setSelection] = useState<Set<string>>(new Set())
+  const [focusIndex, setFocusIndex] = useState<number>(-1)
+  const [lastClickIndex, setLastClickIndex] = useState<number>(-1)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  // Load persisted expand state, showAll, extendedMode
+  useEffect(() => {
+    const cfgApi = (window as any).cipherMux?.config
+    if (!cfgApi?.get) return
+    Promise.all([
+      cfgApi.get('notesTreeExpanded').catch(() => null),
+      cfgApi.get('notesShowAll').catch(() => null),
+      cfgApi.get('notesExtendedMode').catch(() => null),
+    ]).then(([saved, savedShowAll, savedExtended]: [string[] | null, boolean | null, boolean | null]) => {
+      if (Array.isArray(saved)) setExpanded(new Set(saved))
+      if (typeof savedShowAll === 'boolean') setShowAll(savedShowAll)
+      if (typeof savedExtended === 'boolean') setExtendedMode(savedExtended)
+    })
+  }, [])
+
+  // Persist expand state
+  const persistExpanded = useCallback((next: Set<string>) => {
+    const cfgApi = (window as any).cipherMux?.config
+    cfgApi?.set?.('notesTreeExpanded', [...next]).catch(() => {})
+  }, [])
 
   // Debounced FlexSearch query
   useEffect(() => {
@@ -204,58 +283,78 @@ export function NotesTreeView({
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [searchTerm, onSearch])
 
-  // Build unique tags and their counts
-  const { allTags, tagCounts } = useMemo(() => {
-    const counts = new Map<string, number>()
-    const tagSet = new Set<string>()
-    for (const note of notes) {
-      for (const tag of note.tags) {
-        tagSet.add(tag)
-        counts.set(tag, (counts.get(tag) || 0) + 1)
-      }
-    }
-    return { allTags: [...tagSet].sort(), tagCounts: counts }
-  }, [notes])
+  // Apply workspace scope filter unless showAll
+  const scopedNotes = useMemo(() => {
+    if (showAll || !activeWorkspaceId) return notes
+    return filterByWorkspace(notes, activeWorkspaceId)
+  }, [notes, showAll, activeWorkspaceId])
 
-  // Build tree
-  const tree = useMemo(() => buildTagTree(allTags, tagCounts), [allTags, tagCounts])
+  // Build class:value tree from scoped notes
+  const tree = useMemo(
+    () => buildClassTree(scopedNotes, tagClassRepo, tagIndex),
+    [scopedNotes, tagClassRepo, tagIndex],
+  )
 
   // Toggle expanded state
-  const toggleExpand = useCallback((path: string) => {
+  const toggleExpand = useCallback((className: string) => {
     setExpanded(prev => {
       const next = new Set(prev)
-      if (next.has(path)) next.delete(path)
-      else next.add(path)
+      if (next.has(className)) next.delete(className)
+      else next.add(className)
+      persistExpanded(next)
       return next
     })
-  }, [])
+  }, [persistExpanded])
 
-  // Cycle tag filter: neutral → include → exclude → neutral
-  const cycleFilter = useCallback((path: string) => {
+  // Cycle filter for a single tag value
+  const cycleValueFilter = useCallback((fullTag: string) => {
     const next = { ...tagFilter }
-    const newMode = cycleFilterMode(next[path])
+    const newMode = cycleFilterMode(next[fullTag])
     if (newMode) {
-      next[path] = newMode
+      next[fullTag] = newMode
     } else {
-      delete next[path]
+      delete next[fullTag]
     }
     onTagFilterChange(next)
   }, [tagFilter, onTagFilterChange])
 
-  // Clear all filters
+  // Cycle filter for an entire class (set all values to the same mode)
+  const cycleClassFilter = useCallback((_className: string, values: ValueNode[]) => {
+    const next = { ...tagFilter }
+    const modes = values.map(v => next[v.fullTag])
+    const allInclude = modes.every(m => m === 'include')
+    const allExclude = modes.every(m => m === 'exclude')
+
+    let newMode: TagFilterMode | undefined
+    if (allInclude) newMode = 'exclude'
+    else if (allExclude) newMode = undefined
+    else newMode = 'include'
+
+    for (const v of values) {
+      if (newMode) {
+        next[v.fullTag] = newMode
+      } else {
+        delete next[v.fullTag]
+      }
+    }
+    onTagFilterChange(next)
+  }, [tagFilter, onTagFilterChange])
+
   const hasActiveFilter = Object.keys(tagFilter).length > 0
 
-  // Filter notes — use FlexSearch results when available, else client-side
+  // Filter notes
   const filteredNotes = useMemo(() => {
+    let source = scopedNotes
     if (searchResults && searchTerm.trim()) {
-      // FlexSearch results already ranked — just apply tag filter
-      return applyTagFilter(searchResults, tagFilter)
+      source = searchResults
+      if (!showAll && activeWorkspaceId) {
+        source = filterByWorkspace(source, activeWorkspaceId)
+      }
     }
 
-    let result = applyTagFilter(notes, tagFilter)
+    let result = applyTagFilter(source, tagFilter)
 
-    // Client-side fallback for search term (when no FlexSearch)
-    if (searchTerm) {
+    if (searchTerm && !searchResults) {
       const q = searchTerm.toLowerCase()
       result = result.filter(n =>
         n.title.toLowerCase().includes(q) ||
@@ -264,106 +363,278 @@ export function NotesTreeView({
     }
 
     return result
-  }, [notes, tagFilter, searchTerm, searchResults])
+  }, [scopedNotes, tagFilter, searchTerm, searchResults, showAll, activeWorkspaceId])
 
-  // Flat tag chips for tags that don't appear in the tree (single-segment tags)
-  const flatTags = useMemo(() => allTags.filter(t => !t.includes('/')), [allTags])
+  // ─── Selection: clear stale items when filtered notes change ─
+  useEffect(() => {
+    const visibleIds = new Set(filteredNotes.map(n => n.id))
+    setSelection(prev => {
+      const next = new Set([...prev].filter(id => visibleIds.has(id)))
+      if (next.size !== prev.size) return next
+      return prev
+    })
+  }, [filteredNotes])
+
+  // ─── Click handlers (REQ-NOTES-004) ─────────────────────
+  const handleNoteClick = useCallback((note: NoteInfo, index: number, e: MouseEvent) => {
+    const metaKey = e.metaKey || e.ctrlKey
+
+    if (e.shiftKey && lastClickIndex >= 0) {
+      const start = Math.min(lastClickIndex, index)
+      const end = Math.max(lastClickIndex, index)
+      const rangeIds = filteredNotes.slice(start, end + 1).map(n => n.id)
+      if (metaKey) {
+        setSelection(prev => new Set([...prev, ...rangeIds]))
+      } else {
+        setSelection(new Set(rangeIds))
+      }
+    } else if (metaKey) {
+      setSelection(prev => {
+        const next = new Set(prev)
+        if (next.has(note.id)) next.delete(note.id)
+        else next.add(note.id)
+        return next
+      })
+      setLastClickIndex(index)
+    } else {
+      setSelection(new Set([note.id]))
+      setLastClickIndex(index)
+    }
+    setFocusIndex(index)
+  }, [filteredNotes, lastClickIndex])
+
+  // ─── Keyboard navigation (REQ-NOTES-004) ────────────────
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (filteredNotes.length === 0) return
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const next = Math.min(focusIndex + 1, filteredNotes.length - 1)
+      setFocusIndex(next)
+      if (!e.shiftKey) {
+        setSelection(new Set([filteredNotes[next].id]))
+        setLastClickIndex(next)
+      } else {
+        setSelection(prev => new Set([...prev, filteredNotes[next].id]))
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const next = Math.max(focusIndex - 1, 0)
+      setFocusIndex(next)
+      if (!e.shiftKey) {
+        setSelection(new Set([filteredNotes[next].id]))
+        setLastClickIndex(next)
+      } else {
+        setSelection(prev => new Set([...prev, filteredNotes[next].id]))
+      }
+    } else if (e.key === 'Enter' && focusIndex >= 0 && focusIndex < filteredNotes.length) {
+      e.preventDefault()
+      onNoteDoubleClick(filteredNotes[focusIndex])
+    } else if (e.key === 'Escape') {
+      setSelection(new Set())
+      setFocusIndex(-1)
+    } else if ((e.key === 'a' || e.key === 'A') && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      setSelection(new Set(filteredNotes.map(n => n.id)))
+    }
+  }, [filteredNotes, focusIndex, onNoteDoubleClick])
+
+  // ─── Bulk action helpers (REQ-NOTES-005/006) ────────────
+  const selectedNotes = useMemo(() =>
+    filteredNotes.filter(n => selection.has(n.id)),
+    [filteredNotes, selection]
+  )
+
+  const commonTags = useMemo(() => {
+    if (selectedNotes.length === 0) return []
+    const first = new Set(selectedNotes[0].tags)
+    for (let i = 1; i < selectedNotes.length; i++) {
+      const noteTags = new Set(selectedNotes[i].tags)
+      for (const t of first) {
+        if (!noteTags.has(t)) first.delete(t)
+      }
+    }
+    return [...first]
+  }, [selectedNotes])
+
+  // Collect all known tags for auto-complete from tree
+  const autoCompleteTags = useMemo(() => {
+    if (allKnownTags && allKnownTags.length > 0) return allKnownTags
+    const tags: string[] = []
+    for (const cls of tree) {
+      for (const v of cls.values) tags.push(v.fullTag)
+    }
+    return tags
+  }, [allKnownTags, tree])
+
+  const handleBulkDelete = useCallback(() => {
+    if (onBulkDelete && selection.size > 0) {
+      onBulkDelete([...selection])
+      setSelection(new Set())
+    }
+  }, [onBulkDelete, selection])
+
+  const handleBulkTagAdd = useCallback((tag: string) => {
+    if (onBulkTagAdd && selection.size > 0) {
+      onBulkTagAdd([...selection], tag)
+    }
+  }, [onBulkTagAdd, selection])
+
+  const handleBulkTagRemove = useCallback((tag: string) => {
+    if (onBulkTagRemove && selection.size > 0) {
+      onBulkTagRemove([...selection], tag)
+    }
+  }, [onBulkTagRemove, selection])
+
+  // Toggle handlers with persistence
+  const toggleShowAll = useCallback(() => {
+    setShowAll(prev => {
+      const next = !prev
+      const cfgApi = (window as any).cipherMux?.config
+      cfgApi?.set?.('notesShowAll', next).catch(() => {})
+      return next
+    })
+  }, [])
+
+  const toggleExtended = useCallback(() => {
+    setExtendedMode(prev => {
+      const next = !prev
+      const cfgApi = (window as any).cipherMux?.config
+      cfgApi?.set?.('notesExtendedMode', next).catch(() => {})
+      return next
+    })
+  }, [])
 
   const hasTree = tree.length > 0
 
   return (
     <div class="notes-tree-view">
-      {/* Search */}
-      <input
-        type="text"
-        class="sidebar-notes__search"
-        placeholder={t('sidebar.notesSearch')}
-        value={searchTerm}
-        onInput={(e) => onSearchChange((e.target as HTMLInputElement).value)}
-      />
+      {/* Toolbar: Search + Toggles */}
+      <div class="notes-tree-view__toolbar">
+        <input
+          type="text"
+          class="sidebar-notes__search"
+          placeholder={t('sidebar.notesSearch')}
+          value={searchTerm}
+          onInput={(e) => onSearchChange((e.target as HTMLInputElement).value)}
+        />
+        <div class="notes-tree-view__toggles">
+          {activeWorkspaceId && (
+            <button
+              class={`notes-toggle${showAll ? ' notes-toggle--active' : ''}`}
+              onClick={toggleShowAll}
+              title={showAll ? t('sidebar.notesShowWorkspace', 'Workspace only') : t('sidebar.notesShowAll', 'All notes')}
+            >
+              {showAll ? '◎' : '⊙'}
+            </button>
+          )}
+          <button
+            class={`notes-toggle${extendedMode ? ' notes-toggle--active' : ''}`}
+            onClick={toggleExtended}
+            title={extendedMode ? t('sidebar.notesCompact', 'Compact view') : t('sidebar.notesExtended', 'Extended view')}
+          >
+            ≡
+          </button>
+        </div>
+      </div>
 
-      {/* Tag Tree */}
+      {/* Class:Value Tag Tree */}
       {hasTree && (
         <div class="notes-tree-view__tree">
           {hasActiveFilter && (
             <div
-              class="tree-node tree-node--clear"
+              class="tree-class tree-class--clear"
               onClick={() => onTagFilterChange({})}
             >
-              <span class="tree-node__label">{t('sidebar.clearFilter', 'Clear filter')}</span>
+              <span class="tree-class__label">{t('sidebar.clearFilter', 'Clear filter')}</span>
             </div>
           )}
           {tree.map(node => (
-            <TreeNodeItem
-              key={node.fullPath}
+            <ClassNodeItem
+              key={node.className}
               node={node}
-              depth={0}
-              expanded={expanded}
+              expanded={expanded.has(node.className)}
               filterState={tagFilter}
               onToggleExpand={toggleExpand}
-              onCycleFilter={cycleFilter}
+              onCycleClassFilter={cycleClassFilter}
+              onCycleValueFilter={cycleValueFilter}
             />
           ))}
         </div>
       )}
 
-      {/* Flat tag chips (for tags without slash hierarchy) */}
-      {flatTags.length > 0 && !hasTree && (
-        <div class="sidebar-notes__tags">
-          {flatTags.map(tag => {
-            const mode = tagFilter[tag]
-            const cls = mode === 'include' ? 'sidebar-notes__tag--include'
-              : mode === 'exclude' ? 'sidebar-notes__tag--exclude'
-              : ''
-            return (
-              <span
-                key={tag}
-                class={`sidebar-notes__tag ${cls}`}
-                onClick={() => cycleFilter(tag)}
-              >#{tag}</span>
-            )
-          })}
-        </div>
+      {/* Separator */}
+      {hasTree && <div class="notes-tree-view__sep" />}
+
+      {/* Bulk Actions Bar (REQ-NOTES-005/006) */}
+      {selection.size > 1 && (
+        <BulkNotesBar
+          count={selection.size}
+          commonTags={commonTags}
+          allKnownTags={autoCompleteTags}
+          selectedNotes={selectedNotes}
+          onTagAdd={handleBulkTagAdd}
+          onTagRemove={handleBulkTagRemove}
+          onDelete={handleBulkDelete}
+          onClearSelection={() => setSelection(new Set())}
+        />
       )}
 
-      {/* Separator */}
-      {(hasTree || flatTags.length > 0) && <div class="notes-tree-view__sep" />}
-
       {/* Note List */}
-      <div class="notes-tree-view__list">
-        {filteredNotes.map(note => (
+      <div
+        class="notes-tree-view__list"
+        ref={listRef}
+        tabIndex={0}
+        onKeyDown={handleKeyDown as any}
+      >
+        {filteredNotes.map((note, idx) => (
           <div
             key={note.id}
-            class="bg-card"
+            class={`note-card${extendedMode ? ' note-card--extended' : ''}${selection.has(note.id) ? ' note-card--selected' : ''}${idx === focusIndex ? ' note-card--focused' : ''}`}
             data-highlight={`side-note-${note.id}`}
+            onClick={(e) => handleNoteClick(note, idx, e as any)}
             onDblClick={() => onNoteDoubleClick(note)}
             title={t('sidebar.noteDoubleClick')}
             draggable
             onDragStart={(e) => onNoteDragStart(note, e as any)}
           >
-            <div class="bg-card__head">
-              <span class="bg-card__name">
+            {/* Line 1: Title + Delete */}
+            <div class="note-card__head">
+              <span class="note-card__title">
                 {note.title && note.title !== 'Untitled' ? note.title : t('notesCell.untitled')}
               </span>
               <button
-                class="bg-card__delete"
-                onClick={(e) => onNoteDelete(note, e)}
+                class="note-card__delete"
+                onClick={(e) => { e.stopPropagation(); onNoteDelete(note, e) }}
                 title={t('sidebar.noteDelete')}
               >✕</button>
             </div>
-            <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)' }}>
-              {note.tags.map(t => `#${t}`).join(' ')}
+            {/* Line 2: Tag chips */}
+            <div class="note-card__tags">
+              {note.tags.map(tag => {
+                const colonIdx = tag.indexOf(':')
+                const cls = colonIdx > -1 ? tag.slice(0, colonIdx) : undefined
+                const color = cls && tagClassRepo.classes[cls]?.color
+                return (
+                  <span
+                    key={tag}
+                    class="note-card__tag"
+                    style={color ? { borderColor: color, color } : undefined}
+                  >
+                    {tag}
+                  </span>
+                )
+              })}
               {note.tags.length > MAX_MANUAL_TAGS && (
-                <span
-                  class="bg-card__tag-warning"
-                  title={t('sidebar.tagLimitWarning', `${note.tags.length}/${MAX_MANUAL_TAGS} tags`)}
-                  style={{ color: 'var(--color-warning, #f0a000)', marginLeft: '4px' }}
-                >!</span>
+                <span class="note-card__tag-warning" title={`${note.tags.length}/${MAX_MANUAL_TAGS} tags`}>!</span>
               )}
             </div>
-            <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)', opacity: 0.5 }}>
-              {note.modifiedAt ? new Date(note.modifiedAt).toLocaleDateString() : ''}
-            </div>
+            {/* Line 3: Preview (hover or extended mode) */}
+            {note.preview && (
+              <div class={`note-card__preview${extendedMode ? ' note-card__preview--visible' : ''}`}>
+                {note.preview}
+              </div>
+            )}
           </div>
         ))}
         {filteredNotes.length === 0 && (
@@ -372,6 +643,140 @@ export function NotesTreeView({
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ─── Bulk Notes Bar (REQ-NOTES-005/006) ─────────────────────
+
+interface BulkNotesBarProps {
+  count: number
+  commonTags: string[]
+  allKnownTags: string[]
+  selectedNotes: NoteInfo[]
+  onTagAdd: (tag: string) => void
+  onTagRemove: (tag: string) => void
+  onDelete: () => void
+  onClearSelection: () => void
+}
+
+function BulkNotesBar({
+  count,
+  commonTags,
+  allKnownTags,
+  selectedNotes,
+  onTagAdd,
+  onTagRemove,
+  onDelete,
+  onClearSelection,
+}: BulkNotesBarProps) {
+  const { t } = useTranslation()
+  const [tagInput, setTagInput] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [showRemove, setShowRemove] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const canAddTag = useMemo(() => {
+    return selectedNotes.every(n => n.tags.length < MAX_MANUAL_TAGS)
+  }, [selectedNotes])
+
+  const suggestions = useMemo(() => {
+    if (!tagInput.trim()) return []
+    const q = tagInput.toLowerCase()
+    return allKnownTags
+      .filter(t => t.toLowerCase().includes(q))
+      .slice(0, 8)
+  }, [tagInput, allKnownTags])
+
+  const handleAddTag = useCallback((tag: string) => {
+    if (!tag.trim()) return
+    onTagAdd(tag.trim())
+    setTagInput('')
+    setShowSuggestions(false)
+  }, [onTagAdd])
+
+  const handleInputKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault()
+      handleAddTag(tagInput)
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false)
+      setTagInput('')
+    }
+  }, [tagInput, handleAddTag])
+
+  return (
+    <div class="bulk-notes-bar">
+      <div class="bulk-notes-bar__header">
+        <span class="bulk-notes-bar__count">{count} selected</span>
+        <button
+          class="bulk-notes-bar__clear"
+          onClick={onClearSelection}
+          title="Clear selection"
+        >✕</button>
+      </div>
+
+      {/* Tag Add */}
+      <div class="bulk-notes-bar__tag-add">
+        <div class="bulk-notes-bar__input-wrap">
+          <input
+            ref={inputRef}
+            type="text"
+            class="bulk-notes-bar__input"
+            placeholder={canAddTag ? 'Add tag...' : 'Tag limit reached'}
+            value={tagInput}
+            disabled={!canAddTag}
+            onInput={(e) => {
+              setTagInput((e.target as HTMLInputElement).value)
+              setShowSuggestions(true)
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            onKeyDown={handleInputKeyDown as any}
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <div class="bulk-notes-bar__suggestions">
+              {suggestions.map(s => (
+                <div
+                  key={s}
+                  class="bulk-notes-bar__suggestion"
+                  onMouseDown={(e) => { e.preventDefault(); handleAddTag(s) }}
+                >#{s}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tag Remove */}
+      {commonTags.length > 0 && (
+        <div class="bulk-notes-bar__tag-remove">
+          <button
+            class="bulk-notes-bar__toggle"
+            onClick={() => setShowRemove(!showRemove)}
+          >
+            {showRemove ? '▾' : '▸'} Remove tags
+          </button>
+          {showRemove && (
+            <div class="bulk-notes-bar__common-tags">
+              {commonTags.map(tag => (
+                <span
+                  key={tag}
+                  class="bulk-notes-bar__removable-tag"
+                  onClick={() => onTagRemove(tag)}
+                  title={`Remove #${tag} from all selected`}
+                >#{tag} ✕</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Delete */}
+      <button
+        class="bulk-notes-bar__delete"
+        onClick={onDelete}
+      >Delete {count} notes</button>
     </div>
   )
 }

@@ -1695,6 +1695,63 @@ export class IpcHub {
       return { ok }
     })
 
+    // REQ-NOTES-006: Trash (soft delete with undo)
+    ipcMain.handle(IPC.NOTES_TRASH, async (_e, { id }: { id: string }) => {
+      const ok = await this.noteManager.trash(id)
+      if (ok) {
+        this.noteSearchIndex.remove(id)
+        this.tagIndex.removeNote(id)
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'deleted', id })
+      }
+      return { ok }
+    })
+
+    ipcMain.handle(IPC.NOTES_TRASH_MANY, async (_e, { ids }: { ids: string[] }) => {
+      const trashed = await this.noteManager.trashMany(ids)
+      for (const id of trashed) {
+        this.noteSearchIndex.remove(id)
+        this.tagIndex.removeNote(id)
+      }
+      if (trashed.length > 0) {
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'deleted', ids: trashed })
+      }
+      return { trashed }
+    })
+
+    ipcMain.handle(IPC.NOTES_RESTORE, async (_e, { id }: { id: string }) => {
+      const ok = await this.noteManager.restore(id)
+      if (ok) {
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'restored', id })
+      }
+      return { ok }
+    })
+
+    ipcMain.handle(IPC.NOTES_RESTORE_MANY, async (_e, { ids }: { ids: string[] }) => {
+      const restored = await this.noteManager.restoreMany(ids)
+      if (restored.length > 0) {
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'restored', ids: restored })
+      }
+      return { restored }
+    })
+
+    // REQ-NOTES-005: Bulk tagging
+    ipcMain.handle(IPC.NOTES_BULK_TAG_ADD, async (_e, { ids, tag }: { ids: string[]; tag: string }) => {
+      const updated = await this.noteManager.bulkAddTag(ids, tag, MAX_MANUAL_TAGS)
+      if (updated.length > 0) {
+        this.tagClassRepo.ensureTag(tag)
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', ids: updated })
+      }
+      return { updated }
+    })
+
+    ipcMain.handle(IPC.NOTES_BULK_TAG_REMOVE, async (_e, { ids, tag }: { ids: string[]; tag: string }) => {
+      const updated = await this.noteManager.bulkRemoveTag(ids, tag)
+      if (updated.length > 0) {
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', ids: updated })
+      }
+      return { updated }
+    })
+
     ipcMain.handle(IPC.NOTES_SEARCH, async (_e, { query, tags }: { query: string; tags?: string[] }) => {
       let results = this.noteSearchIndex.search(query)
       // Apply tag filter if provided
