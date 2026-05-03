@@ -132,6 +132,22 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
 
     term.open(container)
 
+    // Cmd+C/Cmd+X with selection → clipboard copy instead of SIGINT
+    term.attachCustomKeyEventHandler((ev) => {
+      if (ev.type !== 'keydown') return true
+      if (!ev.metaKey) return true
+      if (ev.key === 'c' && term.hasSelection()) {
+        navigator.clipboard.writeText(term.getSelection())
+        return false
+      }
+      if (ev.key === 'x' && term.hasSelection()) {
+        navigator.clipboard.writeText(term.getSelection())
+        term.clearSelection()
+        return false
+      }
+      return true
+    })
+
     // Try WebGL, fall back to Canvas
     try {
       const webgl = new WebglAddon()
