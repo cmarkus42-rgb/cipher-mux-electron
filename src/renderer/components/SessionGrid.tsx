@@ -21,6 +21,8 @@ interface SessionGridProps {
   entityStatus: Record<string, boolean>
   voiceTargetSessionId: string | null
   voicePinned: boolean
+  voiceState: string
+  isSpeaking: boolean
   onToggleVoicePin: (sessionId: string) => void
   workspaceLoading: boolean
   onFocusSession: (sessionId: string) => void
@@ -66,7 +68,7 @@ function getCoveredSlots(slots: GridState['slots'], cols: number, rows: number):
 export function SessionGrid({
   grid, sessions, contextUsages, focusedSessionId, theme,
   orchestratorSessionId, activeWorkspaceId, entityStatus,
-  voiceTargetSessionId, voicePinned, onToggleVoicePin,
+  voiceTargetSessionId, voicePinned, voiceState, isSpeaking, onToggleVoicePin,
   workspaceLoading,
   onFocusSession, onCloseSession,
   onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground,
@@ -243,6 +245,8 @@ export function SessionGrid({
                 isOrchestrator={session.id === orchestratorSessionId}
                 isVoiceTarget={session.id === voiceTargetSessionId}
                 isVoicePinned={voicePinned && session.id === voiceTargetSessionId}
+                voiceState={session.id === voiceTargetSessionId ? voiceState : 'idle'}
+                isSpeaking={session.id === voiceTargetSessionId && isSpeaking}
                 onToggleVoicePin={onToggleVoicePin}
                 theme={theme}
                 rowSpan={slot.rowSpan}

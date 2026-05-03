@@ -12,6 +12,8 @@ interface SessionCellProps {
   isOrchestrator: boolean
   isVoiceTarget: boolean
   isVoicePinned: boolean
+  voiceState: string
+  isSpeaking: boolean
   onToggleVoicePin: (sessionId: string) => void
   theme: ThemeName
   rowSpan: number
@@ -33,7 +35,7 @@ interface SessionCellProps {
 }
 
 export function SessionCell({
-  session, contextUsage, focused, isOrchestrator, isVoiceTarget, isVoicePinned, onToggleVoicePin, theme,
+  session, contextUsage, focused, isOrchestrator, isVoiceTarget, isVoicePinned, voiceState, isSpeaking, onToggleVoicePin, theme,
   rowSpan, maxRows, slotCol, slotRow,
   onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDragStart, onDragOver, onDragLeave, onDrop, dragOver,
 }: SessionCellProps) {
@@ -93,6 +95,18 @@ export function SessionCell({
   const entityColor = session.entityId ? ENTITY_COLORS[session.entityId] : undefined
   const isEntity = !!session.entityId
 
+  // Voice status indicator — only shown when this session is the voice target
+  const voiceActive = isVoiceTarget && voiceState !== 'idle'
+  const voiceDotClass = isSpeaking
+    ? 'voice-dot voice-dot--speaking'
+    : voiceState === 'user_speaking' || voiceState === 'recording'
+      ? 'voice-dot voice-dot--listening'
+      : voiceState === 'processing'
+        ? 'voice-dot voice-dot--processing'
+        : voiceState === 'ready'
+          ? 'voice-dot voice-dot--idle'
+          : ''
+
   const cellClass = [
     'session-cell',
     focused && 'session-cell--focused',
@@ -132,6 +146,7 @@ export function SessionCell({
             ? <span class="neon-dot" style={{ background: entityColor, boxShadow: `0 0 4px ${entityColor}` }} />
             : <span class={`neon-dot ${dotClass}`} />}
           <span class="cell-name">{session.name}</span>
+          {voiceActive && <span class={voiceDotClass} />}
           {isVoiceTarget && (
             <button
               class={`cell-btn voice-target-btn${isVoicePinned ? ' voice-target-btn--pinned' : ''}`}
