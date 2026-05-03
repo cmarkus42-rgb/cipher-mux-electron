@@ -1,13 +1,22 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import type { EntityConfig } from '../../shared/types'
+import { APP_VERSION } from '../../shared/constants'
 
 const MARKER_FILE = '.entity-deployed'
 
+interface DeployMarker {
+  deployedAt: string
+  entityId: string
+  sourceDir: string
+  appVersion?: string
+}
+
 /**
  * Deploy entity assets (CLAUDE.md, guides, skills, etc.) to the entity's
- * working directory. Skips deployment if assets were already deployed
- * (marker file exists), preserving any user modifications.
+ * working directory. On first deploy, copies all files. On version upgrade,
+ * force-overwrites template files (except .claude/settings.local.json which
+ * is always merged via ensureTemplateSettings).
  *
  * @param config Entity configuration with projectPath and templatePath.
  * @param appRoot Root directory of the application (for resolving templatePath).
@@ -19,9 +28,19 @@ export function deployEntityAssets(config: EntityConfig, appRoot: string): boole
   const targetDir = config.projectPath
   const markerPath = path.join(targetDir, MARKER_FILE)
 
-  // Skip if already deployed — preserve user modifications
+  // Check existing marker for version comparison
   if (fs.existsSync(markerPath)) {
-    return false
+    try {
+      const marker: DeployMarker = JSON.parse(fs.readFileSync(markerPath, 'utf-8'))
+      if (marker.appVersion === APP_VERSION) {
+        return false // Same version — skip
+      }
+      // Version differs — redeploy with force
+      console.log(`[EntityAssets] Version upgrade detected for ${config.id}: ${marker.appVersion ?? 'unknown'} → ${APP_VERSION}`)
+    } catch {
+      // Corrupt marker — treat as upgrade (redeploy)
+      console.warn(`[EntityAssets] Corrupt marker for ${config.id}, redeploying`)
+    }
   }
 
   const sourceDir = path.join(appRoot, config.templatePath)
@@ -30,20 +49,24 @@ export function deployEntityAssets(config: EntityConfig, appRoot: string): boole
     return false
   }
 
+  // Determine if this is an upgrade (marker exists but version differs)
+  const isUpgrade = fs.existsSync(markerPath)
+
   // Ensure target directory exists
   fs.mkdirSync(targetDir, { recursive: true })
 
-  // Copy all files recursively
-  copyDirRecursive(sourceDir, targetDir)
+  // Copy all files recursively — force overwrite on upgrade
+  copyDirRecursive(sourceDir, targetDir, isUpgrade)
 
-  // Write marker file with deployment timestamp
+  // Write marker file with deployment timestamp and version
   fs.writeFileSync(markerPath, JSON.stringify({
     deployedAt: new Date().toISOString(),
     entityId: config.id,
     sourceDir,
+    appVersion: APP_VERSION,
   }, null, 2), 'utf-8')
 
-  console.log(`[EntityAssets] Deployed ${config.id} assets from ${sourceDir} to ${targetDir}`)
+  console.log(`[EntityAssets] ${isUpgrade ? 'Upgraded' : 'Deployed'} ${config.id} assets from ${sourceDir} to ${targetDir}`)
   return true
 }
 
@@ -92,10 +115,12 @@ export function ensureTemplateSettings(config: EntityConfig, appRoot: string): v
 }
 
 /**
- * Recursively copy a directory. Does NOT overwrite existing files —
- * only copies files that don't exist in the target.
+ * Recursively copy a directory.
+ * @param force When true, overwrites existing files (for version upgrades).
+ *              When false, only copies files that don't exist in the target.
+ *              .claude/settings.local.json is NEVER overwritten (handled by ensureTemplateSettings).
  */
-function copyDirRecursive(src: string, dest: string): void {
+function copyDirRecursive(src: string, dest: string, force = false): void {
   fs.mkdirSync(dest, { recursive: true })
 
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
@@ -105,10 +130,12 @@ function copyDirRecursive(src: string, dest: string): void {
     if (entry.isDirectory()) {
       // Skip hidden directories like .git, but allow .claude (settings, permissions)
       if (entry.name.startsWith('.') && entry.name !== '.claude') continue
-      copyDirRecursive(srcPath, destPath)
+      copyDirRecursive(srcPath, destPath, force)
     } else {
-      // Don't overwrite existing files
-      if (!fs.existsSync(destPath)) {
+      // Never overwrite settings.local.json — ensureTemplateSettings handles merging
+      if (entry.name === 'settings.local.json' && dest.endsWith('.claude')) continue
+
+      if (force || !fs.existsSync(destPath)) {
         fs.copyFileSync(srcPath, destPath)
       }
     }
