@@ -19,7 +19,7 @@ import type { BtShutterEvent, BtShutterStatus } from './bluetooth/bt-shutter-man
 import type { ConversationTransport } from './voice/conversation-engine'
 import { TaskManager } from './task/task-manager'
 import { TaskWatcher } from './task/task-watcher'
-import { InputRequestWatcher } from './mpo/input-request-watcher'
+import { InputRequestWatcher } from './session/input-request-watcher'
 import { TaskHooks } from './task/task-hooks'
 import { BugreportTaskSource } from './task/sources/bugreport-source'
 import { NoteManager } from './notes/note-manager'

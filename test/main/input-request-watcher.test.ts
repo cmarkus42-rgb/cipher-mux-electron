@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
-import { InputRequestWatcher } from '../../src/main/mpo/input-request-watcher'
+import { InputRequestWatcher } from '../../src/main/session/input-request-watcher'
 import type { InputRequestsFile, InputRequest, InputRequestUpdate } from '../../src/shared/types'
 
 function waitFor(ms: number): Promise<void> {
