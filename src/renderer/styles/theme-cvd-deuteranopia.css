@@ -61,6 +61,13 @@ body[data-theme="cvd-deuteranopia"] {
   --shadow-lg:              0 4px 8px rgba(0,0,0,0.28), 0 8px 32px rgba(0,0,0,0.24);
   --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.16);
 
+  /* session action buttons */
+  --session-action-btn-text:       #56B4E9;
+  --session-action-btn-bg:         transparent;
+  --session-action-btn-border:     #3C3C4A;
+  --session-action-btn-text-hover: #7CCAF0;
+  --session-action-btn-bg-hover:   rgba(86, 180, 233, 0.14);
+
   /* ANSI terminal palette 0-15 — Okabe-Ito safe */
   --ansi-0:                 #141418;
   --ansi-1:                 #CC79A7;  /* pink (replaces red) */

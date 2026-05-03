@@ -18,7 +18,7 @@ export type AdapterCapabilities = Record<AdapterFeature, boolean>
 // ─── Entity Framework ─────────────────────────────────────
 
 /** Well-known entity identifiers. Extensible via string for dynamic/scanned entities. */
-export type BuiltinEntityId = 'orchestrator' | 'cyber-factory' | 'launcher' | 'companion' | 'refinement' | 'voice-relay' | 'audit' | 'ideation-partner' | 'debugger' | 'testing-assistant'
+export type BuiltinEntityId = 'orchestrator' | 'cyber-factory' | 'launcher' | 'companion' | 'refinement' | 'voice-relay' | 'audit' | 'ideation-partner' | 'debugger' | 'testing-assistant' | 'bugreport'
 export type EntityId = BuiltinEntityId | (string & {})
 
 /**
@@ -298,6 +298,11 @@ export interface AppConfig {
   testing_assistant?: import('../main/testing-assistant/types').TestingAssistantConfig
   /** Audit module configuration. */
   audit_config?: import('../main/audit/types').AuditConfig
+  /** Bugreport preset configuration — guided interview via Claude Code. */
+  bugreport_preset?: {
+    /** LLM provider: 'haiku' (Claude Code session) or 'ollama' (local enrichment). */
+    provider: 'haiku' | 'ollama'
+  }
   /** Experimental feature flags. */
   experimental?: {
     /** Enable extended 7-phase Refinement (RE audit, REQ-IDs, structured handoffs). */

@@ -59,6 +59,13 @@ body[data-theme="blueprint"] {
   --shadow-lg:              0 4px 8px rgba(0,0,0,0.28), 0 8px 32px rgba(0,0,0,0.24);
   --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.16);
 
+  /* session action buttons */
+  --session-action-btn-text:       #8EE3B0;
+  --session-action-btn-bg:         transparent;
+  --session-action-btn-border:     #2E6FA0;
+  --session-action-btn-text-hover: #AEF3C8;
+  --session-action-btn-bg-hover:   rgba(142, 227, 176, 0.14);
+
   /* ANSI terminal palette 0-15 */
   --ansi-0:                 #081C30;
   --ansi-1:                 #FF8FA0;

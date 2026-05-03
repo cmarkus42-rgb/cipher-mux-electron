@@ -142,9 +142,9 @@ export function SessionCell({
     dragOver && 'session-cell--drag-over',
   ].filter(Boolean).join(' ')
 
-  const expanded = rowSpan > 1
+  const isAtMax = rowSpan >= maxRows
   const cellStyle: Record<string, string | number> = {}
-  if (expanded) cellStyle.gridRow = `span ${rowSpan}`
+  if (rowSpan > 1) cellStyle.gridRow = `span ${rowSpan}`
 
   // ARIA label for the grid cell (REQ-A11Y-007)
   const ariaLabel = `Session: ${session.name}, Status: ${session.status}, Context: ${pct}%`
@@ -211,11 +211,11 @@ export function SessionCell({
           )}
           {maxRows > 1 && (
             <button
-              class={`cell-btn ${expanded ? 'cell-btn--active' : ''}`}
+              class={`cell-btn ${isAtMax ? 'cell-btn--active' : ''}`}
               onClick={handleExpand}
-              title={expanded ? t('sessionCell.collapseHeight') : t('sessionCell.expandHeight')}
-              aria-label={expanded ? t('sessionCell.collapseHeight') : t('sessionCell.expandHeight')}
-            >{expanded ? '↥' : '↧'}</button>
+              title={isAtMax ? t('sessionCell.collapseHeight') : t('sessionCell.expandHeight')}
+              aria-label={isAtMax ? t('sessionCell.collapseHeight') : t('sessionCell.expandHeight')}
+            >{isAtMax ? '↥' : '↧'}</button>
           )}
           {isClaudeSession && (
             <button class="cell-btn" onClick={handleFork} title={t('sessionCell.forkSession')} aria-label={t('sessionCell.forkSession')}>⑂</button>

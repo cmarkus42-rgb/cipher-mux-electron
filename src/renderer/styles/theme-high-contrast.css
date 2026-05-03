@@ -59,6 +59,13 @@ body[data-theme="high-contrast"] {
   --shadow-lg:              0 4px 8px rgba(0,0,0,0.28), 0 8px 32px rgba(0,0,0,0.24);
   --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.16);
 
+  /* session action buttons */
+  --session-action-btn-text:       #00FF00;
+  --session-action-btn-bg:         transparent;
+  --session-action-btn-border:     #FFFFFF;
+  --session-action-btn-text-hover: #FFFFFF;
+  --session-action-btn-bg-hover:   rgba(0, 255, 0, 0.16);
+
   /* ANSI terminal palette 0-15 */
   --ansi-0:                 #000000;
   --ansi-1:                 #FF5555;

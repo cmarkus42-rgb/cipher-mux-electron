@@ -59,6 +59,13 @@ body[data-theme="cipher-dark"] {
   --shadow-lg:              0 4px 8px rgba(0,0,0,0.28), 0 8px 32px rgba(0,0,0,0.24);
   --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.16);
 
+  /* session action buttons */
+  --session-action-btn-text:       #8CC8A0;
+  --session-action-btn-bg:         transparent;
+  --session-action-btn-border:     #3E3E4A;
+  --session-action-btn-text-hover: #A8E0B8;
+  --session-action-btn-bg-hover:   rgba(92, 154, 110, 0.14);
+
   /* ANSI terminal palette 0-15 */
   --ansi-0:                 #1A1A20;
   --ansi-1:                 #B85060;
