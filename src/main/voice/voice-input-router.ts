@@ -245,10 +245,21 @@ export class VoiceInputRouter extends EventEmitter {
   }
 
   /**
+   * If the given session is currently pinned, unpin it.
+   * Called when a session is killed or ejected from the grid.
+   */
+  unpinIfSession(sessionId: string): void {
+    if (this.pinnedSessionId === sessionId) {
+      console.log('[VoiceRouter] pinned session removed — auto-unpinning:', sessionId)
+      this.unpinSession()
+    }
+  }
+
+  /**
    * Check whether the pinned session is still visible in the grid.
    * If it moved to background, auto-unpin so STT follows focus again.
    */
-  private autoUnpinIfBackground(): void {
+  autoUnpinIfBackground(): void {
     if (!this.pinnedSessionId) return
     const gridState = this.sessionManager.getSessionStore().getGridState()
     if (!gridState) return
