@@ -59,6 +59,13 @@ body[data-theme="synthwave"] {
   --shadow-lg:              0 4px 8px rgba(0,0,0,0.28), 0 8px 32px rgba(0,0,0,0.24);
   --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.16);
 
+  /* session action buttons */
+  --session-action-btn-text:       #50FFC0;
+  --session-action-btn-bg:         transparent;
+  --session-action-btn-border:     #4A1E6E;
+  --session-action-btn-text-hover: #80FFD0;
+  --session-action-btn-bg-hover:   rgba(80, 255, 192, 0.14);
+
   /* ANSI terminal palette 0-15 */
   --ansi-0:                 #14082A;
   --ansi-1:                 #FF4080;

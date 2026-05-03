@@ -980,6 +980,15 @@ export function App() {
           }
           break
         }
+        case 'note': {
+          const noteId = data.context?.noteId as string
+          if (noteId && action !== 'close') {
+            setSidebarVisible(true)
+            // Open note in NotesCell via handleOpenNoteInGrid pattern
+            handleOpenNoteInGridRef.current?.({ id: noteId } as any)
+          }
+          break
+        }
       }
 
       // scrollTo support: after opening, scroll to element

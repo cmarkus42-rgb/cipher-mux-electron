@@ -59,6 +59,13 @@ body[data-theme="nord"] {
   --shadow-lg:              0 4px 8px rgba(0,0,0,0.28), 0 8px 32px rgba(0,0,0,0.24);
   --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.16);
 
+  /* session action buttons */
+  --session-action-btn-text:       #A3BE8C;
+  --session-action-btn-bg:         transparent;
+  --session-action-btn-border:     #434C5E;
+  --session-action-btn-text-hover: #C3DEAC;
+  --session-action-btn-bg-hover:   rgba(163, 190, 140, 0.14);
+
   /* ANSI terminal palette 0-15 */
   --ansi-0:                 #3B4252;
   --ansi-1:                 #BF616A;

@@ -20,6 +20,7 @@ const KNOWN_COLORS: Record<string, string> = {
   'voice-relay': '#9b59b6',
   watchdog: '#2ecc71',
   projectlauncher: '#3498db',
+  bugreport: '#e57373',
 }
 
 /** Default icons for known entity IDs. */
@@ -30,6 +31,7 @@ const KNOWN_ICONS: Record<string, string> = {
   'voice-relay': '🎙',
   watchdog: '🐕',
   projectlauncher: '🚀',
+  bugreport: '🐛',
 }
 
 /** Palette for unknown entities. */

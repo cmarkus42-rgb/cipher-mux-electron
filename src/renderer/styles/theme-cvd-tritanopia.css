@@ -61,6 +61,13 @@ body[data-theme="cvd-tritanopia"] {
   --shadow-lg:              0 4px 8px rgba(0,0,0,0.28), 0 8px 32px rgba(0,0,0,0.24);
   --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.16);
 
+  /* session action buttons */
+  --session-action-btn-text:       #50C878;
+  --session-action-btn-bg:         transparent;
+  --session-action-btn-border:     #3C3C4A;
+  --session-action-btn-text-hover: #70E898;
+  --session-action-btn-bg-hover:   rgba(80, 200, 120, 0.14);
+
   /* ANSI terminal palette 0-15 — tritanopia-safe */
   --ansi-0:                 #141418;
   --ansi-1:                 #E06090;  /* magenta (replaces red) */

@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { NoteEditor } from './NoteEditor'
+import { TagBar } from './TagBar'
 import { TestcaseView } from './TestcaseView'
 import { useNotes } from '../hooks/useNotes'
 import type { NoteInfo } from '../../shared/types'
@@ -12,6 +13,7 @@ interface NoteTab {
   id: string
   title: string
   content: string
+  tags: string[]
   dirty: boolean
   /** Parsed testcase data — present only if this is a testcase note. */
   testcase?: ParsedTestcase
@@ -83,6 +85,7 @@ export function NotesCell({
         id: info.id,
         title: info.title,
         content: result.body,
+        tags: info.tags ?? [],
         dirty: false,
         testcase,
       }
@@ -123,6 +126,7 @@ export function NotesCell({
       id: note.id,
       title: t('notesCell.newTitle'),
       content: '# ',
+      tags: note.tags ?? [],
       dirty: false,
     }
     setTabs((prev) => [...prev, tab])
@@ -150,6 +154,19 @@ export function NotesCell({
       const title = result?.title || activeTab.title
       setTabs((prev) =>
         prev.map((t) => (t.id === activeTab.id ? { ...t, content, title, dirty: false } : t)),
+      )
+    },
+    [activeTab],
+  )
+
+  const handleTagsChange = useCallback(
+    async (newTags: string[]) => {
+      if (!activeTab) return
+      const apiObj = (window as any).cipherMux
+      // Save with current body + new tags
+      await apiObj.notes.save(activeTab.id, activeTab.content, newTags, true)
+      setTabs((prev) =>
+        prev.map((t) => (t.id === activeTab.id ? { ...t, tags: newTags } : t)),
       )
     },
     [activeTab],
@@ -262,8 +279,8 @@ export function NotesCell({
     onDrop(e)
   }, [openNote, onDrop])
 
-  const expanded = rowSpan > 1
-  const cellStyle = expanded ? { gridRow: `span ${rowSpan}` } : undefined
+  const isAtMax = rowSpan >= maxRows
+  const cellStyle = rowSpan > 1 ? { gridRow: `span ${rowSpan}` } : undefined
 
   return (
     <div
@@ -288,14 +305,14 @@ export function NotesCell({
         <div class="cell-header__right">
           {maxRows > 1 && (
             <button
-              class={`cell-btn ${expanded ? 'cell-btn--active' : ''}`}
+              class={`cell-btn ${isAtMax ? 'cell-btn--active' : ''}`}
               onClick={(e) => {
                 e.stopPropagation()
                 onToggleExpand()
               }}
-              title={expanded ? t('notesCell.collapseHeight') : t('notesCell.expandHeight')}
+              title={isAtMax ? t('notesCell.collapseHeight') : t('notesCell.expandHeight')}
             >
-              {expanded ? '↥' : '↧'}
+              {isAtMax ? '↥' : '↧'}
             </button>
           )}
           <button
@@ -372,6 +389,11 @@ export function NotesCell({
           +
         </button>
       </div>
+
+      {/* Tag bar for active note */}
+      {activeTab && !activeTab.testcase && (
+        <TagBar tags={activeTab.tags} onTagsChange={handleTagsChange} />
+      )}
 
       {/* Editor or TestcaseView */}
       <div class="notes-editor-area">

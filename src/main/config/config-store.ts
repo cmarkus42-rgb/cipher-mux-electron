@@ -126,6 +126,9 @@ const defaults: AppConfig = {
     cognitiveDebtThreshold: 5,
     blockOnHighSeverity: true,
   },
+  bugreport_preset: {
+    provider: 'haiku' as const,
+  },
   experimental: {
     refinement_v2: true,
     ideation_partner: true,

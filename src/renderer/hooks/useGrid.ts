@@ -122,7 +122,9 @@ export function useGrid(panelWidth = 0) {
       const idx = prev.slots.findIndex((s) => s.sessionId === sessionId)
       if (idx === -1) return prev
       const currentSpan = prev.slots[idx].rowSpan
-      const newSpan = currentSpan > 1 ? 1 : prev.config.rows
+      // Stepwise: if already expanded, shrink by 1; otherwise grow by 1
+      const newSpan = currentSpan >= prev.config.rows ? currentSpan - 1 : currentSpan + 1
+      if (newSpan < 1 || newSpan > prev.config.rows) return prev
       const newSlots = [...prev.slots]
       newSlots[idx] = { ...newSlots[idx], rowSpan: newSpan }
       const next = { ...prev, slots: newSlots }
@@ -186,7 +188,9 @@ export function useGrid(panelWidth = 0) {
     setGrid((prev) => {
       if (slotIndex < 0 || slotIndex >= prev.slots.length) return prev
       const currentSpan = prev.slots[slotIndex].rowSpan
-      const newSpan = currentSpan > 1 ? 1 : prev.config.rows
+      // Stepwise: if already expanded, shrink by 1; otherwise grow by 1
+      const newSpan = currentSpan >= prev.config.rows ? currentSpan - 1 : currentSpan + 1
+      if (newSpan < 1 || newSpan > prev.config.rows) return prev
       const newSlots = [...prev.slots]
       newSlots[slotIndex] = { ...newSlots[slotIndex], rowSpan: newSpan }
       const next = { ...prev, slots: newSlots }
