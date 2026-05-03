@@ -159,6 +159,8 @@ export class SessionManager extends EventEmitter {
    * like Claude at the default 80x24 before xterm has fitted.
    */
   private pendingLaunch: Map<string, { command: string; timer: NodeJS.Timeout }> = new Map()
+  /** Sessions that had an autoLaunch command (Claude CLI). Plain terminal sessions are NOT in this set. */
+  private autoLaunchedSessions: Set<string> = new Set()
   /** Persistent session store — survives app restarts. */
   private sessionStore: SessionStore
 
@@ -319,9 +321,11 @@ export class SessionManager extends EventEmitter {
     // Queue auto-launch (e.g. `claude --...`) to fire once the renderer
     // reports the real terminal size, so TUIs start at the correct dims.
     if (opts.autoLaunch) {
+      this.autoLaunchedSessions.add(id)
       this.setPendingLaunch(id, opts.autoLaunch)
     } else if (opts.forkFromClaudeSessionId) {
       // Build auto-launch with fork flag via adapter
+      this.autoLaunchedSessions.add(id)
       const launchCmd = adapter.buildLaunchCommand({
         projectPath: opts.projectPath || os.homedir(),
         sessionName: opts.name,
@@ -354,6 +358,7 @@ export class SessionManager extends EventEmitter {
     this.emit('session-stopped', session)
     this.sessions.delete(sessionId)
     this.sessionAdapters.delete(sessionId)
+    this.autoLaunchedSessions.delete(sessionId)
     if (session.entityId) {
       const entityId = session.entityId as EntityId
       this.removeEntitySession(entityId, sessionId)
@@ -457,6 +462,7 @@ export class SessionManager extends EventEmitter {
     this.emit('session-stopped', session)
     this.sessions.delete(sessionId)
     this.sessionAdapters.delete(sessionId)
+    this.autoLaunchedSessions.delete(sessionId)
 
     // Clean up entity links if this was an entity session
     if (session.entityId) {
@@ -1363,6 +1369,8 @@ export class SessionManager extends EventEmitter {
       if (session.status !== 'active') continue
       // Skip sessions that have a pending launch (Claude hasn't started yet)
       if (this.pendingLaunch.has(sessionId)) continue
+      // Skip plain terminal sessions (no autoLaunch/Claude) — they naturally run a shell
+      if (!this.autoLaunchedSessions.has(sessionId)) continue
 
       checks.push(
         this.tmux.getPaneCommand(session.tmuxSession).then(async (cmd) => {
@@ -1376,6 +1384,7 @@ export class SessionManager extends EventEmitter {
             this.emit('session-stopped', session)
             this.sessions.delete(sessionId)
             this.sessionAdapters.delete(sessionId)
+            this.autoLaunchedSessions.delete(sessionId)
             this.sessionStore.removeSession(sessionId)
           }
         }),
