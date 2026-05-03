@@ -208,6 +208,11 @@ export class SessionManager extends EventEmitter {
     return this.sessionStore
   }
 
+  /** Whether this session was auto-launched with Claude CLI (not a plain terminal). */
+  isAutoLaunched(sessionId: string): boolean {
+    return this.autoLaunchedSessions.has(sessionId)
+  }
+
   /** Get the entity registry. */
   getEntityRegistry(): EntityRegistry {
     return this.entityRegistry

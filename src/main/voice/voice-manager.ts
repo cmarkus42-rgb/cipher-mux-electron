@@ -123,6 +123,31 @@ export class VoiceManager extends EventEmitter {
   }
 
   /**
+   * Initialize only PiperTTS (no STT, no ConversationEngine).
+   * Used by MCP mux_tts_speak when voice mode is not active but local TTS is preferred.
+   */
+  private _piperOnlyInitialized = false
+
+  async initPiperOnly(): Promise<void> {
+    if (this._piperOnlyInitialized || this._initialized) return
+    console.log('[Voice] VoiceManager.initPiperOnly() starting...')
+    const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
+    this.piperTTS = new PiperTTS({
+      voice: this.config.piperVoice,
+      modelsDir: this.config.piperModelsDir,
+      nodeModulesPath: appNodeModules,
+    })
+    await this.piperTTS.init()
+    this._piperOnlyInitialized = true
+    console.log('[Voice] VoiceManager.initPiperOnly() complete — Piper ready')
+  }
+
+  /** Whether Piper TTS is available (either via full init or piperOnly). */
+  isPiperReady(): boolean {
+    return this._piperOnlyInitialized || (this._initialized && this.piperTTS !== null)
+  }
+
+  /**
    * Start a bugreport interview session.
    * Creates an OllamaChat with the bugreport system prompt,
    * wires transcription → interview → TTS playback.
@@ -275,7 +300,7 @@ export class VoiceManager extends EventEmitter {
   private _speakChain: Promise<void> = Promise.resolve()
 
   async speakText(text: string, interrupt = false): Promise<void> {
-    if (!this._initialized) {
+    if (!this._initialized && !this._piperOnlyInitialized) {
       throw new Error('VoiceManager not initialized')
     }
     if (configStore.get('ttsEnabled') === false) return

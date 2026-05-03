@@ -92,6 +92,10 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
 
       fitAddon.fit()
 
+      // After fit(), refresh the viewport so xterm recalculates scrollback
+      // accessibility. Without this, height increases leave scroll stuck.
+      try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
+
       if (!wasAtBottom) {
         // User was scrolled up — restore their position
         term.scrollToLine(Math.min(savedViewportY, buf.baseY))

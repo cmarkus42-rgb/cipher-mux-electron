@@ -2019,7 +2019,9 @@ export class IpcHub {
       const claudeMdPath = path.join(entitiesDir, entityId, 'CLAUDE.md')
       try {
         const content = fs.readFileSync(claudeMdPath, 'utf-8')
-        return { ok: true, content }
+        const registry = this.sessionManager.getEntityRegistry()
+        const entity = registry.list().find(e => e.id === entityId)
+        return { ok: true, content, displayName: entity?.displayName ?? entityId }
       } catch {
         return { ok: false, content: '', error: 'File not found' }
       }
