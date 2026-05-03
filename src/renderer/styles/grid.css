@@ -276,6 +276,7 @@
 .session-cell--drag-over {
   border-color: var(--color-accent);
   border-style: dashed;
+  background: rgba(var(--color-accent-rgb, 0, 255, 170), 0.06);
 }
 
 .launcher-cell--drag-over {
