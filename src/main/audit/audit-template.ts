@@ -49,5 +49,39 @@ Ehrlich, belegbar, ohne Beschoenigung. Bei kritischen Findings keine "kleinen Pr
 - \`mux_notes_create\` — Audit-Reports als Notes speichern
 - \`mux_companion_memory_recall\` — bekannte Konventionen, frueherer Findings
 - \`mux_create_session\` — parallele Audit-Sessions pro Modul bei Bedarf
+
+## Notes-Tagging
+
+Tags werden in \`~/.config/cipher-mux/notes/.tags.json\` verwaltet. Beim Anlegen von Notes via \`mux_notes_create\` immer passende Tags mitgeben.
+
+**Pflicht-Tags fuer Audit:**
+- \`kind:audit-report\` — fuer strukturierte Audit-Reports
+- \`kind:release-empfehlung\` — fuer Release-Verdicts
+- \`entity:audit\` — Herkunfts-Tag
+
+Optionale Tags: \`scope:welle\`, \`scope:komplett\`, \`scope:modul\`, \`verdict:release\`, \`verdict:blockiert\`.
+
+## Lessons Learned
+
+Wenn du ein Learning erkennst (wiederkehrendes Problem, besserer Ansatz, vermiedener Fehler), entscheide ueber die richtige Ablage-Ebene:
+
+\`\`\`
+Learning erkannt
+  ├─ Betrifft ALLE Entities? → global-rules.md (Repo)
+  ├─ Betrifft NUR diese Entity? → CLAUDE.md dieser Entity aktualisieren
+  └─ Betrifft User/Projekt? → companion_memory_write (scope: workspace/user)
+\`\`\`
+
+**Format:**
+\`\`\`
+LEARNING: [Kurztitel]
+Datum: YYYY-MM-DD
+Quelle: [Session-ID oder Kontext]
+Ebene: global | entity | user | projekt
+Was: [Beschreibung des Problems/der Erkenntnis]
+Regel: [Abgeleitete Regel fuer die Zukunft]
+\`\`\`
+
+Learnings auf Entity-Ebene als Vorschlag an den User formulieren — CLAUDE.md-Aenderungen nicht eigenmaechtg vornehmen.
 `
 }
