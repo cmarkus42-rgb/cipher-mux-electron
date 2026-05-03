@@ -10,7 +10,10 @@
  *
  * Voice commands (session mode only):
  *   "abschicken" / "absenden" / "senden" / "enter" / "send" → sends Enter
+ *   "löschen" / "leeren" / "alles weg" / "clear" → clears input (Ctrl+U)
  *   "neue zeile" / "new line" → sends newline without submitting
+ *   "kopieren" / "copy" → triggers Cmd+C via renderer
+ *   "einfügen" / "paste" → triggers Cmd+V via renderer
  *   Everything else → typed into the session (no Enter)
  */
 
@@ -27,6 +30,17 @@ export interface VoiceInputRouterDeps {
 const VOICE_COMMANDS: Array<{ patterns: string[]; keys: string; label: string }> = [
   { patterns: ['abschicken', 'absenden', 'senden', 'bitte abschicken', 'bitte absenden', 'enter', 'send', 'submit'], keys: '\r', label: 'submit' },
   { patterns: ['neue zeile', 'new line', 'newline', 'zeilenumbruch'], keys: '\n', label: 'newline' },
+  { patterns: ['löschen', 'loeschen', 'leeren', 'alles weg', 'clear', 'eingabe löschen', 'eingabe loeschen'], keys: '\x15', label: 'clear-input' },
+]
+
+// Clipboard commands — emits 'clipboard' event for renderer to handle (Cmd+C / Cmd+V)
+const CLIPBOARD_COMMANDS: Array<{
+  patterns: string[]
+  action: 'copy' | 'paste'
+  label: string
+}> = [
+  { patterns: ['kopieren', 'copy'],                                    action: 'copy',  label: 'copy' },
+  { patterns: ['einfügen', 'einfuegen', 'paste', 'einsetzen'],         action: 'paste', label: 'paste' },
 ]
 
 // Scroll navigation commands — matched before VOICE_COMMANDS.
@@ -302,6 +316,19 @@ export class VoiceInputRouter extends EventEmitter {
         sessionId: targetId,
         sessionName: session?.name ?? targetId,
         text: `[${scrollCmd.label}]`,
+      })
+      return
+    }
+
+    // Check for clipboard commands (copy/paste)
+    const clipCmd = voiceCommandsOn ? CLIPBOARD_COMMANDS.find(cmd => cmd.patterns.includes(normalized)) : undefined
+    if (clipCmd) {
+      console.log('[VoiceRouter] clipboard command:', clipCmd.label)
+      this.emit('clipboard', { action: clipCmd.action })
+      this.emit('dispatched', {
+        sessionId: targetId,
+        sessionName: session?.name ?? targetId,
+        text: `[${clipCmd.label}]`,
       })
       return
     }

@@ -220,6 +220,83 @@ describe('VoiceInputRouter', () => {
     assert.equal(dispatched.text, '[scroll-down]')
   })
 
+  it('sends Ctrl+U on "löschen" voice command', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    await router.routeTranscription('löschen')
+    assert.equal(sentKeys.length, 1)
+    assert.equal(sentKeys[0].keys, '\x15')
+  })
+
+  it('sends Ctrl+U on "leeren" voice command', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    await router.routeTranscription('Leeren.')
+    assert.equal(sentKeys.length, 1)
+    assert.equal(sentKeys[0].keys, '\x15')
+  })
+
+  it('sends Ctrl+U on "alles weg" voice command', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    await router.routeTranscription('alles weg')
+    assert.equal(sentKeys.length, 1)
+    assert.equal(sentKeys[0].keys, '\x15')
+  })
+
+  it('emits clipboard event for "kopieren" command', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    let clipEvent: any = null
+    router.on('clipboard', (data) => { clipEvent = data })
+    await router.routeTranscription('kopieren')
+    assert.ok(clipEvent)
+    assert.equal(clipEvent.action, 'copy')
+    assert.equal(sentKeys.length, 0, 'clipboard commands must NOT send keys to tmux')
+  })
+
+  it('emits clipboard event for "paste" command', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    let clipEvent: any = null
+    router.on('clipboard', (data) => { clipEvent = data })
+    await router.routeTranscription('Paste!')
+    assert.ok(clipEvent)
+    assert.equal(clipEvent.action, 'paste')
+    assert.equal(sentKeys.length, 0)
+  })
+
+  it('emits clipboard event for "einfügen" command', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    let clipEvent: any = null
+    router.on('clipboard', (data) => { clipEvent = data })
+    await router.routeTranscription('einfügen')
+    assert.ok(clipEvent)
+    assert.equal(clipEvent.action, 'paste')
+    assert.equal(sentKeys.length, 0)
+  })
+
+  it('emits dispatched event with clear-input label', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    let dispatched: any = null
+    router.on('dispatched', (data) => { dispatched = data })
+    await router.routeTranscription('löschen')
+    assert.ok(dispatched)
+    assert.equal(dispatched.text, '[clear-input]')
+  })
+
+  it('emits dispatched event with copy label', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    let dispatched: any = null
+    router.on('dispatched', (data) => { dispatched = data })
+    await router.routeTranscription('copy')
+    assert.ok(dispatched)
+    assert.equal(dispatched.text, '[copy]')
+  })
+
   it('does not match scroll command in longer text', async () => {
     router.setMode('session')
     router.setFocusedSession('sess-1')

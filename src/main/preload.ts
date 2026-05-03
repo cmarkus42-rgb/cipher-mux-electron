@@ -77,6 +77,11 @@ const api = {
       ipcRenderer.on(IPC.GRID_NAV, handler)
       return () => ipcRenderer.removeListener(IPC.GRID_NAV, handler)
     },
+    onVoiceClipboard: (cb: (data: { action: 'copy' | 'paste' }) => void) => {
+      const handler = (_e: unknown, data: { action: 'copy' | 'paste' }) => cb(data)
+      ipcRenderer.on(IPC.VOICE_CLIPBOARD, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_CLIPBOARD, handler)
+    },
   },
 
   // ─── Messages ──────────────────────────────────────────

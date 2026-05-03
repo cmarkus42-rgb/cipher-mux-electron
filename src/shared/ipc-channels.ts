@@ -203,6 +203,7 @@ export const IPC = {
   SIDEBAR_TOGGLE: 'cipher-mux:sidebar:toggle',
   CELL_SCROLL: 'cipher-mux:cell:scroll',
   GRID_NAV: 'cipher-mux:grid:nav',
+  VOICE_CLIPBOARD: 'cipher-mux:voice:clipboard',
   KEEP_WORKING_RESTORE: 'cipher-mux:keep-working:restore',
   KEEP_WORKING_PULL: 'cipher-mux:keep-working:pull',
 
