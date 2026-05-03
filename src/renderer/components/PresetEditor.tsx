@@ -16,11 +16,6 @@ interface PresetInfo {
   launcherHidden: boolean
 }
 
-/** Extract title from first h1 heading in content. */
-function extractTitle(content: string): string {
-  const line = content.split('\n').find(l => /^#\s/.test(l))
-  return line ? line.replace(/^#\s*/, '').trim() : ''
-}
 
 /** Extract H2 headings with their line indices for navigation. */
 function extractH2Headings(content: string): { label: string; lineIndex: number }[] {
@@ -107,7 +102,6 @@ export function PresetEditor() {
   const [editConfirmed, setEditConfirmed] = useState(false)
 
   // Draft state — single textarea for full CLAUDE.md
-  const [draftTitle, setDraftTitle] = useState('')
   const [draftContent, setDraftContent] = useState('')
   const [savedContent, setSavedContent] = useState('')
 
@@ -147,7 +141,6 @@ export function PresetEditor() {
     }).catch(() => setPersonaOverrideId(null))
     api.presets.read(selectedId).then((res: { ok: boolean; content: string }) => {
       if (res.ok) {
-        setDraftTitle(extractTitle(res.content))
         setDraftContent(res.content)
         setSavedContent(res.content)
         setDirty(false)
@@ -171,7 +164,6 @@ export function PresetEditor() {
       setEditConfirmed(true)
     }
     setDraftContent(value)
-    setDraftTitle(extractTitle(value))
     setDirty(true)
   }
 
@@ -187,7 +179,6 @@ export function PresetEditor() {
   const handleRevert = () => {
     if (!savedContent) return
     setDraftContent(savedContent)
-    setDraftTitle(extractTitle(savedContent))
     setDirty(false)
     setEditConfirmed(false)
   }
@@ -313,13 +304,9 @@ export function PresetEditor() {
         <div class="pp-edit" style={{ minHeight: '400px' }}>
           <div class="pp-edit-head">
             <div class="pp-edit-dot" style={{ background: selected.color }} />
-            <input
-              class="pp-edit-name"
-              value={draftTitle}
-              placeholder="Preset name"
-              disabled
-              title="Name is derived from the CLAUDE.md heading"
-            />
+            <span class="pp-edit-name" style={{ fontWeight: 600 }}>
+              {selected.displayName}
+            </span>
             <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-dim)', marginLeft: 'auto' }}>
               <input
                 type="checkbox"
