@@ -71,8 +71,8 @@ export function registerBuiltinEntities(
 
   registry.register({
     id: 'orchestrator',
-    displayName: 'Orchestrator',
-    icon: '🎯',
+    displayName: 'Workshop',
+    icon: '🔨',
     color: '#4fc3f7',
     projectPath: `${entitiesBase}/orchestrator`,
     features: ['mcp'],
