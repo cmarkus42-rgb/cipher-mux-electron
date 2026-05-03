@@ -112,6 +112,24 @@ describe('VoiceInputRouter', () => {
     assert.equal(sentKeys[0].keys, 'hello world ')
   })
 
+  it('strips U+200E/U+200F directional marks before sending (T-VP.7)', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    await router.routeTranscription('hello\u200e world\u200f')
+    assert.equal(sentKeys.length, 2) // text + CR
+    assert.equal(sentKeys[0].keys, 'hello world')
+    assert.equal(sentKeys[1].keys, '\r')
+  })
+
+  it('auto-submit sends CR as separate sendKeys call (T-VP.7)', async () => {
+    router.setMode('session')
+    router.setFocusedSession('sess-1')
+    await router.routeTranscription('test input')
+    assert.equal(sentKeys.length, 2)
+    assert.equal(sentKeys[0].keys, 'test input')
+    assert.equal(sentKeys[1].keys, '\r')
+  })
+
   it('routes to pinned session instead of focused', async () => {
     router.setMode('session')
     router.setFocusedSession('sess-1')
@@ -119,8 +137,9 @@ describe('VoiceInputRouter', () => {
     sessions.set('sess-3', { id: 'sess-3', name: 'pinned-project', status: 'active' })
     router.pinToSession('sess-3')
     await router.routeTranscription('goes to pinned')
-    assert.equal(sentKeys.length, 1)
+    assert.equal(sentKeys.length, 2) // text + CR (auto-submit)
     assert.equal(sentKeys[0].sessionId, 'sess-3')
+    assert.equal(sentKeys[1].keys, '\r')
   })
 
   it('returns to focus-following after unpin', async () => {
@@ -130,7 +149,7 @@ describe('VoiceInputRouter', () => {
     router.pinToSession('sess-3')
     router.unpinSession()
     await router.routeTranscription('goes to focused')
-    assert.equal(sentKeys.length, 1)
+    assert.equal(sentKeys.length, 2) // text + CR (auto-submit)
     assert.equal(sentKeys[0].sessionId, 'sess-1')
   })
 
@@ -162,8 +181,11 @@ describe('VoiceInputRouter', () => {
     sessions.set('sess-3', { id: 'sess-3', name: 'pinned', status: 'active' })
     router.pinToSession('sess-3')
     await router.routeTranscription('goes to pin')
-    assert.equal(sentKeys.length, 1)
+    // auto-submit sends text + CR as two separate sendKeys calls
+    assert.equal(sentKeys.length, 2)
     assert.equal(sentKeys[0].sessionId, 'sess-3')
+    assert.equal(sentKeys[0].keys, 'goes to pin')
+    assert.equal(sentKeys[1].keys, '\r')
   })
 
   it('getActiveSessionId returns pinned > focused', () => {
@@ -304,6 +326,7 @@ describe('VoiceInputRouter', () => {
     router.on('scroll', (data) => { scrollEvent = data })
     await router.routeTranscription('scroll mal hoch bitte')
     assert.equal(scrollEvent, null, 'partial match should not trigger scroll')
-    assert.equal(sentKeys.length, 1, 'text should be sent normally')
+    // auto-submit sends text + CR as two separate sendKeys calls
+    assert.equal(sentKeys.length, 2, 'text should be sent normally')
   })
 })
