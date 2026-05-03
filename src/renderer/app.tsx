@@ -19,6 +19,9 @@ import { WorkspacePopup } from './components/WorkspacePopup'
 import { GridPlacementPopup } from './components/GridPlacementPopup'
 import { HighlightOverlay } from './components/HighlightOverlay'
 import { useGlobalTtsPlayback } from './hooks/useGlobalTtsPlayback'
+import { useA11ySettings } from './a11y/hooks/useA11ySettings'
+import { FocusMode } from './a11y/FocusMode'
+import { useFocusTrap } from './a11y/useFocusTrap'
 
 export function App() {
   const { t } = useTranslation()
@@ -91,6 +94,8 @@ export function App() {
   }, [pendingLauncherSlot])
 
   const { isSpeaking, stopSpeech } = useGlobalTtsPlayback()
+  const { settings: a11ySettings, toggleFocusMode } = useA11ySettings()
+  const modalFocusTrapRef = useFocusTrap<HTMLDivElement>(infoVisible)
 
   // Global keyboard shortcuts
   const shortcutEntries = useMemo(() => [
@@ -99,6 +104,12 @@ export function App() {
       label: t('app.shortcut.bugreport'),
       category: 'Aktionen' as const,
       action: () => { setInfoInitialTab('settings'); setInfoVisible(true); setBugreportVisible(true) },
+    },
+    {
+      combo: 'Cmd+Shift+F',
+      label: 'Focus Mode',
+      category: 'Aktionen' as const,
+      action: () => toggleFocusMode(),
     },
     {
       combo: 'Cmd+N',
@@ -136,7 +147,7 @@ export function App() {
         return false
       },
     },
-  ], [t, bugreportVisible, infoVisible, workspacesPopupVisible, placementPopup, grid.slots, isSpeaking, stopSpeech])
+  ], [t, bugreportVisible, infoVisible, workspacesPopupVisible, placementPopup, grid.slots, isSpeaking, stopSpeech, toggleFocusMode])
   useShortcuts(shortcutEntries)
 
   const focusedSessionName = useMemo(() => {
@@ -1030,6 +1041,7 @@ export function App() {
           onShell={handleShell}
           onFork={handleFork}
           onSendToBackground={handleSendToBackground}
+          onFocusMode={() => toggleFocusMode()}
           onStartEntity={handleStartEntity}
           onResumeEntity={handleResumeEntity}
           onFocusEntity={handleFocusEntity}
@@ -1061,6 +1073,13 @@ export function App() {
           />
         )}
       </div>
+
+      <FocusMode
+        enabled={a11ySettings.focusModeEnabled}
+        sessionName={focusedSessionName}
+        contextPct={focusedSessionId ? (contextUsages[focusedSessionId]?.usedPercentage ?? 0) : 0}
+        onDeactivate={toggleFocusMode}
+      />
 
       <StatusBar
         theme={theme}
@@ -1110,9 +1129,23 @@ export function App() {
         visible={bugreportVisible}
         onClose={() => setBugreportVisible(false)}
       />
+      {/* ARIA live region for context warnings (REQ-A11Y-007) */}
+      <div class="a11y-live-region" aria-live="assertive" role="alert">
+        {focusedSessionId && (contextUsages[focusedSessionId]?.usedPercentage ?? 0) >= 80
+          ? `Warnung: Context-Nutzung bei ${contextUsages[focusedSessionId]?.usedPercentage}%`
+          : ''}
+      </div>
+      <div class="a11y-live-region" aria-live="polite" role="status" id="a11y-session-status" />
+
       {infoVisible && (
-        <div class={`modal-overlay${themeEditorActive ? ' modal-overlay--transparent' : ''}`} onClick={() => { setInfoVisible(false); setThemeEditorActive(false) }}>
-          <div class="modal-panel" style={{ width: '600px' }} onClick={(e) => e.stopPropagation()}>
+        <div
+          class={`modal-overlay${themeEditorActive ? ' modal-overlay--transparent' : ''}`}
+          onClick={() => { setInfoVisible(false); setThemeEditorActive(false) }}
+          role="dialog"
+          aria-label="Einstellungen"
+          aria-modal="true"
+        >
+          <div class="modal-panel" style={{ width: '600px' }} onClick={(e) => e.stopPropagation()} ref={modalFocusTrapRef}>
             <InfoSettingsView
               theme={theme}
               onSetTheme={setTheme}

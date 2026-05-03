@@ -32,6 +32,7 @@ interface SessionGridProps {
   onShell: (sessionId: string, projectPath: string | null) => void
   onFork: (sessionId: string) => void
   onSendToBackground: (sessionId: string) => void
+  onFocusMode?: (sessionId: string) => void
   onStartEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
   onResumeEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
   onFocusEntity: (entityId: EntityId) => void
@@ -71,7 +72,7 @@ export function SessionGrid({
   voiceTargetSessionId, voicePinned, voiceState, isSpeaking, onToggleVoicePin,
   workspaceLoading,
   onFocusSession, onCloseSession,
-  onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground,
+  onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onFocusMode,
   onStartEntity, onResumeEntity, onFocusEntity, onStartPath,
   onOpenNotes, onOpenNote, onCloseNotes, onToggleExpandSlot, onSwap,
   onDropSession, onDropNoteOnEmpty, onDropNoteOnSession,
@@ -260,6 +261,7 @@ export function SessionGrid({
                 onShell={onShell}
                 onFork={onFork}
                 onSendToBackground={onSendToBackground}
+                onFocusMode={onFocusMode}
                 onDragStart={() => handleDragStart(idx)}
                 onDragOver={(e: DragEvent) => handleDragOver(idx, e)}
                 onDragLeave={handleDragLeave}

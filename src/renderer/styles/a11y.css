@@ -1,0 +1,319 @@
+/* ── A11y Settings Page ────────────────────────── */
+
+.a11y-settings {
+  padding: 8px 0;
+}
+
+.a11y-section {
+  margin-bottom: 20px;
+}
+
+.a11y-section__title {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+  margin: 0 0 4px 0;
+}
+
+.a11y-section__desc {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+  margin: 0 0 10px 0;
+  line-height: 1.4;
+}
+
+/* CVD Theme list */
+.a11y-cvd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.a11y-cvd-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-light);
+  background: var(--color-bg);
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.a11y-cvd-item:hover {
+  border-color: var(--color-border-focus);
+}
+
+.a11y-cvd-item--active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.a11y-cvd-item input[type="radio"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+  accent-color: var(--color-accent);
+}
+
+.a11y-cvd-item strong {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  display: block;
+}
+
+.a11y-cvd-item__desc {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+  display: block;
+  margin-top: 2px;
+}
+
+/* Preference rows */
+.a11y-pref-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.a11y-pref-row:last-child {
+  border-bottom: none;
+}
+
+.a11y-pref-label {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.a11y-pref-label > span:first-child {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.a11y-pref-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+}
+
+.a11y-pref-row select {
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  padding: 4px 8px;
+  font-size: var(--font-size-xs);
+  min-width: 180px;
+}
+
+.a11y-pref-row input[type="range"] {
+  width: 160px;
+  accent-color: var(--color-accent);
+}
+
+.a11y-input-text {
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  padding: 4px 8px;
+  font-size: var(--font-size-xs);
+  min-width: 180px;
+}
+
+/* Toggle switch */
+.a11y-toggle {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.a11y-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.a11y-toggle__slider {
+  position: absolute;
+  inset: 0;
+  background: var(--color-border);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.a11y-toggle__slider::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  top: 3px;
+  background: var(--color-text);
+  border-radius: 50%;
+  transition: transform var(--transition-fast);
+}
+
+.a11y-toggle input:checked + .a11y-toggle__slider {
+  background: var(--color-accent);
+}
+
+.a11y-toggle input:checked + .a11y-toggle__slider::before {
+  transform: translateX(18px);
+}
+
+/* ── Focus Mode ───────────────────────────────── */
+
+.app-body.focus-mode-active > .sidebar-panel {
+  display: none !important;
+}
+
+.app-body.focus-mode-active > .session-grid {
+  /* Only show the focused cell */
+  grid-template-columns: 1fr !important;
+  grid-template-rows: 1fr !important;
+}
+
+.app-body.focus-mode-active > .session-grid > *:not(.session-cell--focused) {
+  display: none !important;
+}
+
+.app-body.focus-mode-active > .session-grid > .session-cell--focused {
+  grid-column: 1 / -1 !important;
+  grid-row: 1 / -1 !important;
+}
+
+.focus-mode-bar {
+  position: fixed;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 14px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  z-index: 1000;
+  font-size: var(--font-size-xs);
+  pointer-events: auto;
+}
+
+.focus-bar__name {
+  color: var(--color-text);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.focus-bar__ctx {
+  font-family: var(--font-mono);
+}
+
+.focus-bar__ctx--ok { color: var(--color-ctx-ok); }
+.focus-bar__ctx--warn { color: var(--color-ctx-warn); }
+.focus-bar__ctx--error { color: var(--color-ctx-error); }
+
+.focus-bar__exit {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-dim);
+  padding: 2px 8px;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+
+.focus-bar__exit:hover {
+  color: var(--color-text);
+  border-color: var(--color-text);
+}
+
+/* ── Reduced Motion ───────────────────────────── */
+
+.a11y-reduce-motion,
+.a11y-reduce-motion * {
+  transition-duration: 0s !important;
+  animation-duration: 0s !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body:not(.a11y-force-motion),
+  body:not(.a11y-force-motion) * {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+  }
+}
+
+/* ── A11y Font Overrides ──────────────────────── */
+
+:root {
+  --a11y-font-size: inherit;
+  --a11y-line-height: inherit;
+  --a11y-letter-spacing: normal;
+  --a11y-font-family: inherit;
+}
+
+/* Apply a11y font settings to UI text (not terminal) */
+.app-shell {
+  font-size: var(--a11y-font-size, var(--font-size-base));
+  line-height: var(--a11y-line-height, 1.5);
+  letter-spacing: var(--a11y-letter-spacing, normal);
+}
+
+/* ── Voice Status Label (REQ-A11Y-002) ────────── */
+
+.voice-status-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+/* ── Status Icons (REQ-A11Y-002) ──────────────── */
+
+.status-icon {
+  display: inline-block;
+  font-size: 10px;
+  line-height: 1;
+  margin-right: 2px;
+  vertical-align: middle;
+}
+
+/* ── Cell Header Button A11y (REQ-A11Y-004) ───── */
+
+.cell-btn {
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── ARIA Live Region (visually hidden) ───────── */
+
+.a11y-live-region {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Focus Trap (visual indicator) ────────────── */
+
+.focus-trap-active :focus {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}

@@ -20,6 +20,10 @@
 @import './theme-matrix.css';
 @import './theme-brutalist.css';
 @import './theme-high-contrast.css';
+@import './theme-cvd-deuteranopia.css';
+@import './theme-cvd-tritanopia.css';
+@import './theme-cvd-achromatopsia.css';
+@import './a11y-overrides.css';
 
 /* ================================================================
    Font Faces

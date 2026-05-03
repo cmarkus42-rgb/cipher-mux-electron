@@ -319,6 +319,8 @@ export interface AppConfig {
   sidebarCollapsed?: Record<string, boolean>
   /** Workspace-scoped memory configuration. */
   memory?: MemoryConfig
+  /** Accessibility settings (font overrides, system preference overrides). */
+  a11y?: import('../main/a11y/a11y-config').A11yConfig
 }
 
 // ─── Kickoff ───────────────────────────────────────────────

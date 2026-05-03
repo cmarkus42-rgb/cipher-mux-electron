@@ -6,6 +6,7 @@ import type { AppConfig, Character } from '../../shared/types'
 import { createEmptyGrid } from '../../shared/grid-types'
 import { deepMerge } from '../util/deep-merge'
 import { BRAND } from '../../shared/brand'
+import { A11Y_DEFAULTS } from '../a11y/a11y-config'
 import { BUILTIN_PERSONAS, SEED_CUSTOM_PERSONAS, SEED_WORKSPACES } from '../../shared/persona-types'
 import { SEED_CHARACTERS, DEFAULT_CHARACTER_ID } from '../character/character-defaults'
 import { DEBUGGER_DEFAULTS } from '../debugger/types'
@@ -146,6 +147,7 @@ const defaults: AppConfig = {
   sidebarDetached: false,
   sidebarWindowBounds: null as { x: number; y: number; width: number; height: number } | null,
   sidebarCollapsed: {} as Record<string, boolean>,
+  a11y: { ...A11Y_DEFAULTS },
 }
 
 function getConfigPath(): string {

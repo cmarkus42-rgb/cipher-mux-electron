@@ -1,0 +1,143 @@
+/* a11y-overrides.css — Accessibility overrides
+ * Media queries for system preferences + font-settings CSS variables.
+ * REQ-A11Y-003, REQ-A11Y-005
+ */
+
+/* ================================================================
+   A11y Font Settings — applied via CSS custom properties
+   Set by a11y-config.ts through ConfigStore, applied to <body> style
+   ================================================================ */
+
+:root {
+  --a11y-font-family: inherit;
+  --a11y-font-size: inherit;
+  --a11y-line-height: inherit;
+  --a11y-letter-spacing: normal;
+}
+
+body[data-a11y-fonts="true"] {
+  font-family: var(--a11y-font-family);
+  font-size: var(--a11y-font-size);
+  line-height: var(--a11y-line-height);
+  letter-spacing: var(--a11y-letter-spacing);
+}
+
+/* Don't override terminal font — terminals have their own font settings */
+body[data-a11y-fonts="true"] .xterm,
+body[data-a11y-fonts="true"] .xterm-screen {
+  font-family: var(--font-mono) !important;
+  font-size: var(--font-size-base) !important;
+  line-height: normal !important;
+  letter-spacing: normal !important;
+}
+
+/* ================================================================
+   prefers-reduced-motion: reduce
+   Disable all animations and transitions when system requests it.
+   Override: body[data-a11y-motion="allow"] re-enables them.
+   WCAG 2.3.1: no flashing faster than 3x/sec regardless.
+   ================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  body:not([data-a11y-motion="allow"]) *,
+  body:not([data-a11y-motion="allow"]) *::before,
+  body:not([data-a11y-motion="allow"]) *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  body:not([data-a11y-motion="allow"]) .wire-divider {
+    animation: none !important;
+    opacity: 0.3;
+  }
+
+  body:not([data-a11y-motion="allow"])::after {
+    /* Keep scanlines (static, not animated) */
+  }
+}
+
+/* Force reduced motion regardless of system setting */
+body[data-a11y-motion="reduce"] *,
+body[data-a11y-motion="reduce"] *::before,
+body[data-a11y-motion="reduce"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+body[data-a11y-motion="reduce"] .wire-divider {
+  animation: none !important;
+  opacity: 0.3;
+}
+
+/* ================================================================
+   prefers-contrast: more
+   Auto-switch to high-contrast theme when system requests it.
+   Override: body[data-a11y-contrast="normal"] prevents auto-switch.
+   Note: The actual theme switch is handled in JS (useTheme hook).
+   This CSS ensures extra contrast on borders/focus indicators.
+   ================================================================ */
+
+@media (prefers-contrast: more) {
+  body:not([data-a11y-contrast="normal"]) {
+    --color-border: var(--color-text-secondary, #A0A0B0);
+    --color-border-light: var(--color-text-secondary, #A0A0B0);
+  }
+
+  body:not([data-a11y-contrast="normal"]) :focus-visible {
+    outline: 3px solid var(--color-border-focus) !important;
+    outline-offset: 2px;
+  }
+}
+
+/* Force high contrast regardless of system setting */
+body[data-a11y-contrast="more"] {
+  --color-border: var(--color-text-secondary, #A0A0B0);
+  --color-border-light: var(--color-text-secondary, #A0A0B0);
+}
+
+body[data-a11y-contrast="more"] :focus-visible {
+  outline: 3px solid var(--color-border-focus) !important;
+  outline-offset: 2px;
+}
+
+/* ================================================================
+   prefers-color-scheme
+   Auto-select dark/light theme. Handled primarily in JS (useTheme).
+   This CSS provides a fallback for the very first paint before JS loads.
+   Override: body[data-a11y-color-scheme="dark"|"light"] forces one mode.
+   ================================================================ */
+
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme]):not([data-a11y-color-scheme="light"]) {
+    /* Dark fallback before theme JS loads */
+    background: #2A2A32;
+    color: #D8D8E0;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  body:not([data-theme]):not([data-a11y-color-scheme="dark"]) {
+    /* Light fallback before theme JS loads */
+    background: #F2F2E8;
+    color: #1A1A1D;
+  }
+}
+
+/* ================================================================
+   WCAG 2.3.1 — No flashing faster than 3x/sec (always enforced)
+   ================================================================ */
+
+@keyframes safe-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* Override any blink-like animations to safe frequency */
+.neon-dot--error[data-animate],
+.neon-dot--warn[data-animate] {
+  animation: safe-blink 1s step-end infinite;
+}

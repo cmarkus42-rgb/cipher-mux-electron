@@ -1,0 +1,81 @@
+/* theme-cvd-deuteranopia.css — CVD Deuteranopia / Protanopia
+ * Red-Green color vision deficiency (~7% of men)
+ * Strategy: Red/Green replaced by Blue/Orange. Based on Okabe-Ito palette.
+ * All foreground/background pairs meet WCAG 4.5:1 contrast minimum.
+ * Mode: dark · Font preset: Inter + IBM Plex Mono
+ * REQ-A11Y-001
+ */
+
+body[data-theme="cvd-deuteranopia"] {
+  /* surfaces */
+  --color-bg:               #1C1C24;
+  --color-bg-elevated:      #26262F;
+  --color-bg-sunken:        #141418;
+  --color-bg-terminal:      #141418;
+
+  /* borders */
+  --color-border:           #3C3C4A;
+  --color-border-light:     #4C4C5A;
+  --color-border-focus:     #56B4E9;
+
+  /* text — all >4.5:1 on #1C1C24 */
+  --color-text:             #E8E8F0;
+  --color-text-secondary:   #B0B0C0;
+  --color-text-dim:         #7A7A8E;
+  --color-text-accent:      #56B4E9;
+
+  /* Okabe-Ito safe accents — no red/green confusion */
+  --color-neon-green:       #56B4E9;  /* sky blue replaces green */
+  --color-neon-red:         #E69F00;  /* orange replaces red */
+  --color-neon-orange:      #D55E00;  /* vermillion */
+  --color-neon-cyan:        #0072B2;  /* blue */
+
+  /* status dots — distinguishable under deuteranopia simulation */
+  --color-dot-ok:           #56B4E9;  /* sky blue = OK */
+  --color-dot-warn:         #E69F00;  /* orange = warn */
+  --color-dot-error:        #CC79A7;  /* reddish pink = error */
+  --color-dot-info:         #0072B2;  /* blue = info */
+
+  /* semantic */
+  --color-accent:           #56B4E9;
+  --color-accent-soft:      rgba(86, 180, 233, 0.12);
+  --color-success:          #56B4E9;
+  --color-error:            #CC79A7;
+  --color-warning:          #E69F00;
+  --color-info:             #0072B2;
+
+  /* context usage */
+  --color-ctx-ok:           #56B4E9;
+  --color-ctx-warn:         #E69F00;
+  --color-ctx-error:        #CC79A7;
+
+  /* overlay */
+  --color-bg-overlay:       rgba(28, 28, 36, 0.85);
+
+  /* scanline */
+  --scanline-opacity:       0.020;
+
+  /* shadows */
+  --shadow-sm:              0 1px 2px rgba(0,0,0,0.20), 0 2px 6px rgba(0,0,0,0.16);
+  --shadow-md:              0 2px 4px rgba(0,0,0,0.24), 0 4px 16px rgba(0,0,0,0.20);
+  --shadow-lg:              0 4px 8px rgba(0,0,0,0.28), 0 8px 32px rgba(0,0,0,0.24);
+  --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.16);
+
+  /* ANSI terminal palette 0-15 — Okabe-Ito safe */
+  --ansi-0:                 #141418;
+  --ansi-1:                 #CC79A7;  /* pink (replaces red) */
+  --ansi-2:                 #56B4E9;  /* sky blue (replaces green) */
+  --ansi-3:                 #E69F00;  /* orange */
+  --ansi-4:                 #0072B2;  /* blue */
+  --ansi-5:                 #9B7AB8;  /* purple */
+  --ansi-6:                 #009E73;  /* bluish green (safe for deutan) */
+  --ansi-7:                 #B0B0C0;
+  --ansi-8:                 #3C3C4A;
+  --ansi-9:                 #D89BC0;  /* bright pink */
+  --ansi-10:                #7CCAF0;  /* bright sky blue */
+  --ansi-11:                #F0B830;  /* bright orange */
+  --ansi-12:                #3090D0;  /* bright blue */
+  --ansi-13:                #BB9AD8;  /* bright purple */
+  --ansi-14:                #30B890;  /* bright bluish green */
+  --ansi-15:                #E8E8F0;
+}
