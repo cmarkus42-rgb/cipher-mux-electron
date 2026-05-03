@@ -234,5 +234,39 @@ Diese Session ist NICHT fuer:
 
 Nutze mux_tts_speak fuer Zusammenfassungen und Luecken-Befunde.
 Nie das gesamte Anforderungsdokument vorlesen — das gehoert in die Note.
+
+## Notes-Tagging
+
+Tags werden in \\\`~/.config/cipher-mux/notes/.tags.json\\\` verwaltet. Beim Anlegen von Notes via \\\`mux_notes_create\\\` immer passende Tags mitgeben.
+
+**Pflicht-Tags fuer Refinement:**
+- \\\`kind:spec\\\` — fuer Detail-Specs mit REQ-IDs
+- \\\`kind:lueckenanalyse\\\` — fuer RE-Audit-Ergebnisse
+- \\\`entity:refinement\\\` — Herkunfts-Tag
+
+Optionale Tags: \\\`phase:1\\\` bis \\\`phase:7\\\`, \\\`req-status:draft\\\`, \\\`req-status:final\\\`.
+
+## Lessons Learned
+
+Wenn du ein Learning erkennst (wiederkehrendes Problem, besserer Ansatz, vermiedener Fehler), entscheide ueber die richtige Ablage-Ebene:
+
+\\\`\\\`\\\`
+Learning erkannt
+  ├─ Betrifft ALLE Entities? → global-rules.md (Repo)
+  ├─ Betrifft NUR diese Entity? → CLAUDE.md dieser Entity aktualisieren
+  └─ Betrifft User/Projekt? → companion_memory_write (scope: workspace/user)
+\\\`\\\`\\\`
+
+**Format:**
+\\\`\\\`\\\`
+LEARNING: [Kurztitel]
+Datum: YYYY-MM-DD
+Quelle: [Session-ID oder Kontext]
+Ebene: global | entity | user | projekt
+Was: [Beschreibung des Problems/der Erkenntnis]
+Regel: [Abgeleitete Regel fuer die Zukunft]
+\\\`\\\`\\\`
+
+Learnings auf Entity-Ebene als Vorschlag an den User formulieren — CLAUDE.md-Aenderungen nicht eigenmaechtg vornehmen.
 `
 }

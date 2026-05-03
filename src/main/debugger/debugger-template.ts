@@ -39,5 +39,40 @@ Ruhig, methodisch. "Lass uns das systematisch durchgehen." Bei Findings-Vagheit:
 - Test-Suite MUSS komplett gruen sein nach Fix
 - Keine Aenderungen ausserhalb der im Plan benannten Dateien ohne Rueckfrage
 - Worker-Startup-Protokoll: Readiness-Check + tmux send-keys (nicht mux_send)
+
+## Notes-Tagging
+
+Tags werden in \`~/.config/cipher-mux/notes/.tags.json\` verwaltet. Beim Anlegen von Notes via \`mux_notes_create\` immer passende Tags mitgeben.
+
+**Pflicht-Tags fuer Debugger:**
+- \`kind:bugreport\` — fuer Bug-Findings und Intake-Protokolle
+- \`kind:fix-plan\` — fuer Fix-Plaene mit Hypothese und Risiko
+- \`kind:walkthrough\` — fuer Post-Fix-Walkthroughs
+- \`entity:debugger\` — Herkunfts-Tag
+
+Optionale Tags: \`severity:high\`, \`severity:medium\`, \`severity:low\`, \`status:open\`, \`status:fixed\`.
+
+## Lessons Learned
+
+Wenn du ein Learning erkennst (wiederkehrendes Problem, besserer Ansatz, vermiedener Fehler), entscheide ueber die richtige Ablage-Ebene:
+
+\`\`\`
+Learning erkannt
+  ├─ Betrifft ALLE Entities? → global-rules.md (Repo)
+  ├─ Betrifft NUR diese Entity? → CLAUDE.md dieser Entity aktualisieren
+  └─ Betrifft User/Projekt? → companion_memory_write (scope: workspace/user)
+\`\`\`
+
+**Format:**
+\`\`\`
+LEARNING: [Kurztitel]
+Datum: YYYY-MM-DD
+Quelle: [Session-ID oder Kontext]
+Ebene: global | entity | user | projekt
+Was: [Beschreibung des Problems/der Erkenntnis]
+Regel: [Abgeleitete Regel fuer die Zukunft]
+\`\`\`
+
+Learnings auf Entity-Ebene als Vorschlag an den User formulieren — CLAUDE.md-Aenderungen nicht eigenmaechtg vornehmen.
 `
 }

@@ -202,6 +202,16 @@ src/renderer/      — Preact UI
 src/shared/        — Typed IPC channels, domain types, constants
 ```
 
+## Accessibility
+
+cipher-mux includes accessibility features for users with different visual and motor needs:
+
+- **CVD Themes** — Three color-vision-deficiency themes: Deuteranopia/Protanopia (red-green, Okabe-Ito palette), Tritanopia (blue-yellow), and Achromatopsia (full grayscale). Selectable in Settings.
+- **Focus Mode** — Dims all grid cells except the focused one, reducing visual noise. Toggle via keyboard shortcut or Settings.
+- **Font Settings** — Configurable font family, size (10-32px), line-height, and letter-spacing via the A11y settings page. Persisted across sessions.
+- **Reduced Motion** — Respects `prefers-reduced-motion` system setting. Can also be overridden to `reduce` or `allow` in A11y settings.
+- **ARIA Attributes** — UI components use `aria-label`, `role`, and semantic HTML for screen reader compatibility (65+ ARIA annotations across components).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, test execution, commit conventions, and the PR checklist.

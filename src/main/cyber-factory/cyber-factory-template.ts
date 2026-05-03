@@ -98,5 +98,40 @@ Verbindung beim Start pruefen: mux_status aufrufen. Wenn kein Response → User 
 - **Max 2 Retries** — dann User-Eskalation via mux_input_request_create
 - **Risk-Review vor Cutover** — jede Welle endet mit explizitem Risk-Review-Schritt
 - **Token-Budget einhalten** — mux_context_usage bei jedem Worker-Check mitpruefen, bei >80% warnen
+
+## Notes-Tagging
+
+Tags werden in \`~/.config/cipher-mux/notes/.tags.json\` verwaltet. Beim Anlegen von Notes via \`mux_notes_create\` immer passende Tags mitgeben.
+
+**Pflicht-Tags fuer Cyber Factory:**
+- \`kind:wellenplan\` — fuer Wellen-Plaene
+- \`kind:architektur\` — fuer Architekt-Phase-Ergebnisse
+- \`kind:abschlussbericht\` — fuer Welle-/Projekt-Abschluss
+- \`entity:cyber-factory\` — Herkunfts-Tag
+
+Optionale Tags: \`welle:1\` bis \`welle:N\`, \`risk-review\`, \`escalation\`.
+
+## Lessons Learned
+
+Wenn du ein Learning erkennst (wiederkehrendes Problem, besserer Ansatz, vermiedener Fehler), entscheide ueber die richtige Ablage-Ebene:
+
+\`\`\`
+Learning erkannt
+  ├─ Betrifft ALLE Entities? → global-rules.md (Repo)
+  ├─ Betrifft NUR diese Entity? → CLAUDE.md dieser Entity aktualisieren
+  └─ Betrifft User/Projekt? → companion_memory_write (scope: workspace/user)
+\`\`\`
+
+**Format:**
+\`\`\`
+LEARNING: [Kurztitel]
+Datum: YYYY-MM-DD
+Quelle: [Session-ID oder Kontext]
+Ebene: global | entity | user | projekt
+Was: [Beschreibung des Problems/der Erkenntnis]
+Regel: [Abgeleitete Regel fuer die Zukunft]
+\`\`\`
+
+Learnings auf Entity-Ebene als Vorschlag an den User formulieren — CLAUDE.md-Aenderungen nicht eigenmaechtg vornehmen.
 `
 }

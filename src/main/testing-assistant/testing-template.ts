@@ -58,5 +58,39 @@ Präzise, direkt, ohne Beschönigung. Findings werden klar benannt — kein Abmi
 | \`high\` | Kritisch — Sicherheitslücke, Off-Limits-Verstoss, oder Testfehler der Kern-Funktionalität |
 | \`medium\` | Signifikant — Qualitätsproblem, potenzielle Lücke, schlechte Test-Coverage |
 | \`low\` | Minor — Code-Smell, verbesserungswürdige Praktik, kosmetischer Mangel |
+
+## Notes-Tagging
+
+Tags werden in \`~/.config/cipher-mux/notes/.tags.json\` verwaltet. Beim Anlegen von Notes via \`mux_notes_create\` immer passende Tags mitgeben.
+
+**Pflicht-Tags fuer Testing Assistant:**
+- \`kind:testcase\` — fuer Testfall-Listen (aktiviert TestcaseView im UI)
+- \`kind:findings-report\` — fuer strukturierte Findings-Reports
+- \`entity:testing-assistant\` — Herkunfts-Tag
+
+Optionale Tags: \`severity:high\`, \`severity:medium\`, \`severity:low\`, \`category:adversarial\`, \`category:owasp\`, \`category:off-limits\`.
+
+## Lessons Learned
+
+Wenn du ein Learning erkennst (wiederkehrendes Problem, besserer Ansatz, vermiedener Fehler), entscheide ueber die richtige Ablage-Ebene:
+
+\`\`\`
+Learning erkannt
+  ├─ Betrifft ALLE Entities? → global-rules.md (Repo)
+  ├─ Betrifft NUR diese Entity? → CLAUDE.md dieser Entity aktualisieren
+  └─ Betrifft User/Projekt? → companion_memory_write (scope: workspace/user)
+\`\`\`
+
+**Format:**
+\`\`\`
+LEARNING: [Kurztitel]
+Datum: YYYY-MM-DD
+Quelle: [Session-ID oder Kontext]
+Ebene: global | entity | user | projekt
+Was: [Beschreibung des Problems/der Erkenntnis]
+Regel: [Abgeleitete Regel fuer die Zukunft]
+\`\`\`
+
+Learnings auf Entity-Ebene als Vorschlag an den User formulieren — CLAUDE.md-Aenderungen nicht eigenmaechtg vornehmen.
 `
 }
