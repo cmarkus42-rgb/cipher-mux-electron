@@ -10,6 +10,7 @@ import type { KickoffOrchestrator } from '../project/kickoff-orchestrator'
 import type { TaskManager } from '../task/task-manager'
 import type { Topic } from '../../shared/types'
 import type { NoteManager } from '../notes/note-manager'
+import type { NoteSearchIndex } from '../notes/note-search-index'
 import type { MemoryStore } from '../companion/memory-store'
 import { IPC } from '../../shared/ipc-channels'
 
@@ -25,6 +26,7 @@ export interface ToolContext {
   inputRequestWatcher: import('../mpo/input-request-watcher').InputRequestWatcher | null
   windowManager: { sendToMainWindow(channel: string, data: unknown): void } | null
   noteManager: NoteManager | null
+  noteSearchIndex: NoteSearchIndex | null
   memoryStore: MemoryStore | null
   getVoiceManager?: () => import('../voice/voice-manager').VoiceManager | null
   testingAssistantManager?: import('../testing-assistant/testing-assistant-manager').TestingAssistantManager
@@ -629,7 +631,12 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       }
       try {
         const fullBody = `# ${args.title}\n\n${args.body}`
-        let tags = args.tags ? args.tags.slice(0, 5) : ([] as string[])
+        let tags = args.tags ?? ([] as string[])
+        // REQ-NOTES-007: warn if manual tags exceed limit, but create anyway
+        const manualTagCount = tags.length
+        const tagLimitWarning = manualTagCount > 5
+          ? `Warning: ${manualTagCount} manual tags exceed recommended limit of 5.`
+          : undefined
         // P.2: auto-apply workspace defaultTags
         try {
           const { configStore } = require('../config/config-store')
@@ -645,13 +652,20 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         } catch { /* configStore not available */ }
         const note = await ctx.noteManager.create(args.title, fullBody, tags.length > 0 ? tags : undefined)
 
+        // Update search index
+        if (ctx.noteSearchIndex) {
+          ctx.noteSearchIndex.addOrUpdate({ info: note, body: fullBody })
+        }
+
         // Notify UI
         if (ctx.windowManager) {
           ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created', note })
         }
 
+        const result: Record<string, unknown> = { ok: true, id: note.id, title: note.title }
+        if (tagLimitWarning) result.warning = tagLimitWarning
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: note.id, title: note.title }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
@@ -805,11 +819,21 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
       }
       try {
-        const results = await ctx.noteManager.search(args.query, {
-          tags: args.tags,
-        })
+        // Prefer FlexSearch index, fallback to NoteManager.search
+        let resultInfos: import('../../shared/types').NoteInfo[]
+        if (ctx.noteSearchIndex) {
+          let results = ctx.noteSearchIndex.search(args.query)
+          if (args.tags && args.tags.length > 0) {
+            const tagSet = new Set(args.tags.map(t => t.toLowerCase()))
+            results = results.filter(r => r.info.tags.some(t => tagSet.has(t.toLowerCase())))
+          }
+          resultInfos = results.map(r => r.info)
+        } else {
+          const results = await ctx.noteManager.search(args.query, { tags: args.tags })
+          resultInfos = results.map(r => r.info)
+        }
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(results.map(r => r.info), null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(resultInfos, null, 2) }],
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)

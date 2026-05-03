@@ -22,41 +22,64 @@ function getLlmConfig() {
 
 // ─── Seed Tags ────────────────────────────────────────────
 
+// Tag classes (klasse:wert schema, REQ-NOTES-013):
+//   kind:     Note type / purpose (bugreport, testcase, handoff, journal, reference, todo, idea)
+//   domain:   Subject area (trading, risk, market-data, portfolio, infra, ai-ml)
+//   tech:     Technology (typescript, python, electron, tailscale, truenas)
+//   project:  Project name (cipher-mux, cipher-boox, openclaw)
+//   phase:    Workflow phase (research, architecture, coding, testing, debugging, automation, monitoring)
+//   scope:    Visibility / lifecycle (workspace:<id>, session, global)
+//
+// Entity-specific functional tags (no class prefix): handoff, testcase
+// These are used as programmatic markers and must stay flat.
+
 export const SEED_TAGS: Record<string, TagEntry> = {
-  // Trading
-  trading: { count: 0, description: 'Trading strategies, market analysis, order execution' },
-  risk: { count: 0, description: 'Risk management, position sizing, drawdown' },
-  'market-data': { count: 0, description: 'Market data feeds, price history, tick data' },
-  portfolio: { count: 0, description: 'Portfolio management, allocation, performance tracking' },
-  // Infrastructure
-  infra: { count: 0, description: 'Infrastructure, server setup, deployment' },
-  tailscale: { count: 0, description: 'Tailscale VPN, mesh networking, node connectivity' },
-  truenas: { count: 0, description: 'TrueNAS SCALE, storage, ZFS, datasets' },
-  monitoring: { count: 0, description: 'Monitoring, alerts, metrics, dashboards' },
-  // Development
-  coding: { count: 0, description: 'General coding, implementation, development' },
-  typescript: { count: 0, description: 'TypeScript, type system, compiler' },
-  python: { count: 0, description: 'Python scripts, libraries, automation' },
-  testing: { count: 0, description: 'Unit tests, integration tests, test coverage' },
-  architecture: { count: 0, description: 'System architecture, design patterns, ADRs' },
-  debugging: { count: 0, description: 'Debugging, troubleshooting, error investigation' },
-  // Projects
-  project: { count: 0, description: 'Project planning, milestones, scope' },
-  'cipher-mux': { count: 0, description: 'cipher-mux-electron project, terminal multiplexer UI' },
-  'cipher-boox': { count: 0, description: 'cipher-boox project, e-reader integration' },
-  openclaw: { count: 0, description: 'OpenClaw project, SSH keys, infrastructure access' },
-  // Research
-  research: { count: 0, description: 'Research, analysis, investigation' },
-  'ai-ml': { count: 0, description: 'AI/ML models, training, inference, LLMs' },
-  idea: { count: 0, description: 'Ideas, brainstorming, concepts' },
-  // Operations
-  automation: { count: 0, description: 'Automation scripts, workflows, CI/CD' },
-  security: { count: 0, description: 'Security, access control, credentials, encryption' },
-  backup: { count: 0, description: 'Backups, snapshots, data recovery' },
-  // Personal
-  journal: { count: 0, description: 'Personal journal, daily notes, reflections' },
-  reference: { count: 0, description: 'Reference material, documentation, guides' },
-  todo: { count: 0, description: 'Todo items, tasks, action points' },
+  // kind — note purpose
+  'kind:bugreport': { count: 0, description: 'Bug report notes' },
+  'kind:journal': { count: 0, description: 'Personal journal, daily notes, reflections' },
+  'kind:reference': { count: 0, description: 'Reference material, documentation, guides' },
+  'kind:todo': { count: 0, description: 'Todo items, tasks, action points' },
+  'kind:idea': { count: 0, description: 'Ideas, brainstorming, concepts' },
+  // domain — subject area
+  'domain:trading': { count: 0, description: 'Trading strategies, market analysis, order execution' },
+  'domain:risk': { count: 0, description: 'Risk management, position sizing, drawdown' },
+  'domain:market-data': { count: 0, description: 'Market data feeds, price history, tick data' },
+  'domain:portfolio': { count: 0, description: 'Portfolio management, allocation, performance tracking' },
+  'domain:infra': { count: 0, description: 'Infrastructure, server setup, deployment' },
+  'domain:ai-ml': { count: 0, description: 'AI/ML models, training, inference, LLMs' },
+  'domain:security': { count: 0, description: 'Security, access control, credentials, encryption' },
+  'domain:backup': { count: 0, description: 'Backups, snapshots, data recovery' },
+  // tech — technology
+  'tech:typescript': { count: 0, description: 'TypeScript, type system, compiler' },
+  'tech:python': { count: 0, description: 'Python scripts, libraries, automation' },
+  'tech:electron': { count: 0, description: 'Electron framework, desktop app, IPC' },
+  'tech:tailscale': { count: 0, description: 'Tailscale VPN, mesh networking, node connectivity' },
+  'tech:truenas': { count: 0, description: 'TrueNAS SCALE, storage, ZFS, datasets' },
+  // project — project name
+  'project:cipher-mux': { count: 0, description: 'cipher-mux-electron project, terminal multiplexer UI' },
+  'project:cipher-boox': { count: 0, description: 'cipher-boox project, e-reader integration' },
+  'project:openclaw': { count: 0, description: 'OpenClaw project, SSH keys, infrastructure access' },
+  // phase — workflow phase
+  'phase:research': { count: 0, description: 'Research, analysis, investigation' },
+  'phase:architecture': { count: 0, description: 'System architecture, design patterns, ADRs' },
+  'phase:coding': { count: 0, description: 'General coding, implementation, development' },
+  'phase:testing': { count: 0, description: 'Unit tests, integration tests, test coverage' },
+  'phase:debugging': { count: 0, description: 'Debugging, troubleshooting, error investigation' },
+  'phase:automation': { count: 0, description: 'Automation scripts, workflows, CI/CD' },
+  'phase:monitoring': { count: 0, description: 'Monitoring, alerts, metrics, dashboards' },
+  // Entity-specific functional tags (flat, no class prefix)
+  handoff: { count: 0, description: 'Handoff note between sessions' },
+  testcase: { count: 0, description: 'Testcase note with checklist format' },
+}
+
+/** Recommended tag classes for .tags.json documentation */
+export const TAG_CLASSES: Record<string, string> = {
+  kind: 'Note type/purpose (bugreport, journal, reference, todo, idea)',
+  domain: 'Subject area (trading, risk, infra, ai-ml, security)',
+  tech: 'Technology (typescript, python, electron, tailscale)',
+  project: 'Project name (cipher-mux, cipher-boox, openclaw)',
+  phase: 'Workflow phase (research, architecture, coding, testing, debugging)',
+  scope: 'Visibility/lifecycle — auto-assigned (workspace:<id>, session)',
 }
 
 const TAGS_FILENAME = '.tags.json'
@@ -67,9 +90,12 @@ function buildTaggingPrompt(content: string, tagRepo: TagRepository): string {
   const existingTags = Object.keys(tagRepo.tags).join(', ')
   return `Du bist ein erfahrener Wissensorganisator. Lies die folgende Notiz sorgfältig und vergib bis zu 5 passende Tags.
 
+Tags folgen dem klasse:wert Schema. Bekannte Klassen: kind (Zweck), domain (Fachgebiet), tech (Technologie), project (Projekt), phase (Workflow-Phase).
+Beispiele: "domain:trading", "tech:typescript", "phase:debugging", "kind:reference".
+
 Vorhandene Tags im Repository: ${existingTags}
 
-Bevorzuge bestehende Tags — erfinde nur dann neue, wenn wirklich keiner passt. Gib ausschliesslich ein JSON-Array zurück, z.B. ["tag1", "tag2"].
+Bevorzuge bestehende Tags — erfinde nur dann neue, wenn wirklich keiner passt. Neue Tags muessen dem klasse:wert Format folgen. Gib ausschliesslich ein JSON-Array zurück, z.B. ["domain:trading", "tech:typescript"].
 
 Notiz:
 ${content.slice(0, 3000)}`
@@ -200,7 +226,9 @@ export class NoteTagging {
   private saveRepository(): void {
     try {
       fs.mkdirSync(this.notesDir, { recursive: true })
-      fs.writeFileSync(this.tagsFilePath, JSON.stringify(this.repo, null, 2), 'utf-8')
+      // Include tag class documentation in .tags.json
+      const output = { ...this.repo, _tagClasses: TAG_CLASSES }
+      fs.writeFileSync(this.tagsFilePath, JSON.stringify(output, null, 2), 'utf-8')
     } catch {
       // Non-fatal — next call will retry
     }

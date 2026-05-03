@@ -45,6 +45,13 @@ export function useNotes() {
     return api().notes.delete(id) as Promise<{ ok: boolean }>
   }, [])
 
+  /** Full-text search via FlexSearch backend. Returns NoteInfo[] for matching notes. */
+  const searchNotes = useCallback(async (query: string, tags?: string[]): Promise<NoteInfo[]> => {
+    if (!query.trim()) return []
+    const results = await api().notes.search(query, tags)
+    return (results as Array<{ info: NoteInfo; body: string }>).map(r => r.info)
+  }, [])
+
   return {
     notes,
     tagRepo,
@@ -54,5 +61,6 @@ export function useNotes() {
     readNote,
     saveNote,
     deleteNote,
+    searchNotes,
   }
 }

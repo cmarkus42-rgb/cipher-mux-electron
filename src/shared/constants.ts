@@ -68,6 +68,9 @@ export const CHATROOM_PANEL_WIDTH = 280
 /** Default kickoff timeout (minutes) — how long we wait for a completion signal. */
 export const KICKOFF_TIMEOUT_MIN_DEFAULT = 15
 
+/** Max manual tags per note (workspace defaultTags don't count) */
+export const MAX_MANUAL_TAGS = 5
+
 /** Task stall detection defaults */
 export const TASK_STALL_TIMEOUT_MS = 300_000       // 5 minutes
 export const TASK_WATCH_INTERVAL_MS = 30_000       // 30 seconds
