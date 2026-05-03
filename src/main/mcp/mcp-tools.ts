@@ -13,6 +13,7 @@ import type { NoteManager } from '../notes/note-manager'
 import type { NoteSearchIndex } from '../notes/note-search-index'
 import type { MemoryStore } from '../companion/memory-store'
 import { IPC } from '../../shared/ipc-channels'
+import { registerAllHandoffTools } from './handoff-kernel'
 
 /**
  * Context passed to tool handlers — references to core services.
@@ -71,6 +72,9 @@ export function findSessionByName(
  * Register all MCP tools on the given McpServer instance.
  */
 export function registerTools(server: McpServer, ctx: ToolContext): void {
+  // Register all handoff tools (entity_start + 10 handoff tools) from kernel
+  registerAllHandoffTools(server, ctx)
+
   // 1. mux_send — Send a message to the message bus (with optional push delivery)
   ;(server.registerTool as any)(
     'mux_send',
@@ -1195,90 +1199,6 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     }
   )
 
-  // CF-2. mux_cyber_factory_handoff_testing — Create a testing handoff note
-  ;(server.registerTool as any)(
-    'mux_cyber_factory_handoff_testing',
-    {
-      description:
-        'Create a testing handoff note for a Cyber Factory welle. '
-        + 'The note contains the test summary and is tagged for the testing pipeline.',
-      inputSchema: {
-        run_id: z.string().describe('Cyber Factory run ID'),
-        welle_id: z.string().describe('Welle ID that completed'),
-        summary: z.string().describe('Testing summary / handoff body (markdown)'),
-      },
-    },
-    async (args: { run_id: string; welle_id: string; summary: string }) => {
-      if (!ctx.noteManager) {
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
-      }
-      try {
-        // Resolve welle reihenfolge for a readable title
-        let welleLabel = args.welle_id
-        if (ctx.memoryStore) {
-          try {
-            const { CyberFactoryManager } = await import('../cyber-factory/cyber-factory-manager.js')
-            const cfm = new CyberFactoryManager(ctx.memoryStore)
-            const wellen = cfm.listWellen(args.run_id)
-            const welle = wellen.find(w => w.id === args.welle_id)
-            if (welle) welleLabel = String(welle.reihenfolge)
-          } catch { /* fallback to welle_id */ }
-        }
-
-        const title = `Testing Handoff — Welle ${welleLabel}`
-        const fullBody = `# ${title}\n\n${args.summary}`
-        const note = await ctx.noteManager.create(title, fullBody, ['cyber-factory', 'testing-handoff'])
-
-        if (ctx.windowManager) {
-          ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created', note })
-        }
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, noteId: note.id }) }],
-        }
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err)
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
-      }
-    }
-  )
-
-  // CF-3. mux_cyber_factory_handoff_debugger — Create a debugger handoff note
-  ;(server.registerTool as any)(
-    'mux_cyber_factory_handoff_debugger',
-    {
-      description:
-        'Create a debugger handoff note for the Cyber Factory. '
-        + 'Contains findings from testing or monitoring that need debugging attention.',
-      inputSchema: {
-        run_id: z.string().describe('Cyber Factory run ID'),
-        findings_report: z.string().describe('Detailed findings report (markdown)'),
-        severity_summary: z.string().describe('Short severity summary for the title'),
-      },
-    },
-    async (args: { run_id: string; findings_report: string; severity_summary: string }) => {
-      if (!ctx.noteManager) {
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
-      }
-      try {
-        const title = `Debugger Handoff — ${args.severity_summary}`
-        const fullBody = `# ${title}\n\n${args.findings_report}`
-        const note = await ctx.noteManager.create(title, fullBody, ['cyber-factory', 'debugger-handoff'])
-
-        if (ctx.windowManager) {
-          ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created', note })
-        }
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, noteId: note.id }) }],
-        }
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err)
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
-      }
-    }
-  )
-
   // ─── App-Control Tools ─────────────────────────────────
 
   // 27. mux_grid_resize — Resize the grid
@@ -1703,212 +1623,6 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     }
   )
 
-  // 37. mux_refinement_handoff_cyber_factory — Structured handoff from Refinement to Cyber Factory
-  ;(server.registerTool as any)(
-    'mux_refinement_handoff_cyber_factory',
-    {
-      description:
-        'Hand off a completed detail spec from Refinement to the Cyber Factory. '
-        + 'Creates a new session targeting the Cyber Factory entity (or a regular session '
-        + 'if Cyber Factory is not yet available) with the spec path as context.',
-      inputSchema: {
-        detailSpecPath: z.string().describe('Absolute path to the detail spec file with REQ-IDs'),
-        projectPath: z.string().describe('Project directory path for the Cyber Factory session'),
-        lifecyclePhase: z.string().optional().describe('Target lifecycle phase (default: architect)'),
-      },
-    },
-    async (args: { detailSpecPath: string; projectPath: string; lifecyclePhase?: string }) => {
-      try {
-        const phase = args.lifecyclePhase || 'architect'
-        const sessionName = `CF-${path.basename(args.projectPath)}`
-        // Try startEntity for cyber-factory; fall back to plain start if entity not registered
-        let session
-        try {
-          session = await ctx.sessionManager.startEntity('cyber-factory', {
-            name: sessionName,
-            projectPath: args.projectPath,
-          })
-        } catch {
-          session = await ctx.sessionManager.start({
-            name: sessionName,
-            projectPath: args.projectPath,
-          })
-        }
-
-        if (ctx.windowManager) {
-          ctx.windowManager.sendToMainWindow(IPC.SESSION_VISIBLE_ADD, { sessionId: session.id })
-        }
-
-        // Post handoff context to message bus
-        if (ctx.messageBus) {
-          ctx.messageBus.send({
-            topic: 'system' as Topic,
-            sender: 'refinement',
-            payload: { text: `Refinement handoff: Detail-Spec at ${args.detailSpecPath}, phase: ${phase}`, sessionId: session.id },
-          })
-        }
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({
-            ok: true,
-            sessionId: session.id,
-            sessionName,
-            detailSpecPath: args.detailSpecPath,
-            lifecyclePhase: phase,
-          }) }],
-        }
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err)
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: errMsg }) }],
-          isError: true,
-        }
-      }
-    }
-  )
-
-  // 38. mux_refinement_handoff_ideation — Send back to Ideation Partner when too many gaps
-  ;(server.registerTool as any)(
-    'mux_refinement_handoff_ideation',
-    {
-      description:
-        'Hand back to the Ideation Partner when the requirements package has too many gaps. '
-        + 'Creates or finds an existing Ideation Partner session and sends the gap summary.',
-      inputSchema: {
-        reason: z.string().describe('Why the handoff is needed (e.g. "systematic gaps in NFRs")'),
-        gaps: z.array(z.string()).describe('List of identified gaps'),
-        projectPath: z.string().optional().describe('Project directory path (optional, uses calling session context if omitted)'),
-      },
-    },
-    async (args: { reason: string; gaps: string[]; projectPath?: string }) => {
-      try {
-        // Look for existing ideation session
-        const sessions = ctx.sessionManager.list()
-        let ideationSession = sessions.find(s =>
-          s.entityId === 'ideation-partner' || s.entityId === 'ideationpartner'
-        )
-
-        if (!ideationSession && args.projectPath) {
-          // Try startEntity; fall back to plain start if entity not registered
-          try {
-            ideationSession = await ctx.sessionManager.startEntity('ideationpartner', {
-              name: 'Ideation',
-              projectPath: args.projectPath,
-            })
-          } catch {
-            ideationSession = await ctx.sessionManager.start({
-              name: 'Ideation',
-              projectPath: args.projectPath,
-            })
-          }
-          if (ctx.windowManager) {
-            ctx.windowManager.sendToMainWindow(IPC.SESSION_VISIBLE_ADD, { sessionId: ideationSession.id })
-          }
-        }
-
-        const gapSummary = `Refinement-Rueckgabe: ${args.reason}\n\nIdentifizierte Luecken:\n${args.gaps.map(g => `- ${g}`).join('\n')}`
-
-        if (ctx.messageBus && ideationSession) {
-          ctx.messageBus.send({
-            topic: 'system' as Topic,
-            sender: 'refinement',
-            payload: { text: gapSummary, sessionId: ideationSession.id },
-          })
-        }
-
-        // Also create an input request bubble for user visibility
-        if (ctx.inputRequestWatcher) {
-          const irId = `ir-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-          ctx.inputRequestWatcher.createRequest({
-            id: irId,
-            type: 'bubble' as const,
-            projectId: 'refinement',
-            question: `Refinement: Zurueck zum Ideation Partner — ${args.reason}`,
-            context: gapSummary,
-            status: 'open' as const,
-            answer: null,
-            createdAt: new Date().toISOString(),
-            answeredAt: null,
-          })
-        }
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({
-            ok: true,
-            reason: args.reason,
-            gapCount: args.gaps.length,
-            ideationSessionId: ideationSession?.id ?? null,
-          }) }],
-        }
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err)
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: errMsg }) }],
-          isError: true,
-        }
-      }
-    }
-  )
-
-  // 39. mux_ideation_handoff_refinement — Hand off Anforderungspaket from Ideation to Refinement
-  ;(server.registerTool as any)(
-    'mux_ideation_handoff_refinement',
-    {
-      description:
-        'Hand off a completed Anforderungspaket from the Ideation Partner to Refinement. '
-        + 'Creates or finds an existing Refinement session and sends the package path as context.',
-      inputSchema: {
-        anforderungspaketPath: z.string().describe('Absolute path to the Anforderungspaket markdown file'),
-        projectPath: z.string().optional().describe('Project directory path (optional)'),
-      },
-    },
-    async (args: { anforderungspaketPath: string; projectPath?: string }) => {
-      try {
-        const sessions = ctx.sessionManager.list()
-        let refinementSession = sessions.find(s => s.entityId === 'refinement')
-
-        if (!refinementSession) {
-          try {
-            refinementSession = await ctx.sessionManager.startEntity('refinement', {
-              name: 'Refinement',
-              projectPath: args.projectPath,
-            })
-          } catch {
-            refinementSession = await ctx.sessionManager.start({
-              name: 'Refinement',
-              projectPath: args.projectPath || process.cwd(),
-            })
-          }
-          if (ctx.windowManager) {
-            ctx.windowManager.sendToMainWindow(IPC.SESSION_VISIBLE_ADD, { sessionId: refinementSession.id })
-          }
-        }
-
-        if (ctx.messageBus) {
-          ctx.messageBus.send({
-            topic: 'system' as Topic,
-            sender: 'ideation-partner',
-            payload: { text: `Ideation handoff: Anforderungspaket at ${args.anforderungspaketPath}`, sessionId: refinementSession.id },
-          })
-        }
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({
-            ok: true,
-            refinementSessionId: refinementSession.id,
-            anforderungspaketPath: args.anforderungspaketPath,
-          }) }],
-        }
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err)
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: errMsg }) }],
-          isError: true,
-        }
-      }
-    }
-  )
-
   // D-1. mux_debugger_findings_intake — Submit structured bug findings to the Debugger
   ;(server.registerTool as any)(
     'mux_debugger_findings_intake',
@@ -2047,25 +1761,6 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         workspaceId: args.workspaceId,
       })
       return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, runId: run.id }) }] }
-    }
-  )
-
-  ;(server.registerTool as any)(
-    'mux_testing_findings_handoff_debugger',
-    {
-      description: 'Hand off testing findings to the debugger for fixing.',
-      inputSchema: {
-        runId: z.string().describe('Testing run ID to hand off'),
-      },
-    },
-    async (args: { runId: string }) => {
-      if (!ctx.testingAssistantManager) {
-        return { content: [{ type: 'text' as const, text: 'TestingAssistantManager not available' }], isError: true }
-      }
-      const findings = ctx.testingAssistantManager.listFindings(args.runId)
-      const { buildDebuggerHandoff } = await import('../testing-assistant/handoff-debugger')
-      const handoff = buildDebuggerHandoff(findings, args.runId)
-      return { content: [{ type: 'text' as const, text: JSON.stringify(handoff) }] }
     }
   )
 
