@@ -3,9 +3,10 @@
 // Tag filter is tri-state: neutral → include (green) → exclude (red) → neutral.
 
 import { h } from 'preact'
-import { useState, useMemo, useCallback } from 'preact/hooks'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { NoteInfo } from '../../shared/types'
+import { MAX_MANUAL_TAGS } from '../../shared/constants'
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -170,6 +171,8 @@ interface NotesTreeViewProps {
   onNoteDoubleClick: (note: NoteInfo) => void
   onNoteDelete: (note: NoteInfo, e: Event) => void
   onNoteDragStart: (note: NoteInfo, e: DragEvent) => void
+  /** FlexSearch backend search function (optional — falls back to client-side) */
+  onSearch?: (query: string, tags?: string[]) => Promise<NoteInfo[]>
 }
 
 export function NotesTreeView({
@@ -181,9 +184,25 @@ export function NotesTreeView({
   onNoteDoubleClick,
   onNoteDelete,
   onNoteDragStart,
+  onSearch,
 }: NotesTreeViewProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [searchResults, setSearchResults] = useState<NoteInfo[] | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Debounced FlexSearch query
+  useEffect(() => {
+    if (!onSearch || !searchTerm.trim()) {
+      setSearchResults(null)
+      return
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      onSearch(searchTerm).then(setSearchResults).catch(() => setSearchResults(null))
+    }, 150)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [searchTerm, onSearch])
 
   // Build unique tags and their counts
   const { allTags, tagCounts } = useMemo(() => {
@@ -226,11 +245,16 @@ export function NotesTreeView({
   // Clear all filters
   const hasActiveFilter = Object.keys(tagFilter).length > 0
 
-  // Filter notes
+  // Filter notes — use FlexSearch results when available, else client-side
   const filteredNotes = useMemo(() => {
+    if (searchResults && searchTerm.trim()) {
+      // FlexSearch results already ranked — just apply tag filter
+      return applyTagFilter(searchResults, tagFilter)
+    }
+
     let result = applyTagFilter(notes, tagFilter)
 
-    // Search term
+    // Client-side fallback for search term (when no FlexSearch)
     if (searchTerm) {
       const q = searchTerm.toLowerCase()
       result = result.filter(n =>
@@ -240,7 +264,7 @@ export function NotesTreeView({
     }
 
     return result
-  }, [notes, tagFilter, searchTerm])
+  }, [notes, tagFilter, searchTerm, searchResults])
 
   // Flat tag chips for tags that don't appear in the tree (single-segment tags)
   const flatTags = useMemo(() => allTags.filter(t => !t.includes('/')), [allTags])
@@ -329,6 +353,13 @@ export function NotesTreeView({
             </div>
             <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)' }}>
               {note.tags.map(t => `#${t}`).join(' ')}
+              {note.tags.length > MAX_MANUAL_TAGS && (
+                <span
+                  class="bg-card__tag-warning"
+                  title={t('sidebar.tagLimitWarning', `${note.tags.length}/${MAX_MANUAL_TAGS} tags`)}
+                  style={{ color: 'var(--color-warning, #f0a000)', marginLeft: '4px' }}
+                >!</span>
+              )}
             </div>
             <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)', opacity: 0.5 }}>
               {note.modifiedAt ? new Date(note.modifiedAt).toLocaleDateString() : ''}

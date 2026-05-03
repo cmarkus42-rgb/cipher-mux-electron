@@ -81,7 +81,7 @@ export function SidebarPanel({
   const [tagFilter, setTagFilter] = useState<TagFilterState>({})
   const [searchTerm, setSearchTerm] = useState('')
 
-  const { notes, tagRepo, deleteNote } = useNotes()
+  const { notes, tagRepo, deleteNote, searchNotes } = useNotes()
 
   // Pre-select workspace defaultTags as include-filters when workspace changes
   useEffect(() => {
@@ -202,6 +202,7 @@ export function SidebarPanel({
               onNoteDoubleClick={handleNoteDoubleClick}
               onNoteDelete={handleNoteDelete}
               onNoteDragStart={handleNoteDragStart}
+              onSearch={searchNotes}
             />
           </div>
         )}
