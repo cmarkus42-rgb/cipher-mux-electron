@@ -3,6 +3,7 @@ import './i18n'
 import './styles/theme.css'
 import './styles/layout.css'
 import './styles/components.css'
+import './styles/a11y.css'
 
 const params = new URLSearchParams(location.search)
 const view = params.get('view')

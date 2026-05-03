@@ -7,6 +7,9 @@ import type { ThemeName } from '../../shared/grid-types'
 import type { CustomTheme } from '../hooks/useTheme'
 import themesManifest from '../themes.json'
 import '../styles/workspaces.css'
+import '../styles/a11y.css'
+import { A11ySettingsPage } from '../a11y/A11ySettingsPage'
+import { useA11ySettings } from '../a11y/hooks/useA11ySettings'
 
 interface InfoSettingsViewProps {
   theme: ThemeName
@@ -29,7 +32,7 @@ interface LlmConfig {
   ollamaModel: string
 }
 
-type TabId = 'general' | 'themes' | 'models' | 'shortcuts' | 'about'
+type TabId = 'general' | 'themes' | 'models' | 'shortcuts' | 'a11y' | 'about'
 // Legacy alias for external consumers
 type LegacyTabId = 'settings' | TabId
 
@@ -82,7 +85,7 @@ const THEME_TOKEN_GROUPS: Array<{ labelKey: string; tokens: string[] }> = [
 export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme, onOpenBugreport }: InfoSettingsViewProps) {
   const { t } = useTranslation()
   // Map legacy 'settings' tab to 'general', validate tab name
-  const ALL_TABS: TabId[] = ['general', 'themes', 'models', 'shortcuts', 'about']
+  const ALL_TABS: TabId[] = ['general', 'themes', 'models', 'shortcuts', 'a11y', 'about']
   const resolveTab = (t?: string): TabId => {
     if (t === 'settings') return 'general'
     if (ALL_TABS.includes(t as TabId)) return t as TabId
@@ -279,18 +282,21 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
     return acc
   }, {})
 
+  const { settings: a11ySettings, update: updateA11y } = useA11ySettings()
+
   const TAB_LABELS: Record<TabId, string> = {
     general: t('info.tabGeneral', 'General'),
     themes: t('info.tabThemes', 'Themes'),
     models: t('info.tabModels', 'Models'),
     shortcuts: t('info.tabShortcuts'),
+    a11y: 'A11y',
     about: t('info.tabAbout'),
   }
 
   return (
     <div class="settings-view" data-highlight="popup-info">
       <div class="info-tabs">
-        {(['general', 'themes', 'models', 'shortcuts', 'about'] as TabId[]).map((tab) => (
+        {(['general', 'themes', 'models', 'shortcuts', 'a11y', 'about'] as TabId[]).map((tab) => (
           <button
             key={tab}
             class={`info-tab ${activeTab === tab ? 'info-tab--active' : ''}`}
@@ -321,6 +327,12 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
           <div class="settings-section__hint" style={{ marginTop: '12px' }}>
             {t('info.shortcutHint')}
           </div>
+        </section>
+      )}
+
+      {activeTab === 'a11y' && (
+        <section class="settings-section">
+          <A11ySettingsPage settings={a11ySettings} onUpdate={updateA11y} />
         </section>
       )}
 

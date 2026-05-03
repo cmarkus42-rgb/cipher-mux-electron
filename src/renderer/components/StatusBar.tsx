@@ -40,7 +40,7 @@ export function StatusBar({
 }: StatusBarProps) {
   const { t } = useTranslation()
   return (
-    <div class="status-bar">
+    <div class="status-bar" role="toolbar" aria-label="Status-Leiste">
       <div class="status-bar__actions">
         <span data-highlight="sb-voice">
           <VoiceControl
@@ -50,15 +50,17 @@ export function StatusBar({
             inline
           />
         </span>
-        <span class="status-bar__sep">|</span>
+        <span class="status-bar__sep" aria-hidden="true">|</span>
         <span data-highlight="sb-grid">
           <GridControls cols={gridCols} rows={gridRows} onResize={onGridResize} inline />
         </span>
-        <span class="status-bar__sep">|</span>
+        <span class="status-bar__sep" aria-hidden="true">|</span>
         <button
           class={`status-bar__btn${workspacesPopupVisible ? ' status-bar__btn--active' : ''}`}
           onClick={onToggleWorkspaces}
           data-highlight="sb-workspaces"
+          aria-label="Workspaces anzeigen"
+          aria-pressed={workspacesPopupVisible}
         >
           {t('statusBar.workspaces')}
         </button>
@@ -67,15 +69,22 @@ export function StatusBar({
           onClick={onToggleSidebar}
           title={t('statusBar.sidebarToggle')}
           data-highlight="sb-sidebar"
+          aria-label="Seitenleiste oeffnen/schliessen"
+          aria-pressed={sidebarVisible}
         >
           {t('statusBar.sidebar')}
         </button>
-        <button class="status-bar__btn status-bar__btn--active" onClick={onThemeSettings} data-highlight="sb-theme">
+        <button
+          class="status-bar__btn status-bar__btn--active"
+          onClick={onThemeSettings}
+          data-highlight="sb-theme"
+          aria-label={`Theme auswaehlen (aktuell: ${themeDisplayName(theme)})`}
+        >
           {themeDisplayName(theme)}
         </button>
-        <button class="status-bar__btn" onClick={onInfo} data-highlight="sb-info">{t('statusBar.settings', 'Settings')}</button>
+        <button class="status-bar__btn" onClick={onInfo} data-highlight="sb-info" aria-label="Einstellungen oeffnen">{t('statusBar.settings', 'Settings')}</button>
       </div>
-      <span class="status-bar__version">{APP_VERSION}</span>
+      <span class="status-bar__version" aria-label={`Version ${APP_VERSION}`}>{APP_VERSION}</span>
     </div>
   )
 }

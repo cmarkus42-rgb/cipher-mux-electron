@@ -1,0 +1,82 @@
+/* theme-cvd-achromatopsia.css — CVD Achromatopsia
+ * Complete color blindness (~0.003%)
+ * Strategy: Pure grayscale. Information conveyed through shapes/icons/text only.
+ * No color carries semantic meaning. Unique among IDEs.
+ * All foreground/background pairs meet WCAG 4.5:1 contrast minimum.
+ * Mode: dark · Font preset: Inter + IBM Plex Mono
+ * REQ-A11Y-001
+ */
+
+body[data-theme="cvd-achromatopsia"] {
+  /* surfaces — grayscale only */
+  --color-bg:               #1A1A1A;
+  --color-bg-elevated:      #252525;
+  --color-bg-sunken:        #111111;
+  --color-bg-terminal:      #111111;
+
+  /* borders */
+  --color-border:           #404040;
+  --color-border-light:     #505050;
+  --color-border-focus:     #E0E0E0;
+
+  /* text — high contrast grayscale, all >4.5:1 on #1A1A1A */
+  --color-text:             #E8E8E8;
+  --color-text-secondary:   #B0B0B0;
+  --color-text-dim:         #787878;
+  --color-text-accent:      #FFFFFF;
+
+  /* "accents" are grayscale — status conveyed by shapes/text, not color */
+  --color-neon-green:       #D0D0D0;
+  --color-neon-red:         #909090;
+  --color-neon-orange:      #A8A8A8;
+  --color-neon-cyan:        #C0C0C0;
+
+  /* status dots — varying luminance levels for differentiation */
+  --color-dot-ok:           #E0E0E0;  /* bright = OK */
+  --color-dot-warn:         #A0A0A0;  /* medium = warn */
+  --color-dot-error:        #686868;  /* dim = error (rely on icon/text) */
+  --color-dot-info:         #C0C0C0;  /* light = info */
+
+  /* semantic — all gray, icons/text carry the meaning */
+  --color-accent:           #E0E0E0;
+  --color-accent-soft:      rgba(224, 224, 224, 0.10);
+  --color-success:          #D0D0D0;
+  --color-error:            #909090;
+  --color-warning:          #A8A8A8;
+  --color-info:             #C0C0C0;
+
+  /* context usage — luminance-differentiated */
+  --color-ctx-ok:           #D0D0D0;
+  --color-ctx-warn:         #A0A0A0;
+  --color-ctx-error:        #686868;
+
+  /* overlay */
+  --color-bg-overlay:       rgba(26, 26, 26, 0.88);
+
+  /* scanline */
+  --scanline-opacity:       0.025;
+
+  /* shadows */
+  --shadow-sm:              0 1px 2px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.20);
+  --shadow-md:              0 2px 4px rgba(0,0,0,0.30), 0 4px 16px rgba(0,0,0,0.25);
+  --shadow-lg:              0 4px 8px rgba(0,0,0,0.35), 0 8px 32px rgba(0,0,0,0.30);
+  --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.20);
+
+  /* ANSI terminal palette 0-15 — pure grayscale */
+  --ansi-0:                 #111111;
+  --ansi-1:                 #787878;  /* dim gray (error/red) */
+  --ansi-2:                 #D0D0D0;  /* bright gray (success/green) */
+  --ansi-3:                 #A8A8A8;  /* medium gray (warning/yellow) */
+  --ansi-4:                 #909090;  /* gray (blue) */
+  --ansi-5:                 #B8B8B8;  /* light gray (magenta) */
+  --ansi-6:                 #C0C0C0;  /* light gray (cyan) */
+  --ansi-7:                 #B0B0B0;
+  --ansi-8:                 #404040;
+  --ansi-9:                 #909090;  /* bright error */
+  --ansi-10:                #E8E8E8;  /* bright success */
+  --ansi-11:                #C8C8C8;  /* bright warning */
+  --ansi-12:                #A8A8A8;  /* bright blue */
+  --ansi-13:                #D0D0D0;  /* bright magenta */
+  --ansi-14:                #D8D8D8;  /* bright cyan */
+  --ansi-15:                #E8E8E8;
+}

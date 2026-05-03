@@ -29,6 +29,7 @@ export type ThemeName =
   | 'gruvbox-dark' | 'nord'
   | 'synthwave' | 'matrix'
   | 'brutalist' | 'high-contrast'
+  | 'cvd-deuteranopia' | 'cvd-tritanopia' | 'cvd-achromatopsia'
 
 export const LEGACY_THEME_ALIASES: Record<string, ThemeName> = {
   'ivory': 'cipher-ivory',

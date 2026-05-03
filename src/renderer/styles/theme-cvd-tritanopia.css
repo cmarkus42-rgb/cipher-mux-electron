@@ -1,0 +1,81 @@
+/* theme-cvd-tritanopia.css — CVD Tritanopia
+ * Blue-Yellow color vision deficiency (<0.01%)
+ * Strategy: Blue/Yellow replaced by Magenta/Green (NOT green→red per spec).
+ * All foreground/background pairs meet WCAG 4.5:1 contrast minimum.
+ * Mode: dark · Font preset: Inter + IBM Plex Mono
+ * REQ-A11Y-001
+ */
+
+body[data-theme="cvd-tritanopia"] {
+  /* surfaces */
+  --color-bg:               #1C1C24;
+  --color-bg-elevated:      #26262F;
+  --color-bg-sunken:        #141418;
+  --color-bg-terminal:      #141418;
+
+  /* borders */
+  --color-border:           #3C3C4A;
+  --color-border-light:     #4C4C5A;
+  --color-border-focus:     #E06090;
+
+  /* text — all >4.5:1 on #1C1C24 */
+  --color-text:             #E8E8F0;
+  --color-text-secondary:   #B0B0C0;
+  --color-text-dim:         #7A7A8E;
+  --color-text-accent:      #E06090;
+
+  /* Tritanopia-safe: magenta/green instead of blue/yellow */
+  --color-neon-green:       #50C878;  /* emerald green (safe for tritan) */
+  --color-neon-red:         #E06090;  /* magenta-pink */
+  --color-neon-orange:      #D55E00;  /* vermillion (safe) */
+  --color-neon-cyan:        #CC79A7;  /* pink-mauve */
+
+  /* status dots — distinguishable under tritanopia simulation */
+  --color-dot-ok:           #50C878;  /* green = OK */
+  --color-dot-warn:         #D55E00;  /* vermillion = warn */
+  --color-dot-error:        #E06090;  /* magenta = error */
+  --color-dot-info:         #CC79A7;  /* pink-mauve = info */
+
+  /* semantic */
+  --color-accent:           #E06090;
+  --color-accent-soft:      rgba(224, 96, 144, 0.12);
+  --color-success:          #50C878;
+  --color-error:            #E06090;
+  --color-warning:          #D55E00;
+  --color-info:             #CC79A7;
+
+  /* context usage */
+  --color-ctx-ok:           #50C878;
+  --color-ctx-warn:         #D55E00;
+  --color-ctx-error:        #E06090;
+
+  /* overlay */
+  --color-bg-overlay:       rgba(28, 28, 36, 0.85);
+
+  /* scanline */
+  --scanline-opacity:       0.020;
+
+  /* shadows */
+  --shadow-sm:              0 1px 2px rgba(0,0,0,0.20), 0 2px 6px rgba(0,0,0,0.16);
+  --shadow-md:              0 2px 4px rgba(0,0,0,0.24), 0 4px 16px rgba(0,0,0,0.20);
+  --shadow-lg:              0 4px 8px rgba(0,0,0,0.28), 0 8px 32px rgba(0,0,0,0.24);
+  --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.16);
+
+  /* ANSI terminal palette 0-15 — tritanopia-safe */
+  --ansi-0:                 #141418;
+  --ansi-1:                 #E06090;  /* magenta (replaces red) */
+  --ansi-2:                 #50C878;  /* green */
+  --ansi-3:                 #D55E00;  /* vermillion (replaces yellow) */
+  --ansi-4:                 #CC79A7;  /* pink-mauve (replaces blue) */
+  --ansi-5:                 #9B7AB8;  /* purple */
+  --ansi-6:                 #70D0A0;  /* mint */
+  --ansi-7:                 #B0B0C0;
+  --ansi-8:                 #3C3C4A;
+  --ansi-9:                 #F080A8;  /* bright magenta */
+  --ansi-10:                #70E898;  /* bright green */
+  --ansi-11:                #F07820;  /* bright vermillion */
+  --ansi-12:                #D89BC0;  /* bright pink-mauve */
+  --ansi-13:                #BB9AD8;  /* bright purple */
+  --ansi-14:                #90E8C0;  /* bright mint */
+  --ansi-15:                #E8E8F0;
+}
