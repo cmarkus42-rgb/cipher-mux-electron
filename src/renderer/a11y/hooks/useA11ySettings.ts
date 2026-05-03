@@ -74,6 +74,9 @@ export function useA11ySettings() {
         setSettingsState(merged)
         applyFontSettings(merged)
         applyReducedMotion(merged.reducedMotion)
+        if (merged.cvdTheme) {
+          api().theme?.set(merged.cvdTheme)
+        }
       }
       setLoaded(true)
     }).catch(() => setLoaded(true))
@@ -84,6 +87,12 @@ export function useA11ySettings() {
       const next = { ...prev, ...patch }
       applyFontSettings(next)
       applyReducedMotion(next.reducedMotion)
+      // Apply CVD theme when changed
+      if ('cvdTheme' in patch) {
+        if (next.cvdTheme) {
+          api().theme?.set(next.cvdTheme)
+        }
+      }
       // Persist async
       api().config.get('a11y').then((stored: Partial<A11ySettings> | null) => {
         api().config.set('a11y', { ...(stored ?? {}), ...patch })

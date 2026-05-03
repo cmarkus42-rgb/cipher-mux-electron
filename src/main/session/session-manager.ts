@@ -298,7 +298,9 @@ export class SessionManager extends EventEmitter {
     // REQ-GLOBAL-002: Inject global rules into manual (non-entity) sessions.
     // Entity sessions are handled in startEntity() before this point.
     if (opts.projectPath && !opts._entityInjected) {
-      this.injectGlobalRulesSection(opts.projectPath)
+      try { this.injectGlobalRulesSection(opts.projectPath) } catch (e) {
+        console.warn('[SessionManager] Failed to inject global rules:', e)
+      }
     }
 
     // Create tmux session (empty projectPath → home dir)

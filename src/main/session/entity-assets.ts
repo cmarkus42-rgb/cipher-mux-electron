@@ -80,9 +80,12 @@ export function ensureTemplateSettings(config: EntityConfig, appRoot: string): v
   // Template as base, current overrides (preserves mcpServers from postLaunchInjection)
   const merged = { ...templateSettings, ...currentSettings }
 
-  // But ensure permissions from template are always present
-  if (templateSettings.permissions && !currentSettings.permissions) {
-    merged.permissions = templateSettings.permissions
+  // Union-merge permissions.allow: template + current (new tools propagate automatically)
+  const tplPerms = (templateSettings.permissions as any)?.allow ?? []
+  const curPerms = (currentSettings.permissions as any)?.allow ?? []
+  if (tplPerms.length || curPerms.length) {
+    const union = [...new Set([...tplPerms, ...curPerms])]
+    merged.permissions = { ...((merged.permissions as any) ?? {}), allow: union }
   }
 
   fs.writeFileSync(targetSettingsPath, JSON.stringify(merged, null, 2), 'utf-8')

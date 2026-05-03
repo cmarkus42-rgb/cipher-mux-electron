@@ -17,3 +17,11 @@ export type { InventoryInput, InventoryResult } from './inventory'
 
 export { migrationPlan, MigrationPlanInputSchema } from './migration-plan'
 export type { MigrationPlanInput, MigrationPlanResult } from './migration-plan'
+
+export { hubApply, parseMigrationPlan, findLatestPlan } from './apply'
+
+export { hubVerify, detectStack } from './verify'
+
+export { hubRelease } from './release'
+
+export { hubRollback } from './rollback'
