@@ -2547,6 +2547,12 @@
   white-space: nowrap;
 }
 
+.note-card__tag--ws-default {
+  background: var(--color-accent-soft, rgba(79, 195, 247, 0.12));
+  border-style: dashed;
+  font-weight: 600;
+}
+
 .note-card__tag-warning {
   color: var(--color-warning, #f0a000);
   font-size: 9px;

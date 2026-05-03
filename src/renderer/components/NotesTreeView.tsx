@@ -202,6 +202,8 @@ interface NotesTreeViewProps {
   tagClassRepo: TagClassRepository
   tagIndex: TagIndexData
   activeWorkspaceId: string | null
+  /** Workspace default tags — visually distinct, not removable (REQ-NOTES-008) */
+  workspaceDefaultTags?: string[]
   onSearchChange: (term: string) => void
   onTagFilterChange: (filter: TagFilterState) => void
   onNoteDoubleClick: (note: NoteInfo) => void
@@ -225,6 +227,7 @@ export function NotesTreeView({
   tagClassRepo,
   tagIndex,
   activeWorkspaceId,
+  workspaceDefaultTags,
   onSearchChange,
   onTagFilterChange,
   onNoteDoubleClick,
@@ -454,8 +457,10 @@ export function NotesTreeView({
         if (!noteTags.has(t)) first.delete(t)
       }
     }
-    return [...first]
-  }, [selectedNotes])
+    // REQ-NOTES-008: workspace default tags are not removable
+    const wsDefaults = new Set(workspaceDefaultTags ?? [])
+    return [...first].filter(t => !wsDefaults.has(t))
+  }, [selectedNotes, workspaceDefaultTags])
 
   // Collect all known tags for auto-complete from tree
   const autoCompleteTags = useMemo(() => {
@@ -615,13 +620,15 @@ export function NotesTreeView({
                 const colonIdx = tag.indexOf(':')
                 const cls = colonIdx > -1 ? tag.slice(0, colonIdx) : undefined
                 const color = cls && tagClassRepo.classes[cls]?.color
+                const isWsDefault = workspaceDefaultTags?.includes(tag)
                 return (
                   <span
                     key={tag}
-                    class="note-card__tag"
+                    class={`note-card__tag${isWsDefault ? ' note-card__tag--ws-default' : ''}`}
                     style={color ? { borderColor: color, color } : undefined}
+                    title={isWsDefault ? 'Workspace default tag' : undefined}
                   >
-                    {tag}
+                    {isWsDefault && '⬡ '}{tag}
                   </span>
                 )
               })}

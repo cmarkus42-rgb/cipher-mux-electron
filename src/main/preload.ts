@@ -328,6 +328,11 @@ const api = {
       ipcRenderer.on(IPC.KEEP_WORKING_RESTORE, handler)
       return () => ipcRenderer.removeListener(IPC.KEEP_WORKING_RESTORE, handler)
     },
+    onNotesOpen: (cb: (data: { note: any }) => void) => {
+      const handler = (_e: unknown, data: { note: any }) => cb(data)
+      ipcRenderer.on(IPC.NOTES_OPEN, handler)
+      return () => ipcRenderer.removeListener(IPC.NOTES_OPEN, handler)
+    },
   },
 
   // ─── Input Requests (Cyber Factory) ──────────────────────

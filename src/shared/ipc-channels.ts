@@ -193,6 +193,7 @@ export const IPC = {
   NOTES_TAG_INDEX: 'cipher-mux:notes:tag-index',
   NOTES_TAG_INDEX_REFRESH: 'cipher-mux:notes:tag-index-refresh',
   NOTES_CHANGED: 'cipher-mux:notes:changed',
+  NOTES_OPEN: 'cipher-mux:notes:open',
 
   // Grid Control (MCP App-Control)
   GRID_RESIZE: 'cipher-mux:grid:resize',

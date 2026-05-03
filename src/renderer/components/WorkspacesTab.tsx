@@ -228,7 +228,8 @@ export function WorkspacesTab() {
     if (value.trim()) {
       const lower = value.toLowerCase()
       const current = ws?.defaultTags ?? []
-      setTagSuggestions(allTags.filter(t => t.toLowerCase().includes(lower) && !current.includes(t)).slice(0, 5))
+      // REQ-NOTES-011: only suggest klasse:wert format tags
+      setTagSuggestions(allTags.filter(t => t.includes(':') && t.toLowerCase().includes(lower) && !current.includes(t)).slice(0, 5))
     } else {
       setTagSuggestions([])
     }
@@ -237,8 +238,12 @@ export function WorkspacesTab() {
   const handleAddTag = (tag: string) => {
     if (!ws) return
     const normalized = tag.trim().toLowerCase()
+    // REQ-NOTES-011: only klasse:wert format allowed
+    if (!normalized || !normalized.includes(':')) return
+    const [klasse, ...rest] = normalized.split(':')
+    if (!klasse || rest.join(':').length === 0) return
     const current = ws.defaultTags ?? []
-    if (normalized && !current.includes(normalized)) {
+    if (!current.includes(normalized)) {
       updateWs({ defaultTags: [...current, normalized] })
     }
     setTagInput('')
@@ -423,7 +428,7 @@ export function WorkspacesTab() {
                         handleAddTag(tagInput)
                       }
                     }}
-                    placeholder={t('workspacesTab.addTag', '+ tag')}
+                    placeholder={t('workspacesTab.addTag', '+ klasse:wert')}
                   />
                   {tagSuggestions.length > 0 && (
                     <div class="ws-ed-tags__suggestions">
