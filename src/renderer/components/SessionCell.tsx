@@ -119,6 +119,10 @@ export function SessionCell({
     launcher: '#66bb6a',
     'voice-relay': '#9b59b6',
     audit: '#c0392b',
+    'ideation-partner': '#26a69a',
+    debugger: '#ff7043',
+    'testing-assistant': '#2ecc71',
+    bugreport: '#78909c',
   }
   const entityColor = session.entityId ? ENTITY_COLORS[session.entityId] : undefined
   const isEntity = !!session.entityId

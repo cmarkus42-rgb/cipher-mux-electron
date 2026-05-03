@@ -16,6 +16,10 @@ const ENTITY_COLORS: Record<EntityId, string> = {
   launcher: '#66bb6a',
   'voice-relay': '#9b59b6',
   audit: '#c0392b',
+  'ideation-partner': '#26a69a',
+  debugger: '#ff7043',
+  'testing-assistant': '#2ecc71',
+  bugreport: '#78909c',
 }
 
 function contextColorClass(pct: number): string {
