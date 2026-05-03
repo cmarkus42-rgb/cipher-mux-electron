@@ -357,8 +357,17 @@ export class VoiceInputRouter extends EventEmitter {
         })
       } else {
         // Send text — auto-submit adds Enter, manual leaves it for BT clicker
-        console.log('[VoiceRouter] sendKeys to', targetId, '(submitMode:', this.submitMode, '):', JSON.stringify(text.slice(0, 60)))
-        await this.sessionManager.sendKeys(targetId, text.trimEnd() + (this.submitMode === 'auto' ? '\r' : ' '))
+        // Strip Unicode directional marks (U+200E/U+200F) that Whisper may produce —
+        // they are invisible but prevent tmux from delivering CR as a discrete Enter.
+        const cleanText = text.trimEnd().replace(/[\u200e\u200f]/g, '')
+        console.log('[VoiceRouter] sendKeys to', targetId, '(submitMode:', this.submitMode, '):', JSON.stringify(cleanText.slice(0, 60)))
+        // Send text and CR as separate sendKeys calls — a single concatenated write
+        // gets treated as "pasted content" by Claude's terminal, swallowing the CR.
+        // Two discrete writes ensure CR is processed as Enter (same as voice-relay path).
+        await this.sessionManager.sendKeys(targetId, cleanText + (this.submitMode === 'manual' ? ' ' : ''))
+        if (this.submitMode === 'auto') {
+          await this.sessionManager.sendKeys(targetId, '\r')
+        }
         this.emit('dispatched', {
           sessionId: targetId,
           sessionName: session?.name ?? targetId,
