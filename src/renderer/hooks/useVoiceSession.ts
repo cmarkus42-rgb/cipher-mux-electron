@@ -44,12 +44,12 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
     toastTimer.current = setTimeout(() => setToast(null), 2000)
   }, [])
 
-  // Push focused session to main process whenever it changes (STT mode only)
+  // Push focused session to main process whenever it changes.
+  // Always sent (not just STT mode) so BT Shutter can route to the focused session.
   useEffect(() => {
-    if (mode !== 'stt') return
     const api = (window as any).cipherMux
     api.voice.setSessionTarget(focusedSessionId)
-  }, [focusedSessionId, mode])
+  }, [focusedSessionId])
 
   /** Teardown VAD + mic stream + AudioContext */
   const teardownVAD = useCallback(() => {
