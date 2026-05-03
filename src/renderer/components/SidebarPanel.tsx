@@ -80,6 +80,7 @@ export function SidebarPanel({
   const [orphans, setOrphans] = useState<Array<{ id: string; name: string; tmuxSession: string; projectPath?: string | null }>>([])
   const [tagFilter, setTagFilter] = useState<TagFilterState>({})
   const [searchTerm, setSearchTerm] = useState('')
+  const [workspaceDefaultTags, setWorkspaceDefaultTags] = useState<string[]>([])
 
   const { notes, tagRepo, tagClassRepo, tagIndex, deleteNote, trashMany, restoreMany, bulkTagAdd, bulkTagRemove, searchNotes } = useNotes()
 
@@ -90,6 +91,7 @@ export function SidebarPanel({
   useEffect(() => {
     if (!activeWorkspaceId) {
       setTagFilter({})
+      setWorkspaceDefaultTags([])
       return
     }
     const api = (window as any).cipherMux
@@ -99,8 +101,10 @@ export function SidebarPanel({
         const filter: TagFilterState = {}
         for (const tag of ws.defaultTags) filter[tag] = 'include'
         setTagFilter(filter)
+        setWorkspaceDefaultTags(ws.defaultTags)
       } else {
         setTagFilter({})
+        setWorkspaceDefaultTags([])
       }
     }).catch(() => {})
   }, [activeWorkspaceId])
@@ -237,6 +241,7 @@ export function SidebarPanel({
               tagClassRepo={tagClassRepo}
               tagIndex={tagIndex}
               activeWorkspaceId={activeWorkspaceId}
+              workspaceDefaultTags={workspaceDefaultTags}
               onSearchChange={setSearchTerm}
               onTagFilterChange={setTagFilter}
               onNoteDoubleClick={handleNoteDoubleClick}

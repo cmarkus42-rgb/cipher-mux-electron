@@ -962,6 +962,50 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     }
   )
 
+  // 22b. mux_notes_open — Open a note in the grid
+  ;(server.registerTool as any)(
+    'mux_notes_open',
+    {
+      description:
+        'Open a note in the cipher-mux grid as a NotesCell. If the note is already open, focuses the existing cell. '
+        + 'Optionally highlights the note in the sidebar.',
+      inputSchema: {
+        id: z.string().describe('Note ID (ULID)'),
+        highlight: z.boolean().optional().describe('If true, highlight the note in the sidebar (default false)'),
+      },
+    },
+    async (args: { id: string; highlight?: boolean }) => {
+      if (!ctx.noteManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
+      }
+      try {
+        const result = await ctx.noteManager.read(args.id)
+        if (!result) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Note not found: ${args.id}` }) }], isError: true }
+        }
+        if (!ctx.windowManager) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'WindowManager not available' }) }], isError: true }
+        }
+        // Send IPC to renderer to open/focus the note
+        ctx.windowManager.sendToMainWindow(IPC.NOTES_OPEN, { note: result.info })
+        // Optionally highlight in sidebar
+        if (args.highlight) {
+          ctx.windowManager.sendToMainWindow(IPC.UI_HIGHLIGHT, {
+            target: `side-note-${args.id}`,
+            duration: 3000,
+            style: 'glow',
+          })
+        }
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: result.info.id, title: result.info.title }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
   // ─── Companion Memory Tools ─────────────────────────────
 
   // 23. companion_memory_write — Write a memory

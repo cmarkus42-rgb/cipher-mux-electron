@@ -1632,7 +1632,20 @@ export class IpcHub {
     ipcMain.handle(IPC.NOTES_SAVE, async (_e, { id, body, tags, skipTagging }: {
       id: string; body: string; tags?: string[]; skipTagging?: boolean
     }) => {
-      const note = await this.noteManager.save(id, body, tags)
+      // REQ-NOTES-008: re-merge workspace defaultTags so auto-tagging doesn't drop them
+      let effectiveTags = tags
+      if (effectiveTags) {
+        const activeWsId = configStore.get('activeWorkspaceId')
+        if (activeWsId) {
+          const workspaces = configStore.get('workspaces') ?? []
+          const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
+          if (ws?.defaultTags?.length) {
+            const tagSet = new Set([...effectiveTags, ...ws.defaultTags])
+            effectiveTags = [...tagSet]
+          }
+        }
+      }
+      const note = await this.noteManager.save(id, body, effectiveTags)
       // Update search index + tag index
       this.noteSearchIndex.addOrUpdate({ info: note, body })
       this.tagIndex.updateNote(note.id, note.tags)
@@ -1745,6 +1758,15 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.NOTES_BULK_TAG_REMOVE, async (_e, { ids, tag }: { ids: string[]; tag: string }) => {
+      // REQ-NOTES-008: protect workspace default tags from removal
+      const activeWsId = configStore.get('activeWorkspaceId')
+      if (activeWsId) {
+        const workspaces = configStore.get('workspaces') ?? []
+        const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
+        if (ws?.defaultTags?.includes(tag)) {
+          return { updated: [], blocked: true }
+        }
+      }
       const updated = await this.noteManager.bulkRemoveTag(ids, tag)
       if (updated.length > 0) {
         this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', ids: updated })

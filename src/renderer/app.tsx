@@ -139,6 +139,7 @@ export function App() {
   // Runs once after a short delay to let recovery/restore complete first.
   const sessionsRef = useRef(sessions)
   sessionsRef.current = sessions
+  const handleOpenNoteInGridRef = useRef<((note: any) => void) | null>(null)
   const initialCleanupDone = useRef(false)
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -433,6 +434,12 @@ export function App() {
       unsubs.push(api.gridControl.onKeepWorkingRestore((data: any) => {
         console.log('[app] keepWorking: push-based restore received')
         applyKeepWorkingRestore(data)
+      }))
+    }
+    // MCP mux_notes_open — open a note in the grid
+    if (api.gridControl.onNotesOpen) {
+      unsubs.push(api.gridControl.onNotesOpen((data: { note: any }) => {
+        handleOpenNoteInGridRef.current?.(data.note)
       }))
     }
 
@@ -804,6 +811,7 @@ export function App() {
       setPlacementPopup({ note })
     }
   }, [grid.slots])
+  handleOpenNoteInGridRef.current = handleOpenNoteInGrid
 
   // ─── Drag & Drop from Sidebar to Grid (C.6) ───────────
   const handleDropSession = useCallback((sessionId: string, slotIndex: number) => {
