@@ -94,7 +94,13 @@ export function App() {
   }, [pendingLauncherSlot])
 
   const { isSpeaking, stopSpeech } = useGlobalTtsPlayback()
-  const { settings: a11ySettings, toggleFocusMode } = useA11ySettings()
+  const handleA11yThemeChange = useCallback((cvdTheme: string | null) => {
+    if (cvdTheme) {
+      setTheme(cvdTheme as any)
+    }
+    // Deselect case is handled in InfoSettingsView where the base theme is tracked
+  }, [setTheme])
+  const { settings: a11ySettings, toggleFocusMode } = useA11ySettings(handleA11yThemeChange)
   const modalFocusTrapRef = useFocusTrap<HTMLDivElement>(infoVisible)
 
   // Global keyboard shortcuts

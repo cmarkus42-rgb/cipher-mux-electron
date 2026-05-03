@@ -1,5 +1,5 @@
 // src/renderer/a11y/hooks/useA11ySettings.ts
-import { useState, useEffect, useCallback } from 'preact/hooks'
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 
 export interface A11ySettings {
   /** Active CVD theme override (null = use normal theme) */
@@ -62,9 +62,11 @@ function applyReducedMotion(value: 'system' | 'on' | 'off'): void {
   document.body.classList.toggle('a11y-force-motion', value === 'off')
 }
 
-export function useA11ySettings() {
+export function useA11ySettings(onThemeChange?: (theme: string | null) => void) {
   const [settings, setSettingsState] = useState<A11ySettings>(DEFAULTS)
   const [loaded, setLoaded] = useState(false)
+  const onThemeChangeRef = useRef(onThemeChange)
+  onThemeChangeRef.current = onThemeChange
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -75,7 +77,7 @@ export function useA11ySettings() {
         applyFontSettings(merged)
         applyReducedMotion(merged.reducedMotion)
         if (merged.cvdTheme) {
-          api().theme?.set(merged.cvdTheme)
+          onThemeChangeRef.current?.(merged.cvdTheme)
         }
       }
       setLoaded(true)
@@ -89,9 +91,7 @@ export function useA11ySettings() {
       applyReducedMotion(next.reducedMotion)
       // Apply CVD theme when changed
       if ('cvdTheme' in patch) {
-        if (next.cvdTheme) {
-          api().theme?.set(next.cvdTheme)
-        }
+        onThemeChangeRef.current?.(next.cvdTheme)
       }
       // Persist async
       api().config.get('a11y').then((stored: Partial<A11ySettings> | null) => {

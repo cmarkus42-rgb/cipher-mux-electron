@@ -25,7 +25,7 @@ export interface ToolContext {
   statusLineMonitor: StatusLineMonitor | null
   kickoffOrchestrator: KickoffOrchestrator | null
   taskManager: TaskManager | null
-  inputRequestWatcher: import('../mpo/input-request-watcher').InputRequestWatcher | null
+  inputRequestWatcher: import('../session/input-request-watcher').InputRequestWatcher | null
   windowManager: { sendToMainWindow(channel: string, data: unknown): void } | null
   noteManager: NoteManager | null
   noteSearchIndex: NoteSearchIndex | null
@@ -1514,7 +1514,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     {
       description:
         'Set the active theme in cipher-mux. Valid theme IDs: cipher-ivory, cipher-dark, blueprint, '
-        + 'warm-paper, gruvbox-dark, nord, synthwave, matrix, brutalist, high-contrast.',
+        + 'warm-paper, gruvbox-dark, nord, synthwave, matrix, brutalist, high-contrast, '
+        + 'cvd-deuteranopia, cvd-tritanopia, cvd-achromatopsia.',
       inputSchema: {
         theme: z.string().describe('Theme ID to activate'),
       },
@@ -1526,6 +1527,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       const validThemes = [
         'cipher-ivory', 'cipher-dark', 'blueprint', 'warm-paper',
         'gruvbox-dark', 'nord', 'synthwave', 'matrix', 'brutalist', 'high-contrast',
+        'cvd-deuteranopia', 'cvd-tritanopia', 'cvd-achromatopsia',
       ]
       if (!validThemes.includes(args.theme)) {
         return {

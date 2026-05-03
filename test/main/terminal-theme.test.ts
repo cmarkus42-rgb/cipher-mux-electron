@@ -122,6 +122,7 @@ const ALL_THEME_IDS = [
   'gruvbox-dark', 'nord',
   'synthwave', 'matrix',
   'brutalist', 'high-contrast',
+  'cvd-deuteranopia', 'cvd-tritanopia', 'cvd-achromatopsia',
 ] as const
 
 const ANSI_KEYS: (keyof TerminalThemeColors)[] = [
@@ -135,7 +136,7 @@ const ANSI_KEYS: (keyof TerminalThemeColors)[] = [
   'white', 'brightWhite',
 ]
 
-describe('getTerminalTheme — all 10 themes', () => {
+describe('getTerminalTheme — all 13 themes', () => {
   for (const id of ALL_THEME_IDS) {
     it(`${id} returns a valid TerminalThemeColors object`, () => {
       const theme = getTerminalTheme(id)
@@ -184,9 +185,9 @@ describe('themes.json schema validation', () => {
   const raw = readFileSync(themesPath, 'utf-8')
   const manifest = JSON.parse(raw)
 
-  it('has exactly 10 theme entries', () => {
-    assert.strictEqual(manifest.themes.length, 10,
-      `Expected 10 themes, got ${manifest.themes.length}`)
+  it('has exactly 13 theme entries', () => {
+    assert.strictEqual(manifest.themes.length, 13,
+      `Expected 13 themes, got ${manifest.themes.length}`)
   })
 
   for (const t of manifest.themes) {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
-import { InputRequestWatcher } from '../../src/main/mpo/input-request-watcher'
+import { InputRequestWatcher } from '../../src/main/session/input-request-watcher'
 
 describe('InputRequestWatcher.createRequest', () => {
   let tmpDir: string

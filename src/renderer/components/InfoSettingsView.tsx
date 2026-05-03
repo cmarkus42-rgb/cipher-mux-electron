@@ -282,7 +282,19 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
     return acc
   }, {})
 
-  const { settings: a11ySettings, update: updateA11y } = useA11ySettings()
+  // Store the non-CVD theme so we can restore it when CVD is deselected
+  const baseThemeRef = useRef<ThemeName>(theme)
+  if (!theme.startsWith('cvd-')) baseThemeRef.current = theme
+
+  const handleA11yThemeChange = useCallback((cvdTheme: string | null) => {
+    if (cvdTheme) {
+      onSetTheme(cvdTheme as ThemeName)
+    } else {
+      onSetTheme(baseThemeRef.current)
+    }
+  }, [onSetTheme])
+
+  const { settings: a11ySettings, update: updateA11y } = useA11ySettings(handleA11yThemeChange)
 
   const TAB_LABELS: Record<TabId, string> = {
     general: t('info.tabGeneral', 'General'),

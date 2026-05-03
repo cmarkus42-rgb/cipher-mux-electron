@@ -12,6 +12,7 @@ const ALL_THEMES: ThemeName[] = [
   'gruvbox-dark', 'nord',
   'synthwave', 'matrix',
   'brutalist', 'high-contrast',
+  'cvd-deuteranopia', 'cvd-tritanopia', 'cvd-achromatopsia',
 ]
 
 export interface CustomTheme {
