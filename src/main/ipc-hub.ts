@@ -23,7 +23,10 @@ import { InputRequestWatcher } from './mpo/input-request-watcher'
 import { TaskHooks } from './task/task-hooks'
 import { BugreportTaskSource } from './task/sources/bugreport-source'
 import { NoteManager } from './notes/note-manager'
+import { NoteSearchIndex } from './notes/note-search-index'
 import { NoteTagging } from './notes/note-tagging'
+import { TagClassRepo } from './notes/tag-repository'
+import { TagIndex } from './notes/tag-index'
 import { MemoryStore } from './companion/memory-store'
 import { TestingAssistantManager } from './testing-assistant/testing-assistant-manager'
 import { AuditManager } from './audit/audit-manager'
@@ -40,7 +43,7 @@ import { EntityRegistry, registerBuiltinEntities } from './session/entity-regist
 import { CyberFactoryManager } from './cyber-factory/cyber-factory-manager'
 import { scanAndRegisterEntities } from './session/entity-scanner'
 import { IPC } from '../shared/ipc-channels'
-import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
+import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST, MAX_MANUAL_TAGS } from '../shared/constants'
 import { BRAND } from '../shared/brand'
 import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest, EntityId, Character, RecoveryResult } from '../shared/types'
 import type { Persona, Workspace } from '../shared/persona-types'
@@ -67,6 +70,9 @@ export class IpcHub {
   private inputRequestWatcher: InputRequestWatcher | null = null
   private noteManager!: NoteManager
   private noteTagging!: NoteTagging
+  private noteSearchIndex!: NoteSearchIndex
+  private tagClassRepo!: TagClassRepo
+  private tagIndex!: TagIndex
   private memoryStore: MemoryStore | null = null
   private btShutterManager: BtShutterManager | null = null
   private cyberFactoryManager: CyberFactoryManager | null = null
@@ -117,6 +123,10 @@ export class IpcHub {
     const notesDir = path.join(os.homedir(), '.config', 'cipher-mux', 'notes')
     this.noteManager = new NoteManager(notesDir)
     this.noteTagging = new NoteTagging(notesDir)
+    this.noteSearchIndex = new NoteSearchIndex()
+    this.tagClassRepo = new TagClassRepo(notesDir)
+    this.tagIndex = new TagIndex(notesDir, this.tagClassRepo)
+    this.tagIndex.rebuild()
 
     // Initialize Companion MemoryStore
     try {
@@ -192,6 +202,10 @@ export class IpcHub {
     this.registerCharacterChannels()
     this.registerWorkspaceChannels()
     this.registerNoteChannels()
+    // Build FlexSearch index async (non-blocking)
+    this.noteSearchIndex.buildFromManager(this.noteManager).catch(err =>
+      console.error('[IpcHub] NoteSearchIndex build failed:', err)
+    )
     this.registerGridControlChannels()
     this.registerEntityChannels()
     this.registerPresetChannels()
@@ -286,6 +300,7 @@ export class IpcHub {
       inputRequestWatcher: this.inputRequestWatcher,
       windowManager: this.windowManager,
       noteManager: this.noteManager,
+      noteSearchIndex: this.noteSearchIndex,
       memoryStore: this.memoryStore,
       getVoiceManager: () => this.voiceManager,
       testingAssistantManager: this.testingAssistantManager ?? undefined,
@@ -1618,6 +1633,10 @@ export class IpcHub {
       id: string; body: string; tags?: string[]; skipTagging?: boolean
     }) => {
       const note = await this.noteManager.save(id, body, tags)
+      // Update search index + tag index
+      this.noteSearchIndex.addOrUpdate({ info: note, body })
+      this.tagIndex.updateNote(note.id, note.tags)
+      this.tagClassRepo.ensureTags(note.tags)
       this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', note })
       // Async auto-tagging (fire-and-forget, only on manual Cmd+S save)
       if (!tags && !skipTagging) {
@@ -1625,6 +1644,9 @@ export class IpcHub {
           if (autoTags && autoTags.length > 0) {
             await this.noteTagging.updateRepository(autoTags)
             const updated = await this.noteManager.save(id, body, autoTags)
+            this.noteSearchIndex.addOrUpdate({ info: updated, body })
+            this.tagIndex.updateNote(updated.id, updated.tags)
+            this.tagClassRepo.ensureTags(updated.tags)
             this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tagged', note: updated })
           }
         }).catch(() => { /* Ollama not available — ignore */ })
@@ -1635,8 +1657,15 @@ export class IpcHub {
     ipcMain.handle(IPC.NOTES_CREATE, async (_e, { title, body, tags }: {
       title: string; body: string; tags?: string[]
     }) => {
+      // REQ-NOTES-007: Tag limit — max 5 manual tags (workspace defaults don't count)
+      const manualTags = tags ?? []
+      const tagLimitExceeded = manualTags.length > MAX_MANUAL_TAGS
+      if (tagLimitExceeded) {
+        console.warn(`[IpcHub] NOTES_CREATE: ${manualTags.length} manual tags exceed limit of ${MAX_MANUAL_TAGS}`)
+      }
+
       // P.2: auto-apply workspace defaultTags when workspace is active
-      let mergedTags = tags ?? []
+      let mergedTags = manualTags
       const activeWsId = configStore.get('activeWorkspaceId')
       if (activeWsId) {
         const workspaces = configStore.get('workspaces') ?? []
@@ -1647,6 +1676,11 @@ export class IpcHub {
         }
       }
       const note = await this.noteManager.create(title, body, mergedTags.length > 0 ? mergedTags : undefined)
+      // Update search index + tag index
+      const fullBody = body.startsWith('# ') ? body : `# ${title}\n\n${body}`
+      this.noteSearchIndex.addOrUpdate({ info: note, body: fullBody })
+      this.tagIndex.addNote(note.id, note.tags)
+      this.tagClassRepo.ensureTags(note.tags)
       this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created', note })
       return note
     })
@@ -1654,9 +1688,21 @@ export class IpcHub {
     ipcMain.handle(IPC.NOTES_DELETE, async (_e, { id }: { id: string }) => {
       const ok = await this.noteManager.delete(id)
       if (ok) {
+        this.noteSearchIndex.remove(id)
+        this.tagIndex.removeNote(id)
         this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'deleted', id })
       }
       return { ok }
+    })
+
+    ipcMain.handle(IPC.NOTES_SEARCH, async (_e, { query, tags }: { query: string; tags?: string[] }) => {
+      let results = this.noteSearchIndex.search(query)
+      // Apply tag filter if provided
+      if (tags && tags.length > 0) {
+        const tagSet = new Set(tags.map(t => t.toLowerCase()))
+        results = results.filter(r => r.info.tags.some(t => tagSet.has(t.toLowerCase())))
+      }
+      return results
     })
 
     // Screenshot capture for testcase items (macOS screencapture -i)
@@ -1749,6 +1795,20 @@ export class IpcHub {
         this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
       }
       return { ok: true, affected: affected.length }
+    })
+
+    // Tag Class Repository (REQ-NOTES-010)
+    ipcMain.handle(IPC.NOTES_TAG_CLASS_REPO, async () => {
+      return this.tagClassRepo.getRepository()
+    })
+
+    // Tag Index (REQ-NOTES-012)
+    ipcMain.handle(IPC.NOTES_TAG_INDEX, async () => {
+      return this.tagIndex.getIndex()
+    })
+
+    ipcMain.handle(IPC.NOTES_TAG_INDEX_REFRESH, async () => {
+      return this.tagIndex.rebuild()
     })
   }
 

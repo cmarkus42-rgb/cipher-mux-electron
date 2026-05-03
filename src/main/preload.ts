@@ -232,6 +232,7 @@ const api = {
   // ─── Notes ──────────────────────────────────────────────
   notes: {
     list: () => ipcRenderer.invoke(IPC.NOTES_LIST),
+    search: (query: string, tags?: string[]) => ipcRenderer.invoke(IPC.NOTES_SEARCH, { query, tags }),
     read: (id: string) => ipcRenderer.invoke(IPC.NOTES_READ, { id }),
     save: (id: string, body: string, tags?: string[], skipTagging?: boolean) =>
       ipcRenderer.invoke(IPC.NOTES_SAVE, { id, body, tags, skipTagging }),
@@ -256,6 +257,9 @@ const api = {
       ipcRenderer.invoke(IPC.NOTES_TAG_UPDATE, { name, description }),
     tagDelete: (name: string): Promise<{ ok: boolean; affected: number }> =>
       ipcRenderer.invoke(IPC.NOTES_TAG_DELETE, { name }),
+    tagClassRepo: () => ipcRenderer.invoke(IPC.NOTES_TAG_CLASS_REPO),
+    tagIndex: () => ipcRenderer.invoke(IPC.NOTES_TAG_INDEX),
+    tagIndexRefresh: () => ipcRenderer.invoke(IPC.NOTES_TAG_INDEX_REFRESH),
     onChanged: (cb: (data: unknown) => void) => {
       const handler = (_e: unknown, data: unknown) => cb(data)
       ipcRenderer.on(IPC.NOTES_CHANGED, handler)
