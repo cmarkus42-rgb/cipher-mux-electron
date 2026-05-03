@@ -192,7 +192,7 @@ export function registerBuiltinEntities(
     id: 'bugreport',
     displayName: 'Bugreport',
     icon: '🐛',
-    color: '#e57373',
+    color: '#78909c',
     projectPath: `${entitiesBase}/bugreport`,
     features: ['mcp'],
     visible: true,
