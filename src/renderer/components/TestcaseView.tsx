@@ -21,6 +21,46 @@ function cycleStatus(status: TestcaseStatus): TestcaseStatus {
   return 'open'
 }
 
+// ─── Filter types ───────────────────────────────────────────
+
+export type FilterMode = 'neutral' | 'positive' | 'negative'
+
+export interface StatusFilters {
+  pass: FilterMode
+  fail: FilterMode
+  open: FilterMode
+}
+
+export function cycleFilterMode(mode: FilterMode): FilterMode {
+  if (mode === 'neutral') return 'positive'
+  if (mode === 'positive') return 'negative'
+  return 'neutral'
+}
+
+export function applyStatusFilters(
+  sections: TestcaseSection[],
+  filters: StatusFilters,
+): TestcaseSection[] {
+  const positives = (Object.keys(filters) as TestcaseStatus[]).filter(k => filters[k] === 'positive')
+  const negatives = (Object.keys(filters) as TestcaseStatus[]).filter(k => filters[k] === 'negative')
+
+  // No active filters → show all
+  if (positives.length === 0 && negatives.length === 0) return sections
+
+  return sections
+    .map(s => ({
+      ...s,
+      items: s.items.filter(item => {
+        // Positive filters: item must match ANY positive (OR)
+        if (positives.length > 0 && !positives.includes(item.status)) return false
+        // Negative filters: item must NOT match ANY negative
+        if (negatives.includes(item.status)) return false
+        return true
+      }),
+    }))
+    .filter(s => s.items.length > 0)
+}
+
 // ─── Checkbox CSS Art ───────────────────────────────────────
 
 function CheckboxIcon({ status }: { status: TestcaseStatus }) {
@@ -114,6 +154,45 @@ function TestcaseItemRow({ item, onToggle, onCommentChange, onScreenshot, onFeat
   )
 }
 
+// ─── Filter Bar ─────────────────────────────────────────────
+
+interface FilterBarProps {
+  filters: StatusFilters
+  summary: TestcaseSummary
+  onToggle: (status: TestcaseStatus) => void
+}
+
+function FilterBar({ filters, summary, onToggle }: FilterBarProps) {
+  const buttons: { status: TestcaseStatus; label: string; count: number }[] = [
+    { status: 'pass', label: 'PASS', count: summary.pass },
+    { status: 'fail', label: 'FAIL', count: summary.fail },
+    { status: 'open', label: 'OPEN', count: summary.open },
+  ]
+
+  return (
+    <div class="tc-filter-bar">
+      {buttons.map(({ status, label, count }) => {
+        const mode = filters[status]
+        return (
+          <button
+            key={status}
+            class={`tc-filter-btn tc-filter-btn--${status} tc-filter-btn--${mode}`}
+            onClick={() => onToggle(status)}
+            title={
+              mode === 'neutral' ? `Show only ${label}` :
+              mode === 'positive' ? `Exclude ${label}` :
+              `Clear ${label} filter`
+            }
+          >
+            <span class="tc-filter-btn__label">{label}</span>
+            <span class="tc-filter-btn__badge">{count}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── Status Bar ─────────────────────────────────────────────
 
 function StatusBar({ summary }: { summary: TestcaseSummary }) {
@@ -156,6 +235,11 @@ export function TestcaseView({
   const { t } = useTranslation()
   const readOnly = !!testcase.frontmatter.archived
   const containerRef = useRef<HTMLDivElement>(null)
+  const [filters, setFilters] = useState<StatusFilters>({ pass: 'neutral', fail: 'neutral', open: 'neutral' })
+
+  const handleFilterToggle = useCallback((status: TestcaseStatus) => {
+    setFilters(prev => ({ ...prev, [status]: cycleFilterMode(prev[status]) }))
+  }, [])
 
   // Register as STT target when a comment input is focused
   useEffect(() => {
@@ -213,6 +297,11 @@ export function TestcaseView({
     return { total, pass, fail, open }
   }, [testcase.sections])
 
+  const filteredSections = useMemo(
+    () => applyStatusFilters(testcase.sections, filters),
+    [testcase.sections, filters],
+  )
+
   const handleToggle = useCallback((id: string) => {
     const newSections = testcase.sections.map(s => ({
       ...s,
@@ -265,6 +354,9 @@ export function TestcaseView({
       {/* Status bar */}
       <StatusBar summary={summary} />
 
+      {/* Filter bar */}
+      <FilterBar filters={filters} summary={summary} onToggle={handleFilterToggle} />
+
       {/* Summary (archived only) */}
       {readOnly && testcase.frontmatter.summary && (
         <div class="tc-view__summary">{testcase.frontmatter.summary}</div>
@@ -272,7 +364,7 @@ export function TestcaseView({
 
       {/* Sections */}
       <div class="tc-view__body">
-        {testcase.sections.map((section) => (
+        {filteredSections.map((section) => (
           <div key={section.title} class="tc-section">
             <div class="tc-section__title">{section.title}</div>
             {section.items.map((item) => (
