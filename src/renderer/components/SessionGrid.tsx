@@ -188,16 +188,18 @@ export function SessionGrid({
     if (files && files.length > 0 && !cipherType) {
       const slot = grid.slots[targetIdx]
       if (slot?.sessionId) {
+        const api = (window as any).cipherMux
         const paths: string[] = []
         for (let i = 0; i < files.length; i++) {
-          paths.push(files[i].path)
+          // Use webUtils.getPathForFile via preload (contextIsolation-safe)
+          const p = api.getFilePath ? api.getFilePath(files[i]) : files[i].path
+          if (p) paths.push(p)
         }
         if (paths.length > 0 && paths[0]) {
           const escaped = shellEscapePaths(paths)
           // REQ-DND-005: focus the session first
           onFocusSession(slot.sessionId)
           // Send escaped paths as text — no Enter (user keeps control)
-          const api = (window as any).cipherMux
           api.terminal.write(slot.sessionId, escaped)
         }
       }

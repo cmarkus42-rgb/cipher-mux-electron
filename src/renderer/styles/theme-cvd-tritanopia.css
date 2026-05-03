@@ -21,7 +21,7 @@ body[data-theme="cvd-tritanopia"] {
   /* text — all >4.5:1 on #1C1C24 */
   --color-text:             #E8E8F0;
   --color-text-secondary:   #B0B0C0;
-  --color-text-dim:         #7A7A8E;
+  --color-text-dim:         #9696A8;
   --color-text-accent:      #E06090;
 
   /* Tritanopia-safe: magenta/green instead of blue/yellow */

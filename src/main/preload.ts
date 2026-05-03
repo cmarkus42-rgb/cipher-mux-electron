@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 
 /**
@@ -552,6 +552,8 @@ const api = {
     deleteMemory: (id: string) =>
       ipcRenderer.invoke(IPC.COMPANION_DELETE_MEMORY, { id }),
   },
+  /** Get native file path from a dropped File object (works with contextIsolation). */
+  getFilePath: (file: File) => webUtils.getPathForFile(file),
 }
 
 contextBridge.exposeInMainWorld('cipherMux', api)

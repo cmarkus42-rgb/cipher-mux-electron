@@ -19,7 +19,7 @@ body[data-theme="brutalist"] {
   /* text */
   --color-text:             #000000;
   --color-text-secondary:   #000000;
-  --color-text-dim:         #707070;
+  --color-text-dim:         #8C8C8C;
   --color-text-accent:      #FF3300;
 
   /* accents — neon */
