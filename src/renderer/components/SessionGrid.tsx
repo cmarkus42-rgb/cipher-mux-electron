@@ -8,6 +8,7 @@ import { LauncherCell } from './LauncherCell'
 import type { PathStartOpts } from './LauncherCell'
 import { NotesCell } from './NotesCell'
 import { useScrollHandler } from '../hooks/useScrollHandler'
+import { getTerminal } from '../terminal-registry'
 import { shellEscapePaths } from '../../shared/shell-escape'
 
 interface SessionGridProps {
@@ -115,11 +116,15 @@ export function SessionGrid({
     const api = (window as any).cipherMux
     if (!api?.terminal?.onVoiceClipboard) return
     const unsub = api.terminal.onVoiceClipboard((data: { action: 'copy' | 'paste' }) => {
+      if (!focusedSessionId) return
       if (data.action === 'copy') {
-        document.execCommand('copy')
+        const term = getTerminal(focusedSessionId)
+        if (term?.hasSelection()) {
+          navigator.clipboard.writeText(term.getSelection()).catch(() => {})
+        }
       } else if (data.action === 'paste') {
         navigator.clipboard.readText().then(text => {
-          if (text && focusedSessionId) {
+          if (text) {
             api.sessions.sendKeys(focusedSessionId, text).catch(() => {})
           }
         }).catch(() => {})
