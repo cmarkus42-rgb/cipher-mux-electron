@@ -34,6 +34,7 @@ import { generateTestingAssistantClaudeMd } from './testing-assistant/testing-te
 import { generateAuditClaudeMd } from './audit/audit-template'
 import { generateDebuggerClaudeMd } from './debugger/debugger-template'
 import { generateCyberFactoryClaudeMd } from './cyber-factory/cyber-factory-template'
+import { generateWorkshopClaudeMd } from './workshop/workshop-template'
 import { syncIdeationTemplate } from './ideation-partner/ideation-template'
 import { syncRefinementTemplate } from './refinement/refinement-template'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
@@ -153,6 +154,7 @@ export class IpcHub {
       deployEntity('audit', generateAuditClaudeMd())
       deployEntity('debugger', generateDebuggerClaudeMd())
       deployEntity('cyber-factory', generateCyberFactoryClaudeMd({ mcpHost, mcpPort, mcpApiKey }))
+      deployEntity('orchestrator', generateWorkshopClaudeMd({ mcpHost, mcpPort, mcpApiKey }))
 
       // Sync experimental templates (ideation + refinement)
       const exp = configStore.get('experimental') ?? {}
