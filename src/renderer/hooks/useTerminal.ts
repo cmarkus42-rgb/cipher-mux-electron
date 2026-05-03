@@ -54,13 +54,41 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       resyncTimerRef.current = null
       const term = termRef.current
       if (!term) return
+
+      // T-BF.1: Save scroll state before capture so we can restore after rewrite
+      const buf = term.buffer.active
+      const wasAtBottom = buf.viewportY >= buf.baseY
+      const savedViewportY = buf.viewportY
+
       api().terminal.capture(sessionId).then((content: string) => {
         if (!term || !termRef.current) return
         if (content?.trim()) {
           term.reset()
           term.write(content.replace(/\n/g, '\r\n'), () => {
-            term.scrollToBottom()
+            // T-BF.1: Restore scroll position instead of always jumping to bottom
+            if (wasAtBottom) {
+              term.scrollToBottom()
+            } else {
+              const newBuf = term.buffer.active
+              term.scrollToLine(Math.min(savedViewportY, newBuf.baseY))
+            }
             try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
+
+            // T-BF.2: Re-fit after content write — scrollbar may have appeared/
+            // disappeared, changing available viewport width. Without this, cols
+            // calculated pre-write can be too wide, clipping the right edge.
+            const fitAddon = fitAddonRef.current
+            if (fitAddon) {
+              try {
+                fitAddon.fit()
+                const { cols, rows } = term
+                const last = lastSizeRef.current
+                if (cols !== last.cols || rows !== last.rows) {
+                  lastSizeRef.current = { cols, rows }
+                  api().terminal.resize(sessionId, cols, rows)
+                }
+              } catch { /* ignore */ }
+            }
           })
         }
       }).catch(() => { /* session may not be ready */ })
