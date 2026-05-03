@@ -158,13 +158,25 @@ export function PresetEditor() {
   }
 
   const handleContentChange = (value: string) => {
-    if (!editConfirmed) {
-      const ok = confirm('Preset definitions affect the behavior of all sessions using this preset. Continue?')
+    if (!editConfirmed) return
+    setDraftContent(value)
+    setDirty(true)
+  }
+
+  const handleToggleEditMode = () => {
+    if (editConfirmed) {
+      if (dirty) {
+        const ok = confirm('Unsaved changes will be lost. Disable editing?')
+        if (!ok) return
+        setDraftContent(savedContent)
+        setDirty(false)
+      }
+      setEditConfirmed(false)
+    } else {
+      const ok = confirm('Preset definitions affect the behavior of all sessions using this preset. Enable editing?')
       if (!ok) return
       setEditConfirmed(true)
     }
-    setDraftContent(value)
-    setDirty(true)
   }
 
   const handleSave = async () => {
@@ -307,7 +319,18 @@ export function PresetEditor() {
             <span class="pp-edit-name" style={{ fontWeight: 600 }}>
               {selected.displayName}
             </span>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-dim)', marginLeft: 'auto' }}>
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', marginLeft: 'auto', cursor: 'pointer', color: editConfirmed ? 'var(--color-accent)' : 'var(--color-text-dim)' }}
+              title={editConfirmed ? 'Click to lock editing' : 'Click to enable editing'}
+            >
+              <input
+                type="checkbox"
+                checked={editConfirmed}
+                onChange={handleToggleEditMode}
+              />
+              Editing
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-dim)' }}>
               <input
                 type="checkbox"
                 checked={!selected.launcherHidden}
@@ -409,9 +432,10 @@ export function PresetEditor() {
                 <textarea
                   ref={textareaRef}
                   value={draftContent}
+                  readOnly={!editConfirmed}
                   onInput={e => handleContentChange((e.target as HTMLTextAreaElement).value)}
                   placeholder="# Entity Name&#10;&#10;Rolle, Lifecycle, MCP-Tools, Regeln..."
-                  style={{ minHeight: '360px', flex: 1, fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: '1.5' }}
+                  style={{ minHeight: '360px', flex: 1, fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: '1.5', opacity: editConfirmed ? 1 : 0.7 }}
                 />
               </div>
             )

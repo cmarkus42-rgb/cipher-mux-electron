@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
@@ -452,6 +452,8 @@ export class IpcHub {
       this.windowManager.sendToMainWindow(IPC.SESSION_STOPPED, session)
       // Clean up context-usage cache so bar resets to 0% on new session
       this.statusLineMonitor?.remove(session.id)
+      // T-VP.3: auto-unpin voice if the stopped session was pinned
+      this.voiceManager?.getInputRouter()?.unpinIfSession(session.id)
     })
 
     this.sessionManager.on('cyber-factory-started', (session) => {
@@ -774,6 +776,8 @@ export class IpcHub {
       if (configStore.get('keepWorking') && grid?.config && grid?.slots) {
         this.updateKeepWorkingSnapshot(grid)
       }
+      // T-VP.3: auto-unpin voice if pinned session no longer in grid
+      this.voiceManager?.getInputRouter()?.autoUnpinIfBackground()
     })
 
     ipcMain.handle('cipher-mux:config:get-skip-permissions', () => {
@@ -847,25 +851,27 @@ export class IpcHub {
 
   // ─── Dialogs ────────────────────────────────────────────
   private registerDialogChannels(): void {
-    ipcMain.handle(IPC.DIALOG_OPEN_FILE, async (_e, opts?: { title?: string; filters?: Electron.FileFilter[] }) => {
-      const win = this.windowManager.getMainWindow()
+    ipcMain.handle(IPC.DIALOG_OPEN_FILE, async (e, opts?: { title?: string; filters?: Electron.FileFilter[] }) => {
+      const win = BrowserWindow.fromWebContents(e.sender) ?? this.windowManager.getMainWindow()
       if (!win) return null
       const result = await dialog.showOpenDialog(win, {
         title: opts?.title ?? 'Select File',
         properties: ['openFile'],
         filters: opts?.filters,
       })
+      win.focus()
       return result.canceled ? null : result.filePaths[0] ?? null
     })
 
-    ipcMain.handle(IPC.DIALOG_OPEN_DIR, async (_e, opts?: { title?: string; defaultPath?: string }) => {
-      const win = this.windowManager.getMainWindow()
+    ipcMain.handle(IPC.DIALOG_OPEN_DIR, async (e, opts?: { title?: string; defaultPath?: string }) => {
+      const win = BrowserWindow.fromWebContents(e.sender) ?? this.windowManager.getMainWindow()
       if (!win) return null
       const result = await dialog.showOpenDialog(win, {
         title: opts?.title ?? 'Select Directory',
         defaultPath: opts?.defaultPath ?? os.homedir(),
         properties: ['openDirectory', 'createDirectory'],
       })
+      win.focus()
       return result.canceled ? null : result.filePaths[0] ?? null
     })
   }
