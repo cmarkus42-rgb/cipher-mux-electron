@@ -2,8 +2,27 @@
 //
 // These rules are injected into EVERY entity's CLAUDE.md before the persona block.
 // They encode the universal "Tugenden" from the Whitepaper.
+// Storage: ~/.config/cipher-mux/global-rules.md (file-based, editable in Preset Editor)
+//
+// REQ-GLOBAL-001: Read global-rules.md at app start, skip silently if missing/empty
+// REQ-GLOBAL-002: Inject into every session prompt (Layer 1 in 5-layer model)
+// REQ-GLOBAL-003: Warn if file exceeds ~2000 tokens (approx 1500 words / 8000 chars)
 
-import { configStore } from './config-store'
+import * as fs from 'fs'
+import * as path from 'path'
+import * as os from 'os'
+
+/** Path to the global rules markdown file. */
+export const GLOBAL_RULES_PATH = path.join(
+  os.homedir(),
+  '.config/cipher-mux/global-rules.md',
+)
+
+/**
+ * Approximate character threshold for ~2000 tokens.
+ * Rough heuristic: 1 token ≈ 4 chars for mixed German/English text.
+ */
+export const TOKEN_WARNING_CHAR_THRESHOLD = 8000
 
 /** Default global rules text (from 02-base-rules.md, condensed for injection). */
 export const DEFAULT_GLOBAL_RULES = `### Universelle Regeln
@@ -16,22 +35,95 @@ export const DEFAULT_GLOBAL_RULES = `### Universelle Regeln
 6. **Risk-Review vor Commit.** Was geaendert, was geloescht, was bricht potenziell.
 7. **"Weiss ich nicht" ist valide.** Keine erfundenen Library-Namen, API-Endpunkte oder Versionen.
 8. **Token-Disziplin.** Antwort-Laenge passt zur Frage. Kein Wiederholen, keine Floskeln, kein "Hoffe das hilft".
-9. **Sicherheit.** Keine PII leaken, keine Credentials lesen/zitieren, keine Default-Geheimnisse in Code.`
+9. **Sicherheit.** Keine PII leaken, keine Credentials lesen/zitieren, keine Default-Geheimnisse in Code.
+
+### MCP-Tool-Grundregeln
+
+- **Session-Handoff Timing:** Nach \`mux_create_session\` mindestens 8-10s warten bevor Instruktionen gesendet werden. tmux + Shell + Claude CLI brauchen Startzeit.
+- **mux_send vs. tmux send-keys:** \`mux_send\` ist fuer Inter-Session-Kommunikation (Message Bus), NICHT fuer Prompt-Input. Direkte Instruktionen via \`tmux send-keys\`.
+- **Context-Monitoring:** Bei laufenden Worker-Sessions regelmaessig \`mux_context_usage\` pruefen. Bei >80% proaktiv handeln.
+- **Task-Updates:** Tasks zeitnah updaten — nicht erst am Ende. Andere Sessions verlassen sich auf aktuelle Task-Stati.
+- **Notes fuer Persistenz:** Wichtige Erkenntnisse, die ueber die Session hinaus gelten, als Notes anlegen (\`mux_notes_create\`).`
 
 /**
- * Get the current global rules text from ConfigStore.
- * Falls back to DEFAULT_GLOBAL_RULES if not set.
+ * Ensure the global-rules.md file exists. Creates it with DEFAULT_GLOBAL_RULES
+ * on first install. Existing files are NEVER overwritten.
  */
-export function getGlobalRules(): string {
-  const stored = configStore.get('globalRules')
-  return stored ?? DEFAULT_GLOBAL_RULES
+export function ensureGlobalRulesFile(): void {
+  if (fs.existsSync(GLOBAL_RULES_PATH)) return
+  const dir = path.dirname(GLOBAL_RULES_PATH)
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(GLOBAL_RULES_PATH, DEFAULT_GLOBAL_RULES, 'utf-8')
 }
 
 /**
- * Save updated global rules to ConfigStore.
+ * Get the current global rules text from the file.
+ * Falls back to DEFAULT_GLOBAL_RULES if file doesn't exist.
+ */
+export function getGlobalRules(): string {
+  try {
+    return fs.readFileSync(GLOBAL_RULES_PATH, 'utf-8')
+  } catch {
+    return DEFAULT_GLOBAL_RULES
+  }
+}
+
+/**
+ * Save updated global rules to the file.
  */
 export function setGlobalRules(rules: string): void {
-  configStore.set('globalRules', rules)
+  const dir = path.dirname(GLOBAL_RULES_PATH)
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(GLOBAL_RULES_PATH, rules, 'utf-8')
+}
+
+/** Cached global rules content, loaded once at app start. */
+let cachedGlobalRules: string | null = null
+
+/**
+ * Load global-rules.md at app start (REQ-GLOBAL-001).
+ * Caches the content for injection into sessions.
+ * Logs a warning if file exceeds ~2000 tokens (REQ-GLOBAL-003).
+ * Returns the loaded content (empty string if file missing/empty).
+ */
+export function loadGlobalRulesOnStartup(): string {
+  ensureGlobalRulesFile()
+  const content = getGlobalRules()
+
+  // If file is empty or only whitespace, treat as absent
+  if (!content.trim()) {
+    cachedGlobalRules = ''
+    return ''
+  }
+
+  // REQ-GLOBAL-003: Warn if content exceeds ~2000 tokens
+  if (content.length > TOKEN_WARNING_CHAR_THRESHOLD) {
+    console.warn(
+      `[GlobalRules] WARNING: global-rules.md is ${content.length} chars (~${Math.round(content.length / 4)} tokens). ` +
+      `Recommended max is ~2000 tokens (${TOKEN_WARNING_CHAR_THRESHOLD} chars). Large rules consume context in every session.`,
+    )
+  }
+
+  cachedGlobalRules = content
+  return content
+}
+
+/**
+ * Get the cached global rules content (loaded at startup).
+ * Falls back to reading the file if not yet loaded.
+ */
+export function getCachedGlobalRules(): string {
+  if (cachedGlobalRules === null) {
+    return loadGlobalRulesOnStartup()
+  }
+  return cachedGlobalRules
+}
+
+/**
+ * Invalidate the cached global rules (e.g. after user edits in UI).
+ */
+export function invalidateGlobalRulesCache(): void {
+  cachedGlobalRules = null
 }
 
 /**

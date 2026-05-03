@@ -1,8 +1,10 @@
-// src/renderer/components/PresetEditor.tsx — Entity preset CLAUDE.md editor
+// src/renderer/components/PresetEditor.tsx — Entity preset CLAUDE.md editor + Global Rules editor
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import type { Character } from '../../shared/types'
 
 const api = (window as any).cipherMux
+
+const GLOBAL_ID = '__global__'
 
 interface PresetInfo {
   id: string
@@ -31,9 +33,75 @@ function extractH2Headings(content: string): { label: string; lineIndex: number 
   return headings
 }
 
+// ─── Global Rules Editor ────────────────────────────────────
+function GlobalRulesEditor() {
+  const [content, setContent] = useState('')
+  const [savedContent, setSavedContent] = useState('')
+  const [dirty, setDirty] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    api.globalRules.read().then((res: { ok: boolean; content: string }) => {
+      if (res.ok) {
+        setContent(res.content)
+        setSavedContent(res.content)
+      }
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [])
+
+  const handleSave = async () => {
+    const res = await api.globalRules.save(content)
+    if (res.ok) {
+      setSavedContent(content)
+      setDirty(false)
+    }
+  }
+
+  const handleRevert = () => {
+    setContent(savedContent)
+    setDirty(false)
+  }
+
+  if (loading) {
+    return <div class="pp-edit pp-edit--empty">Loading global rules...</div>
+  }
+
+  return (
+    <div class="pp-edit" style={{ minHeight: '400px' }}>
+      <div class="pp-edit-head">
+        <div class="pp-edit-dot" style={{ background: 'var(--color-accent)' }} />
+        <span class="pp-edit-name" style={{ fontWeight: 600 }}>Global Rules</span>
+      </div>
+
+      <div class="pp-field" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <label>global-rules.md</label>
+        <div class="pp-hint">
+          Universelle Regeln — werden in JEDE Entity-Session injiziert (Layer 1). Pfad: ~/.config/cipher-mux/global-rules.md
+        </div>
+        <textarea
+          value={content}
+          onInput={e => {
+            setContent((e.target as HTMLTextAreaElement).value)
+            setDirty(true)
+          }}
+          placeholder="### Universelle Regeln&#10;&#10;1. ..."
+          style={{ minHeight: '360px', flex: 1, fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: '1.5' }}
+        />
+      </div>
+
+      <div class="pp-foot-actions">
+        <button onClick={handleRevert} disabled={!dirty}>Revert</button>
+        <button class="pp-btn-primary" onClick={handleSave} disabled={!dirty}>Save</button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Preset Editor (main) ───────────────────────────────────
 export function PresetEditor() {
   const [presets, setPresets] = useState<PresetInfo[]>([])
-  const [selectedId, setSelectedId] = useState('')
+  const [selectedId, setSelectedId] = useState(GLOBAL_ID)
   const [dirty, setDirty] = useState(false)
   const [loading, setLoading] = useState(true)
   const [editConfirmed, setEditConfirmed] = useState(false)
@@ -56,9 +124,6 @@ export function PresetEditor() {
     try {
       const list: PresetInfo[] = await api.presets.list()
       setPresets(list)
-      if (!selectedId && list.length > 0) {
-        setSelectedId(list[0].id)
-      }
       // Load characters for persona dropdown
       try {
         const chars: Character[] = await api.characters.list()
@@ -68,13 +133,13 @@ export function PresetEditor() {
       // empty
     }
     setLoading(false)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => { loadPresets() }, [loadPresets])
 
   // Load CLAUDE.md + persona override when selection changes
   useEffect(() => {
-    if (!selectedId) return
+    if (!selectedId || selectedId === GLOBAL_ID) return
     setEditConfirmed(false)
     // Load persona override for this entity
     api.characters.getEntityPersonaOverride(selectedId).then((id: string | null) => {
@@ -96,6 +161,7 @@ export function PresetEditor() {
       if (!ok) return
     }
     setSelectedId(id)
+    if (id === GLOBAL_ID) setDirty(false)
   }
 
   const handleContentChange = (value: string) => {
@@ -156,7 +222,7 @@ export function PresetEditor() {
     if (res.ok) {
       const next = presets.filter(p => p.id !== selectedId)
       setPresets(next)
-      setSelectedId(next.length > 0 ? next[0].id : '')
+      setSelectedId(next.length > 0 ? next[0].id : GLOBAL_ID)
       setDirty(false)
     }
   }
@@ -179,6 +245,7 @@ export function PresetEditor() {
   }
 
   const selected = presets.find(p => p.id === selectedId)
+  const isGlobal = selectedId === GLOBAL_ID
 
   if (loading) {
     return <div class="pp-pane"><div class="pp-edit pp-edit--empty">Loading presets...</div></div>
@@ -193,6 +260,24 @@ export function PresetEditor() {
           <button onClick={() => setShowCreate(true)}>+ New</button>
         </div>
         <div class="pp-list-items">
+          {/* Global Rules entry — always first */}
+          <div
+            class={`pp-item ${isGlobal ? 'pp-item--active' : ''}`}
+            onClick={() => selectPreset(GLOBAL_ID)}
+          >
+            <div
+              class="pp-dot"
+              style={{ background: 'var(--color-accent)' }}
+            />
+            <div class="pp-item-meta">
+              <div class="pp-item-name">Global Rules</div>
+              <div class="pp-item-sub">global-rules.md</div>
+            </div>
+          </div>
+
+          {/* Separator */}
+          <div style={{ borderBottom: '1px solid var(--color-border)', margin: '4px 12px' }} />
+
           {presets.map(p => {
             const preview = p.projectPath.split('/').pop() || p.id
             return (
@@ -222,7 +307,9 @@ export function PresetEditor() {
       </div>
 
       {/* RIGHT: Editor */}
-      {selected ? (
+      {isGlobal ? (
+        <GlobalRulesEditor />
+      ) : selected ? (
         <div class="pp-edit" style={{ minHeight: '400px' }}>
           <div class="pp-edit-head">
             <div class="pp-edit-dot" style={{ background: selected.color }} />

@@ -3,6 +3,7 @@ import { WindowManager } from './window-manager'
 import type { WindowGridHint } from './window-manager'
 import { IpcHub } from './ipc-hub'
 import { configStore } from './config/config-store'
+import { loadGlobalRulesOnStartup } from './config/global-rules'
 import { patchEnvPath } from './util/exec-util'
 
 // macOS GUI apps inherit a minimal PATH — patch in /opt/homebrew/bin etc.
@@ -49,6 +50,9 @@ app.whenReady().then(() => {
   windowManager = new WindowManager()
   ipcHub = new IpcHub(windowManager)
   ipcHub.init()
+
+  // REQ-GLOBAL-001/003: Load global-rules.md at app start, warn if too large
+  loadGlobalRulesOnStartup()
 
   // Read saved grid config to compute initial window dimensions
   const savedUi = configStore.get('ui')
