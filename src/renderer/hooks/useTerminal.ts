@@ -84,7 +84,19 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
     if (clientWidth < MIN_FIT_DIMENSION || clientHeight < MIN_FIT_DIMENSION) return false
 
     try {
+      // Preserve scroll position across fit() — without this, resizing
+      // (especially height increase) resets the viewport to the bottom.
+      const buf = term.buffer.active
+      const wasAtBottom = buf.viewportY >= buf.baseY
+      const savedViewportY = buf.viewportY
+
       fitAddon.fit()
+
+      if (!wasAtBottom) {
+        // User was scrolled up — restore their position
+        term.scrollToLine(Math.min(savedViewportY, buf.baseY))
+      }
+
       // Only send resize IPC if dimensions actually changed
       const { cols, rows } = term
       const last = lastSizeRef.current
