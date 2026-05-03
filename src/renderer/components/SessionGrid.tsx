@@ -8,6 +8,7 @@ import { LauncherCell } from './LauncherCell'
 import type { PathStartOpts } from './LauncherCell'
 import { NotesCell } from './NotesCell'
 import { useScrollHandler } from '../hooks/useScrollHandler'
+import { shellEscapePaths } from '../../shared/shell-escape'
 
 interface SessionGridProps {
   grid: GridState
@@ -161,13 +162,34 @@ export function SessionGrid({
       }
     }
 
+    // File drop from Finder/desktop — insert shell-escaped paths into session terminal
+    const files = e.dataTransfer?.files
+    if (files && files.length > 0 && !cipherType) {
+      const slot = grid.slots[targetIdx]
+      if (slot?.sessionId) {
+        const paths: string[] = []
+        for (let i = 0; i < files.length; i++) {
+          paths.push(files[i].path)
+        }
+        if (paths.length > 0 && paths[0]) {
+          const escaped = shellEscapePaths(paths)
+          // REQ-DND-005: focus the session first
+          onFocusSession(slot.sessionId)
+          // Send escaped paths as text — no Enter (user keeps control)
+          const api = (window as any).cipherMux
+          api.terminal.write(slot.sessionId, escaped)
+        }
+      }
+      return
+    }
+
     // Default: grid-internal swap
     const sourceIdx = dragSourceRef.current
     if (sourceIdx !== null && sourceIdx !== targetIdx) {
       onSwap(sourceIdx, targetIdx)
     }
     dragSourceRef.current = null
-  }, [onSwap, onDropSession, onDropNoteOnEmpty, onDropNoteOnSession, grid.slots])
+  }, [onSwap, onDropSession, onDropNoteOnEmpty, onDropNoteOnSession, onFocusSession, grid.slots])
 
   const handleDragEnd = useCallback(() => {
     dragSourceRef.current = null
