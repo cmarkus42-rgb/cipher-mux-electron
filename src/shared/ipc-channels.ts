@@ -182,6 +182,10 @@ export const IPC = {
   NOTES_SCREENSHOT: 'cipher-mux:notes:screenshot',
   NOTES_PARSE_TESTCASE: 'cipher-mux:notes:parse-testcase',
   NOTES_SERIALIZE_TESTCASE: 'cipher-mux:notes:serialize-testcase',
+  NOTES_SEARCH: 'cipher-mux:notes:search',
+  NOTES_TAG_CLASS_REPO: 'cipher-mux:notes:tag-class-repo',
+  NOTES_TAG_INDEX: 'cipher-mux:notes:tag-index',
+  NOTES_TAG_INDEX_REFRESH: 'cipher-mux:notes:tag-index-refresh',
   NOTES_CHANGED: 'cipher-mux:notes:changed',
 
   // Grid Control (MCP App-Control)

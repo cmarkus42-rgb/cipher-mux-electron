@@ -539,6 +539,33 @@ export interface TagRepository {
   tags: Record<string, TagEntry>
 }
 
+// ─── Tag Class:Value System (REQ-NOTES-010) ──────────────
+
+/** A tag class (e.g. "kind", "status") with known values and optional color. */
+export interface TagClass {
+  values: string[]
+  color?: string
+}
+
+/** Persisted .tags.json format: classes with values and colors. */
+export interface TagClassRepository {
+  classes: Record<string, TagClass>
+}
+
+// ─── Tag Index (REQ-NOTES-012) ───────────────────────────
+
+/** Runtime-only tag index: tag→noteIds and class→value→count. */
+export interface TagIndexData {
+  /** Map from full tag string (e.g. "kind:bugreport") to set of note IDs. */
+  tagToNoteIds: Record<string, string[]>
+  /** Map from class name to value→count. */
+  classValueCounts: Record<string, Record<string, number>>
+  /** Total notes indexed. */
+  totalNotes: number
+  /** Timestamp of last rebuild. */
+  builtAt: string
+}
+
 // ─── Memory Config ────────────────────────────────────────
 
 export interface MemoryConfig {
