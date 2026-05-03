@@ -48,6 +48,28 @@ describe('Voice UX — REQ-VOICE-001: TTS Barge-In', () => {
     assert.ok(fsm.transition(VoiceState.AGENT_SPEAKING))
     assert.equal(fsm.state, VoiceState.AGENT_SPEAKING)
   })
+
+  it('stopSpeech barge-in transitions agent_speaking → ready, then next TTS works', () => {
+    // Simulate what VoiceManager.stopSpeech() does after the fix
+    assert.equal(fsm.state, VoiceState.AGENT_SPEAKING)
+    assert.ok(fsm.transition(VoiceState.READY))
+    assert.equal(fsm.state, VoiceState.READY)
+
+    // Next TTS cycle works normally
+    assert.ok(fsm.transition(VoiceState.USER_SPEAKING))
+    assert.ok(fsm.transition(VoiceState.PROCESSING))
+    assert.ok(fsm.transition(VoiceState.AGENT_SPEAKING))
+    assert.equal(fsm.state, VoiceState.AGENT_SPEAKING)
+  })
+
+  it('barge-in has no effect when not in agent_speaking', () => {
+    // Reset to ready first
+    fsm.transition(VoiceState.READY)
+    const state = fsm.state
+    // Transition to ready again should fail (already there)
+    assert.equal(fsm.transition(VoiceState.READY), false)
+    assert.equal(fsm.state, state)
+  })
 })
 
 describe('Voice UX — REQ-VOICE-002: Voice Status Indicator', () => {

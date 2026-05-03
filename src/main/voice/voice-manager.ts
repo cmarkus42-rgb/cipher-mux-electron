@@ -400,11 +400,15 @@ export class VoiceManager extends EventEmitter {
     })
   }
 
-  /** Stop all TTS playback (Piper + macOS say). Called by tts:stop IPC. */
+  /** Stop all TTS playback (Piper + macOS say). Called by tts:stop IPC and Escape barge-in. */
   stopSpeech(): void {
     if (this.piperTTS) this.piperTTS.stop()
     this.stopMacosSay()
     if (this.transport) this.transport.sendStopPlayback()
+    // Transition state machine back to READY after barge-in so next TTS works
+    if (this.conversation && this.conversation.state === VoiceState.AGENT_SPEAKING) {
+      this.conversation.stateMachine.transition(VoiceState.READY)
+    }
   }
 
   /** Stop any running macOS `say` process. */

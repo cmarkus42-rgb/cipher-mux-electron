@@ -1184,6 +1184,10 @@ export class IpcHub {
           console.log('[Voice] Grid nav:', data.direction)
           this.windowManager.sendToMainWindow(IPC.GRID_NAV, data)
         })
+        inputRouter.on('clipboard', (data: { action: string }) => {
+          console.log('[Voice] Clipboard command:', data.action)
+          this.windowManager.sendToMainWindow(IPC.VOICE_CLIPBOARD, data)
+        })
         console.log('[Voice] VOICE_START_SESSION => ok')
         this.startBtShutter()
         return { ok: true }
@@ -1250,6 +1254,9 @@ export class IpcHub {
         })
         inputRouter.on('gridNav', (data: { direction: string }) => {
           this.windowManager.sendToMainWindow(IPC.GRID_NAV, data)
+        })
+        inputRouter.on('clipboard', (data: { action: string }) => {
+          this.windowManager.sendToMainWindow(IPC.VOICE_CLIPBOARD, data)
         })
 
         // Start voice-relay entity as background session (no grid placement)

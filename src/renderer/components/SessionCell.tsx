@@ -138,6 +138,15 @@ export function SessionCell({
         : voiceState === 'ready'
           ? 'voice-dot voice-dot--idle'
           : ''
+  const voiceDotTitle = isSpeaking
+    ? 'Voice: Speaking'
+    : voiceState === 'user_speaking' || voiceState === 'recording'
+      ? 'Voice: Listening'
+      : voiceState === 'processing'
+        ? 'Voice: Processing'
+        : voiceState === 'ready'
+          ? 'Voice: Idle'
+          : ''
 
   const cellClass = [
     'session-cell',
@@ -189,7 +198,7 @@ export function SessionCell({
             : <span class={`neon-dot ${dotClass}`} aria-hidden="true" />}
           <StatusIcon status={session.status} />
           <span class="cell-name">{session.name}</span>
-          {voiceActive && <span class={voiceDotClass} aria-hidden="true" />}
+          {voiceActive && <span class={voiceDotClass} title={voiceDotTitle} aria-hidden="true" />}
           {isVoiceTarget && voiceActive && (
             <VoiceStatusLabel voiceState={voiceState} isSpeaking={isSpeaking} />
           )}

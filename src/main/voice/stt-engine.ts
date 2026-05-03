@@ -66,7 +66,8 @@ const NOISE_RE = /^[.,!?\-\u2013\u2014\u2026\s]+$/
 export const CODING_BIAS_PROMPT =
   'programming: function, variable, class, return, async, await, ' +
   'TypeScript, React, import, export, const, let, interface, component. ' +
-  'voice commands: grid, scroll, hoch, runter, links, rechts, abschicken, senden, marker'
+  'voice commands: grid, scroll, hoch, runter, links, rechts, abschicken, senden, marker, ' +
+  'löschen, leeren, kopieren, einfügen, copy, paste'
 
 /**
  * Filter known Whisper hallucination patterns.

@@ -110,6 +110,24 @@ export function SessionGrid({
     return () => unsub()
   }, [grid, focusedSessionId, onFocusSession, sessions])
 
+  // Voice clipboard commands (copy/paste)
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.terminal?.onVoiceClipboard) return
+    const unsub = api.terminal.onVoiceClipboard((data: { action: 'copy' | 'paste' }) => {
+      if (data.action === 'copy') {
+        document.execCommand('copy')
+      } else if (data.action === 'paste') {
+        navigator.clipboard.readText().then(text => {
+          if (text && focusedSessionId) {
+            api.sessions.sendKeys(focusedSessionId, text).catch(() => {})
+          }
+        }).catch(() => {})
+      }
+    })
+    return () => unsub()
+  }, [focusedSessionId])
+
   // Use a ref instead of state to avoid stale-closure race: the drop event
   // can fire before Preact completes the re-render triggered by setDragSourceIdx,
   // causing the old handleDrop closure (with null) to execute instead of the swap.
