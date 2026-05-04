@@ -271,6 +271,7 @@
   "info.shortcut.gridLeft": "zelle links fokussieren",
   "info.shortcut.gridDown": "zelle unten fokussieren",
   "info.shortcut.gridRight": "zelle rechts fokussieren",
+  "info.shortcut.showShortcuts": "keyboard shortcuts anzeigen",
   "info.shortcut.copy": "text kopieren / prozess abbrechen",
   "info.shortcut.paste": "einfügen",
   "info.shortcutHint": "die meisten aktionen werden per klick in der statusbar oder im grid ausgelöst. keyboard shortcuts sind auf ein minimum reduziert.",
@@ -365,6 +366,7 @@
   "app.shortcut.gridLeft": "zelle links fokussieren",
   "app.shortcut.gridDown": "zelle unten fokussieren",
   "app.shortcut.gridRight": "zelle rechts fokussieren",
+  "app.shortcut.showShortcuts": "keyboard shortcuts anzeigen",
   "app.workspaceLoading": "Workspace wird geladen…",
 
   "statusBar.companion": "companion",

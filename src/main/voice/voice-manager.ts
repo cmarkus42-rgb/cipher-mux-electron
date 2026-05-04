@@ -16,6 +16,7 @@ import { configStore } from '../config/config-store'
 import { ConversationEngine, type ConversationTransport } from './conversation-engine'
 import { VoiceState } from './voice-state'
 import { OllamaChat } from './ollama-chat'
+import { ClaudeChat } from './claude-chat'
 import { BugreportInterview, BUGREPORT_SYSTEM_PROMPT } from './bugreport-interview'
 import { VoiceInputRouter } from './voice-input-router'
 import { VoiceOutputRouter } from './voice-output-router'
@@ -157,12 +158,17 @@ export class VoiceManager extends EventEmitter {
       throw new Error('VoiceManager: not initialized. Call init() first.')
     }
 
-    const chat = new OllamaChat({
-      model: this.config.ollamaModel,
-      host: this.config.ollamaHost,
-      port: this.config.ollamaPort,
-      systemPrompt: BUGREPORT_SYSTEM_PROMPT,
-    })
+    // Check bugreport_preset.provider config — 'haiku' uses Claude API, 'ollama' uses local
+    const provider = configStore.get('bugreport_preset')?.provider ?? 'haiku'
+    const chat: { send(msg: string): Promise<string> } = provider === 'haiku'
+      ? new ClaudeChat({ systemPrompt: BUGREPORT_SYSTEM_PROMPT })
+      : new OllamaChat({
+          model: this.config.ollamaModel,
+          host: this.config.ollamaHost,
+          port: this.config.ollamaPort,
+          systemPrompt: BUGREPORT_SYSTEM_PROMPT,
+        })
+    console.log(`[Voice] Bugreport interview using ${provider} backend`)
     this.interview = new BugreportInterview(chat)
 
     // Wire: conversation transcription -> interview -> TTS playback
