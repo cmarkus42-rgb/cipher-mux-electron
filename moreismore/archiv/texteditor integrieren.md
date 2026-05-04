@@ -1,1 +1,0 @@
-einen minmalistischen notest editor mit ablagemöglcihkeit  mit bezug zu workspaces (siehe workspaces anforderung) - ein bindbare oss varianten vorshclagen - dann als option für eine grid-zelle anbieten - also ein edritte option project session notes

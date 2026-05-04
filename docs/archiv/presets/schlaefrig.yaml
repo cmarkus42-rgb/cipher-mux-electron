@@ -1,9 +1,0 @@
-version: '1.0'
-name: schlaefrig
-breathing.frequency_hz: 0.08
-breathing.head_amplitude_deg: 1
-breathing.antenna_sway_deg: 2
-ambient.look_around_interval_s: 15
-ambient.micro_movement_amplitude_deg: 0.2
-speaking.wobble_amplitude_deg: 1.5
-speaking.wobble_frequency_hz: 2
