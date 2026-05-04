@@ -6,8 +6,8 @@ cipher-mux is pre-1.0 and ships from a single maintained branch. Only the latest
 
 | Version | Supported |
 |---------|-----------|
-| `0.8.x` (current beta) | Yes |
-| `< 0.8.0`              | No  |
+| `0.9.x` (current beta) | Yes |
+| `< 0.9.0`              | No  |
 
 When 1.0 ships, this table will change to cover the last two minor versions.
 
@@ -66,6 +66,8 @@ cipher-mux runs locally. It does not connect to remote services by default excep
 - the MCP server binds to `127.0.0.1:3100` (configurable) with bearer-token auth; the token is generated on first run and persisted in the app config so that spawned Claude Code sessions can reconnect across restarts
 
 Electron is configured with `contextIsolation: true`, `nodeIntegration: false`, and a minimal `contextBridge` surface (`window.cipherMux`). The renderer never touches Node APIs directly.
+
+`sandbox: false` is required because the preload script uses Node.js APIs (`ipcRenderer`, `webUtils`) that are unavailable in a sandboxed renderer. The combination of contextIsolation + no nodeIntegration ensures the renderer cannot access Node directly — the preload bridge is the only surface.
 
 SQLite databases live under the user's application data directory and are not shared between users on the same machine.
 

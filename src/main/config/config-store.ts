@@ -193,9 +193,10 @@ function loadConfig(): AppConfig {
 }
 
 function saveConfig(config: AppConfig): void {
-  const dir = path.dirname(getConfigPath())
+  const configPath = getConfigPath()
+  const dir = path.dirname(configPath)
   fs.mkdirSync(dir, { recursive: true })
-  fs.writeFileSync(getConfigPath(), JSON.stringify(config, null, 2), 'utf-8')
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), { encoding: 'utf-8', mode: 0o600 })
 }
 
 let cached: AppConfig | null = null
