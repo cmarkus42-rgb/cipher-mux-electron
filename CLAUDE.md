@@ -481,6 +481,10 @@ Learning erkannt
 - **[Kurztitel]:** [Was ab jetzt gilt]. Quelle: [woher das Learning kommt].
 ```
 
+### Notes-Referenzierung
+
+- **Notes beim Titel nennen, nie bei der ID:** ULIDs sind kryptische interne Handles. Im Gespraech, in TTS und in schriftlichem Output immer den Note-Titel verwenden. Quelle: Refinement-Session 2026-05-04.
+
 ### Testcase-Konventionen
 
 - **Testcases gehoeren in die Notes-System-Testcase-Note** (noteType: testcase, ID: `01KQNBDCH1D4G11PMAEM60TPTX`). NICHT in Dateien unter `docs/archiv/`. Der TestcaseView rendert nur Notes mit `noteType: testcase`.

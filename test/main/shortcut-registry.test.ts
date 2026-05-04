@@ -32,6 +32,15 @@ describe('ShortcutRegistry', () => {
     assert.equal(called, true)
   })
 
+  it('matches Cmd+Shift+? (shortcut help)', () => {
+    let called = false
+    registry.register({ combo: 'Cmd+Shift+?', label: 'Shortcuts', category: 'Aktionen', action: () => { called = true } })
+    const event = { metaKey: true, shiftKey: true, key: '?', code: 'Slash', preventDefault: () => {}, stopPropagation: () => {} } as unknown as KeyboardEvent
+    const handled = registry.handleKeyDown(event)
+    assert.equal(handled, true)
+    assert.equal(called, true)
+  })
+
   it('ignores non-matching events', () => {
     let called = false
     registry.register({ combo: 'Cmd+K', label: 'Toggle Chat', category: 'Navigation', action: () => { called = true } })

@@ -1087,8 +1087,23 @@ export class IpcHub {
             this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_TEXT, turn.content)
           }
         })
-        interview.on('interview-complete', (report) => {
+        interview.on('interview-complete', async (report) => {
           this.windowManager.sendToMainWindow(IPC.VOICE_INTERVIEW_DONE, report)
+          // Save report as Note with kind:bugreport tag
+          try {
+            const titleMatch = report.match(/^# (.+)/m)
+            const title = titleMatch?.[1] ?? 'Voice Bug Report'
+            const note = await this.noteManager.create(title, report, ['kind:bugreport', 'open'])
+            // Update search + tag indices
+            const fullBody = report.startsWith('# ') ? report : `# ${title}\n\n${report}`
+            this.noteSearchIndex.addOrUpdate({ info: note, body: fullBody })
+            this.tagIndex.updateNote(note.id, note.tags)
+            console.log(`[Voice] Bugreport saved as note: ${note.id}`)
+            // Notify renderer so Notes sidebar refreshes
+            this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, undefined)
+          } catch (err) {
+            console.error('[Voice] Failed to save bugreport as note:', err)
+          }
         })
         interview.on('error', (err) => {
           this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, (err as Error).message)

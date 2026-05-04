@@ -11,6 +11,12 @@ import '../styles/a11y.css'
 import { A11ySettingsPage } from '../a11y/A11ySettingsPage'
 import { useA11ySettings } from '../a11y/hooks/useA11ySettings'
 
+interface RegisteredShortcut {
+  combo: string
+  label: string
+  category: string
+}
+
 interface InfoSettingsViewProps {
   theme: ThemeName
   onSetTheme: (t: ThemeName) => void
@@ -22,6 +28,7 @@ interface InfoSettingsViewProps {
   onSaveCustomTheme?: (name: string, baseTheme: ThemeName, tokens: Record<string, string>) => Promise<CustomTheme>
   onDeleteCustomTheme?: (id: string) => Promise<void>
   onOpenBugreport?: () => void
+  registeredShortcuts?: RegisteredShortcut[]
 }
 
 const api = (window as any).cipherMux
@@ -36,21 +43,11 @@ type TabId = 'general' | 'themes' | 'models' | 'shortcuts' | 'a11y' | 'about'
 // Legacy alias for external consumers
 type LegacyTabId = 'settings' | TabId
 
-const SHORTCUT_KEYS = [
-  // Navigation
-  { category: 'navigation', combo: 'Escape', labelKey: 'info.shortcut.closeDialog' },
-  { category: 'navigation', combo: 'Cmd+Shift+W', labelKey: 'info.shortcut.gridUp' },
-  { category: 'navigation', combo: 'Cmd+Shift+A', labelKey: 'info.shortcut.gridLeft' },
-  { category: 'navigation', combo: 'Cmd+Shift+S', labelKey: 'info.shortcut.gridDown' },
-  { category: 'navigation', combo: 'Cmd+Shift+D', labelKey: 'info.shortcut.gridRight' },
-  // Actions
-  { category: 'actions', combo: 'Cmd+N', labelKey: 'info.shortcut.newSession' },
-  { category: 'actions', combo: 'Cmd+B', labelKey: 'info.shortcut.openBugreport' },
-  { category: 'actions', combo: 'Cmd+S', labelKey: 'info.shortcut.saveNote' },
-  { category: 'actions', combo: 'Cmd+Shift+F', labelKey: 'info.shortcut.focusMode' },
-  // Terminal
-  { category: 'terminal', combo: 'Cmd+C', labelKey: 'info.shortcut.copy' },
-  { category: 'terminal', combo: 'Cmd+V', labelKey: 'info.shortcut.paste' },
+// Built-in shortcuts not managed by ShortcutRegistry (OS/browser/editor defaults)
+const BUILTIN_SHORTCUTS = [
+  { category: 'Terminal', combo: 'Cmd+C', labelKey: 'info.shortcut.copy' },
+  { category: 'Terminal', combo: 'Cmd+V', labelKey: 'info.shortcut.paste' },
+  { category: 'Aktionen', combo: 'Cmd+S', labelKey: 'info.shortcut.saveNote' },
 ]
 
 const themes = themesManifest.themes
@@ -83,7 +80,7 @@ const THEME_TOKEN_GROUPS: Array<{ labelKey: string; tokens: string[] }> = [
   },
 ]
 
-export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme, onOpenBugreport }: InfoSettingsViewProps) {
+export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme, onOpenBugreport, registeredShortcuts = [] }: InfoSettingsViewProps) {
   const { t } = useTranslation()
   // Map legacy 'settings' tab to 'general', validate tab name
   const ALL_TABS: TabId[] = ['general', 'themes', 'models', 'shortcuts', 'a11y', 'about']
@@ -277,8 +274,10 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
     setTimeout(() => setLlmSaved(false), 2000)
   }, [ollamaHost, ollamaPort, ollamaModel])
 
-  const shortcuts = SHORTCUT_KEYS.map(s => ({ ...s, label: t(s.labelKey) }))
-  const grouped = shortcuts.reduce<Record<string, typeof shortcuts>>((acc, s) => {
+  // Merge live registry shortcuts with built-in (OS/browser) shortcuts
+  const builtinMapped = BUILTIN_SHORTCUTS.map(s => ({ combo: s.combo, label: t(s.labelKey), category: s.category }))
+  const allShortcuts = [...registeredShortcuts, ...builtinMapped]
+  const grouped = allShortcuts.reduce<Record<string, typeof allShortcuts>>((acc, s) => {
     (acc[s.category] ??= []).push(s)
     return acc
   }, {})

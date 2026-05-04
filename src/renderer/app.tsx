@@ -194,6 +194,12 @@ export function App() {
       action: () => { setInfoInitialTab('settings'); setInfoVisible(true); setBugreportVisible(true) },
     },
     {
+      combo: 'Cmd+Shift+?',
+      label: t('app.shortcut.showShortcuts'),
+      category: 'Aktionen' as const,
+      action: () => { setInfoInitialTab('shortcuts'); setInfoVisible(true) },
+    },
+    {
       combo: 'Cmd+Shift+F',
       label: 'Focus Mode',
       category: 'Aktionen' as const,
@@ -1311,6 +1317,7 @@ export function App() {
               onSaveCustomTheme={saveCustomTheme}
               onDeleteCustomTheme={deleteCustomTheme}
               onOpenBugreport={() => setBugreportVisible(true)}
+              registeredShortcuts={shortcutEntries}
             />
           </div>
         </div>
