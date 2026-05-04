@@ -69,6 +69,8 @@ function ChatBubbles({ turns }: { turns: ChatTurn[] }) {
 
 export type ReportType = 'bug' | 'feature-request'
 
+type EnrichBackend = 'cloud' | 'local'
+
 export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   const { t } = useTranslation()
   const [reportType, setReportType] = useState<ReportType>('bug')
@@ -81,16 +83,23 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   const [result, setResult] = useState<string | null>(null)
   const [screenshots, setScreenshots] = useState<string[]>([])
   const [voiceAvailable, setVoiceAvailable] = useState(false)
+  const [enrichBackend, setEnrichBackend] = useState<EnrichBackend>('cloud')
 
   const { voiceState, turns, report, error: voiceError, startVoiceInterview, stopVoiceInterview } = useVoiceBugreport()
 
-  // Check voice availability on mount
+  // Load enrich backend + voice availability on mount
   useEffect(() => {
     let mounted = true
     api()?.voice?.available?.().then((res: { available: boolean }) => {
       if (!mounted) return
       setVoiceAvailable(res?.available ?? false)
     }).catch(() => { if (mounted) setVoiceAvailable(false) })
+    api()?.config?.get?.('llm').then((llm: any) => {
+      if (!mounted) return
+      if (llm?.bugreportEnrichBackend === 'local' || llm?.bugreportEnrichBackend === 'cloud') {
+        setEnrichBackend(llm.bugreportEnrichBackend)
+      }
+    }).catch(() => {})
     return () => { mounted = false }
   }, [])
 
@@ -184,6 +193,13 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
     setScreenshots((prev) => prev.filter((_, i) => i !== idx))
   }, [])
 
+  const handleBackendToggle = useCallback((backend: EnrichBackend) => {
+    setEnrichBackend(backend)
+    api()?.config?.get?.('llm').then((llm: any) => {
+      api()?.config?.set?.('llm', { ...llm, bugreportEnrichBackend: backend })
+    }).catch(() => {})
+  }, [])
+
   const isVoiceActive = VOICE_ACTIVE_STATES.has(voiceState)
 
   const handleVoiceClick = useCallback(() => {
@@ -220,6 +236,15 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
                   class={`btn btn--sm ${reportType === 'feature-request' ? 'btn--primary' : ''}`}
                   onClick={() => setReportType('feature-request')}
                 >{t('bugreport.typeFeature')}</button>
+                <span class="bugreport-type-toggle__separator" />
+                <button
+                  class={`btn btn--sm ${enrichBackend === 'cloud' ? 'btn--primary' : ''}`}
+                  onClick={() => handleBackendToggle('cloud')}
+                >{t('bugreport.backendCloud')}</button>
+                <button
+                  class={`btn btn--sm ${enrichBackend === 'local' ? 'btn--primary' : ''}`}
+                  onClick={() => handleBackendToggle('local')}
+                >{t('bugreport.backendLocal')}</button>
               </div>
               <p class="bugreport-body__text">
                 {reportType === 'bug'
@@ -270,7 +295,7 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
                 </div>
               )}
 
-              {enrichFailed && <p class="bugreport-body__notice">{t('bugreport.ollamaFailed')}</p>}
+              {enrichFailed && <p class="bugreport-body__notice">{t('bugreport.enrichFailed')}</p>}
               {enriched && (
                 <>
                   <p class="bugreport-body__label">{t('bugreport.previewLabel')}</p>

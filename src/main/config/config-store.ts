@@ -8,7 +8,7 @@ import { deepMerge } from '../util/deep-merge'
 import { BRAND } from '../../shared/brand'
 import { A11Y_DEFAULTS } from '../a11y/a11y-config'
 import { BUILTIN_PERSONAS, SEED_CUSTOM_PERSONAS, SEED_WORKSPACES } from '../../shared/persona-types'
-import { SEED_CHARACTERS, DEFAULT_CHARACTER_ID } from '../character/character-defaults'
+import { SEED_CHARACTERS, DEFAULT_CHARACTER_ID, assignCharacterColor } from '../character/character-defaults'
 import { DEBUGGER_DEFAULTS } from '../debugger/types'
 import { TESTING_ASSISTANT_DEFAULTS } from '../testing-assistant/types'
 import {
@@ -68,6 +68,7 @@ const defaults: AppConfig = {
     ollamaHost: '127.0.0.1',
     ollamaPort: 11434,
     ollamaModel: 'gemma4:26b',
+    bugreportEnrichBackend: 'cloud' as const,
   },
   ui: {
     chatroomVisible: false,
@@ -174,6 +175,16 @@ function migrateConfig(config: AppConfig): AppConfig {
     for (const seed of SEED_CHARACTERS) {
       if (!existingIds.has(seed.id)) {
         config.characters.push({ ...seed })
+        changed = true
+      }
+    }
+    // Migrate: assign colors to characters that don't have one yet
+    const usedColors: string[] = config.characters.filter(c => c.color).map(c => c.color)
+    for (const c of config.characters) {
+      if (!c.color) {
+        const seed = SEED_CHARACTERS.find(s => s.id === c.id)
+        c.color = seed?.color ?? assignCharacterColor(usedColors)
+        usedColors.push(c.color)
         changed = true
       }
     }

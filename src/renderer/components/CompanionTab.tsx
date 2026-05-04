@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { Character } from '../../shared/types'
+import { assignCharacterColor } from '../../shared/character-palette'
 
 const api = (window as any).cipherMux
 
@@ -78,10 +79,12 @@ export function CompanionTab() {
   const handleAdd = () => {
     const id = 'char-' + Date.now()
     const now = new Date().toISOString()
+    const existingColors = characters.map(c => c.color).filter(Boolean)
     const newChar: Character = {
       id,
       name: 'New Character',
       prompt: '',
+      color: assignCharacterColor(existingColors),
       isDefault: false,
       createdAt: now,
       updatedAt: now,
@@ -135,7 +138,7 @@ export function CompanionTab() {
                 class={`pp-item ${c.id === selectedId ? 'pp-item--active' : ''}`}
                 onClick={() => selectCharacter(c.id)}
               >
-                <div class="pp-dot" style={{ background: c.id === activeId ? '#4fc3f7' : '#6A6A72' }} />
+                <div class="pp-dot" style={{ background: c.color || '#6A6A72', opacity: c.id === activeId ? 1 : 0.4 }} />
                 <div class="pp-item-meta">
                   <div class="pp-item-name">{c.name}</div>
                   <div class={`pp-item-sub ${preview ? '' : 'pp-item-sub--empty'}`}>
@@ -155,7 +158,7 @@ export function CompanionTab() {
       {selected ? (
         <div class="pp-edit">
           <div class="pp-edit-head">
-            <div class="pp-edit-dot" style={{ background: selected.id === activeId ? '#4fc3f7' : '#6A6A72' }} />
+            <div class="pp-edit-dot" style={{ background: selected.color || '#6A6A72', opacity: selected.id === activeId ? 1 : 0.4 }} />
             <input
               class="pp-edit-name"
               value={draftName}

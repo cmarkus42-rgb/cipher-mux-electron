@@ -229,6 +229,8 @@ export interface AppConfig {
     ollamaPort: number
     /** Ollama model for enrichment/tagging (default gemma4:26b). */
     ollamaModel: string
+    /** Bug report enrichment backend: 'cloud' (Claude/Haiku) or 'local' (Ollama). Default: 'cloud'. */
+    bugreportEnrichBackend: 'cloud' | 'local'
   }
   windows: {
     main: { x: number; y: number; width: number; height: number }
@@ -653,6 +655,7 @@ export interface Character {
   id: string           // e.g. 'relay', 'wayne'
   name: string         // Display name
   prompt: string       // Full persona prompt text
+  color: string        // Hex color from CHARACTER_PALETTE, assigned at creation
   isDefault: boolean   // Relay = true
   createdAt: string
   updatedAt: string

@@ -6,6 +6,7 @@
 //   companionTasks — companion-specific tasks → only used by Companion entity
 
 import type { Character } from '../../shared/types'
+import { CHARACTER_PALETTE, assignCharacterColor } from '../../shared/character-palette'
 
 export const DEFAULT_CHARACTER_ID = 'relay'
 
@@ -160,6 +161,9 @@ ${GLITCH_CHARACTER_BLOCK}
 
 ${GLITCH_COMPANION_TASKS}`
 
+// Re-export for consumers that imported from here
+export { CHARACTER_PALETTE, assignCharacterColor } from '../../shared/character-palette'
+
 // ─── Seed data ──────────────────────────────────────────────
 
 export const SEED_CHARACTERS: Character[] = [
@@ -167,6 +171,7 @@ export const SEED_CHARACTERS: Character[] = [
     id: 'relay',
     name: 'Relay',
     prompt: RELAY_PROMPT,
+    color: CHARACTER_PALETTE[0], // gold
     isDefault: true,
     createdAt: now,
     updatedAt: now,
@@ -175,6 +180,7 @@ export const SEED_CHARACTERS: Character[] = [
     id: 'cipher',
     name: 'Cipher',
     prompt: CIPHER_PROMPT,
+    color: CHARACTER_PALETTE[1], // emerald
     isDefault: false,
     createdAt: now,
     updatedAt: now,
@@ -183,6 +189,7 @@ export const SEED_CHARACTERS: Character[] = [
     id: 'wayne',
     name: 'Wayne Szalinski',
     prompt: WAYNE_PROMPT,
+    color: CHARACTER_PALETTE[2], // amber
     isDefault: false,
     createdAt: now,
     updatedAt: now,
@@ -191,6 +198,7 @@ export const SEED_CHARACTERS: Character[] = [
     id: 'kyniker',
     name: 'Der Kyniker',
     prompt: KYNIKER_PROMPT,
+    color: CHARACTER_PALETTE[3], // amethyst
     isDefault: false,
     createdAt: now,
     updatedAt: now,
@@ -199,6 +207,7 @@ export const SEED_CHARACTERS: Character[] = [
     id: 'sokrates',
     name: 'Sokratischer Tutor',
     prompt: SOKRATES_PROMPT,
+    color: CHARACTER_PALETTE[4], // cobalt
     isDefault: false,
     createdAt: now,
     updatedAt: now,
@@ -207,6 +216,7 @@ export const SEED_CHARACTERS: Character[] = [
     id: 'glitch',
     name: 'Der Glitch',
     prompt: GLITCH_PROMPT,
+    color: CHARACTER_PALETTE[5], // crimson
     isDefault: false,
     createdAt: now,
     updatedAt: now,
