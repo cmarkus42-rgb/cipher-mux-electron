@@ -255,8 +255,9 @@ export class SessionManager extends EventEmitter {
       }
     }
 
-    // Inject workspace prompt + context directories into project CLAUDE.md
-    if (opts.projectPath && (opts.workspacePrompt || opts.contextPaths?.length)) {
+    // Inject workspace prompt + context directories into project CLAUDE.md.
+    // Entity sessions handle this in assembleEntityClaudeMd (no regex — pure append).
+    if (opts.projectPath && !opts._entityInjected && (opts.workspacePrompt || opts.contextPaths?.length)) {
       try {
         this.injectWorkspaceSections(opts.projectPath, opts.workspacePrompt, opts.contextPaths)
       } catch (err) {
@@ -859,6 +860,55 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
+   * Assemble a CLAUDE.md for an entity session from preset.md content.
+   * Pure concatenation — no regex-replace. Used only for entity sessions.
+   *
+   * Assembly order:
+   * 1. preset.md content (verbatim)
+   * 2. ## Persona (inserted after first H1)
+   * 3. ## Global Rules (appended at end)
+   */
+  private assembleEntityClaudeMd(
+    presetContent: string,
+    entityId: string,
+    workspacePrompt?: string,
+    contextPaths?: string[],
+  ): string {
+    let result = presetContent
+
+    // Insert Persona after first H1 heading
+    const characterBlock = this.getCharacterBlockForEntity(entityId)
+    if (characterBlock) {
+      const personaSection = `\n\n## Persona\n\n**WICHTIG: Diese Persona ueberschreibt alle globalen Persona-Definitionen (z.B. Mimir aus ~/.claude/CLAUDE.md). In dieser Session bist du NICHT Mimir.**\n\n${characterBlock}`
+      const firstNewline = result.indexOf('\n')
+      if (firstNewline > 0) {
+        result = result.substring(0, firstNewline) + personaSection + result.substring(firstNewline)
+      } else {
+        result = result + personaSection
+      }
+    }
+
+    // Append Global Rules at end
+    const globalRules = getCachedGlobalRules()
+    if (globalRules.trim()) {
+      result = result + `\n\n## Global Rules\n\n${globalRules.trim()}`
+    }
+
+    // Append Workspace Prompt (optional, from workspace apply)
+    if (workspacePrompt && workspacePrompt.trim()) {
+      result = result + `\n\n## Workspace Prompt\n\n${workspacePrompt.trim()}`
+    }
+
+    // Append Context Directories (optional, from workspace apply)
+    if (contextPaths && contextPaths.length > 0) {
+      const body = contextPaths.map((p) => `- \`${p}\``).join('\n')
+      result = result + `\n\n## Context Directories\n\n${body}`
+    }
+
+    return result
+  }
+
+  /**
    * Inject workspace prompt and context directories into a project's CLAUDE.md.
    * Called during workspace apply for project-path cells.
    */
@@ -929,29 +979,29 @@ export class SessionManager extends EventEmitter {
     // Ensure entity directory exists
     fs.mkdirSync(config.projectPath, { recursive: true })
 
-    // Write CLAUDE.md for entities without asset templates.
-    // Each entity gets a role-specific CLAUDE.md so it overrides the global
-    // Mimir persona from ~/.claude/CLAUDE.md (fixes B07 persona distribution).
-    // Code-generated templates (voice-relay, audit) are always refreshed so
+    // Write preset.md for entities without asset templates.
+    // preset.md is the source-of-truth for preset-owned content.
+    // CLAUDE.md is generated at session start by assembling preset.md + injected layers.
+    // Code-generated presets (voice-relay, audit) are always refreshed so
     // updates propagate on next session start. Orchestrator and Cyber Factory use
-    // pre-authored CLAUDE.md in their entity directories (no code generation).
-    // Only truly generic fallback CLAUDE.md is write-once (preserves manual edits).
+    // pre-authored preset.md in their entity directories (no code generation).
+    // Only truly generic fallback preset.md is write-once (preserves manual edits).
     if (!config.templatePath) {
-      const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
+      const presetMdPath = path.join(config.projectPath, 'preset.md')
       if (config.id === 'audit') {
-        fs.writeFileSync(claudeMdPath, generateAuditClaudeMd(), 'utf-8')
+        fs.writeFileSync(presetMdPath, generateAuditClaudeMd(), 'utf-8')
       } else if (config.id === 'voice-relay') {
-        fs.writeFileSync(claudeMdPath, generateVoiceRelayClaudeMd(), 'utf-8')
+        fs.writeFileSync(presetMdPath, generateVoiceRelayClaudeMd(), 'utf-8')
       } else if (config.id === 'debugger') {
-        // Write-once: preserve manual edits to the debugger's CLAUDE.md
-        if (!fs.existsSync(claudeMdPath)) {
-          fs.writeFileSync(claudeMdPath, generateDebuggerClaudeMd(), 'utf-8')
+        // Write-once: preserve manual edits to the debugger's preset.md
+        if (!fs.existsSync(presetMdPath)) {
+          fs.writeFileSync(presetMdPath, generateDebuggerClaudeMd(), 'utf-8')
         }
       } else if (config.id === 'bugreport') {
-        fs.writeFileSync(claudeMdPath, generateBugreportPresetClaudeMd(), 'utf-8')
-      } else if (!fs.existsSync(claudeMdPath)) {
+        fs.writeFileSync(presetMdPath, generateBugreportPresetClaudeMd(), 'utf-8')
+      } else if (!fs.existsSync(presetMdPath)) {
         // Generic fallback — only write once to preserve manual edits
-        fs.writeFileSync(claudeMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')
+        fs.writeFileSync(presetMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')
       }
       // Always update MCP connection file for entities that use MCP
       if (config.features.includes('mcp') && this.mcpConfig) {
@@ -1009,21 +1059,29 @@ export class SessionManager extends EventEmitter {
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2), 'utf-8')
     }
 
-    // ─── Global Rules Injection (Layer 1) ──────────────────
-    // REQ-GLOBAL-002: Inject global-rules.md content into EVERY session's CLAUDE.md
-    // before persona/entity content. This is Layer 1 in the 5-layer prompt model.
-    this.injectGlobalRulesSection(config.projectPath)
+    // ─── Assembly: preset.md + Persona + Global Rules → CLAUDE.md ──────
+    // Read preset.md as source-of-truth, assemble with injected layers,
+    // write result as CLAUDE.md. No regex-replace — pure concatenation.
+    {
+      const presetMdPath = path.join(config.projectPath, 'preset.md')
+      const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
 
-    // ─── Universal Persona Injection ───────────────────────
-    // Inject the resolved character block (tone, style, rules) into every
-    // entity's CLAUDE.md. Uses persona-resolver: global > preset override > default matrix > fallback.
-    const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
-    if (fs.existsSync(claudeMdPath)) {
-      const characterBlock = this.getCharacterBlockForEntity(entityId)
-      if (characterBlock) {
-        const existing = fs.readFileSync(claudeMdPath, 'utf-8')
-        const withPersona = this.injectPersonaSection(existing, characterBlock)
-        fs.writeFileSync(claudeMdPath, withPersona, 'utf-8')
+      // Read preset.md; fallback to existing CLAUDE.md if preset.md missing
+      let presetContent: string | null = null
+      if (fs.existsSync(presetMdPath)) {
+        presetContent = fs.readFileSync(presetMdPath, 'utf-8')
+      } else if (fs.existsSync(claudeMdPath)) {
+        presetContent = fs.readFileSync(claudeMdPath, 'utf-8')
+      }
+
+      if (presetContent !== null) {
+        const assembled = this.assembleEntityClaudeMd(
+          presetContent,
+          entityId,
+          opts?.workspacePrompt,
+          opts?.contextPaths,
+        )
+        fs.writeFileSync(claudeMdPath, assembled, 'utf-8')
       }
     }
 

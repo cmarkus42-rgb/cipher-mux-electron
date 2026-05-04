@@ -326,6 +326,8 @@ export interface AppConfig {
   memory?: MemoryConfig
   /** Accessibility settings (font overrides, system preference overrides). */
   a11y?: import('../main/a11y/a11y-config').A11yConfig
+  /** Whether preset.md migration from CLAUDE.md has been completed. */
+  presetMigrationDone?: boolean
 }
 
 // ─── Kickoff ───────────────────────────────────────────────
