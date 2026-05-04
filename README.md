@@ -13,6 +13,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="#"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="CONTRIBUTING.md#maintenance-status"><img alt="Maintenance" src="https://img.shields.io/badge/maintenance-active-00FF88?style=flat-square&labelColor=000000"></a>
+  <a href="#install"><img alt="Early Beta" src="https://img.shields.io/badge/early%20beta-macOS%20only%2C%20Claude%20Code%20required-FF6B35?style=flat-square&labelColor=000000"></a>
 </p>
 
 ---
@@ -45,6 +46,8 @@ cipher-mux orchestrates multiple Claude Code CLI sessions in embedded tmux panes
 The primary audience is developers who run multiple parallel Claude Code sessions and want to eliminate the manual coordination overhead. You should be comfortable with tmux and use Claude Code daily. macOS and Linux are supported; Windows is not planned for v1.
 
 cipher-mux is **not** an editor, not an IDE plugin, not a multi-LLM router, and not an autonomous agent platform. It is a cockpit: you see your sessions, you talk to them, you coordinate them. The full feature set is built for Claude Code.
+
+cipher-mux was built with cipher-mux. The 1,207 tests, the audit reports, and the code quality are a direct result of the entity pipeline it ships. [Read how.](docs/BUILT-WITH-ITSELF.md)
 
 ## Install
 
