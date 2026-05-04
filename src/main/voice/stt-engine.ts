@@ -39,6 +39,7 @@ const HALLUCINATION_RE =
  */
 export const HALLUCINATION_BLOCKLIST: string[] = [
   'verwendet.',
+  'verwendet,',
   'verwendet',
   'untertitel von',
   'danke fürs zuschauen',

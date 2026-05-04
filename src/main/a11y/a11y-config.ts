@@ -13,6 +13,8 @@ export interface A11yConfig {
   fontFamily: string
   /** UI font size in px (10-32). */
   fontSize: number
+  /** Terminal font size in px (8-28). Separate from UI font size. */
+  terminalFontSize: number
   /** UI line height multiplier (1.0-3.0). */
   lineHeight: number
   /** UI letter spacing in px (0-5). */
@@ -28,6 +30,7 @@ export interface A11yConfig {
 export const A11Y_DEFAULTS: A11yConfig = {
   fontFamily: '',
   fontSize: 14,
+  terminalFontSize: 13,
   lineHeight: 1.5,
   letterSpacing: 0,
   motionOverride: 'system',
@@ -41,6 +44,7 @@ export function sanitizeA11yConfig(raw: Partial<A11yConfig>): A11yConfig {
   return {
     fontFamily: typeof merged.fontFamily === 'string' ? merged.fontFamily : '',
     fontSize: clamp(merged.fontSize, 10, 32),
+    terminalFontSize: clamp(merged.terminalFontSize, 8, 28),
     lineHeight: clampFloat(merged.lineHeight, 1.0, 3.0),
     letterSpacing: clamp(merged.letterSpacing, 0, 5),
     motionOverride: validateEnum(merged.motionOverride, ['system', 'reduce', 'allow'], 'system'),
@@ -72,6 +76,7 @@ export function hasCustomFontSettings(config: A11yConfig): boolean {
   return (
     config.fontFamily !== '' ||
     config.fontSize !== A11Y_DEFAULTS.fontSize ||
+    config.terminalFontSize !== A11Y_DEFAULTS.terminalFontSize ||
     config.lineHeight !== A11Y_DEFAULTS.lineHeight ||
     config.letterSpacing !== A11Y_DEFAULTS.letterSpacing
   )

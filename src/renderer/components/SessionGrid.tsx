@@ -1,7 +1,7 @@
 // src/renderer/components/SessionGrid.tsx
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import type { SessionInfo, ContextUsage, EntityId } from '../../shared/types'
-import { computeGridStyle } from '../../shared/grid-types'
+import { computeGridStyle, getCoveredSlots, getFocusModePlacement } from '../../shared/grid-types'
 import type { GridState, ThemeName } from '../../shared/grid-types'
 import { SessionCell } from './SessionCell'
 import { LauncherCell } from './LauncherCell'
@@ -34,6 +34,8 @@ interface SessionGridProps {
   onFork: (sessionId: string) => void
   onSendToBackground: (sessionId: string) => void
   onFocusMode?: (sessionId: string) => void
+  focusModeSlot?: number | null
+  focusModeOverlapped?: Set<number>
   onStartEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
   onResumeEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
   onFocusEntity: (entityId: EntityId) => void
@@ -48,24 +50,7 @@ interface SessionGridProps {
   onDropNoteOnSession: (note: any, sessionId: string) => void
 }
 
-/**
- * Build a set of slot indices that are "covered" by a cell above them
- * that has rowSpan > 1. Grid is row-major: index = row * cols + col.
- */
-function getCoveredSlots(slots: GridState['slots'], cols: number, rows: number): Set<number> {
-  const covered = new Set<number>()
-  for (let idx = 0; idx < slots.length; idx++) {
-    const span = slots[idx].rowSpan
-    if (span > 1) {
-      const col = idx % cols
-      const row = Math.floor(idx / cols)
-      for (let r = 1; r < span && row + r < rows; r++) {
-        covered.add((row + r) * cols + col)
-      }
-    }
-  }
-  return covered
-}
+
 
 export function SessionGrid({
   grid, sessions, contextUsages, focusedSessionId, theme,
@@ -74,6 +59,7 @@ export function SessionGrid({
   workspaceLoading,
   onFocusSession, onCloseSession,
   onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onFocusMode,
+  focusModeSlot, focusModeOverlapped,
   onStartEntity, onResumeEntity, onFocusEntity, onStartPath,
   onOpenNotes, onOpenNote, onCloseNotes, onToggleExpandSlot, onSwap,
   onDropSession, onDropNoteOnEmpty, onDropNoteOnSession,
@@ -226,14 +212,28 @@ export function SessionGrid({
 
   const gridStyle = computeGridStyle(cols, rows)
 
-  const covered = getCoveredSlots(grid.slots, cols, rows)
+  const covered = getCoveredSlots(grid)
+
+  // Compute focus mode placement CSS if active
+  const focusPlacement = focusModeSlot != null && focusModeSlot >= 0
+    ? getFocusModePlacement(cols, rows, focusModeSlot)
+    : null
 
   return (
     <div class="session-grid-area">
-      <div class="session-grid" style={gridStyle} onDragEnd={handleDragEnd}>
+      <div class={`session-grid${focusModeSlot != null ? ' session-grid--focus-mode' : ''}`} style={gridStyle} onDragEnd={handleDragEnd}>
         {grid.slots.map((slot, idx) => {
           // Skip cells covered by a rowSpan above
           if (covered.has(idx)) return null
+
+          // Hide cells overlapped by focus mode
+          const isOverlapped = focusModeOverlapped?.has(idx)
+          if (isOverlapped) return null
+
+          const isFocusModeTarget = focusModeSlot === idx
+          const focusStyle: Record<string, string> = isFocusModeTarget && focusPlacement
+            ? { gridColumn: focusPlacement.gridColumn, gridRow: focusPlacement.gridRow }
+            : {}
 
           // Notes cell
           if (slot.type === 'notes') {
@@ -243,6 +243,7 @@ export function SessionGrid({
                 rowSpan={slot.rowSpan}
                 maxRows={rows}
                 activeWorkspaceId={activeWorkspaceId}
+                slotIndex={idx}
                 slotCol={idx % cols}
                 slotRow={Math.floor(idx / cols)}
                 onClose={() => onCloseNotes(idx)}
@@ -275,10 +276,11 @@ export function SessionGrid({
                 isSpeaking={session.id === voiceTargetSessionId && isSpeaking}
                 onToggleVoicePin={onToggleVoicePin}
                 theme={theme}
-                rowSpan={slot.rowSpan}
+                rowSpan={isFocusModeTarget ? 1 : slot.rowSpan}
                 maxRows={rows}
                 slotCol={idx % cols}
                 slotRow={Math.floor(idx / cols)}
+                focusModeStyle={isFocusModeTarget ? focusStyle : undefined}
                 onFocus={onFocusSession}
                 onClose={onCloseSession}
                 onSwitchProject={onSwitchProject}

@@ -8,6 +8,7 @@ import {
   swapSlots,
   resizeGrid,
   findFirstEmptySlot,
+  nextRowSpan,
 } from '../../shared/grid-types'
 import { MAX_GRID_COLS } from '../../shared/constants'
 import { GRID_SAVE_DEBOUNCE_MS } from '../../shared/constants'
@@ -122,9 +123,8 @@ export function useGrid(panelWidth = 0) {
       const idx = prev.slots.findIndex((s) => s.sessionId === sessionId)
       if (idx === -1) return prev
       const currentSpan = prev.slots[idx].rowSpan
-      // Stepwise: if already expanded, shrink by 1; otherwise grow by 1
-      const newSpan = currentSpan >= prev.config.rows ? currentSpan - 1 : currentSpan + 1
-      if (newSpan < 1 || newSpan > prev.config.rows) return prev
+      const newSpan = nextRowSpan(currentSpan, prev.config.rows)
+      if (newSpan === currentSpan) return prev
       const newSlots = [...prev.slots]
       newSlots[idx] = { ...newSlots[idx], rowSpan: newSpan }
       const next = { ...prev, slots: newSlots }
@@ -161,11 +161,6 @@ export function useGrid(panelWidth = 0) {
 
   const setSlotType = useCallback((slotIndex: number, type: 'session' | 'notes') => {
     setGrid((prev) => {
-      // Max one notes cell validation
-      if (type === 'notes' && prev.slots.some((s, i) => s.type === 'notes' && i !== slotIndex)) {
-        console.warn('[useGrid] Only one notes cell allowed')
-        return prev
-      }
       const newSlots = [...prev.slots]
       newSlots[slotIndex] = { ...newSlots[slotIndex], type, sessionId: null }
       const next = { ...prev, slots: newSlots }
@@ -188,9 +183,8 @@ export function useGrid(panelWidth = 0) {
     setGrid((prev) => {
       if (slotIndex < 0 || slotIndex >= prev.slots.length) return prev
       const currentSpan = prev.slots[slotIndex].rowSpan
-      // Stepwise: if already expanded, shrink by 1; otherwise grow by 1
-      const newSpan = currentSpan >= prev.config.rows ? currentSpan - 1 : currentSpan + 1
-      if (newSpan < 1 || newSpan > prev.config.rows) return prev
+      const newSpan = nextRowSpan(currentSpan, prev.config.rows)
+      if (newSpan === currentSpan) return prev
       const newSlots = [...prev.slots]
       newSlots[slotIndex] = { ...newSlots[slotIndex], rowSpan: newSpan }
       const next = { ...prev, slots: newSlots }

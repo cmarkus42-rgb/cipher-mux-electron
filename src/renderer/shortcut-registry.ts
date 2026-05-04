@@ -10,6 +10,7 @@ export interface ShortcutEntry {
 
 interface ParsedCombo {
   meta: boolean
+  shift: boolean
   key: string
 }
 
@@ -17,12 +18,15 @@ function parseCombo(combo: string): ParsedCombo {
   const parts = combo.toLowerCase().split('+')
   return {
     meta: parts.includes('cmd') || parts.includes('meta'),
+    shift: parts.includes('shift'),
     key: parts[parts.length - 1],
   }
 }
 
 function matchEvent(e: KeyboardEvent, parsed: ParsedCombo): boolean {
   if (parsed.meta && !e.metaKey) return false
+  if (parsed.shift && !e.shiftKey) return false
+  if (!parsed.shift && e.shiftKey && parsed.meta) return false
   return e.key.toLowerCase() === parsed.key || e.code.toLowerCase() === parsed.key
 }
 

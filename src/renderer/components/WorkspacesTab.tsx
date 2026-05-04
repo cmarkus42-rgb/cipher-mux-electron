@@ -9,6 +9,27 @@ import type { EntityId } from '../../shared/types'
 
 const api = (window as any).cipherMux
 
+/** Clipboard copy button with checkmark feedback. */
+function CopyButton({ getText }: { getText: () => string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(getText())
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch { /* ignore */ }
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      title="Copy to clipboard"
+      style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '12px', color: copied ? 'var(--color-success, #4caf50)' : 'var(--color-text-dim)', display: 'inline-flex', alignItems: 'center', gap: '2px', lineHeight: 1 }}
+    >
+      {copied ? '\u2713' : '\u2398'}
+    </button>
+  )
+}
+
 export function WorkspacesTab() {
   const { t } = useTranslation()
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
@@ -444,7 +465,13 @@ export function WorkspacesTab() {
             {/* Workspace Prompt + Context Directories */}
             <div class="ws-ed-sections">
               <div class="insp-field wide">
-                <label>WORKSPACE PROMPT</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                  <label style={{ margin: 0 }}>WORKSPACE PROMPT</label>
+                  <CopyButton getText={() => ws.workspacePrompt ?? ''} />
+                </div>
+                <div class="pp-hint" style={{ color: 'var(--color-warning)', marginBottom: 4 }}>
+                  Aenderungen werden erst fuer neu gestartete Sessions wirksam.
+                </div>
                 <textarea
                   value={ws.workspacePrompt ?? ''}
                   placeholder="Prompt for all project cells (injected as ## Workspace Prompt in CLAUDE.md)"
@@ -603,7 +630,13 @@ export function WorkspacesTab() {
                     </div>
                   </div>
                   <div class="insp-field wide">
-                    <label>{t('workspacesTab.cellPrompt')}</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                      <label style={{ margin: 0 }}>{t('workspacesTab.cellPrompt')}</label>
+                      <CopyButton getText={() => cellData.prompt} />
+                    </div>
+                    <div class="pp-hint" style={{ color: 'var(--color-warning)', marginBottom: 4 }}>
+                      Aenderungen werden erst fuer neu gestartete Sessions wirksam.
+                    </div>
                     <textarea
                       value={cellData.prompt}
                       placeholder="Optional cell-specific prompt (overrides workspace prompt for this cell)"

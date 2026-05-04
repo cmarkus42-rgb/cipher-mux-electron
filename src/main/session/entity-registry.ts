@@ -100,7 +100,7 @@ export function registerBuiltinEntities(
     color: '#66bb6a',
     projectPath: expandHome('~/.config/cipher-mux/launcher'),
     features: ['mcp'],
-    visible: true,
+    visible: false,
     sortOrder: 30,
     singleInstance: true,
   })

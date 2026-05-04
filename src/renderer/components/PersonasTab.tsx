@@ -4,6 +4,27 @@ import { useTranslation } from 'react-i18next'
 import type { Persona, Workspace } from '../../shared/persona-types'
 import { PERSONA_SWATCHES } from '../../shared/persona-types'
 
+/** Clipboard copy button with checkmark feedback. */
+function CopyButton({ getText }: { getText: () => string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(getText())
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch { /* ignore */ }
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      title="Copy to clipboard"
+      style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '12px', color: copied ? 'var(--color-success, #4caf50)' : 'var(--color-text-dim)', display: 'inline-flex', alignItems: 'center', gap: '2px', lineHeight: 1 }}
+    >
+      {copied ? '\u2713' : '\u2398'}
+    </button>
+  )
+}
+
 const api = (window as any).cipherMux
 
 function countUsage(personaId: string, workspaces: Workspace[]) {
@@ -232,9 +253,15 @@ export function PersonasTab() {
 
           {/* Prompt textarea */}
           <div class="pp-field">
-            <label>{t('personasTab.defaultPrompt')}</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <label style={{ margin: 0 }}>{t('personasTab.defaultPrompt')}</label>
+              <CopyButton getText={() => draftPrompt} />
+            </div>
             <div class="pp-hint">
               {t('personasTab.promptHint')}
+            </div>
+            <div class="pp-hint" style={{ marginTop: 4, color: 'var(--color-warning)' }}>
+              Aenderungen werden erst fuer neu gestartete Sessions wirksam.
             </div>
             <textarea
               value={draftPrompt}

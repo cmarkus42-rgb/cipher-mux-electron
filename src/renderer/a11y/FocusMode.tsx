@@ -10,18 +10,9 @@ interface FocusModeProps {
 
 /**
  * Focus Mode overlay — renders the compact status bar when active.
- * The actual fullscreen behavior is achieved by adding/removing a CSS class
- * on the app-body, which hides the sidebar and shows only the focused cell.
+ * The actual 2x2 cell spanning is handled by SessionGrid via inline grid placement.
  */
 export function FocusMode({ enabled, sessionName, contextPct, onDeactivate }: FocusModeProps) {
-  // Toggle the CSS class on app-body
-  useEffect(() => {
-    const body = document.querySelector('.app-body')
-    if (!body) return
-    body.classList.toggle('focus-mode-active', enabled)
-    return () => { body.classList.remove('focus-mode-active') }
-  }, [enabled])
-
   // Escape to deactivate
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && enabled) {

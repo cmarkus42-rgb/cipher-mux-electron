@@ -87,8 +87,8 @@ app.whenReady().then(() => {
     {
       label: 'Edit',
       submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
+        { label: 'Undo', accelerator: 'CommandOrControl+Z', registerAccelerator: false, click: () => BrowserWindow.getFocusedWindow()?.webContents.undo() },
+        { label: 'Redo', accelerator: 'Shift+CommandOrControl+Z', registerAccelerator: false, click: () => BrowserWindow.getFocusedWindow()?.webContents.redo() },
         { type: 'separator' },
         { label: 'Cut', accelerator: 'CommandOrControl+X', registerAccelerator: false, click: () => BrowserWindow.getFocusedWindow()?.webContents.cut() },
         { label: 'Copy', accelerator: 'CommandOrControl+C', registerAccelerator: false, click: () => BrowserWindow.getFocusedWindow()?.webContents.copy() },
@@ -107,8 +107,8 @@ app.whenReady().then(() => {
             if (win) win.webContents.toggleDevTools()
           },
         },
-        { role: 'reload' },
-        { role: 'forceReload' },
+        { label: 'Reload', accelerator: 'CommandOrControl+R', registerAccelerator: false, click: () => BrowserWindow.getFocusedWindow()?.webContents.reload() },
+        { label: 'Force Reload', accelerator: 'CommandOrControl+Shift+R', registerAccelerator: false, click: () => BrowserWindow.getFocusedWindow()?.webContents.reloadIgnoringCache() },
       ],
     },
     {
