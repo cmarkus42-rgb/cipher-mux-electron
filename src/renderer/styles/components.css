@@ -843,6 +843,14 @@
   display: flex;
   gap: 4px;
   margin-bottom: 6px;
+  align-items: center;
+}
+
+.bugreport-type-toggle__separator {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
 }
 
 .bugreport-footer {
@@ -3105,6 +3113,21 @@
 .tc-filter-btn--negative .tc-filter-btn__badge {
   text-decoration: line-through;
   opacity: 0.4;
+}
+
+/* Refresh button: appears when snapshot is active */
+.tc-filter-btn--refresh {
+  margin-left: 4px;
+  background: var(--bg-tertiary, #555);
+  border: 1px solid var(--border-secondary, #666);
+  color: var(--text-secondary, #ccc);
+  min-width: 28px;
+  padding: 2px 6px;
+  font-size: 14px;
+}
+.tc-filter-btn--refresh:hover {
+  background: var(--bg-hover, #666);
+  color: var(--text-primary, #fff);
 }
 
 /* ================================================================

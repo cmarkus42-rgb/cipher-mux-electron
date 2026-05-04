@@ -1,6 +1,13 @@
 import * as http from 'node:http'
+import * as https from 'node:https'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 
 const TIMEOUT_MS = 120_000 // 2 minutes — local models can be slow
+const CLAUDE_TIMEOUT_MS = 30_000 // 30s — cloud API is faster
+const CLAUDE_MODEL = 'claude-haiku-4-5-20251001'
+const CLAUDE_API_HOST = 'api.anthropic.com'
 
 const ENRICH_PROMPT = `You are a professional QA engineer. Given a raw bug description, produce a structured bug report in YAML format with these fields:
 - title: concise summary (max 80 chars)
@@ -32,10 +39,79 @@ function getLlmConfig() {
       host: llm?.ollamaHost ?? '127.0.0.1',
       port: llm?.ollamaPort ?? 11434,
       model: llm?.ollamaModel ?? 'gemma4:26b',
+      bugreportEnrichBackend: llm?.bugreportEnrichBackend ?? 'cloud',
     }
   } catch {
-    return { host: '127.0.0.1', port: 11434, model: 'gemma4:26b' }
+    return { host: '127.0.0.1', port: 11434, model: 'gemma4:26b', bugreportEnrichBackend: 'cloud' as const }
   }
+}
+
+/** Read Anthropic API key from env var or ~/.cipher-anthropic.env file. */
+function getAnthropicApiKey(): string | null {
+  if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY
+  try {
+    const envFile = path.join(os.homedir(), '.cipher-anthropic.env')
+    const content = fs.readFileSync(envFile, 'utf-8')
+    for (const line of content.split('\n')) {
+      const match = line.match(/^(?:export\s+)?ANTHROPIC_API_KEY\s*=\s*['"]?(.+?)['"]?\s*$/)
+      if (match) return match[1]
+    }
+  } catch { /* file not found — ok */ }
+  return null
+}
+
+/** Call Claude API (Haiku) for bug report enrichment. */
+async function enrichViaClaude(description: string): Promise<EnrichedBugreport | null> {
+  const apiKey = getAnthropicApiKey()
+  if (!apiKey) throw new Error('No Anthropic API key found')
+
+  const body = JSON.stringify({
+    model: CLAUDE_MODEL,
+    max_tokens: 1024,
+    messages: [
+      { role: 'user', content: `${ENRICH_PROMPT}\n\nBug description:\n${description}` },
+    ],
+  })
+
+  const raw = await new Promise<string>((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: CLAUDE_API_HOST,
+        path: '/v1/messages',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Length': Buffer.byteLength(body),
+        },
+        timeout: CLAUDE_TIMEOUT_MS,
+      },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (chunk: Buffer) => chunks.push(chunk))
+        res.on('end', () => {
+          if (res.statusCode !== 200) {
+            reject(new Error(`Claude API HTTP ${res.statusCode}`))
+            return
+          }
+          resolve(Buffer.concat(chunks).toString('utf-8'))
+        })
+      },
+    )
+    req.on('error', reject)
+    req.on('timeout', () => {
+      req.destroy()
+      reject(new Error('Claude API request timed out'))
+    })
+    req.write(body)
+    req.end()
+  })
+
+  const data = JSON.parse(raw) as { content?: Array<{ type: string; text?: string }> }
+  const text = data.content?.find(b => b.type === 'text')?.text?.trim()
+  if (!text) return null
+  return parseEnrichedOutput(text)
 }
 
 /**
@@ -116,24 +192,33 @@ function ollamaGet(urlPath: string, host?: string, port?: number): Promise<strin
   })
 }
 
+/** Enrich via local Ollama. */
+async function enrichViaOllama(description: string): Promise<EnrichedBugreport | null> {
+  const cfg = getLlmConfig()
+  const body = JSON.stringify({
+    model: cfg.model,
+    prompt: `${ENRICH_PROMPT}\n\nBug description:\n${description}`,
+    stream: false,
+    keep_alive: -1,
+  })
+
+  const raw = await ollamaPost('/api/generate', body)
+  const data = JSON.parse(raw) as Record<string, unknown>
+  const text = (data.response as string | undefined)?.trim()
+  if (!text) return null
+  return parseEnrichedOutput(text)
+}
+
 export async function enrichBugreport(description: string): Promise<EnrichedBugreport | null> {
+  const cfg = getLlmConfig()
+  const backend = cfg.bugreportEnrichBackend
   try {
-    const cfg = getLlmConfig()
-    const body = JSON.stringify({
-      model: cfg.model,
-      prompt: `${ENRICH_PROMPT}\n\nBug description:\n${description}`,
-      stream: false,
-      keep_alive: -1,
-    })
-
-    const raw = await ollamaPost('/api/generate', body)
-    const data = JSON.parse(raw) as Record<string, unknown>
-    const text = (data.response as string | undefined)?.trim()
-    if (!text) return null
-
-    return parseEnrichedOutput(text)
-  } catch {
-    // Ollama not available or request failed — return null for fallback
+    if (backend === 'cloud') {
+      return await enrichViaClaude(description)
+    }
+    return await enrichViaOllama(description)
+  } catch (err) {
+    console.error(`[enrichBugreport] ${backend} backend failed:`, err)
     return null
   }
 }

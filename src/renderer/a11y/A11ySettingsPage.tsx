@@ -31,12 +31,6 @@ const SYSTEM_PREF_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'off', label: 'Immer aus' },
 ]
 
-const COLOR_SCHEME_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'system', label: 'Systemeinstellung folgen' },
-  { value: 'dark', label: 'Immer dunkel' },
-  { value: 'light', label: 'Immer hell' },
-]
-
 export function A11ySettingsPage({ settings, onUpdate }: A11ySettingsPageProps) {
   const handleCvdChange = useCallback((themeId: typeof settings.cvdTheme) => {
     onUpdate({ cvdTheme: settings.cvdTheme === themeId ? null : themeId })
@@ -110,37 +104,6 @@ export function A11ySettingsPage({ settings, onUpdate }: A11ySettingsPageProps) 
           </select>
         </div>
 
-        <div class="a11y-pref-row">
-          <div class="a11y-pref-label">
-            <span>Hoher Kontrast</span>
-            <span class="a11y-pref-hint">Wechselt automatisch zum High-Contrast-Theme</span>
-          </div>
-          <select
-            value={settings.highContrast}
-            onChange={e => onUpdate({ highContrast: (e.target as HTMLSelectElement).value as any })}
-            aria-label="Hoher Kontrast"
-          >
-            {SYSTEM_PREF_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div class="a11y-pref-row">
-          <div class="a11y-pref-label">
-            <span>Farbschema</span>
-            <span class="a11y-pref-hint">Hell/Dunkel-Modus automatisch oder fest waehlen</span>
-          </div>
-          <select
-            value={settings.colorScheme}
-            onChange={e => onUpdate({ colorScheme: (e.target as HTMLSelectElement).value as any })}
-            aria-label="Farbschema"
-          >
-            {COLOR_SCHEME_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </div>
       </section>
 
       {/* Font Settings */}

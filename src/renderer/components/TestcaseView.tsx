@@ -160,9 +160,11 @@ interface FilterBarProps {
   filters: StatusFilters
   summary: TestcaseSummary
   onToggle: (status: TestcaseStatus) => void
+  onRefresh: () => void
+  isSnapshotActive: boolean
 }
 
-function FilterBar({ filters, summary, onToggle }: FilterBarProps) {
+function FilterBar({ filters, summary, onToggle, onRefresh, isSnapshotActive }: FilterBarProps) {
   const buttons: { status: TestcaseStatus; label: string; count: number }[] = [
     { status: 'pass', label: 'PASS', count: summary.pass },
     { status: 'fail', label: 'FAIL', count: summary.fail },
@@ -189,6 +191,15 @@ function FilterBar({ filters, summary, onToggle }: FilterBarProps) {
           </button>
         )
       })}
+      {isSnapshotActive && (
+        <button
+          class="tc-filter-btn tc-filter-btn--refresh"
+          onClick={onRefresh}
+          title="Refresh filter (re-apply to current data)"
+        >
+          <span class="tc-filter-btn__label">↻</span>
+        </button>
+      )}
     </div>
   )
 }
@@ -236,9 +247,30 @@ export function TestcaseView({
   const readOnly = !!testcase.frontmatter.archived
   const containerRef = useRef<HTMLDivElement>(null)
   const [filters, setFilters] = useState<StatusFilters>({ pass: 'neutral', fail: 'neutral', open: 'neutral' })
+  // Snapshot: frozen set of item IDs to display when a filter is active.
+  // Prevents items from vanishing when their status is toggled while filtered.
+  const snapshotIdsRef = useRef<Set<string> | null>(null)
+  const [snapshotGeneration, setSnapshotGeneration] = useState(0)
+
+  const hasActiveFilter = filters.pass !== 'neutral' || filters.fail !== 'neutral' || filters.open !== 'neutral'
+
+  // Take a new snapshot whenever filters change (REQ-TCVIEW-001, REQ-TCVIEW-003)
+  useEffect(() => {
+    if (!hasActiveFilter) {
+      snapshotIdsRef.current = null
+      return
+    }
+    const filtered = applyStatusFilters(testcase.sections, filters)
+    snapshotIdsRef.current = new Set(filtered.flatMap(s => s.items.map(i => i.id)))
+  }, [filters, snapshotGeneration]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFilterToggle = useCallback((status: TestcaseStatus) => {
     setFilters(prev => ({ ...prev, [status]: cycleFilterMode(prev[status]) }))
+  }, [])
+
+  // REQ-TCVIEW-004: Manual refresh re-snapshots from current live data
+  const handleFilterRefresh = useCallback(() => {
+    setSnapshotGeneration(g => g + 1)
   }, [])
 
   // Register as STT target when a comment input is focused
@@ -297,10 +329,17 @@ export function TestcaseView({
     return { total, pass, fail, open }
   }, [testcase.sections])
 
-  const filteredSections = useMemo(
-    () => applyStatusFilters(testcase.sections, filters),
-    [testcase.sections, filters],
-  )
+  // REQ-TCVIEW-002: Render from snapshot IDs (stable) with live item data (fresh status)
+  const filteredSections = useMemo(() => {
+    if (!snapshotIdsRef.current) {
+      // No active filter → show all live
+      return testcase.sections
+    }
+    const ids = snapshotIdsRef.current
+    return testcase.sections
+      .map(s => ({ ...s, items: s.items.filter(i => ids.has(i.id)) }))
+      .filter(s => s.items.length > 0)
+  }, [testcase.sections, filters, snapshotGeneration])
 
   const handleToggle = useCallback((id: string) => {
     const newSections = testcase.sections.map(s => ({
@@ -355,7 +394,7 @@ export function TestcaseView({
       <StatusBar summary={summary} />
 
       {/* Filter bar */}
-      <FilterBar filters={filters} summary={summary} onToggle={handleFilterToggle} />
+      <FilterBar filters={filters} summary={summary} onToggle={handleFilterToggle} onRefresh={handleFilterRefresh} isSnapshotActive={hasActiveFilter} />
 
       {/* Summary (archived only) */}
       {readOnly && testcase.frontmatter.summary && (
