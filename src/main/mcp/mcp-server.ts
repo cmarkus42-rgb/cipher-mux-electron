@@ -193,8 +193,10 @@ export class McpServerManager {
     res.setHeader('Connection', 'keep-alive')
     res.setHeader('Keep-Alive', 'timeout=600')
 
-    // CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*')
+    // CORS headers — restrict to localhost origins (MCP clients are local processes)
+    const origin = req.headers.origin
+    const allowedOrigin = origin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : 'null'
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin)
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Mcp-Session-Id')
     res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id')

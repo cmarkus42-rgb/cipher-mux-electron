@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="https://github.com/cmarkus42/cipher-mux-electron/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cmarkus42/cipher-mux-electron/ci.yml?branch=main&label=CI&style=flat-square&labelColor=000000&color=F5F5EC"></a>
-  <a href="https://github.com/cmarkus42/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.9.9-0088A0?style=flat-square&labelColor=000000"></a>
+  <a href="https://github.com/cmarkus42/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.9.99-0088A0?style=flat-square&labelColor=000000"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="#"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="CONTRIBUTING.md#maintenance-status"><img alt="Maintenance" src="https://img.shields.io/badge/maintenance-active-00FF88?style=flat-square&labelColor=000000"></a>
@@ -17,19 +17,13 @@
 
 ---
 
-<!--
-  SCREENSHOT BLOCK — activate by:
-  1. Saving your screenshot as `assets/screenshots/main.png` (2560×1600 or 1920×1200).
-  2. Deleting this HTML comment and the two `--` markers around the block below.
+<p align="center">
+  <img src="assets/screenshots/main.png" alt="cipher-mux — 2x2 grid with companion, cyber-factory, debugger, and refinement sessions" width="100%">
+</p>
 
-  <p align="center">
-    <img src="assets/screenshots/main.png" alt="cipher-mux main window — orchestrator pane, chatroom, bug report outbox" width="100%">
-  </p>
+<p align="center"><i>2x2 grid — four entity sessions working in parallel, sidebar with background sessions and context usage.</i></p>
 
-  <p align="center"><i>Main window — orchestrator pane on the left, session grid in the middle, chatroom panel on the right.</i></p>
-
-  ---
--->
+---
 
 
 ## Table of Contents
