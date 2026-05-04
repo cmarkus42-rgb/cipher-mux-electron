@@ -43,6 +43,7 @@ import { AdapterRegistry } from './agent/registry'
 import { EntityRegistry, registerBuiltinEntities } from './session/entity-registry'
 import { CyberFactoryManager } from './cyber-factory/cyber-factory-manager'
 import { scanAndRegisterEntities } from './session/entity-scanner'
+import { resolvePersonaForPreset } from './session/persona-resolver'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST, MAX_MANUAL_TAGS } from '../shared/constants'
 import { BRAND } from '../shared/brand'
@@ -2028,26 +2029,55 @@ export class IpcHub {
           projectPath: e.projectPath,
           sortOrder: overrides[e.id] ?? e.sortOrder ?? 100,
           launcherHidden: hidden[e.id] ?? false,
+          hasTemplate: !!e.templatePath,
         }))
         .sort((a, b) => a.sortOrder - b.sortOrder)
     })
 
     ipcMain.handle(IPC.PRESETS_READ, async (_e, { entityId }: { entityId: string }) => {
+      const presetMdPath = path.join(entitiesDir, entityId, 'preset.md')
       const claudeMdPath = path.join(entitiesDir, entityId, 'CLAUDE.md')
-      try {
-        const content = fs.readFileSync(claudeMdPath, 'utf-8')
-        const registry = this.sessionManager.getEntityRegistry()
-        const entity = registry.list().find(e => e.id === entityId)
-        return { ok: true, content, displayName: entity?.displayName ?? entityId }
-      } catch {
-        return { ok: false, content: '', error: 'File not found' }
+      const registry = this.sessionManager.getEntityRegistry()
+      const entity = registry.list().find(e => e.id === entityId)
+      const displayName = entity?.displayName ?? entityId
+
+      // Primary: preset.md
+      if (fs.existsSync(presetMdPath)) {
+        try {
+          const content = fs.readFileSync(presetMdPath, 'utf-8')
+          return { ok: true, content, displayName }
+        } catch {
+          return { ok: false, content: '', error: 'Failed to read preset.md' }
+        }
       }
+
+      // Fallback: CLAUDE.md with injected sections stripped
+      if (fs.existsSync(claudeMdPath)) {
+        try {
+          let content = fs.readFileSync(claudeMdPath, 'utf-8')
+          const stripSections = ['Global Rules', 'Persona', 'Workspace Prompt', 'Context Directories']
+          for (const section of stripSections) {
+            const regex = new RegExp(`\\n## ${section}\\n[\\s\\S]*?(?=\\n## |$)`, 'g')
+            content = content.replace(regex, '')
+          }
+          return { ok: true, content: content.trim(), displayName }
+        } catch {
+          return { ok: false, content: '', error: 'Failed to read CLAUDE.md' }
+        }
+      }
+
+      return { ok: true, content: '', displayName }
     })
 
     ipcMain.handle(IPC.PRESETS_SAVE, async (_e, { entityId, content }: { entityId: string; content: string }) => {
-      const claudeMdPath = path.join(entitiesDir, entityId, 'CLAUDE.md')
+      const presetMdPath = path.join(entitiesDir, entityId, 'preset.md')
       try {
-        fs.writeFileSync(claudeMdPath, content, 'utf-8')
+        // Empty content = delete preset.md so template fallback kicks in
+        if (!content.trim()) {
+          if (fs.existsSync(presetMdPath)) fs.unlinkSync(presetMdPath)
+        } else {
+          fs.writeFileSync(presetMdPath, content, 'utf-8')
+        }
         return { ok: true }
       } catch (err: any) {
         return { ok: false, error: err.message }
@@ -2056,14 +2086,14 @@ export class IpcHub {
 
     ipcMain.handle(IPC.PRESETS_CREATE, async (_e, { entityId, displayName }: { entityId: string; displayName: string }) => {
       const dir = path.join(entitiesDir, entityId)
-      const claudeMdPath = path.join(dir, 'CLAUDE.md')
+      const presetMdPath = path.join(dir, 'preset.md')
       try {
         if (fs.existsSync(dir)) {
           return { ok: false, error: 'Preset directory already exists' }
         }
         fs.mkdirSync(dir, { recursive: true })
         const template = `# ${displayName}\n\n## Rolle\n\n\n\n## Faehigkeiten\n\n\n\n## Arbeitsregeln\n\n\n\n## Scope\n\n`
-        fs.writeFileSync(claudeMdPath, template, 'utf-8')
+        fs.writeFileSync(presetMdPath, template, 'utf-8')
         // Re-scan to register the new entity
         const registry = this.sessionManager.getEntityRegistry()
         scanAndRegisterEntities(registry)
@@ -2084,6 +2114,42 @@ export class IpcHub {
       } catch (err: any) {
         return { ok: false, error: err.message }
       }
+    })
+
+    ipcMain.handle(IPC.PRESETS_READ_INJECTED, async (_e, { entityId }: { entityId: string }) => {
+      const sections: Array<{ name: string; source: string }> = []
+
+      // Global Rules — always injected from global-rules.md
+      const globalRulesPath = path.join(os.homedir(), '.config/cipher-mux/global-rules.md')
+      if (fs.existsSync(globalRulesPath)) {
+        sections.push({ name: 'Global Rules', source: 'global-rules.md' })
+      }
+
+      // Persona — resolved via persona-resolver
+      const overrides = configStore.get('entityPersonaOverrides') ?? {}
+      const resolved = resolvePersonaForPreset(entityId, {
+        getCharacters: () => configStore.get('characters') ?? [],
+        getActiveCharacterId: () => configStore.get('activeCharacterId') ?? 'relay',
+        getGlobalActivePersonaId: () => configStore.get('globalActivePersonaId') ?? null,
+      }, overrides[entityId] ?? null)
+      sections.push({ name: 'Persona', source: `character: ${resolved.name}` })
+
+      // Workspace Prompt + Context Directories — from active workspace if it has them
+      const activeWsId = configStore.get('activeWorkspaceId') as string | null
+      if (activeWsId) {
+        const workspaces = configStore.get('workspaces') ?? []
+        const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
+        if (ws) {
+          if (ws.workspacePrompt?.trim()) {
+            sections.push({ name: 'Workspace Prompt', source: `workspace: ${ws.name ?? activeWsId}` })
+          }
+          if (ws.contextPaths?.length) {
+            sections.push({ name: 'Context Directories', source: `workspace: ${ws.name ?? activeWsId}` })
+          }
+        }
+      }
+
+      return { sections }
     })
   }
 

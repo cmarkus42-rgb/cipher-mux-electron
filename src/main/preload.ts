@@ -409,6 +409,7 @@ const api = {
     save: (entityId: string, content: string) => ipcRenderer.invoke(IPC.PRESETS_SAVE, { entityId, content }),
     create: (entityId: string, displayName: string) => ipcRenderer.invoke(IPC.PRESETS_CREATE, { entityId, displayName }),
     delete: (entityId: string) => ipcRenderer.invoke(IPC.PRESETS_DELETE, { entityId }),
+    readInjected: (entityId: string) => ipcRenderer.invoke(IPC.PRESETS_READ_INJECTED, { entityId }),
   },
 
   // ─── Global Rules ──────────────────────────────────────

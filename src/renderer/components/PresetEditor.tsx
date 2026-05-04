@@ -14,6 +14,12 @@ interface PresetInfo {
   projectPath: string
   sortOrder: number
   launcherHidden: boolean
+  hasTemplate: boolean
+}
+
+interface InjectedSection {
+  name: string
+  source: string
 }
 
 
@@ -109,6 +115,10 @@ export function PresetEditor() {
   const [characters, setCharacters] = useState<Character[]>([])
   const [personaOverrideId, setPersonaOverrideId] = useState<string | null>(null)
 
+  // Injected sections modal
+  const [showInjected, setShowInjected] = useState(false)
+  const [injectedSections, setInjectedSections] = useState<InjectedSection[]>([])
+
   // New preset creation
   const [showCreate, setShowCreate] = useState(false)
   const [newId, setNewId] = useState('')
@@ -193,6 +203,30 @@ export function PresetEditor() {
     setDraftContent(savedContent)
     setDirty(false)
     setEditConfirmed(false)
+  }
+
+  const handleBackToDefault = async () => {
+    if (!selectedId) return
+    const ok = confirm('Alle Aenderungen gehen verloren. Standard-Preset wiederherstellen?')
+    if (!ok) return
+    await api.presets.save(selectedId, '')
+    // Reload to get template fallback content
+    const res = await api.presets.read(selectedId)
+    if (res.ok) {
+      setDraftContent(res.content)
+      setSavedContent(res.content)
+      setDirty(false)
+      setEditConfirmed(false)
+    }
+  }
+
+  const handleShowInjected = async () => {
+    if (!selectedId) return
+    try {
+      const res = await api.presets.readInjected(selectedId)
+      setInjectedSections(res.sections ?? [])
+      setShowInjected(true)
+    } catch { /* ignore */ }
   }
 
   const handleSortOrderChange = async (id: string, value: number) => {
@@ -411,9 +445,19 @@ export function PresetEditor() {
             }
             return (
               <div class="pp-field" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <label>CLAUDE.md</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label style={{ margin: 0 }}>preset.md</label>
+                  <button
+                    onClick={handleShowInjected}
+                    title="Show injected sections"
+                    style={{ width: '18px', height: '18px', borderRadius: '50%', border: '1px solid var(--color-border)', background: 'none', color: 'var(--color-text-dim)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1, fontStyle: 'italic', fontFamily: 'serif' }}
+                  >i</button>
+                </div>
                 <div class="pp-hint">
-                  Entity-Definition (Markdown) — definiert Rolle, Regeln und Tools fuer alle Sessions dieses Presets
+                  Editierbarer Preset-Content (Markdown) — definiert Rolle, Regeln und Tools. Injizierte Sections (Persona, Global Rules) werden bei Session-Start automatisch angefuegt.
+                </div>
+                <div class="pp-hint" style={{ marginTop: 4, color: 'var(--color-warning)' }}>
+                  Aenderungen werden erst fuer neu gestartete Sessions wirksam.
                 </div>
                 {headings.length > 0 && (
                   <div class="preset-tabs" style={{ marginBottom: '4px', flexWrap: 'wrap' }}>
@@ -442,13 +486,43 @@ export function PresetEditor() {
           })()}
 
           <div class="pp-foot-actions">
-            <button onClick={handleRevert} disabled={!dirty}>Revert</button>
+            <button onClick={handleRevert} disabled={!dirty}>Last Saved</button>
+            {selected.hasTemplate && (
+              <button onClick={handleBackToDefault}>Back to Default</button>
+            )}
             <button class="pp-btn-primary" onClick={handleSave} disabled={!dirty}>Save</button>
           </div>
         </div>
       ) : (
         <div class="pp-edit pp-edit--empty">
           {presets.length === 0 ? 'Create a preset to get started' : 'Select a preset'}
+        </div>
+      )}
+
+      {/* Injected sections modal */}
+      {showInjected && (
+        <div class="preset-create-overlay" onClick={e => { if (e.target === e.currentTarget) setShowInjected(false) }}>
+          <div class="preset-create-dialog" style={{ maxWidth: '480px' }}>
+            <div class="preset-create-title">Injizierte Sections</div>
+            <div class="pp-hint" style={{ marginBottom: '8px' }}>
+              Diese Sections werden bei jedem Session-Start automatisch in die CLAUDE.md injiziert. Sie muessen nicht manuell in preset.md geschrieben werden.
+            </div>
+            {injectedSections.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {injectedSections.map((s, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'var(--color-bg-elevated)', borderRadius: '4px', fontSize: '12px' }}>
+                    <span style={{ fontWeight: 600 }}>{s.name}</span>
+                    <span style={{ color: 'var(--color-text-dim)' }}>{s.source}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ color: 'var(--color-text-dim)', fontSize: '12px' }}>Keine injizierten Sections.</div>
+            )}
+            <div class="preset-create-actions">
+              <button class="preset-create-btn" onClick={() => setShowInjected(false)}>Close</button>
+            </div>
+          </div>
         </div>
       )}
 

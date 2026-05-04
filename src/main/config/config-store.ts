@@ -151,6 +151,7 @@ const defaults: AppConfig = {
   sidebarWindowBounds: null as { x: number; y: number; width: number; height: number } | null,
   sidebarCollapsed: {} as Record<string, boolean>,
   a11y: { ...A11Y_DEFAULTS },
+  presetMigrationDone: false,
 }
 
 function getConfigPath(): string {

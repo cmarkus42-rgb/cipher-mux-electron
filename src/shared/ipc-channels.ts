@@ -251,6 +251,7 @@ export const IPC = {
   PRESETS_SAVE: 'cipher-mux:presets:save',
   PRESETS_CREATE: 'cipher-mux:presets:create',
   PRESETS_DELETE: 'cipher-mux:presets:delete',
+  PRESETS_READ_INJECTED: 'cipher-mux:presets:read-injected',
 
   // Global Rules (global-rules.md Editor)
   GLOBAL_RULES_READ: 'cipher-mux:global-rules:read',
