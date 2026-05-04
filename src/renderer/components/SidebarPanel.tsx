@@ -144,8 +144,12 @@ export function SidebarPanel({
     if (onOpenNoteInGrid) {
       onOpenNoteInGrid(note)
     } else {
-      const openFn = (window as any).__notesCell_openNote
-      if (openFn) openFn(note)
+      // Fallback: try the first registered NotesCell
+      const reg = (window as any).__notesCellRegistry as Record<number, (n: any) => void> | undefined
+      if (reg) {
+        const keys = Object.keys(reg)
+        if (keys.length > 0) reg[Number(keys[0])]!(note)
+      }
     }
   }, [onOpenNoteInGrid])
 

@@ -38,15 +38,16 @@ type LegacyTabId = 'settings' | TabId
 
 const SHORTCUT_KEYS = [
   // Navigation
-  { category: 'navigation', combo: 'Cmd+1–5', labelKey: 'info.shortcut.focusSession' },
   { category: 'navigation', combo: 'Escape', labelKey: 'info.shortcut.closeDialog' },
-  // Layout
-  { category: 'layout', combo: 'Cmd+←/→', labelKey: 'info.shortcut.gridCols' },
-  { category: 'layout', combo: 'Cmd+↑/↓', labelKey: 'info.shortcut.gridRows' },
+  { category: 'navigation', combo: 'Cmd+Shift+W', labelKey: 'info.shortcut.gridUp' },
+  { category: 'navigation', combo: 'Cmd+Shift+A', labelKey: 'info.shortcut.gridLeft' },
+  { category: 'navigation', combo: 'Cmd+Shift+S', labelKey: 'info.shortcut.gridDown' },
+  { category: 'navigation', combo: 'Cmd+Shift+D', labelKey: 'info.shortcut.gridRight' },
   // Actions
   { category: 'actions', combo: 'Cmd+N', labelKey: 'info.shortcut.newSession' },
   { category: 'actions', combo: 'Cmd+B', labelKey: 'info.shortcut.openBugreport' },
   { category: 'actions', combo: 'Cmd+S', labelKey: 'info.shortcut.saveNote' },
+  { category: 'actions', combo: 'Cmd+Shift+F', labelKey: 'info.shortcut.focusMode' },
   // Terminal
   { category: 'terminal', combo: 'Cmd+C', labelKey: 'info.shortcut.copy' },
   { category: 'terminal', combo: 'Cmd+V', labelKey: 'info.shortcut.paste' },

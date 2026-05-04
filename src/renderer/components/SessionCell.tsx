@@ -42,6 +42,7 @@ interface SessionCellProps {
   maxRows: number
   slotCol?: number
   slotRow?: number
+  focusModeStyle?: Record<string, string>
   onFocus: (sessionId: string) => void
   onClose: (sessionId: string) => void
   onSwitchProject: (sessionId: string) => void
@@ -59,7 +60,7 @@ interface SessionCellProps {
 
 export function SessionCell({
   session, contextUsage, focused, isOrchestrator, isVoiceTarget, isVoicePinned, voiceState, isSpeaking, onToggleVoicePin, theme,
-  rowSpan, maxRows, slotCol, slotRow,
+  rowSpan, maxRows, slotCol, slotRow, focusModeStyle,
   onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onFocusMode, onDragStart, onDragOver, onDragLeave, onDrop, dragOver,
 }: SessionCellProps) {
   const { t } = useTranslation()
@@ -148,16 +149,22 @@ export function SessionCell({
           ? 'Voice: Idle'
           : ''
 
+  const isFocusMode = !!focusModeStyle
   const cellClass = [
     'session-cell',
     focused && 'session-cell--focused',
     (isOrchestrator || isEntity) && 'session-cell--orchestrator',
     dragOver && 'session-cell--drag-over',
+    isFocusMode && 'session-cell--focus-mode',
   ].filter(Boolean).join(' ')
 
   const isAtMax = rowSpan >= maxRows
   const cellStyle: Record<string, string | number> = {}
-  if (rowSpan > 1) cellStyle.gridRow = `span ${rowSpan}`
+  if (isFocusMode && focusModeStyle) {
+    Object.assign(cellStyle, focusModeStyle)
+  } else if (rowSpan > 1) {
+    cellStyle.gridRow = `span ${rowSpan}`
+  }
 
   // ARIA label for the grid cell (REQ-A11Y-007)
   const ariaLabel = `Session: ${session.name}, Status: ${session.status}, Context: ${pct}%`

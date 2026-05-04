@@ -1,5 +1,6 @@
 // src/renderer/a11y/hooks/useA11ySettings.ts
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
+import { setTerminalFontSize } from '../terminal-font-size'
 
 export interface A11ySettings {
   /** Active CVD theme override (null = use normal theme) */
@@ -13,6 +14,8 @@ export interface A11ySettings {
   lineHeight: number
   letterSpacing: number
   fontFamily: string
+  /** Terminal font size in px (8-28). Separate from UI font size. */
+  terminalFontSize: number
   /** Focus Mode */
   focusModeEnabled: boolean
 }
@@ -26,19 +29,36 @@ const DEFAULTS: A11ySettings = {
   lineHeight: 1.5,
   letterSpacing: 0,
   fontFamily: '',
+  terminalFontSize: 13,
   focusModeEnabled: false,
 }
 
 const api = () => (window as any).cipherMux
 
-/** Apply a11y font settings to the document root. */
+/** Base font sizes (px) from theme.css — used for proportional scaling. */
+const BASE_FONT_SIZES = {
+  xs: 10, sm: 11, base: 13, md: 14, lg: 16, xl: 20,
+}
+
+/** Apply a11y font settings to the document root. Scales all --font-size-* vars proportionally. */
 function applyFontSettings(settings: A11ySettings): void {
   const root = document.documentElement
-  if (settings.fontSize !== DEFAULTS.fontSize) {
+
+  // Scale all font-size CSS variables proportionally based on UI fontSize vs base (14px default)
+  const scale = settings.fontSize / DEFAULTS.fontSize
+  if (scale !== 1) {
+    for (const [key, basePx] of Object.entries(BASE_FONT_SIZES)) {
+      root.style.setProperty(`--font-size-${key}`, `${Math.round(basePx * scale)}px`)
+    }
     root.style.setProperty('--a11y-font-size', `${settings.fontSize}px`)
   } else {
+    // Reset to theme defaults
+    for (const key of Object.keys(BASE_FONT_SIZES)) {
+      root.style.removeProperty(`--font-size-${key}`)
+    }
     root.style.removeProperty('--a11y-font-size')
   }
+
   if (settings.lineHeight !== DEFAULTS.lineHeight) {
     root.style.setProperty('--a11y-line-height', `${settings.lineHeight}`)
   } else {
@@ -79,6 +99,10 @@ export function useA11ySettings(onThemeChange?: (theme: string | null) => void) 
         if (merged.cvdTheme) {
           onThemeChangeRef.current?.(merged.cvdTheme)
         }
+        // Sync terminal font size module with stored value
+        if (merged.terminalFontSize !== DEFAULTS.terminalFontSize) {
+          setTerminalFontSize(merged.terminalFontSize)
+        }
       }
       setLoaded(true)
     }).catch(() => setLoaded(true))
@@ -92,6 +116,10 @@ export function useA11ySettings(onThemeChange?: (theme: string | null) => void) 
       // Apply CVD theme when changed
       if ('cvdTheme' in patch) {
         onThemeChangeRef.current?.(next.cvdTheme)
+      }
+      // Apply terminal font size when changed
+      if ('terminalFontSize' in patch) {
+        setTerminalFontSize(next.terminalFontSize)
       }
       // Persist async
       api().config.get('a11y').then((stored: Partial<A11ySettings> | null) => {

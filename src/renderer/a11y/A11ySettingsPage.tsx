@@ -147,14 +147,13 @@ export function A11ySettingsPage({ settings, onUpdate }: A11ySettingsPageProps) 
       <section class="a11y-section">
         <h3 class="a11y-section__title">Schrift-Einstellungen</h3>
         <p class="a11y-section__desc">
-          Passe Schriftgroesse, Zeilenhoehe und Buchstabenabstand an.
-          Betrifft nur die UI — Terminal-Text hat eigene Einstellungen.
+          Passe Schriftgroesse fuer UI und Terminal getrennt an.
         </p>
 
         <div class="a11y-pref-row">
           <div class="a11y-pref-label">
-            <span>Schriftgroesse</span>
-            <span class="a11y-pref-hint">{settings.fontSize}px (10–32)</span>
+            <span>UI-Schriftgroesse</span>
+            <span class="a11y-pref-hint">{settings.fontSize}px (10–32) — Header, Status-Bar, Sidebar</span>
           </div>
           <input
             type="range"
@@ -163,7 +162,23 @@ export function A11ySettingsPage({ settings, onUpdate }: A11ySettingsPageProps) 
             step={1}
             value={settings.fontSize}
             onChange={e => onUpdate({ fontSize: Number((e.target as HTMLInputElement).value) })}
-            aria-label="Schriftgroesse"
+            aria-label="UI-Schriftgroesse"
+          />
+        </div>
+
+        <div class="a11y-pref-row">
+          <div class="a11y-pref-label">
+            <span>Terminal-Schriftgroesse</span>
+            <span class="a11y-pref-hint">{settings.terminalFontSize}px (8–28) — xterm.js Sessions</span>
+          </div>
+          <input
+            type="range"
+            min={8}
+            max={28}
+            step={1}
+            value={settings.terminalFontSize}
+            onChange={e => onUpdate({ terminalFontSize: Number((e.target as HTMLInputElement).value) })}
+            aria-label="Terminal-Schriftgroesse"
           />
         </div>
 

@@ -2,6 +2,27 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import type { Character } from '../../shared/types'
 
+/** Clipboard copy button with checkmark feedback. */
+function CopyButton({ getText }: { getText: () => string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(getText())
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch { /* ignore */ }
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      title="Copy to clipboard"
+      style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '12px', color: copied ? 'var(--color-success, #4caf50)' : 'var(--color-text-dim)', display: 'inline-flex', alignItems: 'center', gap: '2px', lineHeight: 1 }}
+    >
+      {copied ? '\u2713' : '\u2398'}
+    </button>
+  )
+}
+
 const api = (window as any).cipherMux
 
 const GLOBAL_ID = '__global__'
@@ -76,9 +97,15 @@ function GlobalRulesEditor() {
       </div>
 
       <div class="pp-field" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <label>global-rules.md</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <label style={{ margin: 0 }}>global-rules.md</label>
+          <CopyButton getText={() => content} />
+        </div>
         <div class="pp-hint">
           Universelle Regeln — werden in JEDE Entity-Session injiziert (Layer 1). Pfad: ~/.config/cipher-mux/global-rules.md
+        </div>
+        <div class="pp-hint" style={{ marginTop: 4, color: 'var(--color-warning)' }}>
+          Aenderungen werden erst fuer neu gestartete Sessions wirksam.
         </div>
         <textarea
           value={content}
@@ -281,8 +308,25 @@ export function PresetEditor() {
     }
   }
 
+  const handleCopyAsCustom = async () => {
+    if (!selected) return
+    const copyId = selected.id + '-custom-' + Date.now()
+    const copyName = selected.displayName + ' (Custom)'
+    const res = await api.presets.create(copyId, copyName)
+    if (res.ok) {
+      // Write current content into the new preset
+      await api.presets.save(copyId, draftContent)
+      await loadPresets()
+      setSelectedId(copyId)
+      setEditConfirmed(true)
+    } else {
+      alert(res.error || 'Failed to create copy')
+    }
+  }
+
   const selected = presets.find(p => p.id === selectedId)
   const isGlobal = selectedId === GLOBAL_ID
+  const isBuiltinPreset = selected?.hasTemplate === true
 
   if (loading) {
     return <div class="pp-pane"><div class="pp-edit pp-edit--empty">Loading presets...</div></div>
@@ -353,17 +397,27 @@ export function PresetEditor() {
             <span class="pp-edit-name" style={{ fontWeight: 600 }}>
               {selected.displayName}
             </span>
-            <label
-              style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', marginLeft: 'auto', cursor: 'pointer', color: editConfirmed ? 'var(--color-accent)' : 'var(--color-text-dim)' }}
-              title={editConfirmed ? 'Click to lock editing' : 'Click to enable editing'}
-            >
-              <input
-                type="checkbox"
-                checked={editConfirmed}
-                onChange={handleToggleEditMode}
-              />
-              Editing
-            </label>
+            {isBuiltinPreset ? (
+              <button
+                onClick={handleCopyAsCustom}
+                title="Create an editable copy of this built-in preset"
+                style={{ marginLeft: 'auto', fontSize: '11px', padding: '2px 8px', background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-dim)', cursor: 'pointer' }}
+              >
+                Copy as Custom
+              </button>
+            ) : (
+              <label
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', marginLeft: 'auto', cursor: 'pointer', color: editConfirmed ? 'var(--color-accent)' : 'var(--color-text-dim)' }}
+                title={editConfirmed ? 'Click to lock editing' : 'Click to enable editing'}
+              >
+                <input
+                  type="checkbox"
+                  checked={editConfirmed}
+                  onChange={handleToggleEditMode}
+                />
+                Editing
+              </label>
+            )}
             <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-dim)' }}>
               <input
                 type="checkbox"
@@ -452,6 +506,7 @@ export function PresetEditor() {
                     title="Show injected sections"
                     style={{ width: '18px', height: '18px', borderRadius: '50%', border: '1px solid var(--color-border)', background: 'none', color: 'var(--color-text-dim)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1, fontStyle: 'italic', fontFamily: 'serif' }}
                   >i</button>
+                  <CopyButton getText={() => draftContent} />
                 </div>
                 <div class="pp-hint">
                   Editierbarer Preset-Content (Markdown) — definiert Rolle, Regeln und Tools. Injizierte Sections (Persona, Global Rules) werden bei Session-Start automatisch angefuegt.
@@ -485,13 +540,22 @@ export function PresetEditor() {
             )
           })()}
 
-          <div class="pp-foot-actions">
-            <button onClick={handleRevert} disabled={!dirty}>Last Saved</button>
-            {selected.hasTemplate && (
-              <button onClick={handleBackToDefault}>Back to Default</button>
-            )}
-            <button class="pp-btn-primary" onClick={handleSave} disabled={!dirty}>Save</button>
-          </div>
+          {!isBuiltinPreset && (
+            <div class="pp-foot-actions">
+              <button onClick={handleRevert} disabled={!dirty}>Last Saved</button>
+              {selected.hasTemplate && (
+                <button onClick={handleBackToDefault}>Back to Default</button>
+              )}
+              <button class="pp-btn-primary" onClick={handleSave} disabled={!dirty}>Save</button>
+            </div>
+          )}
+          {isBuiltinPreset && (
+            <div class="pp-foot-actions">
+              <span style={{ fontSize: '11px', color: 'var(--color-text-dim)', fontFamily: 'var(--font-mono)' }}>
+                Built-in preset (read-only). Use "Copy as Custom" to create an editable version.
+              </span>
+            </div>
+          )}
         </div>
       ) : (
         <div class="pp-edit pp-edit--empty">

@@ -168,26 +168,16 @@
   transform: translateX(18px);
 }
 
-/* ── Focus Mode ───────────────────────────────── */
+/* ── Focus Mode (2x2 real scaling) ───────────── */
 
-.app-body.focus-mode-active > .sidebar-panel {
-  display: none !important;
+/* Focus-mode cell spans 2x2 via inline gridColumn/gridRow from JS.
+   Transition for smooth entry/exit. */
+.session-cell--focus-mode {
+  z-index: 10;
+  transition: all 0.2s ease-out;
 }
 
-.app-body.focus-mode-active > .session-grid {
-  /* Only show the focused cell */
-  grid-template-columns: 1fr !important;
-  grid-template-rows: 1fr !important;
-}
-
-.app-body.focus-mode-active > .session-grid > *:not(.session-cell--focused) {
-  display: none !important;
-}
-
-.app-body.focus-mode-active > .session-grid > .session-cell--focused {
-  grid-column: 1 / -1 !important;
-  grid-row: 1 / -1 !important;
-}
+/* Focus-mode bar at top edge of the focused cell */
 
 .focus-mode-bar {
   position: fixed;

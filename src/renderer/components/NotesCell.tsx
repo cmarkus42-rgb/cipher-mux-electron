@@ -25,6 +25,7 @@ interface NotesCellProps {
   rowSpan: number
   maxRows: number
   activeWorkspaceId: string | null
+  slotIndex: number
   slotCol?: number
   slotRow?: number
   onClose: () => void
@@ -40,6 +41,7 @@ export function NotesCell({
   rowSpan,
   maxRows,
   activeWorkspaceId,
+  slotIndex,
   slotCol,
   slotRow,
   onClose,
@@ -254,13 +256,14 @@ export function NotesCell({
     )
   }, [activeTab])
 
-  // Expose openNote for external calls (from sidebar)
+  // Expose openNote for external calls (from sidebar / MCP) — per-slot registry
   useEffect(() => {
-    ;(window as any).__notesCell_openNote = openNote
+    const reg = ((window as any).__notesCellRegistry ??= {} as Record<number, typeof openNote>)
+    reg[slotIndex] = openNote
     return () => {
-      delete (window as any).__notesCell_openNote
+      delete reg[slotIndex]
     }
-  }, [openNote])
+  }, [openNote, slotIndex])
 
   // Handle note drops directly (works even when cell is empty/first time)
   const handleNoteDrop = useCallback((e: DragEvent) => {

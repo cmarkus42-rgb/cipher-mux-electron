@@ -7,6 +7,7 @@ import '@xterm/xterm/css/xterm.css'
 import { getTerminalTheme } from './useTheme'
 import type { ThemeName } from '../../shared/grid-types'
 import { registerTerminal, unregisterTerminal, setMarker } from '../terminal-registry'
+import { getTerminalFontSize } from '../a11y/terminal-font-size'
 
 const api = () => (window as any).cipherMux
 
@@ -163,7 +164,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
 
     const term = new Terminal({
       fontFamily: "'Fira Code', 'Roboto Mono', 'SF Mono', Menlo, monospace",
-      fontSize: 13,
+      fontSize: getTerminalFontSize(),
       lineHeight: 1.3,
       cursorBlink: true,
       cursorStyle: 'block',
@@ -217,6 +218,24 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
     termRef.current = term
     fitAddonRef.current = fitAddon
     registerTerminal(sessionId, term)
+
+    // Listen for terminal font size changes from a11y settings
+    const onTermFontSize = ((e: CustomEvent<number>) => {
+      const newSize = e.detail
+      if (term.options.fontSize !== newSize) {
+        term.options.fontSize = newSize
+        try { fitAddon.fit() } catch { /* ignore */ }
+        // Sync tmux pane size after font change
+        const { cols, rows } = term
+        const last = lastSizeRef.current
+        if (cols !== last.cols || rows !== last.rows) {
+          lastSizeRef.current = { cols, rows }
+          api().terminal.resize(sessionId, cols, rows)
+          scheduleResync()
+        }
+      }
+    }) as EventListener
+    window.addEventListener('a11y:terminal-font-size', onTermFontSize)
 
     // Track first successful fit so we can signal TERMINAL_READY exactly once.
     // This unblocks any queued auto-launch commands in the main process (e.g.
@@ -366,6 +385,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       intersectionObserver.disconnect()
       inputDisposable.dispose()
       unsubscribe()
+      window.removeEventListener('a11y:terminal-font-size', onTermFontSize)
       unregisterTerminal(sessionId)
       term.dispose()
       termRef.current = null

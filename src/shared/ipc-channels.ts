@@ -233,6 +233,9 @@ export const IPC = {
   UI_OPEN: 'cipher-mux:ui:open',
   THEME_SET: 'cipher-mux:theme:set',
 
+  // A11y
+  A11Y_TERMINAL_FONT_SIZE: 'cipher-mux:a11y:terminal-font-size',
+
   // BT Shutter Remote
   BT_SHUTTER_EVENT: 'cipher-mux:bt-shutter:event',
   BT_SHUTTER_STATUS: 'cipher-mux:bt-shutter:status',

@@ -51,9 +51,27 @@ export function createEmptyGrid(config: GridConfig = DEFAULT_GRID_CONFIG): GridS
   return { config, slots }
 }
 
+/** Build a set of slot indices covered by cells with rowSpan > 1. */
+export function getCoveredSlots(state: GridState): Set<number> {
+  const { cols, rows } = state.config
+  const covered = new Set<number>()
+  for (let idx = 0; idx < state.slots.length; idx++) {
+    const span = state.slots[idx].rowSpan
+    if (span > 1) {
+      const col = idx % cols
+      const row = Math.floor(idx / cols)
+      for (let r = 1; r < span && row + r < rows; r++) {
+        covered.add((row + r) * cols + col)
+      }
+    }
+  }
+  return covered
+}
+
 /** Find the index of the first empty slot, or -1 if grid is full. */
 export function findFirstEmptySlot(state: GridState): number {
-  return state.slots.findIndex((s) => s.sessionId === null && s.type !== 'notes')
+  const covered = getCoveredSlots(state)
+  return state.slots.findIndex((s, i) => s.sessionId === null && s.type !== 'notes' && !covered.has(i))
 }
 
 /** Assign a session to the first empty slot. Returns the slot index or -1 if full. */
@@ -83,6 +101,56 @@ export function swapSlots(state: GridState, idxA: number, idxB: number): GridSta
   newSlots[idxA] = newSlots[idxB]
   newSlots[idxB] = temp
   return { ...state, slots: newSlots }
+}
+
+/** Compute the next rowSpan in the rotation cycle.
+ *  1 row → no change. 2 rows → 1↔2. 3 rows → 1→2→3→1. */
+export function nextRowSpan(currentSpan: number, maxRows: number): number {
+  if (maxRows <= 1) return currentSpan
+  return (currentSpan % maxRows) + 1
+}
+
+/** Compute which slot indices are overlapped when a cell enters focus mode (2x2).
+ *  Returns the set of indices that should be hidden, excluding the focus slot itself.
+ *  If the grid is too small for 2x2 (1 col or 1 row), returns empty set. */
+export function getFocusModeOverlappedSlots(state: GridState, focusSlotIdx: number): Set<number> {
+  const { cols, rows } = state.config
+  const overlapped = new Set<number>()
+  if (cols < 2 || rows < 2) return overlapped
+  if (focusSlotIdx < 0 || focusSlotIdx >= state.slots.length) return overlapped
+
+  const col = focusSlotIdx % cols
+  const row = Math.floor(focusSlotIdx / cols)
+
+  // Focus cell expands right and down. Clamp to grid bounds.
+  const endCol = Math.min(col + 1, cols - 1)
+  const endRow = Math.min(row + 1, rows - 1)
+
+  for (let r = row; r <= endRow; r++) {
+    for (let c = col; c <= endCol; c++) {
+      const idx = r * cols + c
+      if (idx !== focusSlotIdx) {
+        overlapped.add(idx)
+      }
+    }
+  }
+  return overlapped
+}
+
+/** Compute CSS grid placement for a focus-mode cell (2x2 area).
+ *  Returns gridColumn and gridRow CSS values. */
+export function getFocusModePlacement(cols: number, rows: number, focusSlotIdx: number): { gridColumn: string; gridRow: string } {
+  const col = focusSlotIdx % cols
+  const row = Math.floor(focusSlotIdx / cols)
+  // 1-based CSS grid lines. Span 2 cols and 2 rows, clamped to grid bounds.
+  const colStart = col + 1
+  const colEnd = Math.min(col + 3, cols + 1)  // +3 because CSS grid end is exclusive
+  const rowStart = row + 1
+  const rowEnd = Math.min(row + 3, rows + 1)
+  return {
+    gridColumn: `${colStart} / ${colEnd}`,
+    gridRow: `${rowStart} / ${rowEnd}`,
+  }
 }
 
 import { SESSION_CELL_HEIGHT } from './constants'

@@ -22,6 +22,7 @@ import { useGlobalTtsPlayback } from './hooks/useGlobalTtsPlayback'
 import { useA11ySettings } from './a11y/hooks/useA11ySettings'
 import { FocusMode } from './a11y/FocusMode'
 import { useFocusTrap } from './a11y/useFocusTrap'
+import { getFocusModeOverlappedSlots, getCoveredSlots } from '../shared/grid-types'
 
 export function App() {
   const { t } = useTranslation()
@@ -103,6 +104,87 @@ export function App() {
   const { settings: a11ySettings, toggleFocusMode } = useA11ySettings(handleA11yThemeChange)
   const modalFocusTrapRef = useFocusTrap<HTMLDivElement>(infoVisible)
 
+  // Focus Mode: track which slot is in focus mode (null = off)
+  const [focusModeSlot, setFocusModeSlot] = useState<number | null>(null)
+  const focusModeOverlapped = useMemo(() => {
+    if (focusModeSlot === null) return new Set<number>()
+    return getFocusModeOverlappedSlots(grid, focusModeSlot)
+  }, [focusModeSlot, grid])
+
+  const handleFocusMode = useCallback((sessionId: string) => {
+    const idx = grid.slots.findIndex(s => s.sessionId === sessionId)
+    if (idx === -1) return
+    const { cols, rows } = grid.config
+    if (cols < 2 || rows < 2) return
+    setFocusModeSlot(prev => prev === idx ? null : idx)
+  }, [grid])
+
+  const exitFocusMode = useCallback(() => {
+    setFocusModeSlot(null)
+  }, [])
+
+  // Auto-exit focus mode when the focused session is removed from grid
+  useEffect(() => {
+    if (focusModeSlot === null) return
+    const slot = grid.slots[focusModeSlot]
+    if (!slot?.sessionId) setFocusModeSlot(null)
+  }, [grid.slots, focusModeSlot])
+
+  // Grid navigation: move focus to adjacent cell in the given direction
+  const navigateGrid = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
+    const { config, slots } = gridRef.current
+    const { cols, rows } = config
+    const covered = getCoveredSlots(gridRef.current)
+
+    // Find current slot index of focused session
+    let currentIdx = slots.findIndex(s => s.sessionId === focusedSessionId)
+    if (currentIdx === -1) {
+      // No focused session — focus first occupied slot
+      const first = slots.findIndex((s, i) => (s.sessionId || s.type === 'notes') && !covered.has(i))
+      if (first >= 0) {
+        const sid = slots[first].sessionId
+        if (sid) setFocusedSessionId(sid)
+      }
+      return
+    }
+
+    const currentCol = currentIdx % cols
+    const currentRow = Math.floor(currentIdx / cols)
+
+    let targetCol = currentCol
+    let targetRow = currentRow
+    switch (direction) {
+      case 'up': targetRow = currentRow - 1; break
+      case 'down': targetRow = currentRow + 1; break
+      case 'left': targetCol = currentCol - 1; break
+      case 'right': targetCol = currentCol + 1; break
+    }
+
+    // Wrap around
+    if (targetCol < 0) targetCol = cols - 1
+    if (targetCol >= cols) targetCol = 0
+    if (targetRow < 0) targetRow = rows - 1
+    if (targetRow >= rows) targetRow = 0
+
+    const targetIdx = targetRow * cols + targetCol
+    // If target is covered by a rowSpan, find the parent cell
+    if (covered.has(targetIdx)) {
+      // Walk upward to find the parent
+      for (let r = targetRow - 1; r >= 0; r--) {
+        const parentIdx = r * cols + targetCol
+        if (!covered.has(parentIdx) && slots[parentIdx].sessionId) {
+          setFocusedSessionId(slots[parentIdx].sessionId!)
+          return
+        }
+      }
+    }
+
+    const targetSlot = slots[targetIdx]
+    if (targetSlot?.sessionId) {
+      setFocusedSessionId(targetSlot.sessionId)
+    }
+  }, [focusedSessionId, setFocusedSessionId])
+
   // Global keyboard shortcuts
   const shortcutEntries = useMemo(() => [
     {
@@ -115,7 +197,13 @@ export function App() {
       combo: 'Cmd+Shift+F',
       label: 'Focus Mode',
       category: 'Aktionen' as const,
-      action: () => toggleFocusMode(),
+      action: () => {
+        if (focusModeSlot !== null) {
+          setFocusModeSlot(null)
+        } else if (focusedSessionId) {
+          handleFocusMode(focusedSessionId)
+        }
+      },
     },
     {
       combo: 'Cmd+N',
@@ -130,10 +218,39 @@ export function App() {
       },
     },
     {
+      combo: 'Cmd+Shift+W',
+      label: t('app.shortcut.gridUp'),
+      category: 'Navigation' as const,
+      action: () => navigateGrid('up'),
+    },
+    {
+      combo: 'Cmd+Shift+A',
+      label: t('app.shortcut.gridLeft'),
+      category: 'Navigation' as const,
+      action: () => navigateGrid('left'),
+    },
+    {
+      combo: 'Cmd+Shift+S',
+      label: t('app.shortcut.gridDown'),
+      category: 'Navigation' as const,
+      action: () => navigateGrid('down'),
+    },
+    {
+      combo: 'Cmd+Shift+D',
+      label: t('app.shortcut.gridRight'),
+      category: 'Navigation' as const,
+      action: () => navigateGrid('right'),
+    },
+    {
       combo: 'Escape',
       label: t('app.shortcut.closeOverlay'),
       category: 'Navigation' as const,
       action: () => {
+        // Priority 0: exit focus mode
+        if (focusModeSlot !== null) {
+          setFocusModeSlot(null)
+          return
+        }
         // Priority 1: close overlays
         const anyOverlayOpen = bugreportVisible || infoVisible ||
           workspacesPopupVisible || !!placementPopup
@@ -153,7 +270,7 @@ export function App() {
         return false
       },
     },
-  ], [t, bugreportVisible, infoVisible, workspacesPopupVisible, placementPopup, grid.slots, isSpeaking, stopSpeech, toggleFocusMode])
+  ], [t, bugreportVisible, infoVisible, workspacesPopupVisible, placementPopup, grid.slots, isSpeaking, stopSpeech, focusModeSlot, focusedSessionId, handleFocusMode, navigateGrid])
   useShortcuts(shortcutEntries)
 
   const focusedSessionName = useMemo(() => {
@@ -566,12 +683,21 @@ export function App() {
     if (!placementPopup) return
     if ('note' in placementPopup) {
       // Note placement: open NotesCell at chosen slot, then load the note
+      const noteToOpen = placementPopup.note
       setSlotType(slotIndex, 'notes')
       setPlacementPopup(null)
-      setTimeout(() => {
-        const openFn = (window as any).__notesCell_openNote
-        if (openFn) openFn(placementPopup.note)
-      }, 100)
+      let attempts = 0
+      const tryOpen = () => {
+        const reg = (window as any).__notesCellRegistry as Record<number, (n: any) => void> | undefined
+        const openFn = reg?.[slotIndex]
+        if (openFn) {
+          openFn(noteToOpen)
+        } else if (attempts < 10) {
+          attempts++
+          setTimeout(tryOpen, 100)
+        }
+      }
+      setTimeout(tryOpen, 50)
     } else {
       // A.5 fix: remove session from any existing slot before placing in new one
       removeSession(placementPopup.sessionId)
@@ -826,19 +952,27 @@ export function App() {
   const handleOpenNote = useCallback((note: any, slotIndex: number) => {
     setSlotType(slotIndex, 'notes')
     setSidebarVisible(true)
-    // After a small delay, trigger the note to open in the NotesCell
-    setTimeout(() => {
-      const openFn = (window as any).__notesCell_openNote
-      if (openFn) openFn(note)
-    }, 100)
+    // Retry until NotesCell mounts and registers in the per-slot registry
+    let attempts = 0
+    const tryOpen = () => {
+      const reg = (window as any).__notesCellRegistry as Record<number, (n: any) => void> | undefined
+      const openFn = reg?.[slotIndex]
+      if (openFn) {
+        openFn(note)
+      } else if (attempts < 10) {
+        attempts++
+        setTimeout(tryOpen, 100)
+      }
+    }
+    setTimeout(tryOpen, 50)
   }, [setSlotType])
 
   const handleOpenNoteInGrid = useCallback((note: any) => {
-    // Find existing NotesCell slot
+    // Find first existing NotesCell slot
     const existingIdx = grid.slots.findIndex(s => s.type === 'notes')
     if (existingIdx >= 0) {
-      // Already have a NotesCell — open note there
-      const openFn = (window as any).__notesCell_openNote
+      const reg = (window as any).__notesCellRegistry as Record<number, (n: any) => void> | undefined
+      const openFn = reg?.[existingIdx]
       if (openFn) openFn(note)
     } else {
       // No NotesCell — show GridPlacementPopup for user to pick a slot
@@ -863,10 +997,11 @@ export function App() {
   const handleDropNoteOnEmpty = useCallback((note: any, slotIndex: number) => {
     setSlotType(slotIndex, 'notes')
     setSidebarVisible(true)
-    // Retry until NotesCell mounts and registers __notesCell_openNote
+    // Retry until NotesCell mounts and registers in the per-slot registry
     let attempts = 0
     const tryOpen = () => {
-      const openFn = (window as any).__notesCell_openNote
+      const reg = (window as any).__notesCellRegistry as Record<number, (n: any) => void> | undefined
+      const openFn = reg?.[slotIndex]
       if (openFn) {
         openFn(note)
       } else if (attempts < 10) {
@@ -1056,7 +1191,9 @@ export function App() {
           onShell={handleShell}
           onFork={handleFork}
           onSendToBackground={handleSendToBackground}
-          onFocusMode={() => toggleFocusMode()}
+          onFocusMode={handleFocusMode}
+          focusModeSlot={focusModeSlot}
+          focusModeOverlapped={focusModeOverlapped}
           onStartEntity={handleStartEntity}
           onResumeEntity={handleResumeEntity}
           onFocusEntity={handleFocusEntity}
@@ -1090,10 +1227,10 @@ export function App() {
       </div>
 
       <FocusMode
-        enabled={a11ySettings.focusModeEnabled}
-        sessionName={focusedSessionName}
-        contextPct={focusedSessionId ? (contextUsages[focusedSessionId]?.usedPercentage ?? 0) : 0}
-        onDeactivate={toggleFocusMode}
+        enabled={focusModeSlot !== null}
+        sessionName={focusModeSlot !== null ? (sessions.find(s => s.id === grid.slots[focusModeSlot]?.sessionId)?.name ?? null) : null}
+        contextPct={focusModeSlot !== null ? (contextUsages[grid.slots[focusModeSlot]?.sessionId ?? '']?.usedPercentage ?? 0) : 0}
+        onDeactivate={exitFocusMode}
       />
 
       <StatusBar
@@ -1102,7 +1239,9 @@ export function App() {
         onToggleSidebar={() => {
           if (sidebarDetached) {
             const api = (window as any).cipherMux
-            api.sidebar.toggleWindow()
+            api.sidebar.dock()
+            setSidebarDetached(false)
+            setSidebarVisible(true)
           } else {
             setSidebarVisible(v => !v)
           }
