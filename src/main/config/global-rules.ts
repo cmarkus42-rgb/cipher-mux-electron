@@ -43,7 +43,46 @@ export const DEFAULT_GLOBAL_RULES = `### Universelle Regeln
 - **mux_send vs. tmux send-keys:** \`mux_send\` ist fuer Inter-Session-Kommunikation (Message Bus), NICHT fuer Prompt-Input. Direkte Instruktionen via \`tmux send-keys\`.
 - **Context-Monitoring:** Bei laufenden Worker-Sessions regelmaessig \`mux_context_usage\` pruefen. Bei >80% proaktiv handeln.
 - **Task-Updates:** Tasks zeitnah updaten — nicht erst am Ende. Andere Sessions verlassen sich auf aktuelle Task-Stati.
-- **Notes fuer Persistenz:** Wichtige Erkenntnisse, die ueber die Session hinaus gelten, als Notes anlegen (\`mux_notes_create\`).`
+- **Notes fuer Persistenz:** Wichtige Erkenntnisse, die ueber die Session hinaus gelten, als Notes anlegen (\`mux_notes_create\`).
+
+### TTS-Guardrail
+
+- **Baseline:** \`mux_tts_speak\` fuer Kernaussagen: Zusammenfassungen, Meilensteine, direkte Antworten. Saetze kurz und klar.
+- **Nie per TTS:** Code, Pfade, IDs, technische Details — gehoeren in schriftlichen Output.
+- **Override:** Entity-CLAUDE.md kann TTS erweitern (voice-relay), einschraenken oder deaktivieren (cyber-factory, debugger).
+
+### mux_send Push-Delivery
+
+- **Separates Enter noetig:** Nach \`mux_send\` mit Push-Delivery wird der Text in die Session eingefuegt, aber NICHT submitted. Ein zweites \`mux_send\` mit \`"\\n"\` (oder tmux send-keys Enter) ist Pflicht.
+- **Pattern:** \`mux_send(text)\` → 1-2s Pause → \`mux_send("\\n")\` = Submit.
+- **Ohne:** Text steht in der Eingabezeile, Session wartet — sieht aus als waere nichts angekommen.
+
+### Lessons Learned — Entscheidungsbaum
+
+Wenn du ein Learning erkennst (etwas das beim naechsten Mal anders laufen soll), lege es auf der richtigen Ebene ab:
+
+\`\`\`
+Learning erkannt
+  → Betrifft ein spezifisches MCP-Tool?
+      → JA: Tool-Description anreichern (in mcp-tools.ts)
+  → Muessen ALLE Entities das wissen?
+      → JA: Hier eintragen (global-rules.md)
+  → Nur fuer EINE Entity relevant?
+      → JA: Entity-CLAUDE.md (unter ~/.config/cipher-mux/entities/<id>/)
+  → User/Projekt-spezifisch?
+      → JA: Companion Memory (companion_memory_write)
+\`\`\`
+
+**Format fuer Eintraege hier:**
+\`\`\`
+- **[Kurztitel]:** [Was ab jetzt gilt]. Quelle: [woher das Learning kommt].
+\`\`\`
+
+### Testcase-Konventionen
+
+- **Testcases gehoeren in eine dedizierte Notes-System-Testcase-Note** (noteType: testcase). NICHT in Dateien unter \`docs/archiv/\`. Der TestcaseView rendert nur Notes mit \`noteType: testcase\`.
+- **Format:** \`- [ ] **T-PREFIX.N** Beschreibung\` — der Parser braucht dieses exakte Checkbox+Bold-ID-Format.
+- **Neue Testcases ans Ende anhaengen**, unter einer neuen \`## Section\`-Ueberschrift.`
 
 /**
  * Ensure the global-rules.md file exists. Creates it with DEFAULT_GLOBAL_RULES
