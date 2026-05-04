@@ -830,6 +830,14 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Note not found: ${args.id}` }) }], isError: true }
         }
 
+        // Guard: testcase notes must not have their body replaced via this tool
+        if (args.body && existing.info.noteType === 'testcase') {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Cannot update body of testcase notes via mux_notes_update. Use mux_testcase_update for structured item operations.' }) }],
+            isError: true,
+          }
+        }
+
         let body = args.body ?? existing.body
         const tags = args.tags ? args.tags.slice(0, 5) : existing.info.tags
 
@@ -866,6 +874,112 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: note.id, title: note.title }) }],
         }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // 18b. mux_testcase_update — Structured update for testcase notes
+  ;(server.registerTool as any)(
+    'mux_testcase_update',
+    {
+      description:
+        'Structured update for testcase notes. Use this instead of mux_notes_update to modify testcase items. '
+        + 'Supports: set_status (open/pass/fail), add_item (to a section), set_comment, add_section.',
+      inputSchema: {
+        noteId: z.string().describe('Note ID (ULID) of the testcase note'),
+        operations: z.array(z.union([
+          z.object({
+            op: z.literal('set_status'),
+            itemId: z.string().describe('Testcase item ID (e.g. "T-UI.1")'),
+            status: z.enum(['open', 'pass', 'fail']),
+          }),
+          z.object({
+            op: z.literal('set_comment'),
+            itemId: z.string().describe('Testcase item ID'),
+            comment: z.string().describe('Comment text (replaces existing comment)'),
+          }),
+          z.object({
+            op: z.literal('add_item'),
+            section: z.string().describe('Section title to add the item to'),
+            id: z.string().describe('New item ID (e.g. "T-NEW.1")'),
+            description: z.string().describe('Item description'),
+          }),
+          z.object({
+            op: z.literal('add_section'),
+            title: z.string().describe('New section title'),
+          }),
+        ])).describe('Array of operations to apply sequentially'),
+      },
+    },
+    async (args: {
+      noteId: string
+      operations: Array<
+        | { op: 'set_status'; itemId: string; status: 'open' | 'pass' | 'fail' }
+        | { op: 'set_comment'; itemId: string; comment: string }
+        | { op: 'add_item'; section: string; id: string; description: string }
+        | { op: 'add_section'; title: string }
+      >
+    }) => {
+      if (!ctx.noteManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
+      }
+      try {
+        const existing = await ctx.noteManager.read(args.noteId)
+        if (!existing) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Note not found: ${args.noteId}` }) }], isError: true }
+        }
+        if (existing.info.noteType !== 'testcase') {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Note is not a testcase note (noteType: ${existing.info.noteType ?? 'undefined'})` }) }], isError: true }
+        }
+
+        const { parseTestcaseBody, serializeTestcaseBody } = await import('../notes/testcase-parser')
+        const sections = parseTestcaseBody(existing.body)
+
+        // Apply operations sequentially
+        const errors: string[] = []
+        for (const op of args.operations) {
+          if (op.op === 'set_status') {
+            const item = sections.flatMap(s => s.items).find(i => i.id === op.itemId)
+            if (!item) { errors.push(`Item not found: ${op.itemId}`); continue }
+            item.status = op.status
+          } else if (op.op === 'set_comment') {
+            const item = sections.flatMap(s => s.items).find(i => i.id === op.itemId)
+            if (!item) { errors.push(`Item not found: ${op.itemId}`); continue }
+            item.comment = op.comment
+          } else if (op.op === 'add_item') {
+            let section = sections.find(s => s.title === op.section)
+            if (!section) { errors.push(`Section not found: ${op.section}`); continue }
+            section.items.push({
+              id: op.id,
+              description: op.description,
+              status: 'open',
+              comment: '',
+              lineIndex: -1,
+            })
+          } else if (op.op === 'add_section') {
+            if (sections.find(s => s.title === op.title)) {
+              errors.push(`Section already exists: ${op.title}`)
+              continue
+            }
+            sections.push({ title: op.title, items: [] })
+          }
+        }
+
+        // Serialize and save
+        const newBody = serializeTestcaseBody(sections)
+        const note = await ctx.noteManager.save(args.noteId, newBody, existing.info.tags)
+
+        // Notify UI
+        if (ctx.windowManager) {
+          ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', note })
+        }
+
+        const result: Record<string, unknown> = { ok: true, id: note.id, title: note.title }
+        if (errors.length > 0) result.warnings = errors
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
