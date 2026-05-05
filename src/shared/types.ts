@@ -36,8 +36,6 @@ export interface EntityConfig {
   color: string
   /** Working directory for this entity. */
   projectPath: string
-  /** Path to CLAUDE.md + asset directory (source for deployment). */
-  templatePath?: string
   /** Pre-filled greeting message sent after session start. */
   startupGreeting?: string
   /** Enabled feature flags: 'mcp', 'memory', etc. */

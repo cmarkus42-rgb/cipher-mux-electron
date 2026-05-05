@@ -11,8 +11,18 @@ import { generateAuditClaudeMd } from './audit-template'
 import { generateVoiceRelayClaudeMd } from './voice-relay-template'
 import { generateDebuggerClaudeMd } from '../debugger/debugger-template'
 import { generateBugreportPresetClaudeMd } from '../bugreport/bugreport-preset-template'
+import {
+  generateCompanionClaudeMd,
+  deployCompanionStartup,
+  deployCompanionGuides,
+  deployCompanionRef,
+  deployCompanionInfoPopup,
+  generateRefinementClaudeMd,
+  deployRefinementSkills,
+  deployRefinementDirs,
+  generateIdeationPartnerClaudeMd,
+} from '../entity-content'
 import { EntityRegistry } from './entity-registry'
-import { deployEntityAssets, ensureTemplateSettings } from './entity-assets'
 import { SessionStore } from './session-store'
 import { runCommand } from '../util/exec-util'
 import type { PersistedSession, PersistedGridState } from './session-store'
@@ -42,8 +52,7 @@ const MCP_PREFIX = 'mcp__cipher-mux__'
 
 /**
  * Return pre-approved MCP tool permissions for a given entity.
- * Entities WITH a templatePath get permissions from their template's
- * settings.local.json. This function covers template-less entities only.
+ * All entities get the full base set; orchestrators also get tmux + kickoff.
  */
 /** Base permissions every entity gets. */
 const BASE_PERMISSIONS = [
@@ -122,8 +131,6 @@ export class SessionManager extends EventEmitter {
   private entitySessionIds: Map<EntityId, Set<string>> = new Map()
   /** Mutex: entities currently being started (prevents double-start race). */
   private startingEntities: Set<EntityId> = new Set()
-  /** App root for resolving template paths during asset deployment. */
-  private appRoot: string
   /**
    * Commands queued to be sent to a session once its terminal reports
    * the real (post-mount) size via markReady(). Prevents launching TUIs
@@ -135,12 +142,11 @@ export class SessionManager extends EventEmitter {
   /** Persistent session store — survives app restarts. */
   private sessionStore: SessionStore
 
-  constructor(tmux: TmuxManager, adapterRegistry: AdapterRegistry, entityRegistry?: EntityRegistry, appRoot?: string) {
+  constructor(tmux: TmuxManager, adapterRegistry: AdapterRegistry, entityRegistry?: EntityRegistry, _appRoot?: string) {
     super()
     this.tmux = tmux
     this.adapterRegistry = adapterRegistry
     this.entityRegistry = entityRegistry ?? new EntityRegistry()
-    this.appRoot = appRoot ?? process.cwd()
     this.sessionStore = new SessionStore()
   }
 
@@ -971,22 +977,16 @@ export class SessionManager extends EventEmitter {
       }
     }
 
-    // Deploy assets if this entity has a template
-    if (config.templatePath) {
-      deployEntityAssets(config, this.appRoot)
-    }
-
     // Ensure entity directory exists
     fs.mkdirSync(config.projectPath, { recursive: true })
 
-    // Write preset.md for entities without asset templates.
-    // preset.md is the source-of-truth for preset-owned content.
+    // Write preset.md — source-of-truth for preset-owned content.
     // CLAUDE.md is generated at session start by assembling preset.md + injected layers.
     // Code-generated presets (voice-relay, audit) are always refreshed so
     // updates propagate on next session start. Orchestrator and Cyber Factory use
     // pre-authored preset.md in their entity directories (no code generation).
     // Only truly generic fallback preset.md is write-once (preserves manual edits).
-    if (!config.templatePath) {
+    {
       const presetMdPath = path.join(config.projectPath, 'preset.md')
       if (config.id === 'audit') {
         fs.writeFileSync(presetMdPath, generateAuditClaudeMd(), 'utf-8')
@@ -999,6 +999,24 @@ export class SessionManager extends EventEmitter {
         }
       } else if (config.id === 'bugreport') {
         fs.writeFileSync(presetMdPath, generateBugreportPresetClaudeMd(), 'utf-8')
+      } else if (config.id === 'companion') {
+        if (!fs.existsSync(presetMdPath)) {
+          fs.writeFileSync(presetMdPath, generateCompanionClaudeMd(), 'utf-8')
+        }
+        deployCompanionGuides(config.projectPath)
+        deployCompanionRef(config.projectPath)
+        deployCompanionStartup(config.projectPath)
+        deployCompanionInfoPopup(config.projectPath)
+      } else if (config.id === 'refinement') {
+        if (!fs.existsSync(presetMdPath)) {
+          fs.writeFileSync(presetMdPath, generateRefinementClaudeMd(), 'utf-8')
+        }
+        deployRefinementSkills(config.projectPath)
+        deployRefinementDirs(config.projectPath)
+      } else if (config.id === 'ideation-partner') {
+        if (!fs.existsSync(presetMdPath)) {
+          fs.writeFileSync(presetMdPath, generateIdeationPartnerClaudeMd(), 'utf-8')
+        }
       } else if (!fs.existsSync(presetMdPath)) {
         // Generic fallback — only write once to preserve manual edits
         fs.writeFileSync(presetMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')
@@ -1013,8 +1031,7 @@ export class SessionManager extends EventEmitter {
         )
       }
 
-      // Ensure MCP tool permissions for template-less entities that use MCP.
-      // Entities with templates get permissions via ensureTemplateSettings().
+      // Ensure MCP tool permissions for entities that use MCP.
       // Without pre-approved permissions, Claude Code blocks on tool approval
       // prompts — fatal for non-interactive sessions like voice-relay.
       if (config.features.includes('mcp') && this.mcpConfig) {
@@ -1037,11 +1054,6 @@ export class SessionManager extends EventEmitter {
         }
       }
     }
-
-    // Ensure template .claude/settings.local.json base settings (permissions,
-    // model, statusLine) are present BEFORE start() calls postLaunchInjection,
-    // so the merge preserves them alongside the injected mcpServers config.
-    ensureTemplateSettings(config, this.appRoot)
 
     // Write .mcp.json for MCP auto-discovery (if entity uses MCP)
     if (config.features.includes('mcp') && this.mcpConfig) {
