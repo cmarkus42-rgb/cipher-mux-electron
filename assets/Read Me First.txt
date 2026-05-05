@@ -1,0 +1,28 @@
+
+  cipher-mux — Installation
+  ═════════════════════════
+
+  1. Open Terminal (Spotlight → "Terminal")
+
+  2. Paste this command and press Enter:
+
+     xattr -cr /Applications/cipher-mux.app
+
+  3. Done — start cipher-mux from Applications.
+
+
+  Why is this needed?
+  ───────────────────
+  cipher-mux is not yet signed with an Apple Developer
+  certificate. macOS blocks unsigned apps by default.
+  The command above removes this block. It's safe —
+  you can verify the source code at:
+
+  https://github.com/cmarkus42-rgb/cipher-mux-electron
+
+
+  Quick Install (drag & drop)
+  ───────────────────────────
+  Drag cipher-mux.app to the Applications folder,
+  then run the command above.
+

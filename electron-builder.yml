@@ -27,7 +27,7 @@ dmg:
     - x: 270
       y: 350
       type: file
-      path: assets/Install.command
+      path: "assets/Read Me First.txt"
 extraResources:
   - from: assets/bin/ab-shutter-bridge
     to: bin/ab-shutter-bridge
