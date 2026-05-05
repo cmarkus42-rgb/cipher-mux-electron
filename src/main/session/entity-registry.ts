@@ -111,7 +111,7 @@ export function registerBuiltinEntities(
     icon: '🧭',
     color: '#ffb74d',
     projectPath: `${entitiesBase}/companion`,
-    templatePath: 'the how-to-session',
+
     features: ['mcp', 'memory'],
     visible: true,
     sortOrder: 40,
@@ -123,7 +123,7 @@ export function registerBuiltinEntities(
     icon: '🔬',
     color: '#ef5350',
     projectPath: `${entitiesBase}/refinement`,
-    templatePath: 'the refinement session',
+
     features: ['mcp', 'memory'],
     visible: true,
     sortOrder: 50,
@@ -135,7 +135,7 @@ export function registerBuiltinEntities(
     icon: '💡',
     color: '#26a69a',
     projectPath: `${entitiesBase}/ideation-partner`,
-    templatePath: 'the ideation session',
+
     features: ['mcp', 'memory'],
     visible: true,
     sortOrder: 55,

@@ -2044,7 +2044,7 @@ export class IpcHub {
           projectPath: e.projectPath,
           sortOrder: overrides[e.id] ?? e.sortOrder ?? 100,
           launcherHidden: hidden[e.id] ?? false,
-          hasTemplate: !!e.templatePath,
+          hasTemplate: false,
         }))
         .sort((a, b) => a.sortOrder - b.sortOrder)
     })
