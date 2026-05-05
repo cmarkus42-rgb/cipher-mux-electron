@@ -74,11 +74,31 @@ Got an idea? Build it. cipher-mux structures the path from idea to code — with
 
 ## Install
 
+**Requirements:** macOS 12+ (Apple Silicon or Intel) · Anthropic account with Claude Code access · ~1 GB free space
+
 ### macOS (DMG)
 
-Download the latest `.dmg` from [Releases](https://github.com/cmarkus42-rgb/cipher-mux-electron/releases), mount it, drag `cipher-mux.app` to Applications.
+1. Download the latest `.dmg` from [Releases](https://github.com/cmarkus42-rgb/cipher-mux-electron/releases)
+2. Open DMG, drag `cipher-mux.app` to Applications
+3. Remove quarantine (one-time): `xattr -cr /Applications/cipher-mux.app`
+4. Launch — the **Setup Wizard** handles the rest
 
-**Requirements:** tmux (`brew install tmux`), Claude Code CLI (`npm install -g @anthropic-ai/claude-code`).
+The Setup Wizard detects what's missing and installs it for you:
+
+| Component | Status | Size |
+|-----------|--------|------|
+| **Homebrew** | Required | ~200 MB |
+| **tmux** | Required | ~2 MB |
+| **Node.js** | Recommended | ~30 MB |
+| **Whisper Model** (local STT) | Optional | ~500 MB |
+| **Piper TTS** (local speech) | Optional | ~30 MB |
+
+After the wizard, install Claude Code CLI:
+
+```bash
+npm install -g @anthropic-ai/claude-code
+claude login
+```
 
 ### Linux (AppImage)
 
