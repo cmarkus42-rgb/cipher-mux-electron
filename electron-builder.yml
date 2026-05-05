@@ -17,6 +17,17 @@ mac:
     NSAccessibilityUsageDescription: "cipher-mux needs Accessibility access for BT Shutter remote control (exclusive HID capture)."
 dmg:
   icon: assets/icon.icns
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+    - x: 270
+      y: 350
+      type: file
+      path: assets/Install.command
 extraResources:
   - from: assets/bin/ab-shutter-bridge
     to: bin/ab-shutter-bridge
