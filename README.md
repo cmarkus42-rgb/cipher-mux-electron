@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <b>A graphical layer on top of Claude Code.</b><br>
-  For everyone who wants to build without juggling terminals.
+  <b>Orchestrates Claude Code into a real development process</b><br>
+  with roles, memory, and voice.
 </p>
 
 <p align="center">
