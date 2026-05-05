@@ -205,6 +205,11 @@ export async function executeHandoff(
     // Format and deliver via tmux send-keys (REQ-HANDOFF-005)
     const message = formatPayload(config.senderEntityId, config.payload)
     await ctx.sessionManager.sendKeys(targetSession.id, message)
+    // Claude CLI needs time to render the text before recognizing Enter as submit.
+    // Without delay, the \r arrives while the CLI is still processing the payload
+    // and gets swallowed. Combining text+\r in one call doesn't work either —
+    // CLI treats the \r as a newline in the text, not as submit.
+    await new Promise(resolve => setTimeout(resolve, 500))
     await ctx.sessionManager.sendKeys(targetSession.id, '\r')
 
     // MessageBus entry only if session stays in background (REQ-HANDOFF-004)
