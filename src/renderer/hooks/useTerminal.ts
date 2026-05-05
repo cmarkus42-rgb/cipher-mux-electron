@@ -178,9 +178,18 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
     term.open(container)
 
     // Cmd+C/Cmd+X with selection → clipboard copy instead of SIGINT
+    // Cmd+Shift+WASD → grid navigation (let event bubble to shortcut registry)
     term.attachCustomKeyEventHandler((ev) => {
       if (ev.type !== 'keydown') return true
       if (!ev.metaKey) return true
+      // Grid navigation shortcuts — pass through to window-level handler
+      if (ev.shiftKey && ['w', 'a', 's', 'd'].includes(ev.key.toLowerCase())) {
+        return false
+      }
+      // Cmd+? — shortcut help overlay
+      if (ev.shiftKey && ev.key === '?') {
+        return false
+      }
       if (ev.key === 'c' && term.hasSelection()) {
         navigator.clipboard.writeText(term.getSelection())
         return false
