@@ -23,9 +23,12 @@ import { useA11ySettings } from './a11y/hooks/useA11ySettings'
 import { FocusMode } from './a11y/FocusMode'
 import { useFocusTrap } from './a11y/useFocusTrap'
 import { getFocusModeOverlappedSlots, getCoveredSlots } from '../shared/grid-types'
+import { useSetupWizard } from './hooks/useSetupWizard'
+import { SetupWizard } from './components/SetupWizard'
 
 export function App() {
   const { t } = useTranslation()
+  const setupWizard = useSetupWizard()
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [sidebarDetached, setSidebarDetached] = useState(false)
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null)
@@ -1164,6 +1167,17 @@ export function App() {
   return (
     <div class="app-shell">
       <HighlightOverlay />
+      {setupWizard.visible && (
+        <SetupWizard
+          dependencies={setupWizard.dependencies}
+          onInstallAll={setupWizard.installAll}
+          onSkip={setupWizard.skip}
+          installing={setupWizard.installing}
+          currentStep={setupWizard.currentStep}
+          progress={setupWizard.progress}
+          done={setupWizard.done}
+        />
+      )}
       <div class="drag-region">
         <span class="title">cipher-mux</span>
       </div>

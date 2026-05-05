@@ -543,6 +543,17 @@ const api = {
     },
   },
 
+  // ─── Setup Wizard ──────────────────────────────────────────
+  setup: {
+    check: () => ipcRenderer.invoke(IPC.SETUP_CHECK),
+    installAll: () => ipcRenderer.invoke(IPC.SETUP_INSTALL_ALL),
+    onProgress: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.SETUP_PROGRESS, handler)
+      return () => ipcRenderer.removeListener(IPC.SETUP_PROGRESS, handler)
+    },
+  },
+
   // ─── Companion Memory ────────────────────────────────────
   companion: {
     recall: (limit?: number) => ipcRenderer.invoke(IPC.COMPANION_RECALL, { limit }),

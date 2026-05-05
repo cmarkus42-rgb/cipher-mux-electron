@@ -1,0 +1,74 @@
+// src/renderer/hooks/useSetupWizard.ts
+import { useState, useEffect, useCallback } from 'preact/hooks'
+import type { SetupDependency } from '../components/SetupWizard'
+
+const api = (window as any).cipherMux
+
+interface ProgressPayload {
+  stepId: string | null
+  message: string
+  done: boolean
+  dependencies?: SetupDependency[]
+}
+
+export function useSetupWizard() {
+  const [dependencies, setDependencies] = useState<SetupDependency[]>([])
+  const [installing, setInstalling] = useState(false)
+  const [currentStep, setCurrentStep] = useState<string | null>(null)
+  const [progress, setProgress] = useState('')
+  const [done, setDone] = useState(false)
+  const [visible, setVisible] = useState(false)
+
+  // Initial check — load dependency status
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const result = await api.setup.check()
+        if (cancelled) return
+        const deps: SetupDependency[] = result?.dependencies ?? []
+        setDependencies(deps)
+        // Show wizard only when at least one dependency is missing
+        const hasMissing = deps.some((d: SetupDependency) => !d.installed)
+        setVisible(hasMissing)
+        if (!hasMissing) setDone(true)
+      } catch {
+        // If setup IPC not available, don't show wizard
+        setVisible(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // Listen for progress updates from main process
+  useEffect(() => {
+    if (!api?.setup?.onProgress) return
+    const unsub = api.setup.onProgress((data: ProgressPayload) => {
+      if (data.stepId !== undefined) setCurrentStep(data.stepId)
+      if (data.message) setProgress(data.message)
+      if (data.dependencies) setDependencies(data.dependencies)
+      if (data.done) {
+        setDone(true)
+        setInstalling(false)
+        setCurrentStep(null)
+      }
+    })
+    return unsub
+  }, [])
+
+  const installAll = useCallback(async () => {
+    setInstalling(true)
+    setProgress('')
+    try {
+      await api.setup.installAll()
+    } catch {
+      setInstalling(false)
+    }
+  }, [])
+
+  const skip = useCallback(() => {
+    setVisible(false)
+  }, [])
+
+  return { dependencies, installing, currentStep, progress, done, visible, installAll, skip }
+}
