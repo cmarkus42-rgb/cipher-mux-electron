@@ -259,6 +259,11 @@ export const IPC = {
   // Global Rules (global-rules.md Editor)
   GLOBAL_RULES_READ: 'cipher-mux:global-rules:read',
   GLOBAL_RULES_SAVE: 'cipher-mux:global-rules:save',
+
+  // Setup Wizard
+  SETUP_CHECK: 'cipher-mux:setup:check',
+  SETUP_INSTALL_ALL: 'cipher-mux:setup:install-all',
+  SETUP_PROGRESS: 'cipher-mux:setup:progress',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

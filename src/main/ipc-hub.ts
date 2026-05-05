@@ -50,6 +50,8 @@ import { BRAND } from '../shared/brand'
 import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest, EntityId, Character, RecoveryResult } from '../shared/types'
 import type { Persona, Workspace } from '../shared/persona-types'
 import { applyWorkspace } from './workspace/workspace-manager'
+import { checkAll as setupCheckAll } from './setup/dependency-checker'
+import { installDependency } from './setup/dependency-installer'
 
 /**
  * IPC Hub — Central router for all IPC channels.
@@ -214,6 +216,7 @@ export class IpcHub {
     this.registerPresetChannels()
     this.registerGlobalRulesChannels()
     this.registerCompanionChannels()
+    this.registerSetupChannels()
     this.setupEventForwarding()
 
     // Start context usage monitor
@@ -2217,6 +2220,52 @@ export class IpcHub {
       if (!this.memoryStore) return { ok: false }
       const deleted = this.memoryStore.forget(id)
       return { ok: deleted }
+    })
+  }
+
+  // ─── Setup Wizard ─────────────────────────────────────────
+  private registerSetupChannels(): void {
+    ipcMain.handle(IPC.SETUP_CHECK, async () => {
+      return { dependencies: await setupCheckAll() }
+    })
+
+    ipcMain.handle(IPC.SETUP_INSTALL_ALL, async (event) => {
+      const deps = await setupCheckAll()
+      const missing = deps.filter(d => !d.installed)
+
+      for (const dep of missing) {
+        event.sender.send(IPC.SETUP_PROGRESS, {
+          stepId: dep.id,
+          message: `Installing ${dep.name}...`,
+          done: false,
+        })
+
+        await installDependency(dep.id, (msg) => {
+          event.sender.send(IPC.SETUP_PROGRESS, {
+            stepId: dep.id,
+            message: msg,
+            done: false,
+          })
+        })
+
+        const updated = await setupCheckAll()
+        event.sender.send(IPC.SETUP_PROGRESS, {
+          stepId: dep.id,
+          message: `${dep.name} done`,
+          done: false,
+          dependencies: updated,
+        })
+      }
+
+      const final = await setupCheckAll()
+      event.sender.send(IPC.SETUP_PROGRESS, {
+        stepId: null,
+        message: 'done',
+        done: true,
+        dependencies: final,
+      })
+
+      return { ok: true }
     })
   }
 
