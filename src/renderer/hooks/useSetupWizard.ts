@@ -66,6 +66,13 @@ export function useSetupWizard() {
     }
   }, [])
 
+  // Auto-close overlay 1.5s after done
+  useEffect(() => {
+    if (!done || !visible) return
+    const timer = setTimeout(() => setVisible(false), 1500)
+    return () => clearTimeout(timer)
+  }, [done, visible])
+
   const skip = useCallback(() => {
     setVisible(false)
   }, [])
