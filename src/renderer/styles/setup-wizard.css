@@ -127,6 +127,18 @@
   border: 1px solid rgba(239, 83, 80, 0.3);
 }
 
+.setup-badge--optional {
+  background: rgba(100, 181, 246, 0.12);
+  color: #64b5f6;
+  border: 1px solid rgba(100, 181, 246, 0.3);
+}
+
+.setup-dep-checkbox {
+  margin-right: 6px;
+  accent-color: var(--color-accent, #5c9a6e);
+  cursor: pointer;
+}
+
 /* Progress area */
 .setup-progress {
   font-family: var(--font-mono, 'Fira Code', monospace);
@@ -137,6 +149,10 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.setup-progress--error {
+  color: #ef5350;
 }
 
 /* Done message */

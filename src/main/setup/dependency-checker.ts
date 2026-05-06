@@ -76,6 +76,14 @@ export async function checkAll(): Promise<DependencyStatus[]> {
       description: 'JavaScript Runtime — empfohlen für Claude Code CLI',
     },
     {
+      id: 'claude-code',
+      name: 'Claude Code CLI',
+      installed: whichExists('claude'),
+      required: false,
+      size: '~50MB',
+      description: 'AI Coding Assistant CLI — benötigt Node.js',
+    },
+    {
       id: 'whisper-model',
       name: 'Whisper Model (small)',
       installed: whisperModelExists(),

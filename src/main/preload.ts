@@ -546,7 +546,8 @@ const api = {
   // ─── Setup Wizard ──────────────────────────────────────────
   setup: {
     check: () => ipcRenderer.invoke(IPC.SETUP_CHECK),
-    installAll: () => ipcRenderer.invoke(IPC.SETUP_INSTALL_ALL),
+    installAll: (opts?: { selectedIds?: string[] }) => ipcRenderer.invoke(IPC.SETUP_INSTALL_ALL, opts),
+    skip: () => ipcRenderer.invoke(IPC.SETUP_SKIP),
     onProgress: (cb: (data: unknown) => void) => {
       const handler = (_e: unknown, data: unknown) => cb(data)
       ipcRenderer.on(IPC.SETUP_PROGRESS, handler)
