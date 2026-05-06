@@ -7,6 +7,7 @@ import type { BugreportData, SessionInfo } from '../../shared/types'
 import { APP_VERSION } from '../../shared/constants'
 import { runCommand } from '../util/exec-util'
 import { enrichBugreport, type EnrichedBugreport } from './ollama-client'
+import { deliverToGitHub } from './github-delivery'
 import type { MessageBus } from '../message-bus/message-bus'
 import { BRAND } from '../../shared/brand'
 
@@ -81,6 +82,7 @@ export class BugreportManager {
     projectPath?: string,
     screenshots?: string[],
     reportType?: string,
+    enriched?: EnrichedBugreport | null,
   ): Promise<string> {
     ensureDirs(this.outboxDir)
     const diagnostics = await this.collectDiagnostics(sessions)
@@ -158,6 +160,26 @@ ${diagnostics.logs.slice(-50).join('\n')}
       } catch (err) {
         console.error('[BugreportManager] Failed to send bug message:', err)
       }
+    }
+
+    // GitHub delivery — fire-and-forget, local outbox is the source of truth
+    if (type === 'bug') {
+      const issueTitle = enriched?.title ?? id
+      const issueBody = enriched
+        ? `## Summary\n\n${enriched.summary}\n\n## Steps to Reproduce\n\n${enriched.steps_to_reproduce.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n## Expected Behavior\n\n${enriched.expected_behavior}\n\n## Actual Behavior\n\n${enriched.actual_behavior}\n\n---\n*Filed via cipher-mux bugreport (${id})*`
+        : `${description}\n\n---\n*Filed via cipher-mux bugreport (${id})*`
+      deliverToGitHub(issueTitle, issueBody, enriched?.severity, enriched?.tags).then((result) => {
+        if (result.issueUrl) {
+          // Write issue URL back into the local outbox file
+          try {
+            const filePath = path.join(this.outboxDir, filename)
+            const existing = fs.readFileSync(filePath, 'utf-8')
+            fs.writeFileSync(filePath, existing.replace(/^---$/m, `githubIssue: ${result.issueUrl}\n---`), 'utf-8')
+          } catch { /* non-critical */ }
+        }
+      }).catch((err) => {
+        console.error('[BugreportManager] GitHub delivery failed:', err)
+      })
     }
 
     return id

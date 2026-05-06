@@ -35,9 +35,20 @@ export interface VoiceManagerConfig {
 }
 
 const DEFAULT_PIPER_VOICE = 'de_DE-dii-high'
-const DEFAULT_OLLAMA_HOST = '127.0.0.1'
-const DEFAULT_OLLAMA_PORT = 11433
-const DEFAULT_OLLAMA_MODEL = 'cipher-gemma4:latest'
+
+/** Read Ollama config from configStore (single source of truth). */
+function getOllamaDefaults() {
+  try {
+    const llm = configStore.get('llm')
+    return {
+      host: llm?.ollamaHost ?? '127.0.0.1',
+      port: llm?.ollamaPort ?? 11434,
+      model: llm?.ollamaModel ?? 'gemma4:26b',
+    }
+  } catch {
+    return { host: '127.0.0.1', port: 11434, model: 'gemma4:26b' }
+  }
+}
 
 export class VoiceManager extends EventEmitter {
   private readonly config: Required<VoiceManagerConfig>
@@ -56,6 +67,7 @@ export class VoiceManager extends EventEmitter {
     // Use ~/.config/cipher-mux for model storage — stable across dev/prod
     // (electron getPath('userData') returns different paths in dev vs packaged)
     const userDataDir = path.join(process.env.HOME ?? '', '.config', 'cipher-mux')
+    const ollama = getOllamaDefaults()
 
     this.config = {
       whisperModelDir: config?.whisperModelDir
@@ -63,9 +75,9 @@ export class VoiceManager extends EventEmitter {
       piperModelsDir: config?.piperModelsDir
         ?? path.join(userDataDir, 'models', 'piper'),
       piperVoice: config?.piperVoice ?? DEFAULT_PIPER_VOICE,
-      ollamaHost: config?.ollamaHost ?? DEFAULT_OLLAMA_HOST,
-      ollamaPort: config?.ollamaPort ?? DEFAULT_OLLAMA_PORT,
-      ollamaModel: config?.ollamaModel ?? DEFAULT_OLLAMA_MODEL,
+      ollamaHost: config?.ollamaHost ?? ollama.host,
+      ollamaPort: config?.ollamaPort ?? ollama.port,
+      ollamaModel: config?.ollamaModel ?? ollama.model,
       interactionMode: config?.interactionMode ?? 'toggle',
       skipTTS: config?.skipTTS ?? false,
     }
@@ -158,8 +170,10 @@ export class VoiceManager extends EventEmitter {
       throw new Error('VoiceManager: not initialized. Call init() first.')
     }
 
-    // Check bugreport_preset.provider config — 'haiku' uses Claude API, 'ollama' uses local
-    const provider = configStore.get('bugreport_preset')?.provider ?? 'haiku'
+    // Use llm.bugreportEnrichBackend as the single source of truth for cloud vs local.
+    // This is the same toggle visible in the BugreportDialog UI.
+    const enrichBackend = configStore.get('llm')?.bugreportEnrichBackend ?? 'cloud'
+    const provider = enrichBackend === 'cloud' ? 'haiku' : 'ollama'
     const chat: { send(msg: string): Promise<string> } = provider === 'haiku'
       ? new ClaudeChat({ systemPrompt: BUGREPORT_SYSTEM_PROMPT })
       : new OllamaChat({

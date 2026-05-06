@@ -130,6 +130,10 @@ const defaults: AppConfig = {
   bugreport_preset: {
     provider: 'haiku' as const,
   },
+  bugreportDelivery: {
+    mode: 'github' as const,
+    githubRepo: 'cmarkus42-rgb/cipher-mux-electron',
+  },
   experimental: {
     refinement_v2: true,
     ideation_partner: true,
