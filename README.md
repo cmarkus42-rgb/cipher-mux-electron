@@ -15,7 +15,7 @@
   <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cmarkus42-rgb/cipher-mux-electron/ci.yml?branch=main&label=CI&style=flat-square&labelColor=000000&color=F5F5EC"></a>
   <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.9.9-0088A0?style=flat-square&labelColor=000000"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-F5F5EC?style=flat-square&labelColor=000000"></a>
-  <a href="#"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-F5F5EC?style=flat-square&labelColor=000000"></a>
+  <a href="#"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="CONTRIBUTING.md#maintenance-status"><img alt="Maintenance" src="https://img.shields.io/badge/maintenance-active-00FF88?style=flat-square&labelColor=000000"></a>
   <a href="#install"><img alt="Open Beta" src="https://img.shields.io/badge/status-open%20beta-FF6600?style=flat-square&labelColor=000000"></a>
   <a href="https://cipher-mux.dev"><img alt="Website" src="https://img.shields.io/badge/web-cipher--mux.dev-0088A0?style=flat-square&labelColor=000000"></a>
@@ -100,18 +100,9 @@ After the wizard, log in to Claude Code (one-time):
 claude login
 ```
 
-### Linux (AppImage)
+### Linux & Windows
 
-Download the latest `.AppImage` from [Releases](https://github.com/cmarkus42-rgb/cipher-mux-electron/releases), make it executable:
-
-```bash
-chmod +x cipher-mux-*.AppImage
-./cipher-mux-*.AppImage
-```
-
-**Requirements:** tmux (`sudo apt install tmux`), Claude Code CLI.
-
-**Known limitations:** Global hotkeys may not work on Wayland. Voice input requires PulseAudio or PipeWire. See [docs/linux-notes.md](docs/linux-notes.md) for details.
+Not yet available. Linux support is planned for v1.0. Windows is on the roadmap but has no timeline.
 
 ### Manual Install (without Setup Wizard)
 
@@ -149,7 +140,7 @@ This starts the TypeScript compiler in watch mode and the Vite dev server concur
 npm run build     # Full production build
 npm run test      # Run test suite
 npm run lint      # ESLint
-npm run dist      # Package as DMG (macOS) or AppImage (Linux)
+npm run dist      # Package as DMG (macOS)
 ```
 
 ## Usage
@@ -232,7 +223,7 @@ Entities are specialized session types with pre-configured instructions, persona
 
 ### Does cipher-mux work on Linux?
 
-Yes, as AppImage. tmux is required. Known limitations exist for Wayland (global hotkeys) and audio backends (voice input needs PulseAudio or PipeWire). See [docs/linux-notes.md](docs/linux-notes.md).
+Not yet. Linux support is planned for v1.0.
 
 ### Can I write my own adapter?
 
