@@ -90,13 +90,13 @@ The Setup Wizard detects what's missing and installs it for you:
 | **Homebrew** | Required | ~200 MB |
 | **tmux** | Required | ~2 MB |
 | **Node.js** | Recommended | ~30 MB |
+| **Claude Code CLI** | Recommended | ~50 MB |
 | **Whisper Model** (local STT) | Optional | ~500 MB |
 | **Piper TTS** (local speech) | Optional | ~30 MB |
 
-After the wizard, install Claude Code CLI:
+After the wizard, log in to Claude Code (one-time):
 
 ```bash
-npm install -g @anthropic-ai/claude-code
 claude login
 ```
 
@@ -112,6 +112,27 @@ chmod +x cipher-mux-*.AppImage
 **Requirements:** tmux (`sudo apt install tmux`), Claude Code CLI.
 
 **Known limitations:** Global hotkeys may not work on Wayland. Voice input requires PulseAudio or PipeWire. See [docs/linux-notes.md](docs/linux-notes.md) for details.
+
+### Manual Install (without Setup Wizard)
+
+If you prefer to install dependencies yourself or the wizard isn't available:
+
+```bash
+# Required
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install tmux
+
+# Recommended
+brew install node
+npm install -g @anthropic-ai/claude-code
+claude login
+
+# Optional: Voice models
+curl -L -o ~/.cache/cipher-mux/ggml-base.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
+curl -L -o ~/.cache/cipher-mux/de_thorsten-medium.onnx \
+  https://huggingface.co/rhasspy/piper-voices/resolve/main/de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx
+```
 
 ### Development Setup
 
