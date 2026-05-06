@@ -154,8 +154,22 @@ async function installHomebrew(onProgress: (msg: string) => void): Promise<boole
 
 async function installTmux(onProgress: (msg: string) => void): Promise<boolean> {
   onProgress('Installing tmux via Homebrew...');
-  const brewPath = getBrewPath();
-  return spawnWithProgress(brewPath, ['install', 'tmux'], onProgress);
+
+  // Homebrew may need a moment after fresh install — retry up to 3 times
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const brewPath = getBrewPath();
+      const ok = await spawnWithProgress(brewPath, ['install', 'tmux'], onProgress);
+      if (ok) return true;
+      onProgress(`tmux install attempt ${attempt}/3 failed — retrying in 5s...`);
+    } catch {
+      onProgress(`Homebrew not ready yet (attempt ${attempt}/3) — retrying in 5s...`);
+    }
+    await new Promise(r => setTimeout(r, 5000));
+  }
+
+  onProgress('tmux installation failed. Please try again — click "Install" once more, or run "brew install tmux" in Terminal.');
+  return false;
 }
 
 async function installNode(onProgress: (msg: string) => void): Promise<boolean> {
