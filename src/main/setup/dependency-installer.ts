@@ -94,29 +94,47 @@ async function installHomebrew(onProgress: (msg: string) => void): Promise<boole
     return false;
   }
 
-  onProgress('Installing Homebrew (requires admin password)...');
+  onProgress('Opening Terminal to install Homebrew — please enter your password there...');
 
-  // Homebrew needs sudo to create /opt/homebrew on a fresh Mac.
-  // We write the install script to a temp file to avoid escaping issues
-  // with osascript's "do shell script" quoting (triple-escaping JS →
-  // osascript → bash broke on some macOS setups).
-  const tmpScript = path.join(os.tmpdir(), 'cipher-mux-brew-install.sh');
-  fs.writeFileSync(tmpScript, 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"\n', { mode: 0o755 });
+  // Open a real Terminal.app window with the Homebrew installer.
+  // The user enters their password interactively in Terminal — no osascript
+  // escaping issues, no headless sudo, works on every macOS setup.
+  // We then poll for the brew binary to appear.
+  const appleScript = [
+    'tell application "Terminal"',
+    '  activate',
+    '  do script "/bin/bash -c \\"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\\""',
+    'end tell',
+  ].join('\n');
 
-  const ok: boolean = await new Promise((resolve) => {
-    const script = `do shell script "${tmpScript}" with administrator privileges`;
-    execFile('osascript', ['-e', script], { timeout: 600_000 }, (error) => {
-      try { fs.unlinkSync(tmpScript); } catch { /* ignore */ }
-      if (error) {
-        onProgress(`Homebrew install failed: ${error.message}`);
-        resolve(false);
-        return;
-      }
-      resolve(true);
-    });
+  await new Promise<void>((resolve) => {
+    execFile('osascript', ['-e', appleScript], () => resolve());
   });
 
-  if (!ok) return false;
+  // Poll for brew binary (max 10 minutes — Homebrew install takes a while)
+  const maxWait = 10 * 60 * 1000;
+  const interval = 5000;
+  let elapsed = 0;
+
+  while (elapsed < maxWait) {
+    await new Promise(r => setTimeout(r, interval));
+    elapsed += interval;
+
+    const installed =
+      fs.existsSync('/opt/homebrew/bin/brew') ||
+      fs.existsSync('/usr/local/bin/brew');
+
+    if (installed) {
+      onProgress('Homebrew installed successfully');
+      // Bring cipher-mux back to front
+      try {
+        execFile('osascript', ['-e', 'tell application "cipher-mux" to activate']);
+      } catch { /* ignore */ }
+      return true;
+    }
+
+    onProgress(`Waiting for Homebrew install to complete... (${Math.round(elapsed / 1000)}s)`);
+  }
 
   const installed =
     fs.existsSync('/opt/homebrew/bin/brew') ||
