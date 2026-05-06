@@ -37,6 +37,9 @@ import { generateCyberFactoryClaudeMd } from './cyber-factory/cyber-factory-temp
 import { generateWorkshopClaudeMd } from './workshop/workshop-template'
 import { syncIdeationTemplate } from './ideation-partner/ideation-template'
 import { syncRefinementTemplate } from './refinement/refinement-template'
+import { generateVoiceRelayClaudeMd } from './session/voice-relay-template'
+import { generateBugreportPresetClaudeMd } from './bugreport/bugreport-preset-template'
+import { generateCompanionClaudeMd } from './entity-content/companion-preset'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { getGlobalRules, setGlobalRules, ensureGlobalRulesFile, invalidateGlobalRulesCache } from './config/global-rules'
 import { AdapterRegistry } from './agent/registry'
@@ -151,6 +154,11 @@ export class IpcHub {
         const dir = path.join(entitiesBase, id)
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
         fs.writeFileSync(path.join(dir, 'CLAUDE.md'), content, 'utf-8')
+        // Also write preset.md (source-of-truth for PresetEditor) if missing
+        const presetPath = path.join(dir, 'preset.md')
+        if (!fs.existsSync(presetPath)) {
+          fs.writeFileSync(presetPath, content, 'utf-8')
+        }
       }
 
       deployEntity('testing-assistant', generateTestingAssistantClaudeMd())
@@ -158,6 +166,9 @@ export class IpcHub {
       deployEntity('debugger', generateDebuggerClaudeMd())
       deployEntity('cyber-factory', generateCyberFactoryClaudeMd({ mcpHost, mcpPort, mcpApiKey }))
       deployEntity('orchestrator', generateWorkshopClaudeMd({ mcpHost, mcpPort, mcpApiKey }))
+      deployEntity('voice-relay', generateVoiceRelayClaudeMd())
+      deployEntity('bugreport', generateBugreportPresetClaudeMd())
+      deployEntity('companion', generateCompanionClaudeMd())
 
       // Sync experimental templates (ideation + refinement)
       const exp = configStore.get('experimental') ?? {}
@@ -2031,6 +2042,14 @@ export class IpcHub {
   private registerPresetChannels(): void {
     const entitiesDir = path.join(os.homedir(), '.config/cipher-mux/entities')
 
+    // Entities whose preset.md is code-generated and refreshed at session start.
+    // These are read-only in the PresetEditor ("Copy as Custom" to override).
+    const ENTITIES_WITH_TEMPLATE = new Set([
+      'audit', 'voice-relay', 'bugreport', 'testing-assistant',
+      'debugger', 'cyber-factory', 'orchestrator', 'companion',
+      'refinement', 'ideation-partner',
+    ])
+
     ipcMain.handle(IPC.PRESETS_LIST, async () => {
       // Return entities that have a projectPath inside ~/.config/cipher-mux/entities
       const registry = this.sessionManager.getEntityRegistry()
@@ -2047,7 +2066,7 @@ export class IpcHub {
           projectPath: e.projectPath,
           sortOrder: overrides[e.id] ?? e.sortOrder ?? 100,
           launcherHidden: hidden[e.id] ?? false,
-          hasTemplate: false,
+          hasTemplate: ENTITIES_WITH_TEMPLATE.has(e.id),
         }))
         .sort((a, b) => a.sortOrder - b.sortOrder)
     })
@@ -2082,6 +2101,21 @@ export class IpcHub {
         } catch {
           return { ok: false, content: '', error: 'Failed to read CLAUDE.md' }
         }
+      }
+
+      // Last resort: generate template content on-the-fly for known entities
+      const templateGenerators: Record<string, () => string> = {
+        'voice-relay': generateVoiceRelayClaudeMd,
+        bugreport: generateBugreportPresetClaudeMd,
+        audit: generateAuditClaudeMd,
+        debugger: generateDebuggerClaudeMd,
+        companion: generateCompanionClaudeMd,
+        'testing-assistant': generateTestingAssistantClaudeMd,
+      }
+      const gen = templateGenerators[entityId]
+      if (gen) {
+        const content = gen()
+        return { ok: true, content, displayName }
       }
 
       return { ok: true, content: '', displayName }
