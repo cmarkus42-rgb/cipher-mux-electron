@@ -200,6 +200,26 @@ export async function executeHandoff(
         projectPath: config.projectPath,
         name: config.sessionName,
       })
+
+      // Wait for Claude CLI to be ready. A freshly started session has only
+      // zsh — Claude CLI launches after the renderer calls markReady() or
+      // the 4s fallback timer fires. Without this wait, the payload would
+      // be injected directly into zsh, interpreted as shell commands.
+      const maxWait = 15_000
+      const pollInterval = 500
+      let waited = 0
+      let ready = false
+      while (waited < maxWait) {
+        await new Promise(r => setTimeout(r, pollInterval))
+        waited += pollInterval
+        try {
+          const busy = await isBusy(ctx, targetSession)
+          if (busy) { ready = true; break }
+        } catch { /* ignore */ }
+      }
+      if (!ready) {
+        return { ok: false, error: `Claude CLI did not start in target session within ${maxWait / 1000}s` }
+      }
     }
 
     // Format and deliver via tmux send-keys (REQ-HANDOFF-005)
