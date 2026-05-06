@@ -212,6 +212,18 @@ export async function executeHandoff(
     await new Promise(resolve => setTimeout(resolve, 500))
     await ctx.sessionManager.sendKeys(targetSession.id, '\r')
 
+    // Paste-check: Claude CLI shows long inputs as "[Pasted text #1 +N lines]"
+    // and waits for a second Enter. Check after 2s and resend Enter if needed.
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    try {
+      const captured = await ctx.sessionManager.capture(targetSession.id, 10)
+      if (captured.includes('[Pasted text')) {
+        await ctx.sessionManager.sendKeys(targetSession.id, '\r')
+      }
+    } catch {
+      // capture may fail if session is gone — ignore
+    }
+
     // MessageBus entry only if session stays in background (REQ-HANDOFF-004)
     // In practice: if windowManager is null, we can't make it visible → write to bus
     if (!ctx.windowManager && ctx.messageBus) {
