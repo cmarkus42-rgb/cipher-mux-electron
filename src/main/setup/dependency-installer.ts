@@ -94,32 +94,33 @@ async function installHomebrew(onProgress: (msg: string) => void): Promise<boole
     return false;
   }
 
-  onProgress('Installing Homebrew (requires admin password)...');
+  onProgress('Installing Homebrew...');
 
-  return new Promise((resolve) => {
-    const script =
-      'do shell script "NONINTERACTIVE=1 /bin/bash -c \\"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\\"" with administrator privileges';
+  // Use NONINTERACTIVE=1 so Homebrew doesn't prompt. On Apple Silicon,
+  // Homebrew installs to /opt/homebrew (user-owned, no sudo needed).
+  // Previous approach used osascript with admin privileges, but the
+  // triple-escaping (JS → osascript → bash) broke on some macOS setups.
+  const ok = await spawnWithProgress('/bin/bash', [
+    '-c',
+    'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+  ], onProgress);
 
-    execFile('osascript', ['-e', script], (error) => {
-      if (error) {
-        onProgress(`Homebrew install failed: ${error.message}`);
-        resolve(false);
-        return;
-      }
+  if (!ok) {
+    onProgress('Homebrew install failed');
+    return false;
+  }
 
-      const installed =
-        fs.existsSync('/opt/homebrew/bin/brew') ||
-        fs.existsSync('/usr/local/bin/brew');
+  const installed =
+    fs.existsSync('/opt/homebrew/bin/brew') ||
+    fs.existsSync('/usr/local/bin/brew');
 
-      if (installed) {
-        onProgress('Homebrew installed successfully');
-        resolve(true);
-      } else {
-        onProgress('Homebrew binary not found after install');
-        resolve(false);
-      }
-    });
-  });
+  if (installed) {
+    onProgress('Homebrew installed successfully');
+    return true;
+  } else {
+    onProgress('Homebrew binary not found after install');
+    return false;
+  }
 }
 
 async function installTmux(onProgress: (msg: string) => void): Promise<boolean> {
