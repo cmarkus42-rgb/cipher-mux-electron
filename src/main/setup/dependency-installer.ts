@@ -94,21 +94,29 @@ async function installHomebrew(onProgress: (msg: string) => void): Promise<boole
     return false;
   }
 
-  onProgress('Installing Homebrew...');
+  onProgress('Installing Homebrew (requires admin password)...');
 
-  // Use NONINTERACTIVE=1 so Homebrew doesn't prompt. On Apple Silicon,
-  // Homebrew installs to /opt/homebrew (user-owned, no sudo needed).
-  // Previous approach used osascript with admin privileges, but the
-  // triple-escaping (JS → osascript → bash) broke on some macOS setups.
-  const ok = await spawnWithProgress('/bin/bash', [
-    '-c',
-    'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
-  ], onProgress);
+  // Homebrew needs sudo to create /opt/homebrew on a fresh Mac.
+  // We write the install script to a temp file to avoid escaping issues
+  // with osascript's "do shell script" quoting (triple-escaping JS →
+  // osascript → bash broke on some macOS setups).
+  const tmpScript = path.join(os.tmpdir(), 'cipher-mux-brew-install.sh');
+  fs.writeFileSync(tmpScript, 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"\n', { mode: 0o755 });
 
-  if (!ok) {
-    onProgress('Homebrew install failed');
-    return false;
-  }
+  const ok: boolean = await new Promise((resolve) => {
+    const script = `do shell script "${tmpScript}" with administrator privileges`;
+    execFile('osascript', ['-e', script], { timeout: 600_000 }, (error) => {
+      try { fs.unlinkSync(tmpScript); } catch { /* ignore */ }
+      if (error) {
+        onProgress(`Homebrew install failed: ${error.message}`);
+        resolve(false);
+        return;
+      }
+      resolve(true);
+    });
+  });
+
+  if (!ok) return false;
 
   const installed =
     fs.existsSync('/opt/homebrew/bin/brew') ||
