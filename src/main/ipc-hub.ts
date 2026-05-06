@@ -93,8 +93,14 @@ export class IpcHub {
   } | null = null
 
   private adapterRegistry: AdapterRegistry
+  private setupCompleted = false
+  private setupCompleteResolve: (() => void) | null = null
+  private setupCompletePromise: Promise<void>
 
   constructor(private windowManager: WindowManager) {
+    this.setupCompletePromise = new Promise<void>(resolve => {
+      this.setupCompleteResolve = resolve
+    })
     this.adapterRegistry = new AdapterRegistry()
     const entityRegistry = new EntityRegistry()
     registerBuiltinEntities(entityRegistry, BRAND.orchestratorDir, BRAND.cyberFactoryDir)
@@ -308,6 +314,19 @@ export class IpcHub {
       mcpApiKey: apiKey,
     })
 
+    // Check if setup is needed — if all required deps are present, skip waiting
+    setupCheckAll().then(deps => {
+      const allRequiredOk = deps.filter(d => d.required).every(d => d.installed)
+      if (allRequiredOk) {
+        this.setupCompleted = true
+        this.onSetupComplete()
+      }
+    }).catch(() => {
+      // If check fails, assume deps are present (don't block existing installs)
+      this.setupCompleted = true
+      this.onSetupComplete()
+    })
+
     this.mcpServer.start(port, host, apiKey, {
       sessionManager: this.sessionManager,
       messageBus: this.messageBus,
@@ -322,8 +341,14 @@ export class IpcHub {
       getVoiceManager: () => this.voiceManager,
       testingAssistantManager: this.testingAssistantManager ?? undefined,
       auditManager: this.auditManager ?? undefined,
-    }).then(() => {
-      // MCP ready → connect tmux, recover sessions, then auto-start defaults
+    }).then(async () => {
+      // Wait for setup to complete before connecting tmux
+      if (!this.setupCompleted) {
+        console.log('[IpcHub] Waiting for setup wizard to complete before tmux connect...')
+        await this.setupCompletePromise
+        console.log('[IpcHub] Setup complete — proceeding with tmux connect')
+      }
+      // MCP ready + setup done → connect tmux, recover sessions, then auto-start defaults
       return this.tmux.connect()
     }).then(() => {
       return this.sessionManager.recover()
@@ -2257,15 +2282,23 @@ export class IpcHub {
     })
   }
 
+  private onSetupComplete(): void {
+    if (this.setupCompleteResolve) {
+      this.setupCompleteResolve()
+      this.setupCompleteResolve = null
+    }
+  }
+
   // ─── Setup Wizard ─────────────────────────────────────────
   private registerSetupChannels(): void {
     ipcMain.handle(IPC.SETUP_CHECK, async () => {
       return { dependencies: await setupCheckAll() }
     })
 
-    ipcMain.handle(IPC.SETUP_INSTALL_ALL, async (event) => {
+    ipcMain.handle(IPC.SETUP_INSTALL_ALL, async (event, opts?: { selectedIds?: string[] }) => {
       const deps = await setupCheckAll()
-      const missing = deps.filter(d => !d.installed)
+      const selectedIds = opts?.selectedIds
+      const missing = deps.filter(d => !d.installed && (!selectedIds || d.required || selectedIds.includes(d.id)))
 
       for (const dep of missing) {
         event.sender.send(IPC.SETUP_PROGRESS, {
@@ -2274,13 +2307,25 @@ export class IpcHub {
           done: false,
         })
 
-        await installDependency(dep.id, (msg) => {
+        const success = await installDependency(dep.id, (msg) => {
           event.sender.send(IPC.SETUP_PROGRESS, {
             stepId: dep.id,
             message: msg,
             done: false,
           })
         })
+
+        if (!success) {
+          const updated = await setupCheckAll()
+          event.sender.send(IPC.SETUP_PROGRESS, {
+            stepId: dep.id,
+            message: `Installation of ${dep.name} failed`,
+            done: false,
+            error: true,
+            dependencies: updated,
+          })
+          return { ok: false, failedId: dep.id }
+        }
 
         const updated = await setupCheckAll()
         event.sender.send(IPC.SETUP_PROGRESS, {
@@ -2299,6 +2344,19 @@ export class IpcHub {
         dependencies: final,
       })
 
+      // Signal setup complete for tmux gating
+      this.setupCompleted = true
+      this.onSetupComplete()
+
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.SETUP_SKIP, () => {
+      // User skipped setup — unblock tmux connect
+      if (!this.setupCompleted) {
+        this.setupCompleted = true
+        this.onSetupComplete()
+      }
       return { ok: true }
     })
   }

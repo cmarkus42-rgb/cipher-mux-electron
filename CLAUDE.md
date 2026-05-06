@@ -454,12 +454,6 @@ Alle gaengigen BT Camera Shutter Remotes nutzen dasselbe HID Consumer Control Pr
 - **Nie per TTS:** Code, Pfade, IDs, technische Details — gehoeren in schriftlichen Output.
 - **Override:** Entity-CLAUDE.md kann TTS erweitern (voice-relay), einschraenken oder deaktivieren (cyber-factory, debugger).
 
-### mux_send Push-Delivery
-
-- **Separates Enter noetig:** Nach `mux_send` mit Push-Delivery wird der Text in die Session eingefuegt, aber NICHT submitted. Ein zweites `mux_send` mit `"\n"` (oder tmux send-keys Enter) ist Pflicht.
-- **Pattern:** `mux_send(text)` → 1-2s Pause → `mux_send("\n")` = Submit.
-- **Ohne:** Text steht in der Eingabezeile, Session wartet — sieht aus als waere nichts angekommen.
-
 ### Lessons Learned — Entscheidungsbaum
 
 Wenn du ein Learning erkennst (etwas das beim naechsten Mal anders laufen soll), lege es auf der richtigen Ebene ab:

@@ -406,6 +406,7 @@ describe('handoff-kernel: delivery format', () => {
     const lastCall = ctx.sendKeysCalls[ctx.sendKeysCalls.length - 1]
     assert.equal(lastCall[1], '\r')
   })
+
 })
 
 describe('handoff-kernel: startEntitySession', () => {

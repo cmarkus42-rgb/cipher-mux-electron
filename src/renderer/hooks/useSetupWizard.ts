@@ -8,6 +8,7 @@ interface ProgressPayload {
   stepId: string | null
   message: string
   done: boolean
+  error?: boolean
   dependencies?: SetupDependency[]
 }
 
@@ -17,6 +18,7 @@ export function useSetupWizard() {
   const [currentStep, setCurrentStep] = useState<string | null>(null)
   const [progress, setProgress] = useState('')
   const [done, setDone] = useState(false)
+  const [error, setError] = useState(false)
   const [visible, setVisible] = useState(false)
 
   // Initial check — load dependency status
@@ -47,6 +49,11 @@ export function useSetupWizard() {
       if (data.stepId !== undefined) setCurrentStep(data.stepId)
       if (data.message) setProgress(data.message)
       if (data.dependencies) setDependencies(data.dependencies)
+      if (data.error) {
+        setError(true)
+        setInstalling(false)
+        setCurrentStep(null)
+      }
       if (data.done) {
         setDone(true)
         setInstalling(false)
@@ -56,11 +63,12 @@ export function useSetupWizard() {
     return unsub
   }, [])
 
-  const installAll = useCallback(async () => {
+  const installAll = useCallback(async (selectedIds?: string[]) => {
     setInstalling(true)
     setProgress('')
+    setError(false)
     try {
-      await api.setup.installAll()
+      await api.setup.installAll(selectedIds ? { selectedIds } : undefined)
     } catch {
       setInstalling(false)
     }
@@ -75,7 +83,8 @@ export function useSetupWizard() {
 
   const skip = useCallback(() => {
     setVisible(false)
+    api?.setup?.skip?.()
   }, [])
 
-  return { dependencies, installing, currentStep, progress, done, visible, installAll, skip }
+  return { dependencies, installing, currentStep, progress, done, error, visible, installAll, skip }
 }

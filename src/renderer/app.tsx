@@ -1176,6 +1176,7 @@ export function App() {
           currentStep={setupWizard.currentStep}
           progress={setupWizard.progress}
           done={setupWizard.done}
+          error={setupWizard.error}
         />
       )}
       <div class="drag-region">

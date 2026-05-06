@@ -1,4 +1,4 @@
-import { execFile, spawn } from 'child_process';
+import { execFile, execFileSync, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -36,7 +36,64 @@ function spawnWithProgress(
   });
 }
 
+async function ensureXcodeCLT(onProgress: (msg: string) => void): Promise<boolean> {
+  // Check if Xcode CLT is already installed
+  try {
+    execFileSync('xcode-select', ['-p'], { stdio: 'pipe' });
+    onProgress('Xcode Command Line Tools already installed');
+    return true;
+  } catch {
+    // Not installed — trigger install
+  }
+
+  onProgress('Installing Xcode Command Line Tools...');
+
+  return new Promise((resolve) => {
+    execFile('xcode-select', ['--install'], (error) => {
+      if (error) {
+        // error code 1 means install dialog was shown, which is expected
+        // A real failure would be if the command itself is not found
+        if ((error as any).code === 'ENOENT') {
+          onProgress('xcode-select not found');
+          resolve(false);
+          return;
+        }
+      }
+
+      // Poll for CLT installation (max 5 minutes)
+      const maxWait = 5 * 60 * 1000;
+      const interval = 5000;
+      let elapsed = 0;
+
+      const poll = setInterval(() => {
+        elapsed += interval;
+        try {
+          execFileSync('xcode-select', ['-p'], { stdio: 'pipe' });
+          clearInterval(poll);
+          onProgress('Xcode Command Line Tools installed successfully');
+          resolve(true);
+        } catch {
+          if (elapsed >= maxWait) {
+            clearInterval(poll);
+            onProgress('Xcode CLT install timed out (5min). Please install manually and retry.');
+            resolve(false);
+          } else {
+            onProgress(`Waiting for Xcode CLT install... (${Math.round(elapsed / 1000)}s)`);
+          }
+        }
+      }, interval);
+    });
+  });
+}
+
 async function installHomebrew(onProgress: (msg: string) => void): Promise<boolean> {
+  // Xcode CLT is a prerequisite for Homebrew
+  const cltOk = await ensureXcodeCLT(onProgress);
+  if (!cltOk) {
+    onProgress('Cannot install Homebrew without Xcode Command Line Tools');
+    return false;
+  }
+
   onProgress('Installing Homebrew (requires admin password)...');
 
   return new Promise((resolve) => {
@@ -75,6 +132,17 @@ async function installNode(onProgress: (msg: string) => void): Promise<boolean> 
   onProgress('Installing Node.js via Homebrew...');
   const brewPath = getBrewPath();
   return spawnWithProgress(brewPath, ['install', 'node'], onProgress);
+}
+
+async function installClaudeCode(onProgress: (msg: string) => void): Promise<boolean> {
+  onProgress('Installing Claude Code CLI via npm...');
+  // Prefer Homebrew node's npm
+  const npmPaths = ['/opt/homebrew/bin/npm', '/usr/local/bin/npm'];
+  let npmPath = 'npm';
+  for (const p of npmPaths) {
+    if (fs.existsSync(p)) { npmPath = p; break; }
+  }
+  return spawnWithProgress(npmPath, ['install', '-g', '@anthropic-ai/claude-code'], onProgress);
 }
 
 async function installWhisperModel(onProgress: (msg: string) => void): Promise<boolean> {
@@ -142,6 +210,8 @@ export async function installDependency(
       return installTmux(onProgress);
     case 'node':
       return installNode(onProgress);
+    case 'claude-code':
+      return installClaudeCode(onProgress);
     case 'whisper-model':
       return installWhisperModel(onProgress);
     case 'piper-model':
