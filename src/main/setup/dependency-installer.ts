@@ -96,19 +96,22 @@ async function installHomebrew(onProgress: (msg: string) => void): Promise<boole
 
   onProgress('Opening Terminal to install Homebrew — please enter your password there...');
 
-  // Open a real Terminal.app window with the Homebrew installer.
-  // The user enters their password interactively in Terminal — no osascript
-  // escaping issues, no headless sudo, works on every macOS setup.
-  // We then poll for the brew binary to appear.
-  const appleScript = [
-    'tell application "Terminal"',
-    '  activate',
-    '  do script "/bin/bash -c \\"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\\""',
-    'end tell',
-  ].join('\n');
+  // Write a temp script and open it with Terminal.app via `open -a Terminal`.
+  // Unlike osascript ("tell application Terminal"), `open -a` does NOT require
+  // macOS Automation permissions — it works on a fresh install without TCC prompts.
+  const scriptPath = '/tmp/cipher-mux-homebrew-install.sh';
+  fs.writeFileSync(scriptPath, [
+    '#!/bin/bash',
+    'echo "=== cipher-mux: Installing Homebrew ==="',
+    'echo ""',
+    '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+    'echo ""',
+    'echo "=== Homebrew install complete. You can close this window. ==="',
+    '',
+  ].join('\n'), { mode: 0o755 });
 
   await new Promise<void>((resolve) => {
-    execFile('osascript', ['-e', appleScript], () => resolve());
+    execFile('open', ['-a', 'Terminal', scriptPath], () => resolve());
   });
 
   // Poll for brew binary (max 10 minutes — Homebrew install takes a while)
@@ -128,7 +131,7 @@ async function installHomebrew(onProgress: (msg: string) => void): Promise<boole
       onProgress('Homebrew installed successfully');
       // Bring cipher-mux back to front
       try {
-        execFile('osascript', ['-e', 'tell application "cipher-mux" to activate']);
+        execFile('open', ['-a', 'cipher-mux']);
       } catch { /* ignore */ }
       return true;
     }
