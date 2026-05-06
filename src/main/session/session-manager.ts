@@ -1440,10 +1440,22 @@ export class SessionManager extends EventEmitter {
    * When the pane command is a shell (zsh, bash, fish, sh) instead of
    * 'claude', the Claude process has ended. The session is removed from
    * the registry (freeing the grid cell) and the tmux session is killed.
+   *
+   * Grid-visible sessions are skipped — they belong to the user's active
+   * workspace and should not be auto-reaped even if Claude has exited.
    */
   private async checkSessionExits(): Promise<void> {
     const shellCommands = new Set(['zsh', 'bash', 'fish', 'sh', 'dash'])
     const checks: Promise<void>[] = []
+
+    // Build set of session IDs currently visible in the grid
+    const gridState = this.sessionStore.getGridState()
+    const gridVisibleIds = new Set<string>()
+    if (gridState) {
+      for (const slot of gridState.slots) {
+        if (slot.sessionId) gridVisibleIds.add(slot.sessionId)
+      }
+    }
 
     for (const [sessionId, session] of this.sessions) {
       if (session.status !== 'active') continue
@@ -1451,6 +1463,8 @@ export class SessionManager extends EventEmitter {
       if (this.pendingLaunch.has(sessionId)) continue
       // Skip plain terminal sessions (no autoLaunch/Claude) — they naturally run a shell
       if (!this.autoLaunchedSessions.has(sessionId)) continue
+      // Skip sessions visible in the grid — user's active workspace
+      if (gridVisibleIds.has(sessionId)) continue
 
       checks.push(
         this.tmux.getPaneCommand(session.tmuxSession).then(async (cmd) => {

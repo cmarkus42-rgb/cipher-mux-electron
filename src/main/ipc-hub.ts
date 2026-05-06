@@ -985,13 +985,14 @@ export class IpcHub {
       return this.bugreportManager.collectDiagnostics(this.sessionManager.list())
     })
 
-    ipcMain.handle(IPC.BUGREPORT_SUBMIT, async (_e, { description, project, screenshots, reportType }: {
+    ipcMain.handle(IPC.BUGREPORT_SUBMIT, async (_e, { description, project, screenshots, reportType, enriched }: {
       description: string
       project?: string
       screenshots?: string[]
       reportType?: string
+      enriched?: import('./bugreport/ollama-client').EnrichedBugreport
     }) => {
-      const id = await this.bugreportManager.submit(description, this.sessionManager.list(), project, undefined, screenshots, reportType)
+      const id = await this.bugreportManager.submit(description, this.sessionManager.list(), project, undefined, screenshots, reportType, enriched)
       return { id }
     })
 
@@ -1128,20 +1129,15 @@ export class IpcHub {
         })
         interview.on('interview-complete', async (report) => {
           this.windowManager.sendToMainWindow(IPC.VOICE_INTERVIEW_DONE, report)
-          // Save report as Note with kind:bugreport tag
+          // Submit via BugreportManager (outbox + GitHub delivery)
           try {
-            const titleMatch = report.match(/^# (.+)/m)
-            const title = titleMatch?.[1] ?? 'Voice Bug Report'
-            const note = await this.noteManager.create(title, report, ['kind:bugreport', 'open'])
-            // Update search + tag indices
-            const fullBody = report.startsWith('# ') ? report : `# ${title}\n\n${report}`
-            this.noteSearchIndex.addOrUpdate({ info: note, body: fullBody })
-            this.tagIndex.updateNote(note.id, note.tags)
-            console.log(`[Voice] Bugreport saved as note: ${note.id}`)
-            // Notify renderer so Notes sidebar refreshes
-            this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, undefined)
+            const id = await this.bugreportManager.submit(
+              report, this.sessionManager.list(),
+              undefined, undefined, undefined, 'bug',
+            )
+            console.log(`[Voice] Bugreport submitted: ${id}`)
           } catch (err) {
-            console.error('[Voice] Failed to save bugreport as note:', err)
+            console.error('[Voice] Failed to submit bugreport:', err)
           }
         })
         interview.on('error', (err) => {

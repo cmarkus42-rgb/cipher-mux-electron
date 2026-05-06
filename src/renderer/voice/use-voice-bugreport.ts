@@ -39,10 +39,14 @@ export function useVoiceBugreport() {
   const streamRef = useRef<MediaStream | null>(null)
   /** Whether session voice was active before bugreport took over */
   const sessionVoiceWasActiveRef = useRef(false)
+  /** Guard: only process voice events after interview has started */
+  const interviewActiveRef = useRef(false)
 
   // ── IPC event listeners: wire main-process voice events to React state ──
   // Note: Audio playback (onAgentAudio, onStopPlayback, onGenerationDone)
   // is handled by the global useGlobalTtsPlayback hook in App.
+  // Events arriving before startVoiceInterview() are discarded via
+  // interviewActiveRef to prevent stale session-voice state from leaking in.
 
   useEffect(() => {
     const voice = api()?.voice
@@ -52,19 +56,24 @@ export function useVoiceBugreport() {
 
     try {
       cleanups.push(voice.onState((state: string) => {
+        if (!interviewActiveRef.current) return
         setVoiceState(state as VoiceBugreportState)
       }))
       cleanups.push(voice.onTranscription((text: string) => {
+        if (!interviewActiveRef.current) return
         setTurns((prev) => [...prev, { role: 'user', text }])
       }))
       cleanups.push(voice.onAgentText((text: string) => {
+        if (!interviewActiveRef.current) return
         setTurns((prev) => [...prev, { role: 'assistant', text }])
       }))
       cleanups.push(voice.onInterviewDone((reportText: string) => {
+        if (!interviewActiveRef.current) return
         setReport(reportText)
         setVoiceState('complete')
       }))
       cleanups.push(voice.onError((msg: string) => {
+        if (!interviewActiveRef.current) return
         setError(msg)
         setVoiceState('error')
       }))
@@ -73,6 +82,7 @@ export function useVoiceBugreport() {
     }
 
     return () => {
+      interviewActiveRef.current = false
       for (const cleanup of cleanups) cleanup()
     }
   }, [])
@@ -85,6 +95,8 @@ export function useVoiceBugreport() {
       setTurns([])
       setReport(null)
       setError(null)
+      // Enable the event guard AFTER clearing state — events before this point are discarded
+      interviewActiveRef.current = true
       // Suspend session voice mode if it's active — bugreport takes over the pipeline.
       // Check the global flag set by useVoiceSession when session voice is active.
       const w = window as any
@@ -120,6 +132,10 @@ export function useVoiceBugreport() {
         onVADMisfire: () => {
           api().voice.vadMisfire()
         },
+      }, {
+        // Bugreport interview needs longer pause tolerance (~1.5s instead of ~0.8s)
+        // to avoid cutting off the user mid-thought during natural speech.
+        redemptionFrames: 16,
       })
 
       vadRef.current = vad
@@ -134,6 +150,8 @@ export function useVoiceBugreport() {
   // ── Stop voice interview: destroy VAD, close mic, reset state ──
 
   const stopVoiceInterview = useCallback(() => {
+    interviewActiveRef.current = false
+
     if (vadRef.current) {
       vadRef.current.destroy()
       vadRef.current = null

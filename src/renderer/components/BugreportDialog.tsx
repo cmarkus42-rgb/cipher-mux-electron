@@ -167,6 +167,7 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
         finalDescription, undefined,
         screenshots.length > 0 ? screenshots : undefined,
         reportType,
+        enriched ?? undefined,
       )
       setResult(res.id)
       resetForm()

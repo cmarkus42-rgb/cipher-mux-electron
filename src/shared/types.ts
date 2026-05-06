@@ -303,6 +303,13 @@ export interface AppConfig {
     /** LLM provider: 'haiku' (Claude Code session) or 'ollama' (local enrichment). */
     provider: 'haiku' | 'ollama'
   }
+  /** Bugreport delivery configuration — where submitted bug reports go. */
+  bugreportDelivery?: {
+    /** Delivery mode: 'local' (outbox only) or 'github' (create GitHub Issue). */
+    mode: 'local' | 'github'
+    /** GitHub repo in owner/name format (e.g. 'cmarkus42-rgb/cipher-mux-electron'). */
+    githubRepo?: string
+  }
   /** Experimental feature flags. */
   experimental?: {
     /** Enable extended 7-phase Refinement (RE audit, REQ-IDs, structured handoffs). */
