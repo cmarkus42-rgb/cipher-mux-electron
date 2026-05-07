@@ -809,7 +809,7 @@ export class SessionManager extends EventEmitter {
   private injectPersonaSection(claudeMd: string, characterBlock: string): string {
     if (!characterBlock) return claudeMd
 
-    const personaSection = `\n\n## Persona\n\n**WICHTIG: Diese Persona ueberschreibt alle globalen Persona-Definitionen (z.B. Mimir aus ~/.claude/CLAUDE.md). In dieser Session bist du NICHT Mimir.**\n\n${characterBlock}`
+    const personaSection = `\n\n## Persona\n\n**WICHTIG: Diese Persona ueberschreibt alle globalen Persona-Definitionen aus ~/.claude/CLAUDE.md.**\n\n${characterBlock}`
 
     // Replace existing persona section
     const personaRegex = /\n*## Persona\n[\s\S]*?(?=\n## |\n*$)/
@@ -885,7 +885,7 @@ export class SessionManager extends EventEmitter {
     // Insert Persona after first H1 heading
     const characterBlock = this.getCharacterBlockForEntity(entityId)
     if (characterBlock) {
-      const personaSection = `\n\n## Persona\n\n**WICHTIG: Diese Persona ueberschreibt alle globalen Persona-Definitionen (z.B. Mimir aus ~/.claude/CLAUDE.md). In dieser Session bist du NICHT Mimir.**\n\n${characterBlock}`
+      const personaSection = `\n\n## Persona\n\n**WICHTIG: Diese Persona ueberschreibt alle globalen Persona-Definitionen aus ~/.claude/CLAUDE.md.**\n\n${characterBlock}`
       const firstNewline = result.indexOf('\n')
       if (firstNewline > 0) {
         result = result.substring(0, firstNewline) + personaSection + result.substring(firstNewline)
@@ -1087,11 +1087,28 @@ export class SessionManager extends EventEmitter {
       }
 
       if (presetContent !== null) {
+        // Resolve workspace prompt + context paths: explicit opts take priority,
+        // otherwise read from active workspace (covers launcher/autostart entities)
+        let wsPrompt = opts?.workspacePrompt
+        let wsPaths = opts?.contextPaths
+        if (!wsPrompt && !wsPaths) {
+          try {
+            const activeWsId = configStore.get('activeWorkspaceId')
+            if (activeWsId) {
+              const workspaces = configStore.get('workspaces') ?? []
+              const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
+              if (ws) {
+                if (ws.workspacePrompt?.trim()) wsPrompt = ws.workspacePrompt.trim()
+                if (ws.contextPaths?.length) wsPaths = ws.contextPaths
+              }
+            }
+          } catch { /* configStore not available */ }
+        }
         const assembled = this.assembleEntityClaudeMd(
           presetContent,
           entityId,
-          opts?.workspacePrompt,
-          opts?.contextPaths,
+          wsPrompt,
+          wsPaths,
         )
         fs.writeFileSync(claudeMdPath, assembled, 'utf-8')
       }

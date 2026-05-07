@@ -708,16 +708,21 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         const tagLimitWarning = manualTagCount > 5
           ? `Warning: ${manualTagCount} manual tags exceed recommended limit of 5.`
           : undefined
-        // P.2: auto-apply workspace defaultTags
+        // P.2: auto-apply workspace scope tag + workspace defaultTags
         try {
           const { configStore } = require('../config/config-store')
           const activeWsId = configStore.get('activeWorkspaceId')
           if (activeWsId) {
             const workspaces = configStore.get('workspaces') ?? []
             const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
-            if (ws?.defaultTags?.length) {
-              const tagSet = new Set([...tags, ...ws.defaultTags])
-              tags = [...tagSet]
+            if (ws) {
+              // Auto-scope tag: always applied when workspace is active
+              tags.push(`workspace:${ws.name ?? ws.id}`)
+              // User-configured cross-workspace tags
+              if (ws.defaultTags?.length) {
+                const tagSet = new Set([...tags, ...ws.defaultTags])
+                tags = [...tagSet]
+              }
             }
           }
         } catch { /* configStore not available */ }
@@ -1215,14 +1220,27 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'MemoryStore not available' }) }], isError: true }
       }
       try {
+        // Auto-scope to workspace when active and no explicit scope provided
+        let scopeKind = args.scope_kind
+        let scopeId = args.scope_id
+        if (!scopeKind) {
+          try {
+            const { configStore } = require('../config/config-store')
+            const activeWsId = configStore.get('activeWorkspaceId')
+            if (activeWsId) {
+              scopeKind = 'workspace'
+              scopeId = activeWsId
+            }
+          } catch { /* configStore not available */ }
+        }
         const memory = ctx.memoryStore.write({
           text: args.text,
           kind: args.kind,
           sessionId: args.session_id,
           salience: args.salience,
           sourceExcerpt: args.context_tags ? args.context_tags.join(', ') : undefined,
-          scopeKind: args.scope_kind,
-          scopeId: args.scope_id,
+          scopeKind,
+          scopeId,
         })
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: memory.id }) }],
@@ -1256,13 +1274,31 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       try {
         const since = args.since_hours ? Date.now() - (args.since_hours * 3600_000) : undefined
         const kindFilter = args.entity_filter as import('../../shared/types').MemoryKind | undefined
-        const memories = ctx.memoryStore.recall({
-          limit: args.limit,
-          kindFilter,
-          since,
-          scopeKind: args.scope_kind,
-          scopeId: args.scope_id,
-        })
+        const limit = args.limit ?? 20
+
+        // Auto-scope: when workspace active and no explicit scope, recall both user + workspace memories
+        let memories: import('../../shared/types').Memory[]
+        if (!args.scope_kind) {
+          let activeWsId: string | null = null
+          try {
+            const { configStore } = require('../config/config-store')
+            activeWsId = configStore.get('activeWorkspaceId') ?? null
+          } catch { /* configStore not available */ }
+
+          if (activeWsId) {
+            // Merge user-scope and workspace-scope, sorted by timestamp desc
+            const userMemories = ctx.memoryStore.recall({ limit, kindFilter, since, scopeKind: 'user' })
+            const wsMemories = ctx.memoryStore.recall({ limit, kindFilter, since, scopeKind: 'workspace', scopeId: activeWsId })
+            const merged = [...userMemories, ...wsMemories]
+            merged.sort((a, b) => b.ts - a.ts)
+            memories = merged.slice(0, limit)
+          } else {
+            memories = ctx.memoryStore.recall({ limit, kindFilter, since })
+          }
+        } else {
+          memories = ctx.memoryStore.recall({ limit, kindFilter, since, scopeKind: args.scope_kind, scopeId: args.scope_id })
+        }
+
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(memories, null, 2) }],
         }
@@ -1290,7 +1326,23 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'MemoryStore not available' }) }], isError: true }
       }
       try {
-        const memories = ctx.memoryStore.search(args.query, { limit: args.limit })
+        // Search with extra headroom, then post-filter to user + active workspace scope
+        let activeWsId: string | null = null
+        try {
+          const { configStore } = require('../config/config-store')
+          activeWsId = configStore.get('activeWorkspaceId') ?? null
+        } catch { /* configStore not available */ }
+
+        const limit = args.limit ?? 20
+        const raw = ctx.memoryStore.search(args.query, { limit: activeWsId ? limit * 3 : limit })
+        let memories = raw
+        if (activeWsId) {
+          // Post-filter: show user-scope + active workspace-scope (exclude other workspaces)
+          memories = raw.filter(m =>
+            m.scopeKind === 'user' ||
+            (m.scopeKind === 'workspace' && m.scopeId === activeWsId)
+          ).slice(0, limit)
+        }
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(memories, null, 2) }],
         }

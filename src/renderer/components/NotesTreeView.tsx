@@ -122,10 +122,11 @@ export function applyTagFilter(notes: NoteInfo[], filter: TagFilterState): NoteI
   return result
 }
 
-/** Filter notes by workspace scope tag. */
-export function filterByWorkspace(notes: NoteInfo[], workspaceId: string): NoteInfo[] {
-  const scopeTag = `scope:${workspaceId}`
-  return notes.filter(n => n.tags.some(t => t === scopeTag))
+/** Filter notes by workspace tag (workspace:<name> or workspace:<id>). */
+export function filterByWorkspace(notes: NoteInfo[], workspaceId: string, workspaceName?: string): NoteInfo[] {
+  // Match by name (preferred) or by ID (fallback for old tags)
+  const candidates = [`workspace:${workspaceName ?? workspaceId}`, `workspace:${workspaceId}`]
+  return notes.filter(n => n.tags.some(t => candidates.includes(t)))
 }
 
 // ─── Class Node Renderer ────────────────────────────────────
@@ -202,6 +203,8 @@ interface NotesTreeViewProps {
   tagClassRepo: TagClassRepository
   tagIndex: TagIndexData
   activeWorkspaceId: string | null
+  /** Resolved workspace name for filtering (maps to workspace:<name> tag) */
+  workspaceName?: string | null
   /** Workspace default tags — visually distinct, not removable (REQ-NOTES-008) */
   workspaceDefaultTags?: string[]
   onSearchChange: (term: string) => void
@@ -227,6 +230,7 @@ export function NotesTreeView({
   tagClassRepo,
   tagIndex,
   activeWorkspaceId,
+  workspaceName,
   workspaceDefaultTags,
   onSearchChange,
   onTagFilterChange,
@@ -289,8 +293,8 @@ export function NotesTreeView({
   // Apply workspace scope filter unless showAll
   const scopedNotes = useMemo(() => {
     if (showAll || !activeWorkspaceId) return notes
-    return filterByWorkspace(notes, activeWorkspaceId)
-  }, [notes, showAll, activeWorkspaceId])
+    return filterByWorkspace(notes, activeWorkspaceId, workspaceName ?? undefined)
+  }, [notes, showAll, activeWorkspaceId, workspaceName])
 
   // Build class:value tree from scoped notes
   const tree = useMemo(
@@ -351,7 +355,7 @@ export function NotesTreeView({
     if (searchResults && searchTerm.trim()) {
       source = searchResults
       if (!showAll && activeWorkspaceId) {
-        source = filterByWorkspace(source, activeWorkspaceId)
+        source = filterByWorkspace(source, activeWorkspaceId, workspaceName ?? undefined)
       }
     }
 

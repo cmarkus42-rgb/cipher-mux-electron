@@ -10,7 +10,7 @@ export interface ApplyResult {
 
 export interface SessionStarter {
   start(opts: { name: string; projectPath: string; autoLaunch?: string; workspacePrompt?: string; contextPaths?: string[] }): Promise<{ id: string }>
-  startEntity?(entityId: string): Promise<{ id: string }>
+  startEntity?(entityId: string, opts?: { workspacePrompt?: string; contextPaths?: string[] }): Promise<{ id: string }>
 }
 
 /**
@@ -150,10 +150,25 @@ export async function applyWorkspace(
     const row = Math.floor(i / workspace.cols)
     if (spanOf(workspace, col, row) === 0) continue
 
+    // Resolve workspace-level prompt and context paths (shared by all cells)
+    const wsPrompt = (workspace.workspacePrompt ?? '').trim()
+    const wsPaths = workspace.contextPaths?.length ? workspace.contextPaths : undefined
+
     // Preset-based entity start takes priority
     if (cell.presetId && sessionStarter.startEntity) {
       const presetId = cell.presetId
-      startTasks.push({ cellIndex: i, start: () => sessionStarter.startEntity!(presetId) })
+      // Merge cell project path into context paths so entity knows the target directory
+      const cellProject = cell.project?.trim()
+      const entityPaths = cellProject
+        ? [...(wsPaths ?? []), cellProject].filter((v, i, a) => a.indexOf(v) === i)
+        : wsPaths
+      startTasks.push({
+        cellIndex: i,
+        start: () => sessionStarter.startEntity!(presetId, {
+          workspacePrompt: wsPrompt || undefined,
+          contextPaths: entityPaths,
+        }),
+      })
       continue
     }
 
@@ -161,12 +176,10 @@ export async function applyWorkspace(
 
     // Resolve prompt: cell-level overrides workspace-level
     const cellPrompt = cell.prompt.trim()
-    const wsPrompt = (workspace.workspacePrompt ?? '').trim()
     const effectivePrompt = cellPrompt || wsPrompt || undefined
 
     // Resolve context paths: cell-level overrides workspace-level
     const cellPaths = cell.contextPaths?.length ? cell.contextPaths : undefined
-    const wsPaths = workspace.contextPaths?.length ? workspace.contextPaths : undefined
     const effectivePaths = cellPaths ?? wsPaths
 
     const launchCmd = `clear; claude --dangerously-skip-permissions\n`
