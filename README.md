@@ -49,7 +49,7 @@ Got an idea? Build it. cipher-mux structures the path from idea to code — with
 - **Notes System** — Integrated Markdown editor (CodeMirror 6), auto-tagging via local Ollama, handoff notes
 - **Companion Memory** — Persistent SQLite FTS5 memory for learning entities
 - **Message Bus** — SQLite-backed inter-session communication
-- **Workspaces** — Named grid layouts with persona + preset assignments, one-click setup
+- **Workspaces** — One project = one workspace. Assign project folders, grid layout, presets, and personas. Switch projects in one click
 - **Prompt Architecture** — Dynamic system prompts: preset (what) × persona (how) × workspace (where)
 - **Session Recovery** — Close the app, reopen, resume — tmux keeps everything alive
 - **Accessibility** — 10 themes incl. WCAG AAA, 3 CVD profiles, configurable fonts, reduced motion, ARIA
