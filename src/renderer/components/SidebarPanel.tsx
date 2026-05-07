@@ -81,31 +81,29 @@ export function SidebarPanel({
   const [tagFilter, setTagFilter] = useState<TagFilterState>({})
   const [searchTerm, setSearchTerm] = useState('')
   const [workspaceDefaultTags, setWorkspaceDefaultTags] = useState<string[]>([])
+  const [workspaceName, setWorkspaceName] = useState<string | null>(null)
 
   const { notes, tagRepo, tagClassRepo, tagIndex, deleteNote, trashMany, restoreMany, bulkTagAdd, bulkTagRemove, searchNotes } = useNotes()
 
   // Undo toast state (REQ-NOTES-006)
   const [undoState, setUndoState] = useState<{ ids: string[]; timer: ReturnType<typeof setTimeout> } | null>(null)
 
-  // Pre-select workspace defaultTags as include-filters when workspace changes
+  // Pre-select workspace scope tag as include-filter when workspace changes
   useEffect(() => {
     if (!activeWorkspaceId) {
       setTagFilter({})
       setWorkspaceDefaultTags([])
+      setWorkspaceName(null)
       return
     }
+    // Look up workspace name, then filter by workspace:<name> scope tag
     const api = (window as any).cipherMux
     api?.config?.get?.('workspaces')?.then((workspaces: any[]) => {
       const ws = workspaces?.find((w: any) => w.id === activeWorkspaceId)
-      if (ws?.defaultTags?.length) {
-        const filter: TagFilterState = {}
-        for (const tag of ws.defaultTags) filter[tag] = 'include'
-        setTagFilter(filter)
-        setWorkspaceDefaultTags(ws.defaultTags)
-      } else {
-        setTagFilter({})
-        setWorkspaceDefaultTags([])
-      }
+      const name = ws?.name ?? activeWorkspaceId
+      setWorkspaceName(name)
+      setTagFilter({ [`workspace:${name}`]: 'include' })
+      setWorkspaceDefaultTags(ws?.defaultTags?.length ? ws.defaultTags : [])
     }).catch(() => {})
   }, [activeWorkspaceId])
 
@@ -245,6 +243,7 @@ export function SidebarPanel({
               tagClassRepo={tagClassRepo}
               tagIndex={tagIndex}
               activeWorkspaceId={activeWorkspaceId}
+              workspaceName={workspaceName}
               workspaceDefaultTags={workspaceDefaultTags}
               onSearchChange={setSearchTerm}
               onTagFilterChange={setTagFilter}

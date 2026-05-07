@@ -1700,16 +1700,19 @@ export class IpcHub {
     ipcMain.handle(IPC.NOTES_SAVE, async (_e, { id, body, tags, skipTagging }: {
       id: string; body: string; tags?: string[]; skipTagging?: boolean
     }) => {
-      // REQ-NOTES-008: re-merge workspace defaultTags so auto-tagging doesn't drop them
+      // REQ-NOTES-008: re-merge workspace scope tag + defaultTags so auto-tagging doesn't drop them
       let effectiveTags = tags
       if (effectiveTags) {
         const activeWsId = configStore.get('activeWorkspaceId')
         if (activeWsId) {
           const workspaces = configStore.get('workspaces') ?? []
           const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
-          if (ws?.defaultTags?.length) {
-            const tagSet = new Set([...effectiveTags, ...ws.defaultTags])
-            effectiveTags = [...tagSet]
+          if (ws) {
+            effectiveTags = [...effectiveTags, `workspace:${ws.name ?? ws.id}`]
+            if (ws.defaultTags?.length) {
+              const tagSet = new Set([...effectiveTags, ...ws.defaultTags])
+              effectiveTags = [...tagSet]
+            }
           }
         }
       }
@@ -1745,15 +1748,18 @@ export class IpcHub {
         console.warn(`[IpcHub] NOTES_CREATE: ${manualTags.length} manual tags exceed limit of ${MAX_MANUAL_TAGS}`)
       }
 
-      // P.2: auto-apply workspace defaultTags when workspace is active
+      // P.2: auto-apply workspace scope tag + defaultTags when workspace is active
       let mergedTags = manualTags
       const activeWsId = configStore.get('activeWorkspaceId')
       if (activeWsId) {
         const workspaces = configStore.get('workspaces') ?? []
         const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
-        if (ws?.defaultTags?.length) {
-          const tagSet = new Set([...mergedTags, ...ws.defaultTags])
-          mergedTags = [...tagSet]
+        if (ws) {
+          mergedTags = [...mergedTags, `workspace:${ws.name ?? ws.id}`]
+          if (ws.defaultTags?.length) {
+            const tagSet = new Set([...mergedTags, ...ws.defaultTags])
+            mergedTags = [...tagSet]
+          }
         }
       }
       const note = await this.noteManager.create(title, body, mergedTags.length > 0 ? mergedTags : undefined)
@@ -1826,11 +1832,14 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.NOTES_BULK_TAG_REMOVE, async (_e, { ids, tag }: { ids: string[]; tag: string }) => {
-      // REQ-NOTES-008: protect workspace default tags from removal
+      // REQ-NOTES-008: protect workspace scope tag + default tags from removal
       const activeWsId = configStore.get('activeWorkspaceId')
       if (activeWsId) {
         const workspaces = configStore.get('workspaces') ?? []
         const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
+        if (ws && tag === `workspace:${ws.name ?? ws.id}`) {
+          return { updated: [], blocked: true }
+        }
         if (ws?.defaultTags?.includes(tag)) {
           return { updated: [], blocked: true }
         }
@@ -2252,14 +2261,27 @@ export class IpcHub {
 
   // ─── Companion Memory ──────────────────────────────────
   private registerCompanionChannels(): void {
+    // Helper: workspace-aware recall (user + active workspace, excludes other workspaces)
+    const wsAwareRecall = (opts?: { limit?: number; kindFilter?: import('../shared/types').MemoryKind; since?: number }) => {
+      const limit = opts?.limit ?? 20
+      const activeWsId = configStore.get('activeWorkspaceId') ?? null
+      if (activeWsId) {
+        const userMems = this.memoryStore!.recall({ ...opts, limit, scopeKind: 'user' })
+        const wsMems = this.memoryStore!.recall({ ...opts, limit, scopeKind: 'workspace', scopeId: activeWsId })
+        const merged = [...userMems, ...wsMems].sort((a, b) => b.ts - a.ts)
+        return merged.slice(0, limit)
+      }
+      return this.memoryStore!.recall({ ...opts, limit })
+    }
+
     ipcMain.handle(IPC.COMPANION_RECALL, async (_e, { limit }: { limit?: number }) => {
       if (!this.memoryStore) return []
-      return this.memoryStore.recall({ limit })
+      return wsAwareRecall({ limit })
     })
 
     ipcMain.handle(IPC.COMPANION_LIST_MEMORIES, async (_e, opts?: { limit?: number; kind?: string; since?: number }) => {
       if (!this.memoryStore) return []
-      return this.memoryStore.recall({
+      return wsAwareRecall({
         limit: opts?.limit,
         kindFilter: opts?.kind as import('../shared/types').MemoryKind | undefined,
         since: opts?.since,
@@ -2268,7 +2290,16 @@ export class IpcHub {
 
     ipcMain.handle(IPC.COMPANION_SEARCH, async (_e, { query, limit }: { query: string; limit?: number }) => {
       if (!this.memoryStore) return []
-      return this.memoryStore.search(query, { limit })
+      const searchLimit = limit ?? 20
+      const activeWsId = configStore.get('activeWorkspaceId') ?? null
+      const raw = this.memoryStore.search(query, { limit: activeWsId ? searchLimit * 3 : searchLimit })
+      if (activeWsId) {
+        return raw.filter(m =>
+          m.scopeKind === 'user' ||
+          (m.scopeKind === 'workspace' && m.scopeId === activeWsId)
+        ).slice(0, searchLimit)
+      }
+      return raw
     })
 
     ipcMain.handle(IPC.COMPANION_DELETE_MEMORY, async (_e, { id }: { id: string }) => {
