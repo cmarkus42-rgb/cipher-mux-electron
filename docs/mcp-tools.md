@@ -141,13 +141,13 @@ Get a task by ID, including its children.
 ## Notes
 
 ### `mux_notes_create`
-Create a new note. The title is prepended as a `# heading` to the body automatically.
+Create a new note. The title is prepended as a `# heading` to the body automatically. When a workspace is active, a `workspace:<name>` tag is automatically added.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `title` | string | yes | Note title |
 | `body` | string | yes | Markdown body (without the title heading) |
-| `tags` | string[] | no | Tags for categorization (max 5, lowercase) |
+| `tags` | string[] | no | Tags for categorization (max 5, lowercase). Workspace tag added automatically. |
 
 **Example:**
 ```json
@@ -217,7 +217,7 @@ Search for handoff notes. Returns newest first.
 ## Companion Memory
 
 ### `companion_memory_write`
-Write a memory to the companion memory store.
+Write a memory to the companion memory store. When a workspace is active and no explicit scope is provided, memories are automatically scoped to the workspace (`scope_kind=workspace`).
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -226,18 +226,22 @@ Write a memory to the companion memory store.
 | `session_id` | string | no | Session that created this memory |
 | `context_tags` | string[] | no | Context tags |
 | `salience` | number | no | Importance 0..1 (default 0.5) |
+| `scope_kind` | enum | no | `user` (global), `workspace`, or `session`. Auto-detected when workspace active. |
+| `scope_id` | string | no | Workspace ID or session ID. Auto-filled from active workspace. |
 
 ### `companion_memory_recall`
-Recall recent memories (newest first).
+Recall recent memories (newest first). When a workspace is active, returns both global (user-scope) and workspace-scoped memories, excluding other workspaces.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `limit` | number | no | Max results (default 20) |
 | `entity_filter` | string | no | Filter by memory kind |
 | `since_hours` | number | no | Only memories from the last N hours |
+| `scope_kind` | enum | no | Explicit scope filter (overrides auto-detection) |
+| `scope_id` | string | no | Explicit scope ID |
 
 ### `companion_memory_search`
-Full-text search over memories (FTS5 syntax supported).
+Full-text search over memories (FTS5 syntax supported). When a workspace is active, results are post-filtered to include only global and active workspace memories.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|

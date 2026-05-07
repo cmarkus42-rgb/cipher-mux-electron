@@ -46,11 +46,11 @@ Got an idea? Build it. cipher-mux structures the path from idea to code — with
 - **6 Personas** — Control how the model communicates: from bone-dry to socratic to chaos
 - **Voice I/O** — Local Whisper.cpp STT (no cloud), Silero VAD, Piper/macOS TTS, BT remote support
 - **MCP Server** — 37 tools across 9 categories, Streamable HTTP, bearer auth per entity
-- **Notes System** — Integrated Markdown editor (CodeMirror 6), auto-tagging via local Ollama, handoff notes
-- **Companion Memory** — Persistent SQLite FTS5 memory for learning entities
+- **Notes System** — Integrated Markdown editor (CodeMirror 6), auto-tagging via local Ollama, handoff notes, workspace-scoped filtering
+- **Companion Memory** — Persistent SQLite FTS5 memory, workspace-scoped (isolates learnings per project)
 - **Message Bus** — SQLite-backed inter-session communication
 - **Workspaces** — One project = one workspace. Assign project folders, grid layout, presets, and personas. Switch projects in one click
-- **Prompt Architecture** — Dynamic system prompts: preset (what) × persona (how) × workspace (where)
+- **Prompt Architecture** — Dynamic system prompts: preset (what) × persona (how) × workspace (where). Workspace prompt + context directories auto-injected into all entity sessions
 - **Session Recovery** — Close the app, reopen, resume — tmux keeps everything alive
 - **Accessibility** — 10 themes incl. WCAG AAA, 3 CVD profiles, configurable fonts, reduced motion, ARIA
 

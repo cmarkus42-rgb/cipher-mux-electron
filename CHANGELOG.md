@@ -81,7 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **NoteManager.save() Custom Frontmatter (RT-1):** save() preserves custom frontmatter fields (type, from_session etc.) via spread over existing FM data.
 - **Grid-Place Doppelte Anzeige (RT-10, REGRESSION):** removeSession() called before setSessionAtSlot() — old cell cleared before placing in new one.
 - **Theme-Editor Built-in Immutable (RT-W2):** Built-in themes are read-only. Save redirects to "Save As" for built-ins. customThemeTokens cleared on theme switch.
-- **MPO Persona Override (RT-4):** Persona section in MPO CLAUDE.md with explicit override against global Mimir persona. Dynamic injection adds override hint.
+- **MPO Persona Override (RT-4):** Persona section in MPO CLAUDE.md with explicit override against global persona. Dynamic injection adds override hint.
 - **Pin UI Reset on Unpin (RT-8):** pinChanged events forwarded via IPC to renderer. STT deactivation resets pinned/pinnedSessionId.
 - **Workspace Active Status Startup (RT-6):** activeWorkspaceId always cleared on startup instead of only when no default set.
 - **EntityPickerPopup Stale State (RT-12/13):** Combined handleCellAssign sets presetId + project atomically in single updateWs call.
@@ -96,6 +96,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session Fork (SP-5):** Fork button in SessionCell for Claude Code sessions.
 - **Orphan Detection (SP-5):** Periodic scan for orphaned tmux sessions with Adopt/Terminate UI.
 - **30 new tests** covering SP-2 and SP-5 quality gates
+- **Workspace-Scoped Notes:** Notes auto-tagged with `workspace:<name>` when workspace is active. Sidebar filter button filters by workspace scope. Toggle button (show all / workspace only) works with name-based tags.
+- **Workspace-Scoped Memory:** `companion_memory_write` auto-scopes to `scope_kind=workspace` when workspace is active. `companion_memory_recall` and `companion_memory_search` merge user + active workspace memories (excluding other workspaces). Sidebar memory view respects workspace scoping.
+- **Workspace Context Injection:** Workspace prompt + context directories injected into ALL entity sessions (via workspace apply, launcher, or autostart). Cell project path included as context directory for preset-based entities.
+- **Persona Resolver:** Per-preset persona dropdown. Resolution hierarchy: global active > preset override > matrix default > fallback.
+
+### Changed
+- Persona section text generalized (removed hardcoded Mimir references from assembly code)
+- Companion preset: persona-neutral (Relay/Mimir identity references removed)
+- Workspace tags use human-readable workspace name instead of internal ID
+- `filterByWorkspace()` matches `workspace:<name>` tags (was broken `scope:<id>` format)
 
 ## [0.9.9] - 2026-05-02
 
