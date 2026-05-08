@@ -57,13 +57,13 @@ describe('generateV2Template', () => {
 
   it('includes uncertainty markers requirement', () => {
     const t = generateV2Template()
-    assert.ok(t.includes('Unsicherheits-Markierungen'))
+    assert.ok(t.includes('uncertainty markers'))
   })
 
   it('includes anti-patterns', () => {
     const t = generateV2Template()
     assert.ok(t.includes('grossartige Idee'))
-    assert.ok(t.includes('Confirmation-Bias'))
+    assert.ok(t.includes('confirmation bias') || t.includes('Confirmation bias'))
   })
 })
 
