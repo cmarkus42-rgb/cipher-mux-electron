@@ -274,6 +274,8 @@ const api = {
       ipcRenderer.invoke(IPC.NOTES_TAG_UPDATE, { name, description }),
     tagDelete: (name: string): Promise<{ ok: boolean; affected: number }> =>
       ipcRenderer.invoke(IPC.NOTES_TAG_DELETE, { name }),
+    tagMerge: (sources: string[], target: string): Promise<{ affected: number; error?: string }> =>
+      ipcRenderer.invoke(IPC.NOTES_TAG_MERGE, { sources, target }),
     tagClassRepo: () => ipcRenderer.invoke(IPC.NOTES_TAG_CLASS_REPO),
     tagIndex: () => ipcRenderer.invoke(IPC.NOTES_TAG_INDEX),
     tagIndexRefresh: () => ipcRenderer.invoke(IPC.NOTES_TAG_INDEX_REFRESH),

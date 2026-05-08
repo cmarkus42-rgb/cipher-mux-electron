@@ -2136,3 +2136,26 @@
 .context-path-remove:hover {
   color: var(--color-accent);
 }
+
+/* ─── Tag Manager Merge ─────────────────────────────── */
+.tag-manager__add-btn--active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.tag-manager__merge-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-accent);
+  font-size: 12px;
+}
+.tag-manager__col-check {
+  width: 28px;
+  text-align: center;
+}
+.tag-manager__row--selected {
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+}

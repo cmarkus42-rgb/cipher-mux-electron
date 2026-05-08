@@ -288,6 +288,67 @@ export class NoteTagging {
   }
 
   /**
+   * Merge multiple tags into one target tag.
+   * All source tags (except target) are replaced with target in all notes.
+   * Notes that already have target get duplicates removed.
+   * Source tags are deleted from the repository.
+   */
+  mergeTags(sources: string[], target: string): { affected: number; error?: string } {
+    if (sources.length < 2) return { affected: 0, error: 'need at least 2 tags to merge' }
+    const normTarget = target.toLowerCase().trim()
+    const normSources = sources.map(s => s.toLowerCase().trim())
+    if (!normSources.includes(normTarget)) return { affected: 0, error: 'target must be one of the source tags' }
+
+    const toReplace = normSources.filter(s => s !== normTarget)
+    const matter = require('gray-matter')
+    let affected = 0
+
+    let files: string[]
+    try {
+      files = fs.readdirSync(this.notesDir).filter(f => f.endsWith('.md'))
+    } catch {
+      return { affected: 0 }
+    }
+
+    for (const file of files) {
+      const filePath = path.join(this.notesDir, file)
+      try {
+        const raw = fs.readFileSync(filePath, 'utf-8')
+        const parsed = matter(raw)
+        const tags: string[] = parsed.data.tags ?? []
+        const lower = tags.map((t: string) => t.toLowerCase())
+
+        const hasAnySource = toReplace.some(s => lower.includes(s))
+        if (!hasAnySource) continue
+
+        // Replace source tags with target, then deduplicate
+        const newTags = tags
+          .map((t: string) => toReplace.includes(t.toLowerCase()) ? normTarget : t)
+          .filter((t: string, i: number, arr: string[]) =>
+            arr.findIndex((x: string) => x.toLowerCase() === t.toLowerCase()) === i)
+
+        parsed.data.tags = newTags
+        parsed.data.modified = new Date().toISOString()
+        fs.writeFileSync(filePath, matter.stringify(parsed.content, parsed.data), 'utf-8')
+        affected++
+      } catch { /* skip */ }
+    }
+
+    // Remove source tags from repository (keep target)
+    for (const src of toReplace) {
+      delete this.repo.tags[src]
+    }
+    // Ensure target exists in repo
+    if (!this.repo.tags[normTarget]) {
+      this.repo.tags[normTarget] = { count: 0, description: '' }
+    }
+    this.saveRepository()
+    this.recountTags()
+
+    return { affected }
+  }
+
+  /**
    * Propagate a tag rename or deletion across all note files.
    * If newTag is null, the tag is removed. Returns affected file paths.
    */

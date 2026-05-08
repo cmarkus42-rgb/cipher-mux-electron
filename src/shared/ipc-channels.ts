@@ -185,6 +185,7 @@ export const IPC = {
   NOTES_TAG_RENAME: 'cipher-mux:notes:tag-rename',
   NOTES_TAG_UPDATE: 'cipher-mux:notes:tag-update',
   NOTES_TAG_DELETE: 'cipher-mux:notes:tag-delete',
+  NOTES_TAG_MERGE: 'cipher-mux:notes:tag-merge',
   NOTES_SCREENSHOT: 'cipher-mux:notes:screenshot',
   NOTES_PARSE_TESTCASE: 'cipher-mux:notes:parse-testcase',
   NOTES_SERIALIZE_TESTCASE: 'cipher-mux:notes:serialize-testcase',

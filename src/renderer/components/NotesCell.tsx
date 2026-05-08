@@ -272,6 +272,44 @@ export function NotesCell({
     }
   }, [openNote, slotIndex])
 
+  // Listen for external note changes — reload open tabs whose content changed
+  useEffect(() => {
+    const apiObj = (window as any).cipherMux
+    if (!apiObj?.notes?.onChanged) return
+    const unsub = apiObj.notes.onChanged(async (event: any) => {
+      const noteId = event?.id
+      if (!noteId) return
+
+      // Only reload if this note is open in a tab
+      const openTab = tabs.find(t => t.id === noteId)
+      if (!openTab) return
+
+      // Don't overwrite dirty tabs (unsaved user changes)
+      if (openTab.dirty) return
+
+      try {
+        const result = await apiObj.notes.read(noteId)
+        if (!result) return
+        if (result.body === openTab.content) return
+
+        let testcase: ParsedTestcase | undefined
+        if (result.info?.tags?.includes('testcase')) {
+          const parsed = await apiObj.notes.parseTestcase(noteId)
+          testcase = parsed ?? undefined
+        }
+
+        setTabs(prev => prev.map(t =>
+          t.id === noteId
+            ? { ...t, content: result.body, title: result.info?.title ?? t.title, tags: result.info?.tags ?? t.tags, testcase }
+            : t
+        ))
+      } catch (err) {
+        console.warn('[NotesCell] Failed to reload note after external change:', err)
+      }
+    })
+    return unsub
+  }, [tabs])
+
   // Handle note drops directly (works even when cell is empty/first time)
   const handleNoteDrop = useCallback((e: DragEvent) => {
     const cipherType = e.dataTransfer?.getData('application/x-cipher-type')
