@@ -17,6 +17,8 @@ export class StatusLineMonitor extends EventEmitter {
   private watcher: fs.FSWatcher | null = null
   private cache: Map<string, ContextUsage> = new Map()
   private warningEmitted: Set<string> = new Set()
+  /** Session IDs that were explicitly removed — ignore subsequent file changes (race guard). */
+  private removedIds: Set<string> = new Set()
 
   constructor(watchDir: string = BRAND.statusLineDir) {
     super()
@@ -61,6 +63,7 @@ export class StatusLineMonitor extends EventEmitter {
     }
     this.cache.clear()
     this.warningEmitted.clear()
+    this.removedIds.clear()
   }
 
   /**
@@ -79,10 +82,13 @@ export class StatusLineMonitor extends EventEmitter {
 
   /**
    * Remove a session from the cache (when session stops).
+   * Adds a tombstone to prevent the file watcher from re-adding stale data
+   * if the dying Claude process writes one final status update.
    */
   remove(sessionId: string): void {
     this.cache.delete(sessionId)
     this.warningEmitted.delete(sessionId)
+    this.removedIds.add(sessionId)
 
     // Clean up the file
     const filePath = path.join(this.watchDir, `${sessionId}.json`)
@@ -91,6 +97,14 @@ export class StatusLineMonitor extends EventEmitter {
     } catch {
       // file may not exist
     }
+  }
+
+  /**
+   * Clear the tombstone for a session ID (when a session with this ID is re-created).
+   * Allows future statusLine writes to be cached again.
+   */
+  clearRemoved(sessionId: string): void {
+    this.removedIds.delete(sessionId)
   }
 
   private scanExisting(): void {
@@ -109,6 +123,8 @@ export class StatusLineMonitor extends EventEmitter {
   private handleFileChange(filename: string): void {
     const sessionId = filename.replace('.json', '')
     if (!sessionId) return // Skip bare `.json` (env var CIPHER_MUX_SESSION_ID was unset)
+    // Skip files for sessions that were explicitly removed (race guard)
+    if (this.removedIds.has(sessionId)) return
     const filePath = path.join(this.watchDir, filename)
 
     try {

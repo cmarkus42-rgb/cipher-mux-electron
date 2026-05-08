@@ -37,6 +37,9 @@ export interface ToolContext {
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']
 
+/** Lazy-created VoiceManager for TTS-only use when voice mode is not active. */
+let ttsSingleton: import('../voice/voice-manager').VoiceManager | null = null
+
 /**
  * Escape text for safe injection via tmux send-keys.
  * For long messages (>500 chars), uses base64 encoding to avoid quoting issues.
@@ -1803,7 +1806,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       if (ttsConfigStore.get('ttsEnabled') === false) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, skipped: 'tts disabled' }) }] }
       }
-      const voiceManager = ctx.getVoiceManager?.()
+      let voiceManager = ctx.getVoiceManager?.() ?? ttsSingleton
       if (voiceManager?.isInitialized() || voiceManager?.isPiperReady()) {
         // Full voice pipeline or Piper-only — use Piper/macOS say with echo guard
         try {
@@ -1819,11 +1822,18 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           }
         }
       }
-      // Lazy-init Piper if configured for local TTS but voice mode not active
-      if (voiceManager && ttsConfigStore.get('ttsVoice') !== 'macos') {
+      // Lazy-init Piper if configured for local TTS but voice mode not active.
+      // If voiceManager is null (voice mode never activated), create a TTS-only instance.
+      if (ttsConfigStore.get('ttsVoice') !== 'macos') {
+        if (!voiceManager) {
+          const { VoiceManager } = require('../voice/voice-manager')
+          voiceManager = new VoiceManager() as import('../voice/voice-manager').VoiceManager
+          // Store the lazy VoiceManager so subsequent calls reuse it
+          if (!ttsSingleton) ttsSingleton = voiceManager
+        }
         try {
-          await voiceManager.initPiperOnly()
-          await voiceManager.speakText(args.text, args.priority === 'interrupt')
+          await voiceManager!.initPiperOnly()
+          await voiceManager!.speakText(args.text, args.priority === 'interrupt')
           return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, spoken: args.text.slice(0, 100), via: 'piper-lazy' }) }] }
         } catch (err) {
           console.warn('[mux_tts_speak] Piper lazy-init failed, falling back to macOS say:', (err as Error).message)

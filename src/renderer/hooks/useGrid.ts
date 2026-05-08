@@ -127,6 +127,15 @@ export function useGrid(panelWidth = 0) {
       if (newSpan === currentSpan) return prev
       const newSlots = [...prev.slots]
       newSlots[idx] = { ...newSlots[idx], rowSpan: newSpan }
+      // Eject sessions from slots that become covered by the new span
+      const col = idx % prev.config.cols
+      const row = Math.floor(idx / prev.config.cols)
+      for (let r = 1; r < newSpan && row + r < prev.config.rows; r++) {
+        const coveredIdx = (row + r) * prev.config.cols + col
+        if (coveredIdx < newSlots.length && newSlots[coveredIdx].sessionId) {
+          newSlots[coveredIdx] = { ...newSlots[coveredIdx], sessionId: null, rowSpan: 1 }
+        }
+      }
       const next = { ...prev, slots: newSlots }
       persist(next)
       return next
@@ -149,8 +158,13 @@ export function useGrid(panelWidth = 0) {
             r++
           }
           newSlots[idx] = { ...newSlots[idx], rowSpan: span }
-          // Mark merged-into slots as hidden (rowSpan 0 is not used, they just keep rowSpan 1
-          // but won't render because the parent cell spans over them via CSS grid)
+          // Eject sessions from slots that become covered by the span
+          for (let cr = 1; cr < span && row + cr < rows; cr++) {
+            const coveredIdx = (row + cr) * cols + col
+            if (coveredIdx < newSlots.length && newSlots[coveredIdx].sessionId) {
+              newSlots[coveredIdx] = { ...newSlots[coveredIdx], sessionId: null, rowSpan: 1 }
+            }
+          }
         }
       }
       const next = { ...prev, slots: newSlots }
@@ -187,6 +201,15 @@ export function useGrid(panelWidth = 0) {
       if (newSpan === currentSpan) return prev
       const newSlots = [...prev.slots]
       newSlots[slotIndex] = { ...newSlots[slotIndex], rowSpan: newSpan }
+      // Eject sessions from slots that become covered by the new span
+      const col = slotIndex % prev.config.cols
+      const row = Math.floor(slotIndex / prev.config.cols)
+      for (let r = 1; r < newSpan && row + r < prev.config.rows; r++) {
+        const coveredIdx = (row + r) * prev.config.cols + col
+        if (coveredIdx < newSlots.length && newSlots[coveredIdx].sessionId) {
+          newSlots[coveredIdx] = { ...newSlots[coveredIdx], sessionId: null, rowSpan: 1 }
+        }
+      }
       const next = { ...prev, slots: newSlots }
       persist(next)
       return next

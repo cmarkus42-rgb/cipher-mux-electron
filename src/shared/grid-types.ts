@@ -162,7 +162,7 @@ export const SESSION_CELL_MIN_WIDTH = 640
 export function computeGridStyle(cols: number, rows: number): { gridTemplateColumns: string; gridTemplateRows: string } {
   return {
     gridTemplateColumns: `repeat(${cols}, minmax(${SESSION_CELL_MIN_WIDTH}px, 1fr))`,
-    gridTemplateRows: `repeat(${rows}, ${SESSION_CELL_HEIGHT}px)`,
+    gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
   }
 }
 
