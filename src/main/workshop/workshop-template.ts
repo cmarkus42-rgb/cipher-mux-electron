@@ -124,5 +124,7 @@ Tags muessen dem Format \`klasse:wert\` folgen. Gueltige Klassen: siehe \`.tags.
 Pflicht-Tags fuer Workshop:
 - \`kind:workshop-run\` fuer Status-Reports
 - \`status:open\` / \`status:done\` fuer Lifecycle
+
+**Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \`status:\`-Tag aktualisieren: \`status:open\` → \`status:in-progress\` → \`status:done\` / \`status:closed\`. Kein Update ohne passenden Status-Tag.
 `
 }

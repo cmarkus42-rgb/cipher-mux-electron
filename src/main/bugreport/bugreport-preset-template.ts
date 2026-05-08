@@ -53,7 +53,8 @@ Bei "notier das einfach" oder aehnlichen Abkuerzungen: sofort zum Report ueberge
 ### 3. Report erstellen
 
 Erstelle den Bugreport als Note via mux_notes_create:
-- Tags: bugreport, open
+- Tags: bugreport, status:open
+- **Notes-Status-Pflege:** Bei spaeterer Bearbeitung den \`status:\`-Tag aktualisieren: \`status:open\` → \`status:in-progress\` → \`status:done\` / \`status:closed\`
 - Titel: Kurze Zusammenfassung (max 80 Zeichen)
 - Body: Strukturiertes Markdown (siehe Format unten)
 

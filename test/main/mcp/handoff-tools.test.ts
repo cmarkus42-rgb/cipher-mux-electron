@@ -23,6 +23,7 @@ function makeSession(overrides: Partial<SessionInfo> = {}): SessionInfo {
 interface MockCtxOpts {
   sessions?: SessionInfo[]
   paneCommand?: string
+  captureOutput?: string
   singleInstance?: boolean
   startEntityResult?: SessionInfo
 }
@@ -59,6 +60,7 @@ function makeCtx(opts: MockCtxOpts = {}) {
       return makeSession({ id: `new-${entityId}`, entityId, name: entityId })
     },
     activeCount: () => sessions.filter(s => s.status === 'active').length,
+    capture: async () => opts.captureOutput ?? '❯',
     tmux: {
       getPaneCommand: async () => opts.paneCommand ?? 'zsh',
     },
@@ -145,7 +147,7 @@ describe('REQ-TOOLS-001: mux_ideation_handoff_refinement', () => {
   })
 
   it('starts new refinement session when none exists', async () => {
-    const { ctx } = makeCtx({ sessions: [] })
+    const { ctx } = makeCtx({ sessions: [], paneCommand: 'claude' })
     const handlers = registerAndCollect(ctx)
     const handler = handlers.get('mux_ideation_handoff_refinement')!
 
@@ -319,7 +321,7 @@ describe('REQ-TOOLS-004: mux_cyber_factory_handoff_testing', () => {
   })
 
   it('starts testing session when none exists', async () => {
-    const { ctx } = makeCtx({ sessions: [] })
+    const { ctx } = makeCtx({ sessions: [], paneCommand: 'claude' })
     const handlers = registerAndCollect(ctx)
     const handler = handlers.get('mux_cyber_factory_handoff_testing')!
 
@@ -385,7 +387,7 @@ describe('REQ-TOOLS-005: mux_cyber_factory_handoff_debugger', () => {
   })
 
   it('starts debugger session when none exists', async () => {
-    const { ctx } = makeCtx({ sessions: [] })
+    const { ctx } = makeCtx({ sessions: [], paneCommand: 'claude' })
     const handlers = registerAndCollect(ctx)
     const handler = handlers.get('mux_cyber_factory_handoff_debugger')!
 

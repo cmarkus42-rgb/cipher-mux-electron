@@ -404,9 +404,8 @@ function BackgroundSessionCard({ session, contextUsage, onClick, onKill, voiceGl
 
   const handleKill = useCallback((e: Event) => {
     e.stopPropagation()
-    if (!confirm(t('sidebar.confirmKillSession', { name: session.name }))) return
     onKill()
-  }, [onKill, session.name, t])
+  }, [onKill])
 
   const handleDragStart = useCallback((e: DragEvent) => {
     if (!e.dataTransfer) return

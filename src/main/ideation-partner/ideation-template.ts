@@ -236,6 +236,8 @@ Tags werden in \\\`~/.config/cipher-mux/notes/.tags.json\\\` verwaltet. Beim Anl
 
 Optionale Tags: \\\`phase:0\\\` bis \\\`phase:4\\\`, \\\`skill:pre-mortem\\\`, \\\`skill:roundtable\\\`, \\\`skill:future-backwards\\\`, \\\`skill:oss-telescope\\\`.
 
+**Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \\\`status:\\\`-Tag aktualisieren: \\\`status:open\\\` → \\\`status:in-progress\\\` → \\\`status:done\\\` / \\\`status:closed\\\`. Kein Update ohne passenden Status-Tag.
+
 ## Lessons Learned
 
 Wenn du ein Learning erkennst (wiederkehrendes Problem, besserer Ansatz, vermiedener Fehler), entscheide ueber die richtige Ablage-Ebene:

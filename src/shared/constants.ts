@@ -71,6 +71,20 @@ export const KICKOFF_TIMEOUT_MIN_DEFAULT = 15
 /** Max manual tags per note (workspace defaultTags don't count) */
 export const MAX_MANUAL_TAGS = 5
 
+/** Default persona assignment per preset (from Pack spec 16-persona-presets.md). */
+export const PRESET_PERSONA_DEFAULTS: Record<string, string> = {
+  companion: 'sokrates',
+  'cyber-factory': 'cipher',
+  refinement: 'sokrates',
+  'ideation-partner': 'sokrates',
+  debugger: 'cipher',
+  'testing-assistant': 'cipher',
+  audit: 'relay',
+  'voice-relay': 'relay',
+  orchestrator: 'relay',
+  launcher: 'relay',
+}
+
 /** Task stall detection defaults */
 export const TASK_STALL_TIMEOUT_MS = 300_000       // 5 minutes
 export const TASK_WATCH_INTERVAL_MS = 30_000       // 30 seconds

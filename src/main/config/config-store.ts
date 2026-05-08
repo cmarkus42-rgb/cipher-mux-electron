@@ -192,6 +192,12 @@ function migrateConfig(config: AppConfig): AppConfig {
         changed = true
       }
     }
+    // Migrate: rename "Wayne Szalinski" → "Wayne" (license risk for OSS)
+    const wayne = config.characters.find(c => c.id === 'wayne')
+    if (wayne && wayne.name === 'Wayne Szalinski') {
+      wayne.name = 'Wayne'
+      changed = true
+    }
   }
 
   if (changed) saveConfig(config)

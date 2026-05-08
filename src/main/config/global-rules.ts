@@ -78,6 +78,12 @@ Learning erkannt
 - **[Kurztitel]:** [Was ab jetzt gilt]. Quelle: [woher das Learning kommt].
 \`\`\`
 
+### Notes-Status-Pflege
+
+- **Status-Tag aktualisieren:** Wenn du eine Note bearbeitest oder ihren Inhalt aenderst, MUSS der \`status:\`-Tag aktualisiert werden: \`status:open\` → \`status:in-progress\` → \`status:done\` / \`status:closed\`.
+- **Regel:** Kein \`mux_notes_update\` ohne passenden Status-Tag-Update. Offene Notes die aktiv bearbeitet werden → \`status:in-progress\`. Abgeschlossene Arbeit → \`status:done\` oder \`status:closed\`.
+- **Gilt fuer alle Entities:** Jede Entity die Notes anlegt oder bearbeitet muss diese Konvention einhalten.
+
 ### Testcase-Konventionen
 
 - **Testcases gehoeren in eine dedizierte Notes-System-Testcase-Note** (noteType: testcase). NICHT in Dateien unter \`docs/archiv/\`. Der TestcaseView rendert nur Notes mit \`noteType: testcase\`.

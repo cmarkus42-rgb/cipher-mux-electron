@@ -1460,19 +1460,30 @@ export class SessionManager extends EventEmitter {
    *
    * Grid-visible sessions are skipped — they belong to the user's active
    * workspace and should not be auto-reaped even if Claude has exited.
+   * Only background sessions (not in grid) are reaped.
    */
   private async checkSessionExits(): Promise<void> {
     const shellCommands = new Set(['zsh', 'bash', 'fish', 'sh', 'dash'])
     const checks: Promise<void>[] = []
 
-    // Build set of session IDs currently visible in the grid
-    const gridState = this.sessionStore.getGridState()
+    // Build set of session IDs currently visible in the grid.
+    // Use BOTH sessionStore grid state AND configStore ui.grid for robustness —
+    // after recovery, sessionStore may have stale IDs while configStore is more current.
     const gridVisibleIds = new Set<string>()
-    if (gridState) {
-      for (const slot of gridState.slots) {
+    const storeGridState = this.sessionStore.getGridState()
+    if (storeGridState) {
+      for (const slot of storeGridState.slots) {
         if (slot.sessionId) gridVisibleIds.add(slot.sessionId)
       }
     }
+    try {
+      const uiGrid = configStore.get('ui')?.grid
+      if (uiGrid?.slots) {
+        for (const slot of uiGrid.slots) {
+          if (slot.sessionId) gridVisibleIds.add(slot.sessionId)
+        }
+      }
+    } catch { /* configStore not available */ }
 
     for (const [sessionId, session] of this.sessions) {
       if (session.status !== 'active') continue
@@ -1487,11 +1498,19 @@ export class SessionManager extends EventEmitter {
         this.tmux.getPaneCommand(session.tmuxSession).then(async (cmd) => {
           if (!cmd) return // pane doesn't exist or couldn't be queried
           if (shellCommands.has(cmd)) {
-            console.log(`[SessionManager] session ${session.name} (${sessionId}): Claude exited (pane command: ${cmd})`)
+            console.log(`[SessionManager] session ${session.name} (${sessionId}): Claude exited (pane command: ${cmd}), reaping background session`)
             session.status = 'stopped'
             session.updatedAt = Date.now()
             this.tmux.unwatchSession(session.tmuxSession)
             try { await this.tmux.killSession(session.tmuxSession) } catch { /* already gone */ }
+            // Clean up entity links if this was an entity session
+            if (session.entityId) {
+              const entityId = session.entityId as EntityId
+              this.removeEntitySession(entityId, sessionId)
+              this.entityRegistry.unlinkSession(sessionId)
+              if (entityId === 'orchestrator') this.orchestratorSessionId = null
+              if (entityId === 'cyber-factory') this.cyberFactorySessionId = null
+            }
             this.emit('session-stopped', session)
             this.sessions.delete(sessionId)
             this.sessionAdapters.delete(sessionId)
