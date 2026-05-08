@@ -261,6 +261,9 @@ export const IPC = {
   GLOBAL_RULES_READ: 'cipher-mux:global-rules:read',
   GLOBAL_RULES_SAVE: 'cipher-mux:global-rules:save',
 
+  // Session Screenshot
+  SESSION_SCREENSHOT: 'cipher-mux:session:screenshot',
+
   // Updates
   UPDATE_CHECK: 'cipher-mux:update:check',
   UPDATE_AVAILABLE: 'cipher-mux:update:available',

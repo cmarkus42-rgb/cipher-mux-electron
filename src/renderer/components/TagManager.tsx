@@ -101,6 +101,23 @@ export function TagManager() {
     await loadTags()
   }
 
+  const handleArchiveLegacy = async () => {
+    // Find notes created before CF update (2026-05-01)
+    const allNotes = await api.notes.list()
+    const cutoff = '2026-05-01T00:00:00.000Z'
+    const legacy = allNotes.filter((n: any) => n.createdAt < cutoff)
+    if (legacy.length === 0) {
+      window.alert('No legacy notes found (all notes are post-CF).')
+      return
+    }
+    const confirmed = window.confirm(
+      `Archive ${legacy.length} legacy notes (created before 2026-05-01)?\n\nThey will be moved to trash and can be restored.`
+    )
+    if (!confirmed) return
+    await api.notes.trashMany(legacy.map((n: any) => n.id))
+    await loadTags()
+  }
+
   return (
     <div class="tag-manager">
       <div class="tag-manager__header">
@@ -118,12 +135,21 @@ export function TagManager() {
           {mergeMode ? t('tags.cancel', 'Cancel') : t('tags.merge', 'Merge')}
         </button>
         {!mergeMode && (
-          <button
-            class="tag-manager__add-btn"
-            onClick={() => setShowCreate(!showCreate)}
-          >
-            {showCreate ? t('tags.cancel') : t('tags.newTag')}
-          </button>
+          <>
+            <button
+              class="tag-manager__add-btn"
+              onClick={() => setShowCreate(!showCreate)}
+            >
+              {showCreate ? t('tags.cancel') : t('tags.newTag')}
+            </button>
+            <button
+              class="tag-manager__add-btn"
+              onClick={handleArchiveLegacy}
+              title="Move pre-CF notes to trash"
+            >
+              Archive Legacy
+            </button>
+          </>
         )}
       </div>
 
