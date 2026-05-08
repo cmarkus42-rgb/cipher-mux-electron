@@ -42,6 +42,7 @@ export function WorkspacesTab() {
   const [allTags, setAllTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
+  const [onboardingHint, setOnboardingHint] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
 
   const loadAll = useCallback(async () => {
@@ -101,10 +102,12 @@ export function WorkspacesTab() {
       cells: Array.from({ length: 6 }, () => ({ persona: 'empty', project: '', prompt: '' })),
       merges: {},
     }
+    const isFirst = workspaces.length === 0
     setWorkspaces((prev) => [...prev, newWs])
     setActiveWsId(id)
     setSelectedCell(0)
     setDirty(true)
+    if (isFirst) setOnboardingHint(true)
   }
 
   const handleDuplicate = () => {
@@ -343,6 +346,12 @@ export function WorkspacesTab() {
 
   return (
     <div class="ws-pane">
+      {onboardingHint && (
+        <div class="ws-onboarding" role="status">
+          <span>Your first workspace! A workspace bundles grid layout, presets, notes, and prompts for a project. Set it as default (star) to auto-load on startup.</span>
+          <button onClick={() => setOnboardingHint(false)} style={{ marginLeft: '8px', cursor: 'pointer', background: 'none', border: 'none', color: 'inherit', fontSize: '14px' }}>&times;</button>
+        </div>
+      )}
       {/* LEFT: workspace list */}
       <div class="ws-list">
         <div class="ws-list-head">
@@ -409,6 +418,19 @@ export function WorkspacesTab() {
               </button>
               <button class="ws-ed-tool" onClick={handleDuplicate}>{t('workspacesTab.duplicate')}</button>
               <button class="ws-ed-tool danger" onClick={handleDelete}>{t('workspacesTab.delete')}</button>
+            </div>
+
+            {/* Sort order */}
+            <div class="ws-ed-row" style={{ gap: '6px', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', color: 'var(--color-text-dim)' }}>Sort</span>
+              <input
+                type="number"
+                min={1}
+                max={999}
+                style={{ width: '50px', fontSize: '12px', padding: '2px 4px', background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontFamily: 'var(--font-mono)' }}
+                value={ws.sortOrder ?? 100}
+                onInput={(e) => updateWs({ sortOrder: Number((e.target as HTMLInputElement).value) || 100 })}
+              />
             </div>
 
             {/* Dimension steppers */}
@@ -598,6 +620,26 @@ export function WorkspacesTab() {
                 </div>
                 <div class="insp-grid">
                   <div class="insp-field">
+                    <label>{t('workspacesTab.cellType', 'Cell Type')}</label>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        class={`btn btn--sm${cellData.type !== 'notes' ? ' btn--active' : ''}`}
+                        onClick={() => handleCellUpdate('type', undefined)}
+                        style={{ padding: '2px 10px', fontSize: '11px' }}
+                      >
+                        Session
+                      </button>
+                      <button
+                        class={`btn btn--sm${cellData.type === 'notes' ? ' btn--active' : ''}`}
+                        onClick={() => handleCellUpdate('type', 'notes')}
+                        style={{ padding: '2px 10px', fontSize: '11px' }}
+                      >
+                        Notes
+                      </button>
+                    </div>
+                  </div>
+                  {cellData.type !== 'notes' && (<>
+                  <div class="insp-field">
                     <label>{t('workspacesTab.preset')}</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {cellData.presetId && getPresetInfo(cellData.presetId) ? (
@@ -666,6 +708,14 @@ export function WorkspacesTab() {
                           style={{ fontSize: '11px', marginTop: '4px' }}
                         >+ Add Directory</button>
                       </div>
+                    </div>
+                  )}
+                  </>)}
+                  {cellData.type === 'notes' && (
+                    <div class="insp-field wide">
+                      <span style={{ color: 'var(--color-text-dim)', fontSize: '12px' }}>
+                        Notes cell — opens Notes Editor when workspace is applied. No session spawned.
+                      </span>
                     </div>
                   )}
                 </div>

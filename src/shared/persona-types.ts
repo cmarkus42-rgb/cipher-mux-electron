@@ -31,6 +31,8 @@ export interface Workspace {
   workspacePrompt?: string
   /** Workspace-level context directories injected as ## Context Directories into all project CLAUDE.md files on apply. */
   contextPaths?: string[]
+  /** Sort order for workspace list (lower = first). Default: 100. */
+  sortOrder?: number
 }
 
 export type PromptSource = 'cell' | 'workspace-override' | 'persona-default'

@@ -1668,7 +1668,17 @@ export class IpcHub {
   // ─── Workspaces ───────────────────────────────────────
   private registerWorkspaceChannels(): void {
     ipcMain.handle(IPC.WORKSPACES_LIST, () => {
-      return configStore.get('workspaces')
+      const workspaces = configStore.get('workspaces') ?? []
+      const defaultId = configStore.get('defaultWorkspaceId')
+      // Sort: default workspace first, then by sortOrder (lower first), then by name
+      return [...workspaces].sort((a: any, b: any) => {
+        if (a.id === defaultId && b.id !== defaultId) return -1
+        if (b.id === defaultId && a.id !== defaultId) return 1
+        const aSort = a.sortOrder ?? 100
+        const bSort = b.sortOrder ?? 100
+        if (aSort !== bSort) return aSort - bSort
+        return (a.name ?? '').localeCompare(b.name ?? '')
+      })
     })
 
     ipcMain.handle(IPC.WORKSPACES_SAVE, (_e, workspace: Workspace) => {

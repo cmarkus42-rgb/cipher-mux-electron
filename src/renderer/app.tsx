@@ -790,6 +790,14 @@ export function App() {
           applyMerges(ws.cols, ws.rows, ws.merges)
         }
       }
+      // Set slot types for notes cells before spawning sessions
+      if (ws?.cells) {
+        for (let i = 0; i < ws.cells.length; i++) {
+          if (ws.cells[i]?.type === 'notes') {
+            setSlotType(i, 'notes')
+          }
+        }
+      }
       const result = await api.workspaces.apply(workspaceId)
       setActiveWorkspaceId(workspaceId)
       if (result?.warnings?.length) {
