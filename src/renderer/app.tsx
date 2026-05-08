@@ -194,7 +194,7 @@ export function App() {
       combo: 'Cmd+B',
       label: t('app.shortcut.bugreport'),
       category: 'Aktionen' as const,
-      action: () => { setInfoInitialTab('settings'); setInfoVisible(true); setBugreportVisible(true) },
+      action: () => { setInfoInitialTab('settings'); setInfoVisible(true); setBugreportVisible(true); (window as any).cipherMux?.voice?.stop?.() },
     },
     {
       combo: 'Cmd+Shift+?',
@@ -1343,7 +1343,7 @@ export function App() {
               onSelectCustomTheme={selectCustomTheme}
               onSaveCustomTheme={saveCustomTheme}
               onDeleteCustomTheme={deleteCustomTheme}
-              onOpenBugreport={() => setBugreportVisible(true)}
+              onOpenBugreport={() => { setBugreportVisible(true); (window as any).cipherMux?.voice?.stop?.() }}
               registeredShortcuts={shortcutEntries}
             />
           </div>

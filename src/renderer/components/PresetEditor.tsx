@@ -498,9 +498,12 @@ export function PresetEditor() {
               }
               ta.focus()
               ta.setSelectionRange(charPos, charPos)
-              // Scroll textarea so the heading line is near the top
-              const lineHeight = 18 // approximate
-              ta.scrollTop = Math.max(0, lineIndex * lineHeight - 20)
+              // Scroll textarea so the heading line is visible near the top.
+              // Use computed lineHeight and account for paddingTop.
+              const style = window.getComputedStyle(ta)
+              const lineHeight = parseFloat(style.lineHeight) || 18
+              const paddingTop = parseFloat(style.paddingTop) || 0
+              ta.scrollTop = Math.max(0, lineIndex * lineHeight + paddingTop - lineHeight)
             }
             return (
               <div class="pp-field" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>

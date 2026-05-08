@@ -64,8 +64,15 @@ export function NotesCell({
       // Check if already open
       const existing = tabs.find((t) => t.id === info.id)
       if (existing) {
-        setActiveTabId(info.id)
-        return
+        // Detect noteType change: if testcase tag was added or removed, reload the tab
+        const wasTestcase = !!existing.testcase
+        const isTestcase = !!info.tags?.includes('testcase')
+        if (wasTestcase === isTestcase) {
+          setActiveTabId(info.id)
+          return
+        }
+        // noteType changed — remove stale tab and fall through to reload
+        setTabs((prev) => prev.filter((t) => t.id !== info.id))
       }
       // Read content
       const apiObj = (window as any).cipherMux
