@@ -77,7 +77,7 @@ export function registerBuiltinEntities(
     projectPath: `${entitiesBase}/orchestrator`,
     features: ['mcp'],
     visible: true,
-    sortOrder: 10,
+    sortOrder: 70,
     singleInstance: true,
   })
 
@@ -89,7 +89,7 @@ export function registerBuiltinEntities(
     projectPath: `${entitiesBase}/cyber-factory`,
     features: ['mcp'],
     visible: true,
-    sortOrder: 20,
+    sortOrder: 40,
     singleInstance: true,
   })
 
@@ -114,7 +114,7 @@ export function registerBuiltinEntities(
 
     features: ['mcp', 'memory'],
     visible: true,
-    sortOrder: 40,
+    sortOrder: 10,
   })
 
   registry.register({
@@ -126,7 +126,7 @@ export function registerBuiltinEntities(
 
     features: ['mcp', 'memory'],
     visible: true,
-    sortOrder: 50,
+    sortOrder: 30,
   })
 
   registry.register({
@@ -138,7 +138,7 @@ export function registerBuiltinEntities(
 
     features: ['mcp', 'memory'],
     visible: true,
-    sortOrder: 55,
+    sortOrder: 20,
   })
 
   registry.register({
@@ -150,7 +150,7 @@ export function registerBuiltinEntities(
     startupGreeting: 'Session gestartet. Warte auf Voice-Input.',
     features: ['mcp', 'memory'],
     visible: true,
-    sortOrder: 60,
+    sortOrder: 90,
   })
 
   registry.register({
@@ -161,7 +161,7 @@ export function registerBuiltinEntities(
     projectPath: `${entitiesBase}/audit`,
     features: ['mcp'],
     visible: true,
-    sortOrder: 70,
+    sortOrder: 80,
   })
 
   registry.register({
@@ -172,7 +172,7 @@ export function registerBuiltinEntities(
     projectPath: `${entitiesBase}/debugger`,
     features: ['mcp', 'memory'],
     visible: true,
-    sortOrder: 75,
+    sortOrder: 60,
     singleInstance: true,
   })
 
@@ -184,7 +184,7 @@ export function registerBuiltinEntities(
     projectPath: `${entitiesBase}/testing-assistant`,
     features: ['mcp', 'memory'],
     visible: true,
-    sortOrder: 76,
+    sortOrder: 50,
     singleInstance: true,
   })
 
@@ -196,7 +196,7 @@ export function registerBuiltinEntities(
     projectPath: `${entitiesBase}/bugreport`,
     features: ['mcp'],
     visible: true,
-    sortOrder: 80,
+    sortOrder: 100,
     singleInstance: true,
   })
 }

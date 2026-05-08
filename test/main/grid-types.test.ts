@@ -225,54 +225,28 @@ describe('grid-types', () => {
   })
 
   describe('getFocusModeOverlappedSlots', () => {
-    it('returns 3 overlapped slots for focus at top-left of 3x3 grid', () => {
+    it('overlaps all other slots in 3x3 grid (full-screen)', () => {
       const grid = createEmptyGrid({ cols: 3, rows: 3 })
       grid.slots[0] = { sessionId: 'ses-1', rowSpan: 1, type: 'session' }
       const overlapped = getFocusModeOverlappedSlots(grid, 0)
-      // Focus at (0,0) expands right and down: covers (0,1), (1,0), (1,1)
-      assert.ok(overlapped.has(1), 'should overlap col=1,row=0')
-      assert.ok(overlapped.has(3), 'should overlap col=0,row=1')
-      assert.ok(overlapped.has(4), 'should overlap col=1,row=1')
-      assert.strictEqual(overlapped.size, 3)
+      // Full-screen: all 8 other slots are overlapped
+      assert.strictEqual(overlapped.size, 8)
+      assert.ok(!overlapped.has(0), 'focus slot itself not overlapped')
+      for (let i = 1; i < 9; i++) assert.ok(overlapped.has(i))
     })
 
-    it('clamps to grid bounds at bottom-right corner', () => {
-      // 2x2 grid, focus at idx=3 (col=1, row=1) — no room to expand
+    it('overlaps all other slots in 2x2 grid', () => {
       const grid = createEmptyGrid({ cols: 2, rows: 2 })
       grid.slots[3] = { sessionId: 'ses-1', rowSpan: 1, type: 'session' }
       const overlapped = getFocusModeOverlappedSlots(grid, 3)
-      // At bottom-right, can't expand right or down — no overlapped slots
-      assert.strictEqual(overlapped.size, 0)
+      assert.strictEqual(overlapped.size, 3)
+      assert.ok(overlapped.has(0))
+      assert.ok(overlapped.has(1))
+      assert.ok(overlapped.has(2))
     })
 
-    it('clamps at right edge (col=last)', () => {
-      // 3x2 grid, focus at idx=2 (col=2, row=0) — can expand down but not right
-      const grid = createEmptyGrid({ cols: 3, rows: 2 })
-      grid.slots[2] = { sessionId: 'ses-1', rowSpan: 1, type: 'session' }
-      const overlapped = getFocusModeOverlappedSlots(grid, 2)
-      // Only (2,1) below
-      assert.ok(overlapped.has(5), 'should overlap col=2,row=1')
-      assert.strictEqual(overlapped.size, 1)
-    })
-
-    it('clamps at bottom edge (row=last)', () => {
-      // 2x2 grid, focus at idx=2 (col=0, row=1) — can expand right but not down
-      const grid = createEmptyGrid({ cols: 2, rows: 2 })
-      grid.slots[2] = { sessionId: 'ses-1', rowSpan: 1, type: 'session' }
-      const overlapped = getFocusModeOverlappedSlots(grid, 2)
-      // Only (1,1) to the right
-      assert.ok(overlapped.has(3), 'should overlap col=1,row=1')
-      assert.strictEqual(overlapped.size, 1)
-    })
-
-    it('returns empty set for 1-column grid', () => {
-      const grid = createEmptyGrid({ cols: 1, rows: 3 })
-      const overlapped = getFocusModeOverlappedSlots(grid, 0)
-      assert.strictEqual(overlapped.size, 0)
-    })
-
-    it('returns empty set for 1-row grid', () => {
-      const grid = createEmptyGrid({ cols: 3, rows: 1 })
+    it('works for 1x1 grid (no overlaps)', () => {
+      const grid = createEmptyGrid({ cols: 1, rows: 1 })
       const overlapped = getFocusModeOverlappedSlots(grid, 0)
       assert.strictEqual(overlapped.size, 0)
     })
@@ -285,31 +259,28 @@ describe('grid-types', () => {
   })
 
   describe('getFocusModePlacement', () => {
-    it('returns 2-col 2-row span for top-left cell', () => {
-      const p = getFocusModePlacement(3, 3, 0) // col=0, row=0
+    it('spans full grid for any slot in 3x3', () => {
+      const p = getFocusModePlacement(3, 3, 0)
+      assert.strictEqual(p.gridColumn, '1 / 4')
+      assert.strictEqual(p.gridRow, '1 / 4')
+    })
+
+    it('spans full grid for any slot in 2x2', () => {
+      const p = getFocusModePlacement(2, 2, 3)
       assert.strictEqual(p.gridColumn, '1 / 3')
       assert.strictEqual(p.gridRow, '1 / 3')
     })
 
-    it('clamps span to grid bounds at bottom-right', () => {
-      // 2x2 grid, idx=3 (col=1, row=1)
-      const p = getFocusModePlacement(2, 2, 3)
-      assert.strictEqual(p.gridColumn, '2 / 3') // only 1 col
-      assert.strictEqual(p.gridRow, '2 / 3')    // only 1 row
-    })
-
-    it('spans 2 cols and clamps row at bottom edge', () => {
-      // 3x2 grid, idx=3 (col=0, row=1) — last row
+    it('spans full grid for 3x2', () => {
       const p = getFocusModePlacement(3, 2, 3)
-      assert.strictEqual(p.gridColumn, '1 / 3')
-      assert.strictEqual(p.gridRow, '2 / 3') // clamped
+      assert.strictEqual(p.gridColumn, '1 / 4')
+      assert.strictEqual(p.gridRow, '1 / 3')
     })
 
-    it('middle cell in 3x3 grid spans full 2x2', () => {
-      // idx=4 (col=1, row=1) in 3x3
+    it('spans full grid regardless of slot index', () => {
       const p = getFocusModePlacement(3, 3, 4)
-      assert.strictEqual(p.gridColumn, '2 / 4')
-      assert.strictEqual(p.gridRow, '2 / 4')
+      assert.strictEqual(p.gridColumn, '1 / 4')
+      assert.strictEqual(p.gridRow, '1 / 4')
     })
   })
 })

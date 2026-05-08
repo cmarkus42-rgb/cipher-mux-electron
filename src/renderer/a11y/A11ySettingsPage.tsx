@@ -147,6 +147,22 @@ export function A11ySettingsPage({ settings, onUpdate }: A11ySettingsPageProps) 
 
         <div class="a11y-pref-row">
           <div class="a11y-pref-label">
+            <span>Notes-Editor Schriftgroesse</span>
+            <span class="a11y-pref-hint">{settings.noteEditorFontSize}px (10–32) — CodeMirror Editor</span>
+          </div>
+          <input
+            type="range"
+            min={10}
+            max={32}
+            step={1}
+            value={settings.noteEditorFontSize}
+            onChange={e => onUpdate({ noteEditorFontSize: Number((e.target as HTMLInputElement).value) })}
+            aria-label="Notes-Editor Schriftgroesse"
+          />
+        </div>
+
+        <div class="a11y-pref-row">
+          <div class="a11y-pref-label">
             <span>Zeilenhoehe</span>
             <span class="a11y-pref-hint">{settings.lineHeight.toFixed(1)} (1.0–3.0)</span>
           </div>

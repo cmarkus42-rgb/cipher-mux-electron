@@ -226,6 +226,54 @@
   border-color: var(--color-text);
 }
 
+.focus-bar__sep {
+  color: var(--color-border);
+  margin: 0 4px;
+}
+
+.focus-bar__control {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-dim);
+  padding: 2px 8px;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+.focus-bar__control:hover {
+  color: var(--color-text);
+  border-color: var(--color-text);
+}
+
+.focus-bar__font-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.focus-bar__font-btn {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-dim);
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.focus-bar__font-btn:hover {
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+.focus-bar__font-size {
+  font-size: var(--font-size-xs);
+  min-width: 36px;
+  text-align: center;
+}
+
 /* ── Reduced Motion ───────────────────────────── */
 
 .a11y-reduce-motion,

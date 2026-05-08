@@ -114,42 +114,22 @@ export function nextRowSpan(currentSpan: number, maxRows: number): number {
  *  Returns the set of indices that should be hidden, excluding the focus slot itself.
  *  If the grid is too small for 2x2 (1 col or 1 row), returns empty set. */
 export function getFocusModeOverlappedSlots(state: GridState, focusSlotIdx: number): Set<number> {
-  const { cols, rows } = state.config
   const overlapped = new Set<number>()
-  if (cols < 2 || rows < 2) return overlapped
   if (focusSlotIdx < 0 || focusSlotIdx >= state.slots.length) return overlapped
 
-  const col = focusSlotIdx % cols
-  const row = Math.floor(focusSlotIdx / cols)
-
-  // Focus cell expands right and down. Clamp to grid bounds.
-  const endCol = Math.min(col + 1, cols - 1)
-  const endRow = Math.min(row + 1, rows - 1)
-
-  for (let r = row; r <= endRow; r++) {
-    for (let c = col; c <= endCol; c++) {
-      const idx = r * cols + c
-      if (idx !== focusSlotIdx) {
-        overlapped.add(idx)
-      }
-    }
+  // Full-screen: all slots except the focused one are overlapped
+  for (let i = 0; i < state.slots.length; i++) {
+    if (i !== focusSlotIdx) overlapped.add(i)
   }
   return overlapped
 }
 
-/** Compute CSS grid placement for a focus-mode cell (2x2 area).
- *  Returns gridColumn and gridRow CSS values. */
-export function getFocusModePlacement(cols: number, rows: number, focusSlotIdx: number): { gridColumn: string; gridRow: string } {
-  const col = focusSlotIdx % cols
-  const row = Math.floor(focusSlotIdx / cols)
-  // 1-based CSS grid lines. Span 2 cols and 2 rows, clamped to grid bounds.
-  const colStart = col + 1
-  const colEnd = Math.min(col + 3, cols + 1)  // +3 because CSS grid end is exclusive
-  const rowStart = row + 1
-  const rowEnd = Math.min(row + 3, rows + 1)
+/** Compute CSS grid placement for a focus-mode cell (full grid).
+ *  Returns gridColumn and gridRow CSS values spanning the entire grid. */
+export function getFocusModePlacement(cols: number, rows: number, _focusSlotIdx: number): { gridColumn: string; gridRow: string } {
   return {
-    gridColumn: `${colStart} / ${colEnd}`,
-    gridRow: `${rowStart} / ${rowEnd}`,
+    gridColumn: `1 / ${cols + 1}`,
+    gridRow: `1 / ${rows + 1}`,
   }
 }
 
