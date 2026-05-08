@@ -2596,7 +2596,7 @@ export class IpcHub {
    * persisted ui.grid config.
    */
   private async restoreKeepWorkingFromRecovery(
-    snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string }>,
+    snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }>,
     gridConfig: { cols: number; rows: number } | undefined,
     recovered: Array<{ id: string; name: string; projectPath: string | null; entityId?: string }>,
   ): Promise<void> {
