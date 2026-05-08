@@ -41,7 +41,7 @@ describe('generateV2Template', () => {
     const template = generateV2Template()
     assert.ok(template.includes('Phase 1'))
     assert.ok(template.includes('Phase 7'))
-    assert.ok(template.includes('Pflichtfeld-Check'))
+    assert.ok(template.includes('Required Fields Check'))
     assert.ok(template.includes('REQ-IDs'))
   })
 
@@ -58,7 +58,7 @@ describe('generateV2Template', () => {
     const scaffoldLines = lines.filter(l => l.toLowerCase().includes('scaffolding'))
     for (const line of scaffoldLines) {
       assert.ok(
-        line.includes('Cyber Factory') || line.includes('nicht'),
+        line.includes('Cyber Factory') || line.includes('nicht') || line.includes('not'),
         `Scaffolding line should reference Cyber Factory or negation: ${line}`
       )
     }
