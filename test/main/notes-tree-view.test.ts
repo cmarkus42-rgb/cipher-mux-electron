@@ -179,10 +179,10 @@ describe('applyTagFilter', () => {
 
 describe('filterByWorkspace', () => {
   const notes = [
-    makeNote('n1', ['kind:bugreport', 'scope:ws-123']),
-    makeNote('n2', ['kind:feature', 'scope:ws-456']),
+    makeNote('n1', ['kind:bugreport', 'workspace:ws-123']),
+    makeNote('n2', ['kind:feature', 'workspace:ws-456']),
     makeNote('n3', ['kind:bugreport']),
-    makeNote('n4', ['scope:ws-123', 'domain:trading']),
+    makeNote('n4', ['workspace:ws-123', 'domain:trading']),
   ]
 
   it('filters to notes with matching scope tag', () => {

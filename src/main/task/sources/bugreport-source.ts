@@ -14,8 +14,9 @@ export class BugreportTaskSource implements TaskSource {
   }
 
   start(emit: TaskEmitter): void {
+    this._emit = emit
     fs.mkdirSync(this.watchPath, { recursive: true })
-    this.scanExisting(emit)
+    this.scanDir(emit)
 
     this.watcher = fs.watch(this.watchPath, (eventType, filename) => {
       if (!filename || !filename.endsWith('.md')) return
@@ -32,7 +33,14 @@ export class BugreportTaskSource implements TaskSource {
     }
   }
 
-  private scanExisting(emit: TaskEmitter): void {
+  /** Re-scan directory for new .md files. Useful when fs.watch misses events. */
+  rescan(): void {
+    if (this._emit) this.scanDir(this._emit)
+  }
+
+  private _emit: TaskEmitter | null = null
+
+  private scanDir(emit: TaskEmitter): void {
     let entries: string[]
     try {
       entries = fs.readdirSync(this.watchPath)

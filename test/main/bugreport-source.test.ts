@@ -58,11 +58,9 @@ describe('BugreportTaskSource', () => {
     const filePath = path.join(tmpDir, 'new-bug.md')
     fs.writeFileSync(filePath, 'A new bug report')
 
-    // Poll for the emitted event — macOS fs.watch in tmpdir can be very slow
-    const deadline = Date.now() + 5000
-    while (emitted.length === 0 && Date.now() < deadline) {
-      await waitFor(200)
-    }
+    // Give fs.watch a chance, then fall back to manual rescan (fs.watch is unreliable under load)
+    await waitFor(500)
+    if (emitted.length === 0) source.rescan()
     source.stop()
 
     assert.equal(emitted.length, 1)

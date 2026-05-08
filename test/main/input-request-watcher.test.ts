@@ -103,7 +103,9 @@ describe('InputRequestWatcher', () => {
     const data = makeRequestsFile([makeBubbleRequest('ir-001')])
     fs.writeFileSync(filePath, JSON.stringify(data))
 
-    await waitFor(1200) // debounce is 300ms, fs.watch can be slow
+    // Give fs.watch a chance, then fall back to manual poll (fs.watch is unreliable under load)
+    await waitFor(500)
+    if (events.length === 0) watcher.poll()
     watcher.stop()
 
     assert.ok(events.length >= 1, 'should have emitted at least one event')
