@@ -40,8 +40,8 @@ export function extractPromptFromCapture(capture: string): string | undefined {
   const lines = capture.split('\n')
   for (let i = lines.length - 1; i >= 0; i--) {
     let line = lines[i].trim()
-    // Strip ANSI escape codes
-    line = line.replace(/\x1b\[[0-9;]*m/g, '')
+    // Strip all ANSI escape sequences (color, cursor, screen control)
+    line = line.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').replace(/\x1b\][^\x07]*\x07/g, '')
     // Strip leading prompt markers
     line = line.replace(/^[>$%❯●■▸]+\s*/, '')
     line = line.trim()

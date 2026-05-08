@@ -2695,20 +2695,26 @@ export class IpcHub {
   }
 
   /** Live-update Keep Working snapshot when grid changes (called on every CONFIG_SAVE_GRID). */
-  private updateKeepWorkingSnapshot(grid: { config: { cols: number; rows: number }; slots: Array<{ sessionId: string | null }> }): void {
+  private async updateKeepWorkingSnapshot(grid: { config: { cols: number; rows: number }; slots: Array<{ sessionId: string | null }> }): Promise<void> {
     const sessions = this.sessionManager.list().filter(s => s.status === 'active')
     if (sessions.length === 0) return
     const allTasks = this.taskManager ? this.taskManager.list() : []
-    const snapshot = sessions.map(s => {
+    const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }> = []
+    for (const s of sessions) {
       const slotIdx = grid.slots.findIndex(slot => slot.sessionId === s.id)
-      return {
+      if (!s.projectPath || slotIdx < 0) continue
+      let capture: string | undefined
+      try {
+        if (s.tmuxPane) capture = await this.tmux.capturePane(s.tmuxPane, 10)
+      } catch { /* ignore */ }
+      snapshot.push({
         name: s.name ?? 'session',
         projectPath: s.projectPath ?? '',
-        gridSlot: slotIdx >= 0 ? slotIdx : -1,
+        gridSlot: slotIdx,
         entityId: s.entityId,
-        topic: resolveSessionTopic(s, allTasks, undefined),
-      }
-    }).filter(e => e.projectPath && e.gridSlot >= 0)
+        topic: resolveSessionTopic(s, allTasks, capture),
+      })
+    }
     configStore.set('keepWorkingSnapshot', {
       sessions: snapshot,
       gridConfig: grid.config,
