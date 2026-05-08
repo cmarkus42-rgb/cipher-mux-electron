@@ -234,6 +234,11 @@ export async function executeHandoff(
 
     // Format and deliver via tmux send-keys (REQ-HANDOFF-005)
     const message = formatPayload(config.senderEntityId, config.payload)
+    // Escape first: dismiss any Suggested Prompt the idle CLI may be showing.
+    // Without this, the subsequent Enter could confirm "push it" or similar
+    // destructive suggestions instead of submitting the handoff payload.
+    await ctx.sessionManager.sendKeys(targetSession.id, 'Escape')
+    await new Promise(resolve => setTimeout(resolve, 200))
     await ctx.sessionManager.sendKeys(targetSession.id, message)
     // Claude CLI needs time to render the text before recognizing Enter as submit.
     // Without delay, the \r arrives while the CLI is still processing the payload
@@ -248,6 +253,8 @@ export async function executeHandoff(
     try {
       const captured = await ctx.sessionManager.capture(targetSession.id, 10)
       if (captured.includes('[Pasted text')) {
+        await ctx.sessionManager.sendKeys(targetSession.id, 'Escape')
+        await new Promise(resolve => setTimeout(resolve, 100))
         await ctx.sessionManager.sendKeys(targetSession.id, '\r')
       }
     } catch {

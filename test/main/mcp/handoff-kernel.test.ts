@@ -170,9 +170,11 @@ describe('handoff-kernel: executeHandoff', () => {
     assert.equal((result as HandoffResult).wasExisting, true)
     assert.equal((result as HandoffResult).targetSessionId, existingSession.id)
 
-    // Verify sendKeys was called with formatted payload
-    assert.ok(ctx.sendKeysCalls.length >= 2)
-    const fullMessage = ctx.sendKeysCalls[0][1]
+    // Verify sendKeys was called: Escape + payload + Enter (at minimum)
+    assert.ok(ctx.sendKeysCalls.length >= 3)
+    // First call is Escape to dismiss any Suggested Prompt
+    assert.equal(ctx.sendKeysCalls[0][1], 'Escape')
+    const fullMessage = ctx.sendKeysCalls[1][1]
     assert.ok(fullMessage.includes('[HANDOFF from ideation-partner]'))
     assert.ok(fullMessage.includes('specPath'))
   })
@@ -366,7 +368,8 @@ describe('handoff-kernel: delivery format', () => {
 
     await executeHandoff(ctx, config)
 
-    const delivered = ctx.sendKeysCalls[0][1]
+    // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
+    const delivered = ctx.sendKeysCalls[1][1]
     assert.ok(delivered.startsWith('[HANDOFF from ideation-partner]'))
     assert.ok(delivered.includes('**specPath:** /tmp/spec.md'))
     assert.ok(delivered.includes('**phase:** architect'))
@@ -385,7 +388,8 @@ describe('handoff-kernel: delivery format', () => {
 
     await executeHandoff(ctx, config)
 
-    const delivered = ctx.sendKeysCalls[0][1]
+    // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
+    const delivered = ctx.sendKeysCalls[1][1]
     assert.ok(delivered.includes('**gaps:**'))
     assert.ok(delivered.includes('- NFR missing'))
     assert.ok(delivered.includes('- No error handling spec'))

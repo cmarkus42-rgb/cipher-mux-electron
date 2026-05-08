@@ -140,7 +140,8 @@ describe('REQ-TOOLS-001: mux_ideation_handoff_refinement', () => {
     assert.equal(parsed.targetSessionId, session.id)
 
     // Verify delivery contains sender identity
-    const message = sendKeysCalls[0][1]
+    // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
+    const message = sendKeysCalls[1][1]
     assert.ok(message.includes('[HANDOFF from ideation-partner]'))
     assert.ok(message.includes('anforderungspaketPath'))
     assert.ok(message.includes('/tmp/paket.md'))
@@ -184,7 +185,8 @@ describe('REQ-TOOLS-002: mux_refinement_handoff_cyber_factory', () => {
     assert.equal(parsed.ok, true)
     assert.equal(parsed.targetSessionId, session.id)
 
-    const message = sendKeysCalls[0][1]
+    // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
+    const message = sendKeysCalls[1][1]
     assert.ok(message.includes('[HANDOFF from refinement]'))
     assert.ok(message.includes('detailSpecPath'))
     assert.ok(message.includes('builder'))
@@ -201,7 +203,8 @@ describe('REQ-TOOLS-002: mux_refinement_handoff_cyber_factory', () => {
       projectPath: '/projects/my-app',
     })
 
-    const message = sendKeysCalls[0][1]
+    // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
+    const message = sendKeysCalls[1][1]
     assert.ok(message.includes('architect'))
   })
 
@@ -246,7 +249,8 @@ describe('REQ-TOOLS-003: mux_refinement_handoff_ideation', () => {
     assert.equal(parsed.ok, true)
     assert.equal(parsed.targetSessionId, session.id)
 
-    const message = sendKeysCalls[0][1]
+    // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
+    const message = sendKeysCalls[1][1]
     assert.ok(message.includes('[HANDOFF from refinement]'))
     assert.ok(message.includes('NFR gaps'))
     assert.ok(message.includes('No performance spec'))
@@ -296,7 +300,8 @@ describe('REQ-TOOLS-004: mux_cyber_factory_handoff_testing', () => {
     assert.equal(parsed.ok, true)
     assert.equal(parsed.targetSessionId, session.id)
 
-    const message = sendKeysCalls[0][1]
+    // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
+    const message = sendKeysCalls[1][1]
     assert.ok(message.includes('[HANDOFF from cyber-factory]'))
     assert.ok(message.includes('run_id'))
     assert.ok(message.includes('welle-3'))
@@ -362,7 +367,8 @@ describe('REQ-TOOLS-005: mux_cyber_factory_handoff_debugger', () => {
     assert.equal(parsed.ok, true)
     assert.equal(parsed.targetSessionId, session.id)
 
-    const message = sendKeysCalls[0][1]
+    // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
+    const message = sendKeysCalls[1][1]
     assert.ok(message.includes('[HANDOFF from cyber-factory]'))
     assert.ok(message.includes('findings_report'))
     assert.ok(message.includes('severity_summary'))
@@ -446,9 +452,10 @@ describe('REQ-TOOLS-006: mux_testing_findings_handoff_debugger', () => {
     assert.equal(parsed.ok, true)
     assert.equal(parsed.targetSessionId, session.id)
 
-    // Verify tmux delivery happened
-    assert.ok(sendKeysCalls.length >= 2) // message + \r
-    const message = sendKeysCalls[0][1]
+    // Verify tmux delivery happened: Escape + message + \r (at minimum)
+    assert.ok(sendKeysCalls.length >= 3)
+    // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
+    const message = sendKeysCalls[1][1]
     assert.ok(message.includes('[HANDOFF from testing-assistant]'))
   })
 })
