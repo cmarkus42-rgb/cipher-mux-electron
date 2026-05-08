@@ -2284,6 +2284,11 @@
   color: var(--color-danger, #f44);
 }
 
+.tag-bar__chip--cyclable .tag-bar__chip-text:hover {
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
 .tag-bar__input-wrap {
   position: relative;
   min-width: 100px;

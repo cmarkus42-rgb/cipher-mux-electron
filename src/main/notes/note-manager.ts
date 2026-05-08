@@ -24,6 +24,11 @@ export class NoteManager {
     this.cleanTrash()
   }
 
+  /** Get the notes directory path (used by NoteWatcher). */
+  getNotesDir(): string {
+    return this.notesDir
+  }
+
   /** Remove all files from .trash/ on startup */
   private cleanTrash(): void {
     try {

@@ -53,6 +53,7 @@ import { BRAND } from '../shared/brand'
 import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest, EntityId, Character, RecoveryResult } from '../shared/types'
 import type { Persona, Workspace } from '../shared/persona-types'
 import { applyWorkspace } from './workspace/workspace-manager'
+import { NoteWatcher } from './notes/note-watcher'
 import { checkAll as setupCheckAll } from './setup/dependency-checker'
 import { installDependency } from './setup/dependency-installer'
 import { deployBundledVoice } from './setup/voice-bundle'
@@ -82,6 +83,7 @@ export class IpcHub {
   private noteSearchIndex!: NoteSearchIndex
   private tagClassRepo!: TagClassRepo
   private tagIndex!: TagIndex
+  private noteWatcher!: NoteWatcher
   private memoryStore: MemoryStore | null = null
   private btShutterManager: BtShutterManager | null = null
   private cyberFactoryManager: CyberFactoryManager | null = null
@@ -142,6 +144,15 @@ export class IpcHub {
     this.tagClassRepo = new TagClassRepo(notesDir)
     this.tagIndex = new TagIndex(notesDir, this.tagClassRepo)
     this.tagIndex.rebuild()
+    this.noteWatcher = new NoteWatcher(notesDir, (noteId) => {
+      console.log(`[NoteWatcher] External change detected: ${noteId}`)
+      this.tagIndex.rebuild()
+      this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, {
+        action: 'external-update',
+        id: noteId,
+      })
+    })
+    this.noteWatcher.start()
 
     // Initialize Companion MemoryStore
     try {
@@ -1731,6 +1742,7 @@ export class IpcHub {
           }
         }
       }
+      this.noteWatcher.suppressNext(id)
       const note = await this.noteManager.save(id, body, effectiveTags)
       // Update search index + tag index
       this.noteSearchIndex.addOrUpdate({ info: note, body })
@@ -1788,6 +1800,7 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.NOTES_DELETE, async (_e, { id }: { id: string }) => {
+      this.noteWatcher.suppressNext(id)
       const ok = await this.noteManager.delete(id)
       if (ok) {
         this.noteSearchIndex.remove(id)
@@ -1799,6 +1812,7 @@ export class IpcHub {
 
     // REQ-NOTES-006: Trash (soft delete with undo)
     ipcMain.handle(IPC.NOTES_TRASH, async (_e, { id }: { id: string }) => {
+      this.noteWatcher.suppressNext(id)
       const ok = await this.noteManager.trash(id)
       if (ok) {
         this.noteSearchIndex.remove(id)
@@ -1966,6 +1980,15 @@ export class IpcHub {
         this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
       }
       return { ok: true, affected: affected.length }
+    })
+
+    ipcMain.handle(IPC.NOTES_TAG_MERGE, async (_e, { sources, target }: { sources: string[]; target: string }) => {
+      const result = this.noteTagging.mergeTags(sources, target)
+      if (result.affected > 0) {
+        this.tagIndex.rebuild()
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+      }
+      return result
     })
 
     // Tag Class Repository (REQ-NOTES-010)

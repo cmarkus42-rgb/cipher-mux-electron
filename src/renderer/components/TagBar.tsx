@@ -1,6 +1,7 @@
 // src/renderer/components/TagBar.tsx
 
 import { useState, useRef, useCallback, useEffect } from 'preact/hooks'
+import { EXCLUSIVE_TAG_CLASSES } from '../../shared/constants'
 
 const MAX_TAGS = 5
 
@@ -27,6 +28,7 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
   const [allTags, setAllTags] = useState<string[]>([])
+  const [classValues, setClassValues] = useState<Record<string, string[]>>({})
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
@@ -36,6 +38,21 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
     if (!api?.notes?.tags) return
     api.notes.tags().then((repo: { tags: Record<string, { count: number }> }) => {
       setAllTags(Object.keys(repo.tags))
+    }).catch(() => {})
+  }, [])
+
+  // Load class values for cycle-click
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.notes?.tagClassRepo) return
+    api.notes.tagClassRepo().then((repo: { classes: Record<string, { values: string[] }> }) => {
+      const cv: Record<string, string[]> = {}
+      for (const [cls, data] of Object.entries(repo.classes)) {
+        if (EXCLUSIVE_TAG_CLASSES.includes(cls) && data.values.length > 1) {
+          cv[cls] = data.values
+        }
+      }
+      setClassValues(cv)
     }).catch(() => {})
   }, [])
 
@@ -87,7 +104,16 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
       return
     }
 
-    onTagsChange([...tags, trimmed])
+    // Exclusive categories: remove existing tag of same class
+    const colonIdx = trimmed.indexOf(':')
+    const tagClass = colonIdx > 0 ? trimmed.slice(0, colonIdx) : null
+    let newTags = [...tags]
+    if (tagClass && EXCLUSIVE_TAG_CLASSES.includes(tagClass)) {
+      newTags = newTags.filter(t => !t.startsWith(tagClass + ':'))
+    }
+    newTags.push(trimmed)
+
+    onTagsChange(newTags)
     setInput('')
     setShowSuggestions(false)
   }, [tags, onTagsChange])
@@ -117,22 +143,47 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
     }
   }, [tags, addTag, removeTag])
 
+  const cycleTag = useCallback((tag: string) => {
+    const colonIdx = tag.indexOf(':')
+    if (colonIdx <= 0) return
+    const cls = tag.slice(0, colonIdx)
+    const val = tag.slice(colonIdx + 1)
+    const values = classValues[cls]
+    if (!values || values.length < 2) return
+    const idx = values.indexOf(val)
+    const nextIdx = (idx + 1) % values.length
+    const newTag = `${cls}:${values[nextIdx]}`
+    const newTags = tags.map(t => t === tag ? newTag : t)
+    onTagsChange(newTags)
+  }, [tags, classValues, onTagsChange])
+
   return (
     <div class="tag-bar">
       {/* Current tags as chips */}
       <div class="tag-bar__chips">
-        {tags.map(tag => (
-          <span key={tag} class="tag-bar__chip">
-            <span class="tag-bar__chip-text">{tag}</span>
-            <button
-              class="tag-bar__chip-remove"
-              onClick={() => removeTag(tag)}
-              title="Tag entfernen"
-            >
-              ×
-            </button>
-          </span>
-        ))}
+        {tags.map(tag => {
+          const colonIdx = tag.indexOf(':')
+          const cls = colonIdx > 0 ? tag.slice(0, colonIdx) : null
+          const canCycle = !!(cls && EXCLUSIVE_TAG_CLASSES.includes(cls) && (classValues[cls]?.length ?? 0) > 1)
+
+          return (
+            <span key={tag} class={`tag-bar__chip${canCycle ? ' tag-bar__chip--cyclable' : ''}`}>
+              <span
+                class="tag-bar__chip-text"
+                onClick={canCycle ? () => cycleTag(tag) : undefined}
+                title={canCycle ? `Click to cycle ${cls} values` : undefined}
+                style={canCycle ? { cursor: 'pointer' } : undefined}
+              >{tag}</span>
+              <button
+                class="tag-bar__chip-remove"
+                onClick={() => removeTag(tag)}
+                title="Tag entfernen"
+              >
+                &times;
+              </button>
+            </span>
+          )
+        })}
 
         {/* Input field */}
         <div class="tag-bar__input-wrap">
@@ -141,7 +192,7 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
             class="tag-bar__input"
             type="text"
             value={input}
-            placeholder={tags.length >= MAX_TAGS ? 'Max erreicht' : 'Tag hinzufügen...'}
+            placeholder={tags.length >= MAX_TAGS ? 'Max erreicht' : 'Tag hinzufuegen...'}
             disabled={tags.length >= MAX_TAGS}
             onInput={(e) => {
               setInput((e.target as HTMLInputElement).value)

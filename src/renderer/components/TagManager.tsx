@@ -23,6 +23,8 @@ export function TagManager() {
   const [newTagName, setNewTagName] = useState('')
   const [newTagDesc, setNewTagDesc] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [mergeMode, setMergeMode] = useState(false)
+  const [selectedForMerge, setSelectedForMerge] = useState<Set<string>>(new Set())
 
   const loadTags = useCallback(async () => {
     const list = await api.notes.tagList()
@@ -76,6 +78,29 @@ export function TagManager() {
     await loadTags()
   }
 
+  const toggleMergeSelect = (name: string) => {
+    setSelectedForMerge(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
+  const handleMerge = async () => {
+    if (selectedForMerge.size < 2) return
+    const sources = [...selectedForMerge]
+    const target = sources[0]
+    const confirmed = window.confirm(
+      `Merge ${sources.length} tags into "${target}"?\n\nSource tags: ${sources.join(', ')}\nAll notes will be updated.`
+    )
+    if (!confirmed) return
+    await api.notes.tagMerge(sources, target)
+    setSelectedForMerge(new Set())
+    setMergeMode(false)
+    await loadTags()
+  }
+
   return (
     <div class="tag-manager">
       <div class="tag-manager__header">
@@ -87,14 +112,31 @@ export function TagManager() {
           onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
         />
         <button
-          class="tag-manager__add-btn"
-          onClick={() => setShowCreate(!showCreate)}
+          class={`tag-manager__add-btn${mergeMode ? ' tag-manager__add-btn--active' : ''}`}
+          onClick={() => { setMergeMode(!mergeMode); setSelectedForMerge(new Set()) }}
         >
-          {showCreate ? t('tags.cancel') : t('tags.newTag')}
+          {mergeMode ? t('tags.cancel', 'Cancel') : t('tags.merge', 'Merge')}
         </button>
+        {!mergeMode && (
+          <button
+            class="tag-manager__add-btn"
+            onClick={() => setShowCreate(!showCreate)}
+          >
+            {showCreate ? t('tags.cancel') : t('tags.newTag')}
+          </button>
+        )}
       </div>
 
-      {showCreate && (
+      {mergeMode && selectedForMerge.size >= 2 && (
+        <div class="tag-manager__merge-bar">
+          <span>{selectedForMerge.size} selected — merge into "{[...selectedForMerge][0]}"</span>
+          <button class="tag-manager__btn tag-manager__btn--primary" onClick={handleMerge}>
+            {t('tags.mergeNow', 'Merge Now')}
+          </button>
+        </div>
+      )}
+
+      {showCreate && !mergeMode && (
         <div class="tag-manager__create">
           <input
             type="text"
@@ -124,15 +166,30 @@ export function TagManager() {
         <table class="tag-manager__table">
           <thead>
             <tr>
+              {mergeMode && <th class="tag-manager__col-check" />}
               <th>{t('tags.name')}</th>
               <th class="tag-manager__col-count">{t('tags.count')}</th>
               <th>{t('tags.description')}</th>
-              <th class="tag-manager__col-actions">{t('tags.actions')}</th>
+              {!mergeMode && <th class="tag-manager__col-actions">{t('tags.actions')}</th>}
             </tr>
           </thead>
           <tbody>
             {filteredTags.map((tag) => (
-              <tr key={tag.name} class="tag-manager__row">
+              <tr
+                key={tag.name}
+                class={`tag-manager__row${selectedForMerge.has(tag.name) ? ' tag-manager__row--selected' : ''}`}
+                onClick={mergeMode ? () => toggleMergeSelect(tag.name) : undefined}
+                style={mergeMode ? { cursor: 'pointer' } : undefined}
+              >
+                {mergeMode && (
+                  <td class="tag-manager__col-check">
+                    <input
+                      type="checkbox"
+                      checked={selectedForMerge.has(tag.name)}
+                      onChange={() => toggleMergeSelect(tag.name)}
+                    />
+                  </td>
+                )}
                 <td class="tag-manager__name-cell">
                   {renamingTag === tag.name ? (
                     <input
@@ -172,29 +229,31 @@ export function TagManager() {
                   ) : (
                     <span
                       class="tag-manager__desc"
-                      onClick={() => { setEditingTag(tag.name); setEditDesc(tag.description) }}
-                      title="Click to edit"
+                      onClick={!mergeMode ? () => { setEditingTag(tag.name); setEditDesc(tag.description) } : undefined}
+                      title={!mergeMode ? 'Click to edit' : undefined}
                     >
-                      {tag.description || '—'}
+                      {tag.description || '\u2014'}
                     </span>
                   )}
                 </td>
-                <td class="tag-manager__col-actions">
-                  <button
-                    class="tag-manager__action"
-                    onClick={() => { setRenamingTag(tag.name); setRenameValue(tag.name) }}
-                    title={t('tags.rename')}
-                  >
-                    Aa
-                  </button>
-                  <button
-                    class="tag-manager__action tag-manager__action--danger"
-                    onClick={() => handleDelete(tag.name)}
-                    title={t('tags.delete')}
-                  >
-                    x
-                  </button>
-                </td>
+                {!mergeMode && (
+                  <td class="tag-manager__col-actions">
+                    <button
+                      class="tag-manager__action"
+                      onClick={() => { setRenamingTag(tag.name); setRenameValue(tag.name) }}
+                      title={t('tags.rename')}
+                    >
+                      Aa
+                    </button>
+                    <button
+                      class="tag-manager__action tag-manager__action--danger"
+                      onClick={() => handleDelete(tag.name)}
+                      title={t('tags.delete')}
+                    >
+                      x
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

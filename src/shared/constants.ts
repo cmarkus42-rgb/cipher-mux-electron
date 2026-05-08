@@ -71,6 +71,9 @@ export const KICKOFF_TIMEOUT_MIN_DEFAULT = 15
 /** Max manual tags per note (workspace defaultTags don't count) */
 export const MAX_MANUAL_TAGS = 5
 
+/** Tag classes where only one value is allowed per note. Adding a second replaces the first. */
+export const EXCLUSIVE_TAG_CLASSES = ['status', 'kind']
+
 /** Default persona assignment per preset (from Pack spec 16-persona-presets.md). */
 export const PRESET_PERSONA_DEFAULTS: Record<string, string> = {
   companion: 'sokrates',
