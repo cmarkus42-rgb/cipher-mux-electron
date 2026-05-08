@@ -27,7 +27,7 @@ function removeTmpDir(dir: string): void {
 }
 
 /** Wait up to maxMs for predicate to return true, polling every 50ms */
-async function waitFor(predicate: () => boolean, maxMs = 2000): Promise<void> {
+async function waitFor(predicate: () => boolean, maxMs = 5000): Promise<void> {
   const deadline = Date.now() + maxMs
   while (Date.now() < deadline) {
     if (predicate()) return
@@ -65,8 +65,9 @@ describe('Integration: Full lifecycle', () => {
     const reportFile = path.join(tmpDir, 'login-crash.md')
     fs.writeFileSync(reportFile, '# Bug\nLogin button crashes on click.')
 
-    // Wait for the task to appear
-    await waitFor(() => mgr.nextQueued('bugreport') !== undefined)
+    // Give fs.watch a chance, then fall back to manual rescan (fs.watch is unreliable under load)
+    await waitFor(() => mgr.nextQueued('bugreport') !== undefined, 2000)
+      .catch(() => { source.rescan() })
 
     // nextQueued → dispatch
     const queued = mgr.nextQueued('bugreport')

@@ -123,6 +123,11 @@ export class InputRequestWatcher extends EventEmitter {
     }
   }
 
+  /** Force a reload from disk, useful when fs.watch misses events. */
+  poll(): void {
+    this.reload()
+  }
+
   private debouncedReload(): void {
     if (this.debounceTimer) clearTimeout(this.debounceTimer)
     this.debounceTimer = setTimeout(() => {
