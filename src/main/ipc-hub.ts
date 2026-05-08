@@ -47,6 +47,7 @@ import { EntityRegistry, registerBuiltinEntities } from './session/entity-regist
 import { CyberFactoryManager } from './cyber-factory/cyber-factory-manager'
 import { scanAndRegisterEntities } from './session/entity-scanner'
 import { resolvePersonaForPreset } from './session/persona-resolver'
+import { resolveSessionTopic } from './session/resolve-session-topic'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST, MAX_MANUAL_TAGS } from '../shared/constants'
 import { BRAND } from '../shared/brand'
@@ -2611,7 +2612,7 @@ export class IpcHub {
     }
     const claimed = new Set<string>() // recovered session IDs already matched
 
-    const slotMap: Array<{ sessionId: string | null; slotIndex: number }> = []
+    const slotMap: Array<{ sessionId: string | null; slotIndex: number; topic?: string }> = []
 
     for (const entry of snapshot) {
       // Try to find a matching recovered session
@@ -2625,7 +2626,7 @@ export class IpcHub {
       if (match) {
         // Reuse recovered session — it's still alive in tmux with Claude running
         claimed.add(match.id)
-        slotMap.push({ sessionId: match.id, slotIndex: entry.gridSlot })
+        slotMap.push({ sessionId: match.id, slotIndex: entry.gridSlot, topic: entry.topic })
 
         // Restore entity link from snapshot if missing
         if (entry.entityId && !match.entityId) {
@@ -2653,7 +2654,7 @@ export class IpcHub {
           if (entry.entityId) {
             this.sessionManager.linkEntity(session.id, entry.entityId)
           }
-          slotMap.push({ sessionId: session.id, slotIndex: entry.gridSlot })
+          slotMap.push({ sessionId: session.id, slotIndex: entry.gridSlot, topic: entry.topic })
           console.log(`[IpcHub] keepWorking: started new "${entry.name}" (--resume) → slot ${entry.gridSlot}`)
         } catch (err) {
           console.error(`[IpcHub] keepWorking: failed to start "${entry.name}":`, (err as Error).message)
@@ -2697,6 +2698,7 @@ export class IpcHub {
   private updateKeepWorkingSnapshot(grid: { config: { cols: number; rows: number }; slots: Array<{ sessionId: string | null }> }): void {
     const sessions = this.sessionManager.list().filter(s => s.status === 'active')
     if (sessions.length === 0) return
+    const allTasks = this.taskManager ? this.taskManager.list() : []
     const snapshot = sessions.map(s => {
       const slotIdx = grid.slots.findIndex(slot => slot.sessionId === s.id)
       return {
@@ -2704,6 +2706,7 @@ export class IpcHub {
         projectPath: s.projectPath ?? '',
         gridSlot: slotIdx >= 0 ? slotIdx : -1,
         entityId: s.entityId,
+        topic: resolveSessionTopic(s, allTasks, undefined),
       }
     }).filter(e => e.projectPath && e.gridSlot >= 0)
     configStore.set('keepWorkingSnapshot', {
@@ -2718,15 +2721,23 @@ export class IpcHub {
       const sessions = this.sessionManager.list().filter(s => s.status === 'active')
       const gridState = this.sessionManager.getSessionStore().getGridState()
       if (sessions.length > 0 && gridState) {
-        const snapshot = sessions.map(s => {
+        const allTasks = this.taskManager ? this.taskManager.list() : []
+        const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }> = []
+        for (const s of sessions) {
           const slotIdx = gridState.slots.findIndex(slot => slot.sessionId === s.id)
-          return {
+          if (!s.projectPath || slotIdx < 0) continue
+          let capture: string | undefined
+          try {
+            if (s.tmuxPane) capture = await this.tmux.capturePane(s.tmuxPane, 10)
+          } catch { /* ignore — session may already be gone */ }
+          snapshot.push({
             name: s.name ?? 'session',
             projectPath: s.projectPath ?? '',
-            gridSlot: slotIdx >= 0 ? slotIdx : -1,
+            gridSlot: slotIdx,
             entityId: s.entityId,
-          }
-        }).filter(e => e.projectPath && e.gridSlot >= 0)
+            topic: resolveSessionTopic(s, allTasks, capture),
+          })
+        }
         configStore.set('keepWorkingSnapshot', {
           sessions: snapshot,
           gridConfig: gridState.config,

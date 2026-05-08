@@ -243,7 +243,7 @@ export interface AppConfig {
   keepWorking?: boolean
   /** Snapshot of sessions saved on keepWorking quit — consumed on next start. */
   keepWorkingSnapshot?: {
-    sessions: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string }>
+    sessions: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }>
     gridConfig?: { cols: number; rows: number }
   }
   /** Persisted sort order overrides for entity presets (entityId → sortOrder). */
