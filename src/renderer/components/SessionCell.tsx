@@ -100,6 +100,11 @@ export function SessionCell({
     e.stopPropagation()
     onFocusMode?.(session.id)
   }, [session.id, onFocusMode])
+  const handleScreenshot = useCallback((e: Event) => {
+    e.stopPropagation()
+    const api = (window as any).cipherMux
+    api?.sessions?.screenshot?.(session.id)
+  }, [session.id])
 
   // Fork only available for Claude Code sessions (have adapter capabilities)
   const isClaudeSession = session.capabilities?.['status-line'] === true
@@ -240,6 +245,7 @@ export function SessionCell({
           {isClaudeSession && (
             <button class="cell-btn" onClick={handleFork} title={t('sessionCell.forkSession')} aria-label={t('sessionCell.forkSession')}>⑂</button>
           )}
+          <button class="cell-btn" onClick={handleScreenshot} title={t('sessionCell.screenshot', 'Screenshot')} aria-label="Screenshot">&#x1F4F7;</button>
           <button class="cell-btn" onClick={handleSwitch} title={t('sessionCell.switchProject')} aria-label={t('sessionCell.switchProject')}>⇄</button>
           <button class="cell-btn" onClick={handleSendToBackground} title={t('sessionCell.sendToBackground')} aria-label={t('sessionCell.sendToBackground')}>⏏</button>
           <button class="cell-btn" onClick={handleShell} title={t('sessionCell.openShell')} aria-label={t('sessionCell.openShell')}>$</button>

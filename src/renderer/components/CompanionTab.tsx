@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { Character } from '../../shared/types'
 import { assignCharacterColor } from '../../shared/character-palette'
+import { PersonaAvatar } from './PersonaAvatar'
 
 const api = (window as any).cipherMux
 
@@ -138,6 +139,7 @@ export function CompanionTab() {
                 class={`pp-item ${c.id === selectedId ? 'pp-item--active' : ''}`}
                 onClick={() => selectCharacter(c.id)}
               >
+                <PersonaAvatar characterId={c.id} color={c.color || '#6A6A72'} />
                 <div class="pp-dot" style={{ background: c.color || '#6A6A72', opacity: c.id === activeId ? 1 : 0.4 }} />
                 <div class="pp-item-meta">
                   <div class="pp-item-name">{c.name}</div>

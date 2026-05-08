@@ -219,6 +219,7 @@ export class IpcHub {
 
   init(): void {
     this.registerSessionChannels()
+    this.registerScreenshotChannel()
     this.registerTerminalChannels()
     this.registerMessageChannels()
     this.registerProjectChannels()
@@ -707,6 +708,41 @@ export class IpcHub {
 
     ipcMain.handle(IPC.SESSION_ORPHANS, async () => {
       return this.sessionManager.detectOrphans()
+    })
+  }
+
+  // ─── Session Screenshot ──────────────────────────────────
+
+  private registerScreenshotChannel(): void {
+    ipcMain.handle(IPC.SESSION_SCREENSHOT, async (_e, { sessionId }: { sessionId: string }) => {
+      const { execFileSync } = require('child_process')
+      const fsNode = require('fs')
+      const pathNode = require('path')
+
+      // Save to workspace-specific dir or global screenshots dir
+      const activeWsId = configStore.get('activeWorkspaceId')
+      const screenshotBase = pathNode.join(os.homedir(), '.config', 'cipher-mux', 'screenshots')
+      const screenshotDir = activeWsId
+        ? pathNode.join(screenshotBase, activeWsId)
+        : screenshotBase
+      fsNode.mkdirSync(screenshotDir, { recursive: true })
+
+      const timestamp = Date.now()
+      const filePath = pathNode.join(screenshotDir, `session-${timestamp}.png`)
+      try {
+        execFileSync('screencapture', ['-i', filePath], { timeout: 30000 })
+        if (!fsNode.existsSync(filePath)) return null
+
+        // Send path to the session via tmux
+        const session = this.sessionManager.list().find((s: any) => s.id === sessionId)
+        if (session?.tmuxSession) {
+          const escapedPath = filePath.replace(/'/g, "'\\''")
+          await this.sessionManager.sendKeys(session.tmuxSession, `# Screenshot: ${escapedPath}\r`)
+        }
+        return { path: filePath }
+      } catch {
+        return null
+      }
     })
   }
 

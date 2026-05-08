@@ -42,6 +42,7 @@ const api = {
     },
     capture: (sessionId: string): Promise<string | null> => ipcRenderer.invoke('cipher-mux:sessions:capture', sessionId),
     fork: (sessionId: string) => ipcRenderer.invoke(IPC.SESSION_FORK, { sessionId }),
+    screenshot: (sessionId: string) => ipcRenderer.invoke(IPC.SESSION_SCREENSHOT, { sessionId }),
     detectOrphans: () => ipcRenderer.invoke(IPC.SESSION_ORPHANS),
     onOrphansDetected: (cb: (data: unknown[]) => void) => {
       const handler = (_e: unknown, data: unknown[]) => cb(data)
