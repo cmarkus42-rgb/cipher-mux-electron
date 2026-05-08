@@ -206,41 +206,18 @@ async function installWhisperModel(onProgress: (msg: string) => void): Promise<b
 async function installPiperModel(onProgress: (msg: string) => void): Promise<boolean> {
   const destDir = path.join(
     os.homedir(),
-    'Library/Application Support/cipher-mux-electron/models/piper/vits-piper-de_DE-dii-high'
+    '.config/cipher-mux/models/piper/vits-piper-de_DE-cipher_adult-medium'
   );
 
-  onProgress('Creating model directory...');
-  fs.mkdirSync(destDir, { recursive: true });
-
-  const baseUrl =
-    'https://huggingface.co/rhasspy/piper-voices/resolve/main/de/de_DE/dii/high';
-
-  onProgress('Downloading Piper ONNX model...');
-  const onnxOk = await spawnWithProgress(
-    'curl',
-    ['-L', '--progress-bar', '-o', path.join(destDir, 'de_DE-dii-high.onnx'), `${baseUrl}/de_DE-dii-high.onnx`],
-    onProgress
-  );
-
-  if (!onnxOk) {
-    onProgress('ONNX model download failed');
-    return false;
+  // Check if already deployed (e.g. by voice-bundle from app resources)
+  if (fs.existsSync(path.join(destDir, 'model.onnx'))) {
+    onProgress('Cipher Adult voice model already installed');
+    return true;
   }
 
-  onProgress('Downloading Piper ONNX config...');
-  const jsonOk = await spawnWithProgress(
-    'curl',
-    ['-L', '--progress-bar', '-o', path.join(destDir, 'de_DE-dii-high.onnx.json'), `${baseUrl}/de_DE-dii-high.onnx.json`],
-    onProgress
-  );
-
-  if (!jsonOk) {
-    onProgress('ONNX config download failed');
-    return false;
-  }
-
-  onProgress('Piper model installed successfully');
-  return true;
+  onProgress('Cipher Adult voice is bundled with the app.');
+  onProgress('If missing, please reinstall cipher-mux from the latest DMG.');
+  return false;
 }
 
 export async function installDependency(

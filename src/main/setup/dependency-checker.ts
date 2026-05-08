@@ -36,17 +36,22 @@ function whisperModelExists(): boolean {
 }
 
 function piperModelExists(): boolean {
-  const dir = path.join(
-    os.homedir(),
-    'Library/Application Support/cipher-mux-electron/models/piper/vits-piper-de_DE-dii-high'
+  // Check both possible model locations
+  const configDir = path.join(
+    os.homedir(), '.config/cipher-mux/models/piper/vits-piper-de_DE-cipher_adult-medium'
   );
-  if (!fs.existsSync(dir)) return false;
-  try {
-    const files = fs.readdirSync(dir);
-    return files.some((f) => f.endsWith('.onnx'));
-  } catch {
-    return false;
+  const appSupportDir = path.join(
+    os.homedir(),
+    'Library/Application Support/cipher-mux-electron/models/piper/vits-piper-de_DE-cipher_adult-medium'
+  );
+  for (const dir of [configDir, appSupportDir]) {
+    if (!fs.existsSync(dir)) continue;
+    try {
+      const files = fs.readdirSync(dir);
+      if (files.some((f) => f.endsWith('.onnx'))) return true;
+    } catch { /* ignore */ }
   }
+  return false;
 }
 
 export async function checkAll(): Promise<DependencyStatus[]> {
@@ -93,11 +98,11 @@ export async function checkAll(): Promise<DependencyStatus[]> {
     },
     {
       id: 'piper-model',
-      name: 'Piper TTS Model (de_DE)',
+      name: 'Piper TTS Model (Cipher Adult)',
       installed: piperModelExists(),
       required: false,
-      size: '~30MB',
-      description: 'Text-to-Speech Modell für deutsche Sprachausgabe',
+      size: '~79MB (bundled)',
+      description: 'Cipher Adult Stimme — im App-Bundle enthalten',
     },
   ];
 }

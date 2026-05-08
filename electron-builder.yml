@@ -31,6 +31,10 @@ dmg:
 extraResources:
   - from: assets/bin/ab-shutter-bridge
     to: bin/ab-shutter-bridge
+  - from: assets/voices
+    to: voices
+    filter:
+      - "**/*"
 asarUnpack:
   - "**/node_modules/better-sqlite3/**"
   - "**/node_modules/sherpa-onnx-node/**"

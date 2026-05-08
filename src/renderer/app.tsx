@@ -25,6 +25,7 @@ import { useFocusTrap } from './a11y/useFocusTrap'
 import { getFocusModeOverlappedSlots, getCoveredSlots } from '../shared/grid-types'
 import { useSetupWizard } from './hooks/useSetupWizard'
 import { SetupWizard } from './components/SetupWizard'
+import { UpdateDialog } from './components/UpdateDialog'
 
 export function App() {
   const { t } = useTranslation()
@@ -54,6 +55,7 @@ export function App() {
   gridRef.current = grid
   const { theme, setTheme, toggleTheme, customThemes, activeCustomThemeId, selectCustomTheme, saveCustomTheme, deleteCustomTheme } = useTheme()
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
+  const [updateInfo, setUpdateInfo] = useState<any>(null)
   const [voiceComState, setVoiceComState] = useState('idle')
   const [voiceState, setVoiceState] = useState('idle')
   const [voiceTargetSessionId, setVoiceTargetSessionId] = useState<string | null>(null)
@@ -87,6 +89,14 @@ export function App() {
       }))
     }
     return () => unsubs.forEach(u => u())
+  }, [])
+
+  // Listen for update availability notifications
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.update?.onAvailable) return
+    const unsub = api.update.onAvailable((info: any) => setUpdateInfo(info))
+    return unsub
   }, [])
 
   // After grid re-render from project switch, dispatch launcher-open to the now-mounted LauncherCell
@@ -1316,6 +1326,24 @@ export function App() {
         visible={bugreportVisible}
         onClose={() => setBugreportVisible(false)}
       />
+      {updateInfo && (
+        <UpdateDialog
+          version={updateInfo.version}
+          currentVersion={updateInfo.currentVersion}
+          releaseUrl={updateInfo.releaseUrl}
+          downloadUrl={updateInfo.downloadUrl}
+          releaseNotes={updateInfo.releaseNotes}
+          onDismiss={() => {
+            window.cipherMux.update.dismiss(updateInfo.version)
+            setUpdateInfo(null)
+          }}
+          onDownload={() => {
+            const url = updateInfo.downloadUrl ?? updateInfo.releaseUrl
+            window.open(url, '_blank')
+            setUpdateInfo(null)
+          }}
+        />
+      )}
       {/* ARIA live region for context warnings (REQ-A11Y-007) */}
       <div class="a11y-live-region" aria-live="assertive" role="alert">
         {focusedSessionId && (contextUsages[focusedSessionId]?.usedPercentage ?? 0) >= 80

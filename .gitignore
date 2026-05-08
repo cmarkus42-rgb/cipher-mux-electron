@@ -38,6 +38,9 @@ __pycache__/
 # VAD assets (binary, ~38MB, not tracked in git)
 src/renderer/public/vad-assets/
 
+# Voice model assets (binary, ~79MB, copied at build time)
+assets/voices/
+
 # Private profile (never commit)
 profile.cipher.yaml
 .claude/worktrees/

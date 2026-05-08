@@ -34,7 +34,7 @@ export interface VoiceManagerConfig {
   skipTTS?: boolean
 }
 
-const DEFAULT_PIPER_VOICE = 'de_DE-dii-high'
+const DEFAULT_PIPER_VOICE = 'de_DE-cipher_adult-medium'
 
 /** Read Ollama config from configStore (single source of truth). */
 function getOllamaDefaults() {

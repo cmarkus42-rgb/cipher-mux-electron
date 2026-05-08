@@ -68,6 +68,28 @@ app.whenReady().then(() => {
     windowManager.openSidebarWindow()
   }
 
+  // Check for updates 30s after startup (non-blocking)
+  const updateMode = configStore.get('update')?.mode ?? 'notify'
+  if (updateMode !== 'disabled') {
+    setTimeout(async () => {
+      try {
+        const { checkForUpdate } = await import('./updater/update-checker')
+        const { IPC } = await import('../shared/ipc-channels')
+        const info = await checkForUpdate()
+        if (info) {
+          const dismissed = configStore.get('update')?.dismissedVersion
+          if (dismissed !== info.version) {
+            windowManager.sendToMainWindow(IPC.UPDATE_AVAILABLE, info)
+          }
+        }
+        configStore.set('update', {
+          ...configStore.get('update'),
+          lastCheck: new Date().toISOString(),
+        })
+      } catch { /* silent — update check is best-effort */ }
+    }, 30_000)
+  }
+
   // Custom menu: keep Edit shortcuts (copy/paste/undo) but strip default
   // zoom accelerators (Cmd+-, Cmd+=, Cmd+0) so they reach the renderer's
   // capture-phase keydown handler for our shortcut registry.
