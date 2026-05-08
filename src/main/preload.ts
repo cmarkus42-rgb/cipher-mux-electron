@@ -291,7 +291,7 @@ const api = {
   gridControl: {
     pullKeepWorkingRestore: (): Promise<{
       gridConfig: { cols: number; rows: number }
-      slots: Array<{ sessionId: string | null; slotIndex: number }>
+      slots: Array<{ sessionId: string | null; slotIndex: number; topic?: string }>
     } | null> => ipcRenderer.invoke(IPC.KEEP_WORKING_PULL),
     resize: (cols: number, rows: number): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IPC.GRID_RESIZE, { cols, rows }),
@@ -330,7 +330,7 @@ const api = {
     },
     onKeepWorkingRestore: (cb: (data: {
       gridConfig: { cols: number; rows: number }
-      slots: Array<{ sessionId: string | null; slotIndex: number }>
+      slots: Array<{ sessionId: string | null; slotIndex: number; topic?: string }>
     }) => void) => {
       const handler = (_e: unknown, data: any) => cb(data)
       ipcRenderer.on(IPC.KEEP_WORKING_RESTORE, handler)
