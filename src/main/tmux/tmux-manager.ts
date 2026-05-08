@@ -336,8 +336,11 @@ export class TmuxManager extends EventEmitter {
 
   /**
    * Resize a tmux pane.
+   * Must resize the window first — panes cannot exceed their window dimensions.
+   * Without this, detached sessions (no non-ignore-size client) stay at 80x24.
    */
   async resizePane(target: string, cols: number, rows: number): Promise<void> {
+    await runCommand('tmux', ['resize-window', '-t', target, '-x', String(cols), '-y', String(rows)])
     await runCommand('tmux', ['resize-pane', '-t', target, '-x', String(cols), '-y', String(rows)])
   }
 
