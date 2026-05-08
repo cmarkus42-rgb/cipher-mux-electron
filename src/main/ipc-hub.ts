@@ -55,6 +55,8 @@ import type { Persona, Workspace } from '../shared/persona-types'
 import { applyWorkspace } from './workspace/workspace-manager'
 import { checkAll as setupCheckAll } from './setup/dependency-checker'
 import { installDependency } from './setup/dependency-installer'
+import { deployBundledVoice } from './setup/voice-bundle'
+import { checkForUpdate } from './updater/update-checker'
 
 /**
  * IPC Hub — Central router for all IPC channels.
@@ -234,6 +236,7 @@ export class IpcHub {
     this.registerGlobalRulesChannels()
     this.registerCompanionChannels()
     this.registerSetupChannels()
+    this.registerUpdateChannels()
     this.setupEventForwarding()
 
     // Start context usage monitor
@@ -298,6 +301,18 @@ export class IpcHub {
       const clearedSlots = startupUi.grid.slots.map((s: any) => ({ ...s, sessionId: null }))
       configStore.set('ui', { ...startupUi, grid: { ...startupUi.grid, slots: clearedSlots } })
       console.log('[IpcHub] Cleared stale session IDs from ui.grid on startup')
+    }
+
+    // Deploy bundled voice model on first start
+    try {
+      const modelsDir = path.join(process.env.HOME ?? '', '.config', 'cipher-mux', 'models', 'piper')
+      deployBundledVoice({
+        resourcesPath: process.resourcesPath ?? '',
+        modelsDir,
+        voiceName: 'de_DE-cipher_adult-medium',
+      })
+    } catch (err) {
+      console.warn('[init] Voice bundle deploy failed:', (err as Error).message)
     }
 
     // Start MCP server first — sessions need MCP config injected.
@@ -2385,6 +2400,36 @@ export class IpcHub {
         this.onSetupComplete()
       }
       return { ok: true }
+    })
+  }
+
+  // ─── Update Checker ──────────────────────────────────────
+
+  private registerUpdateChannels(): void {
+    ipcMain.handle(IPC.UPDATE_CHECK, async () => {
+      try {
+        const updateInfo = await checkForUpdate()
+        if (updateInfo) {
+          const dismissed = configStore.get('update')?.dismissedVersion
+          if (dismissed === updateInfo.version) return null
+          this.windowManager.sendToMainWindow(IPC.UPDATE_AVAILABLE, updateInfo)
+        }
+        configStore.set('update', {
+          ...configStore.get('update'),
+          lastCheck: new Date().toISOString(),
+        })
+        return updateInfo
+      } catch (err) {
+        console.warn('[update] Check failed:', (err as Error).message)
+        return null
+      }
+    })
+
+    ipcMain.on(IPC.UPDATE_DISMISS, (_e, version: string) => {
+      configStore.set('update', {
+        ...configStore.get('update'),
+        dismissedVersion: version,
+      })
     })
   }
 

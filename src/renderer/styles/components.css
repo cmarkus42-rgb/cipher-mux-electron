@@ -3554,3 +3554,27 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
 }
+
+/* ─── Update Dialog ──────────────────────────────────── */
+.update-dialog__versions {
+  font-size: 1.1em;
+  margin: 0.5em 0;
+}
+.update-dialog__notes {
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg-secondary, #1a1a1a);
+  padding: 0.5em;
+  border-radius: 4px;
+  margin: 0.5em 0;
+}
+.update-dialog__notes pre {
+  white-space: pre-wrap;
+  font-size: 0.85em;
+  margin: 0;
+}
+.status-bar__version--update {
+  color: var(--accent, #4fc3f7);
+  cursor: pointer;
+  text-decoration: underline;
+}

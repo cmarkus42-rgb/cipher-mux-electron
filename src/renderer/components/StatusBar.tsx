@@ -84,7 +84,13 @@ export function StatusBar({
         </button>
         <button class="status-bar__btn" onClick={onInfo} data-highlight="sb-info" aria-label="Einstellungen oeffnen">{t('statusBar.settings', 'Settings')}</button>
       </div>
-      <span class="status-bar__version" aria-label={`Version ${APP_VERSION}`}>{APP_VERSION}</span>
+      <span
+        class="status-bar__version"
+        onClick={() => window.cipherMux.update.check()}
+        title="Click to check for updates"
+        style={{ cursor: 'pointer' }}
+        aria-label={`Version ${APP_VERSION} — click to check for updates`}
+      >{APP_VERSION}</span>
     </div>
   )
 }

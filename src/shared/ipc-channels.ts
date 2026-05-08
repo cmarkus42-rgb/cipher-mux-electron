@@ -260,6 +260,11 @@ export const IPC = {
   GLOBAL_RULES_READ: 'cipher-mux:global-rules:read',
   GLOBAL_RULES_SAVE: 'cipher-mux:global-rules:save',
 
+  // Updates
+  UPDATE_CHECK: 'cipher-mux:update:check',
+  UPDATE_AVAILABLE: 'cipher-mux:update:available',
+  UPDATE_DISMISS: 'cipher-mux:update:dismiss',
+
   // Setup Wizard
   SETUP_CHECK: 'cipher-mux:setup:check',
   SETUP_INSTALL_ALL: 'cipher-mux:setup:install-all',

@@ -260,6 +260,15 @@ export interface AppConfig {
   ttsVoice?: 'local' | 'macos'
   /** Voice commands (scroll, grid nav) enabled. Default: true. */
   voiceCommandsEnabled?: boolean
+  /** Update checker configuration. */
+  update?: {
+    /** Update mode: 'notify' shows dialog, 'auto' downloads silently, 'disabled' skips. Default: 'notify'. */
+    mode?: 'notify' | 'auto' | 'disabled'
+    /** ISO date of last update check. */
+    lastCheck?: string
+    /** Version the user dismissed — won't be shown again. */
+    dismissedVersion?: string
+  }
   /** Refinement (RE) configuration — extended requirements engineering. */
   refinement?: {
     enabled: boolean

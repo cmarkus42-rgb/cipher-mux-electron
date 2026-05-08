@@ -12,7 +12,7 @@ import { fork, type ChildProcess, execFileSync } from 'node:child_process'
 import { TTSEngine } from './tts-engine'
 import { pcmToWav } from './audio-utils'
 
-const DEFAULT_VOICE = 'de_DE-dii-high'
+const DEFAULT_VOICE = 'de_DE-cipher_adult-medium'
 
 /** Well-known locations for system Node.js on macOS */
 const NODE_SEARCH_PATHS = [

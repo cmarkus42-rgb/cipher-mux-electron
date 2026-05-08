@@ -565,6 +565,17 @@ const api = {
     deleteMemory: (id: string) =>
       ipcRenderer.invoke(IPC.COMPANION_DELETE_MEMORY, { id }),
   },
+  // ─── Updates ──────────────────────────────────────────────
+  update: {
+    check: () => ipcRenderer.invoke(IPC.UPDATE_CHECK),
+    dismiss: (version: string) => ipcRenderer.send(IPC.UPDATE_DISMISS, version),
+    onAvailable: (cb: (info: unknown) => void) => {
+      const handler = (_e: unknown, info: unknown) => cb(info)
+      ipcRenderer.on(IPC.UPDATE_AVAILABLE, handler)
+      return () => ipcRenderer.removeListener(IPC.UPDATE_AVAILABLE, handler)
+    },
+  },
+
   /** Get native file path from a dropped File object (works with contextIsolation). */
   getFilePath: (file: File) => webUtils.getPathForFile(file),
 }
