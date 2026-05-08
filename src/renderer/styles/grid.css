@@ -15,6 +15,7 @@
   flex: 1;
   display: grid;
   gap: 4px;
+  min-height: 0;
 }
 
 /* session cell */
