@@ -381,6 +381,9 @@ export class VoiceManager extends EventEmitter {
           piperProducedAudio = true
           if (this.transport) {
             this.transport.sendAudioPlayback(wavChunk.toString('base64'))
+          } else {
+            // Transport-less playback: write WAV to temp file and play via afplay
+            await this.playWavViaAfplay(wavChunk)
           }
         }
       }
@@ -396,6 +399,32 @@ export class VoiceManager extends EventEmitter {
     this.conversation?.speakEchoGuardOnly()
     await this.speakViaMacosSay(text)
     this.conversation?.releaseEchoGuard()
+  }
+
+  /** Play a WAV buffer via macOS afplay — transport-less Piper playback. */
+  private afplayProcess: import('child_process').ChildProcess | null = null
+
+  private playWavViaAfplay(wavBuffer: Buffer): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const os = require('os')
+      const fs = require('fs')
+      const tmpFile = path.join(os.tmpdir(), `cipher-mux-tts-${Date.now()}.wav`)
+      fs.writeFileSync(tmpFile, wavBuffer)
+      const { execFile } = require('child_process')
+      this.afplayProcess = execFile('afplay', [tmpFile], (err: Error | null) => {
+        this.afplayProcess = null
+        // Clean up temp file
+        try { fs.unlinkSync(tmpFile) } catch { /* ignore */ }
+        if (err && (err as any).killed) {
+          resolve()
+        } else if (err) {
+          console.error('[VoiceManager] afplay failed:', err.message)
+          reject(err)
+        } else {
+          resolve()
+        }
+      })
+    })
   }
 
   /** Fallback TTS via macOS `say` command — simple and reliable. */
@@ -420,10 +449,11 @@ export class VoiceManager extends EventEmitter {
     })
   }
 
-  /** Stop all TTS playback (Piper + macOS say). Called by tts:stop IPC and Escape barge-in. */
+  /** Stop all TTS playback (Piper + macOS say + afplay). Called by tts:stop IPC and Escape barge-in. */
   stopSpeech(): void {
     if (this.piperTTS) this.piperTTS.stop()
     this.stopMacosSay()
+    this.stopAfplay()
     if (this.transport) this.transport.sendStopPlayback()
     // Transition state machine back to READY after barge-in so next TTS works
     if (this.conversation && this.conversation.state === VoiceState.AGENT_SPEAKING) {
@@ -439,10 +469,19 @@ export class VoiceManager extends EventEmitter {
     }
   }
 
+  /** Stop any running afplay process (transport-less Piper playback). */
+  private stopAfplay(): void {
+    if (this.afplayProcess) {
+      try { this.afplayProcess.kill('SIGTERM') } catch { /* ignore */ }
+      this.afplayProcess = null
+    }
+  }
+
   /** Shut down all subsystems and release references */
   shutdown(): void {
     this._initialized = false
     this.stopMacosSay()
+    this.stopAfplay()
 
     if (this.outputRouter) {
       this.outputRouter.shutdown()

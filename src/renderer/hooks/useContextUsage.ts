@@ -39,7 +39,18 @@ export function useContextUsage() {
       })
     })
 
-    return () => { mountedRef.current = false; unsubUpdated(); unsubWarning(); unsubStopped?.() }
+    // Reset usage when a new session is created (clear stale data from previous runs)
+    const unsubChanged = api().sessions?.onChanged?.((session: { id: string }) => {
+      setUsages((prev) => {
+        if (!prev[session.id]) return prev // no stale data to clear
+        // Remove stale entry — real usage will arrive via onUpdated when Claude starts writing
+        const next = { ...prev }
+        delete next[session.id]
+        return next
+      })
+    })
+
+    return () => { mountedRef.current = false; unsubUpdated(); unsubWarning(); unsubStopped?.(); unsubChanged?.() }
   }, [])
 
   return usages

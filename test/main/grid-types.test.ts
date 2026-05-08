@@ -192,25 +192,25 @@ describe('grid-types', () => {
       assert.ok(style.gridTemplateRows.includes('repeat(3,'))
     })
 
-    it('row template uses fixed cell height', () => {
+    it('row template uses flexible row height', () => {
       const style = computeGridStyle(2, 3)
-      // Must use fixed pixel height per row, not flexible 1fr
+      // Must use flexible 1fr rows so all rows fill available space (no clipping)
       assert.ok(
-        style.gridTemplateRows.includes('380px'),
-        `Row template should use fixed 380px height, got: ${style.gridTemplateRows}`,
+        style.gridTemplateRows.includes('1fr'),
+        `Row template should use flexible 1fr height, got: ${style.gridTemplateRows}`,
       )
     })
 
-    it('row height is consistent regardless of row count', () => {
+    it('row template is consistent regardless of row count', () => {
       const style2 = computeGridStyle(2, 2)
       const style3 = computeGridStyle(2, 3)
       assert.strictEqual(
-        style2.gridTemplateRows, 'repeat(2, 380px)',
-        `2-row grid should use fixed height, got: ${style2.gridTemplateRows}`,
+        style2.gridTemplateRows, 'repeat(2, minmax(0, 1fr))',
+        `2-row grid should use flexible rows, got: ${style2.gridTemplateRows}`,
       )
       assert.strictEqual(
-        style3.gridTemplateRows, 'repeat(3, 380px)',
-        `3-row grid should use fixed height, got: ${style3.gridTemplateRows}`,
+        style3.gridTemplateRows, 'repeat(3, minmax(0, 1fr))',
+        `3-row grid should use flexible rows, got: ${style3.gridTemplateRows}`,
       )
     })
 
