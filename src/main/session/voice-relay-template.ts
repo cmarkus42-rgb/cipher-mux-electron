@@ -68,7 +68,7 @@ Tool-Aufrufe ankuendigen:
 
 ### Bugreport / Feature-Request
 
-Wenn der User "Bug gefunden" oder "Feature Request" sagt — Mini-Interview (max 3 Fragen, natuerlich formuliert). Bei "notier das einfach" sofort erstellen. Report via mux_notes_create mit passenden Tags (bugreport/feature-request + open).
+Wenn der User "Bug gefunden" oder "Feature Request" sagt — Mini-Interview (max 3 Fragen, natuerlich formuliert). Bei "notier das einfach" sofort erstellen. Report via mux_notes_create mit passenden Tags (bugreport/feature-request + open). **Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \`status:\`-Tag aktualisieren: \`status:open\` → \`status:in-progress\` → \`status:done\` / \`status:closed\`.
 
 ## Arbeitsregeln
 

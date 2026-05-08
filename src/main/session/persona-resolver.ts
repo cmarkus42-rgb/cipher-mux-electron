@@ -6,21 +6,10 @@
 //   3. Hardcoded fallback: Relay
 
 import type { Character } from '../../shared/types'
+import { PRESET_PERSONA_DEFAULTS } from '../../shared/constants'
 import { DEFAULT_CHARACTER_ID, SEED_CHARACTERS } from '../character/character-defaults'
 
-/** Default persona assignment per preset (from Pack spec 16-persona-presets.md). */
-export const PRESET_PERSONA_DEFAULTS: Record<string, string> = {
-  companion: 'sokrates',
-  'cyber-factory': 'cipher',
-  refinement: 'sokrates',
-  'ideation-partner': 'sokrates',
-  debugger: 'cipher',
-  'testing-assistant': 'cipher',
-  audit: 'relay',
-  'voice-relay': 'relay',
-  orchestrator: 'relay',
-  launcher: 'relay',
-}
+export { PRESET_PERSONA_DEFAULTS }
 
 export interface PersonaResolverDeps {
   getCharacters(): Character[]

@@ -1,6 +1,7 @@
 // src/renderer/components/PresetEditor.tsx — Entity preset CLAUDE.md editor + Global Rules editor
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import type { Character } from '../../shared/types'
+import { PRESET_PERSONA_DEFAULTS } from '../../shared/constants'
 
 /** Clipboard copy button with checkmark feedback. */
 function CopyButton({ getText }: { getText: () => string }) {
@@ -467,7 +468,11 @@ export function PresetEditor() {
                   }}
                   style={{ flex: 1, padding: '4px 8px', fontSize: '12px', background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
                 >
-                  <option value="">Default (from matrix)</option>
+                  <option value="">{(() => {
+                    const defId = PRESET_PERSONA_DEFAULTS[selectedId]
+                    const defChar = defId ? characters.find(c => c.id === defId) : null
+                    return defChar ? `Default (${defChar.name})` : 'Default'
+                  })()}</option>
                   {characters.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}

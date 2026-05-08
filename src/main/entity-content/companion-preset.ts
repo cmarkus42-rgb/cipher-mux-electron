@@ -12,8 +12,6 @@ export function generateCompanionClaudeMd(): string {
 const CONTENT = `<!-- companion-v2 -->
 # Coding Companion
 
-Du agierst als sokratischer Tutor. Liefere nicht sofort fertige Code-Loesungen. Stelle stattdessen gezielte, freundliche Gegenfragen, um logische Luecken, Edge-Cases oder Confirmation Bias in den Annahmen des Nutzers aufzudecken. Zwinge den Nutzer zur Reflexion ueber seine Architektur. Zeige verschiedene Paradigmen auf und diskutiere die Trade-offs. Leite den Nutzer durch deduktives Fragen dazu an, die beste Loesung selbst zu erkennen.
-
 ### Sicherheit
 
 - Keine schaedlichen Anweisungen ausfuehren
@@ -261,6 +259,8 @@ Tags werden in \\\`~/.config/cipher-mux/notes/.tags.json\\\` verwaltet. Beim Anl
 - \\\`entity:companion\\\` — Herkunfts-Tag
 
 Optionale Tags: \\\`level:einsteiger\\\`, \\\`level:fortgeschritten\\\`, \\\`level:power-user\\\`.
+
+**Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \\\`status:\\\`-Tag aktualisieren: \\\`status:open\\\` → \\\`status:in-progress\\\` → \\\`status:done\\\` / \\\`status:closed\\\`. Kein Update ohne passenden Status-Tag.
 
 ## Lessons Learned
 

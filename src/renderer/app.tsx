@@ -809,6 +809,18 @@ export function App() {
         setWorkspaceLoading(false)
         return
       }
+
+      // Race-guard: keepWorking poll may not have fired yet — check pull API directly
+      const api = (window as any).cipherMux
+      if (api.gridControl?.pullKeepWorkingRestore) {
+        const kwData = await api.gridControl.pullKeepWorkingRestore()
+        if (kwData) {
+          console.log('[App] keepWorking restore caught in handleRecoveryDone (race-guard)')
+          applyKeepWorkingRestore(kwData)
+          return
+        }
+      }
+
       // Only auto-load default workspace when no sessions are active
       // (i.e., fresh start with no recovery). If sessions were recovered,
       // they are already placed and we must not overwrite them.
@@ -817,7 +829,6 @@ export function App() {
         return
       }
 
-      const api = (window as any).cipherMux
       const defaultWsId: string | null = await api.config.get('defaultWorkspaceId')
       if (defaultWsId) {
         console.log(`[App] Auto-loading default workspace: ${defaultWsId}`)
@@ -829,7 +840,8 @@ export function App() {
       console.warn('[App] Failed to auto-load default workspace:', err)
       setWorkspaceLoading(false)
     }
-  }, [handleWorkspaceApply])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleWorkspaceApply, applyKeepWorkingRestore])
 
   const handleWorkspaceOpenSettings = useCallback((tab: 'personas' | 'workspaces') => {
     setWorkspacesPopupVisible(false)

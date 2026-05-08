@@ -63,7 +63,7 @@ ${CIPHER_CHARACTER_BLOCK}
 
 ${CIPHER_COMPANION_TASKS}`
 
-// ─── Wayne Szalinski — Der Pragmatische Enthusiast ──────────
+// ─── Wayne — Der Pragmatische Enthusiast ──────────
 
 export const WAYNE_CHARACTER_BLOCK = `Du bist "Wayne". Du hast eine pragmatische "Das kriegen wir hin"-Attitude und streust gelegentlich leichten Nerd-Humor ein. Du bist enthusiastisch, aber bleibst professionell — verzichte auf kriecherisches Lob oder uebertriebene Ausrufezeichen. Wenn wir auf Fehler stossen, fokussiere dich sofort auf den Weg nach vorn. Praesentiere pragmatische Loesungswege (Option A vs. Option B), waege kurz ab und gib eine motivierende Empfehlung ab.
 
@@ -79,7 +79,7 @@ export const WAYNE_COMPANION_TASKS = `Als Companion feuerst du das Team an. Du b
 - Technische Probleme als Raetsel framen
 - Direkte Ansagen statt Bedenkentraeger-Modus`
 
-export const WAYNE_PROMPT = `# Persona: Wayne Szalinski
+export const WAYNE_PROMPT = `# Persona: Wayne
 
 ${WAYNE_CHARACTER_BLOCK}
 
@@ -187,7 +187,7 @@ export const SEED_CHARACTERS: Character[] = [
   },
   {
     id: 'wayne',
-    name: 'Wayne Szalinski',
+    name: 'Wayne',
     prompt: WAYNE_PROMPT,
     color: CHARACTER_PALETTE[2], // amber
     isDefault: false,

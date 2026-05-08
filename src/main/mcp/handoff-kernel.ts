@@ -205,20 +205,30 @@ export async function executeHandoff(
       // zsh — Claude CLI launches after the renderer calls markReady() or
       // the 4s fallback timer fires. Without this wait, the payload would
       // be injected directly into zsh, interpreted as shell commands.
-      const maxWait = 15_000
-      const pollInterval = 500
-      let waited = 0
+      //
+      // Two-layer check with exponential backoff (500ms, 1s, 2s, 4s, 4s ≈ 15s total):
+      // 1. isBusy check (claude process running in pane)
+      // 2. tmux capture-pane for Claude prompt (❯ or "Try") — proves CLI
+      //    is actually waiting for input, not just starting up.
+      const backoffDelays = [500, 1000, 2000, 4000, 4000]
       let ready = false
-      while (waited < maxWait) {
-        await new Promise(r => setTimeout(r, pollInterval))
-        waited += pollInterval
+      for (const delay of backoffDelays) {
+        await new Promise(r => setTimeout(r, delay))
         try {
+          // Layer 1: is claude process present?
           const busy = await isBusy(ctx, targetSession)
-          if (busy) { ready = true; break }
-        } catch { /* ignore */ }
+          if (!busy) continue
+
+          // Layer 2: is the prompt visible? (ready for input)
+          const captured = await ctx.sessionManager.capture(targetSession.id, 15)
+          if (captured.includes('\u276f') || captured.includes('Try')) {
+            ready = true
+            break
+          }
+        } catch { /* ignore — session may not be fully up yet */ }
       }
       if (!ready) {
-        return { ok: false, error: `Claude CLI did not start in target session within ${maxWait / 1000}s` }
+        return { ok: false, error: 'Claude CLI did not become ready in target session within 15s (no prompt detected)' }
       }
     }
 

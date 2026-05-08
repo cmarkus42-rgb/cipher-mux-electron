@@ -32,6 +32,7 @@ function makeSession(overrides: Partial<SessionInfo> = {}): SessionInfo {
 interface MockCtxOpts {
   sessions?: SessionInfo[]
   paneCommand?: string
+  captureOutput?: string
   singleInstance?: boolean
   startEntityResult?: SessionInfo
   startEntityError?: string
@@ -75,6 +76,7 @@ function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[
       return makeSession({ id: `new-${entityId}`, entityId, name: entityId })
     },
     activeCount: () => sessions.filter(s => s.status === 'active').length,
+    capture: async () => opts.captureOutput ?? '❯',
     // Expose tmux for isBusy check
     tmux: {
       getPaneCommand: async () => opts.paneCommand ?? 'zsh',
@@ -177,7 +179,7 @@ describe('handoff-kernel: executeHandoff', () => {
 
   it('starts new entity session when none exists', async () => {
     const newSession = makeSession({ id: 'new-refinement', entityId: 'refinement' as EntityId })
-    const ctx = makeCtx({ sessions: [], startEntityResult: newSession })
+    const ctx = makeCtx({ sessions: [], startEntityResult: newSession, paneCommand: 'claude' })
 
     const config: HandoffConfig = {
       targetEntityId: 'refinement',
