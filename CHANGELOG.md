@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] — 2026-05-08
+
+### Bugfix Welle 1 (16 Bugs)
+- **Preset Editor Source Split:** CLAUDE.md editor split into structured 4-tab view with live preview
+- **Sidebar Notes double-click:** Opens note in grid cell instead of toggling sidebar
+- **Grid drag ghost image:** Eliminated stale drag preview on fast moves
+- **Workspace apply race:** Grid resize completes before session spawning begins
+- **Entity stop cleanup:** Session removal from grid slots on entity stop
+- **Preset dropdown z-index:** Renders above grid cells in workspace editor
+- **Notes frontmatter merge:** Custom fields preserved on save (regression from RT-1)
+- **Theme editor save-as:** Clone flow copies all tokens correctly
+- **Voice command fuzzy match:** Reduced false positives for grid-nav commands
+- **TTS queue priority:** Interrupt priority correctly preempts queued speech
+- **Context bar color thresholds:** Yellow at 60%, red at 80% (was 50/70)
+- **Sidebar activity LED:** Blinks on new messages, solid when panel open
+- **Workspace prompt injection:** Handles missing projectPath gracefully
+- **Cell inspector preset sync:** Dropdown reflects current cell assignment after apply
+- **MCP session GC timing:** Inactivity timer resets on tool calls (not just HTTP)
+- **StatusLine parser edge case:** Handles missing `context_window` field without crash
+
+### Bugfix Welle 2 — Pre-existing Test Fixes
+- Fixed 12 test regressions from Cyber Factory Wave 5 feature-flag cutover
+- Stabilized flaky timing-dependent tests (voice pipeline, session recovery)
+- Test count: 858 (0 failures)
+
+### Bugfix Welle 3 — Preset-Lektorat
+- **EN Homogenization:** All 8 preset CLAUDE.md templates rewritten in consistent English
+- Removed mixed DE/EN fragments from entity templates
+- Unified terminology across presets (e.g. "findings" not "Befunde", "handoff" not "Übergabe")
+
+### Feature Welle F1
+- **Cipher Adult Voice Bundle:** New TTS voice profile with lower pitch and natural pacing
+- **Update Checker:** Automatic check for new releases on startup (configurable, opt-out in Settings)
+
+### Feature Welle F2
+- **Tag Management:** Merge tags, exclusive tag groups, tag cycle (rotate through group)
+- **Notes File Watching:** External file changes detected and reloaded in editor
+
+### Feature Welle F3
+- **Focus Mode Full-Screen:** Focused cell expands to fill entire grid, dimming others
+- **Note Editor Font Size:** Configurable font size for CodeMirror editor (10–32px)
+- **Preset Sort:** Presets sortable by name, category, or usage frequency in picker
+
+### Feature Welle F4
+- **Workspace Notes Cells:** Notes can be assigned to workspace grid cells (alongside sessions and presets)
+- **Sorting:** Configurable sort order for sessions, notes, and presets in sidebar
+- **Onboarding:** First-launch onboarding flow with interactive setup wizard walkthrough
+
+### Feature Welle F5
+- **Session Screenshots:** Capture terminal screenshots (PNG) via Cmd+Shift+S or MCP tool
+- **Persona Avatars:** Custom avatar images for personas, displayed in session headers and sidebar
+- **Legacy Archive:** Automated archival of sessions older than configurable threshold (default 30 days)
+
 ## [0.9.9] — 2026-05-02 (Pre-Cyberfactory Plateau)
 
 ### Added

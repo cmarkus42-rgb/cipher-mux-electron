@@ -13,15 +13,15 @@
 
 <p align="center">
   <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cmarkus42-rgb/cipher-mux-electron/ci.yml?branch=main&label=CI&style=flat-square&labelColor=000000&color=F5F5EC"></a>
-  <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.9.9-0088A0?style=flat-square&labelColor=000000"></a>
+  <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-1.0.0-0088A0?style=flat-square&labelColor=000000"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="#"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="CONTRIBUTING.md#maintenance-status"><img alt="Maintenance" src="https://img.shields.io/badge/maintenance-active-00FF88?style=flat-square&labelColor=000000"></a>
-  <a href="#install"><img alt="Open Beta" src="https://img.shields.io/badge/status-open%20beta-FF6600?style=flat-square&labelColor=000000"></a>
+  <a href="#install"><img alt="v1.0" src="https://img.shields.io/badge/status-v1.0-00FF88?style=flat-square&labelColor=000000"></a>
   <a href="https://cipher-mux.dev"><img alt="Website" src="https://img.shields.io/badge/web-cipher--mux.dev-0088A0?style=flat-square&labelColor=000000"></a>
 </p>
 
-> **⚠️ Open Beta** — Actively developed, expect breaking changes. Feedback welcome via [Issues](https://github.com/cmarkus42-rgb/cipher-mux-electron/issues).
+> **v1.0** — First stable release. Feedback welcome via [Issues](https://github.com/cmarkus42-rgb/cipher-mux-electron/issues).
 
 ---
 
@@ -46,7 +46,10 @@ Got an idea? Build it. cipher-mux structures the path from idea to code — with
 - **6 Personas** — Control how the model communicates: from bone-dry to socratic to chaos
 - **Voice I/O** — Local Whisper.cpp STT (no cloud), Silero VAD, Piper/macOS TTS, BT remote support
 - **MCP Server** — 37 tools across 9 categories, Streamable HTTP, bearer auth per entity
-- **Notes System** — Integrated Markdown editor (CodeMirror 6), auto-tagging via local Ollama, handoff notes, workspace-scoped filtering
+- **Tag Management** — Merge tags, exclusive groups, tag cycling. Hierarchical tag tree with tri-state filtering
+- **Focus Mode** — Full-screen focus: selected cell fills the grid, others dim. Reduces visual noise for deep work
+- **Update Checker** — Automatic release checks on startup (opt-out in Settings)
+- **Notes System** — Integrated Markdown editor (CodeMirror 6), auto-tagging via local Ollama, handoff notes, workspace-scoped filtering, file watching for external edits
 - **Companion Memory** — Persistent SQLite FTS5 memory, workspace-scoped (isolates learnings per project)
 - **Message Bus** — SQLite-backed inter-session communication
 - **Workspaces** — One project = one workspace. Assign project folders, grid layout, presets, and personas. Switch projects in one click
