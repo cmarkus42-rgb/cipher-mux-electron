@@ -1,5 +1,6 @@
 // src/renderer/a11y/FocusMode.tsx
-import { useEffect, useCallback } from 'preact/hooks'
+import { useState, useEffect, useCallback } from 'preact/hooks'
+import { getTerminalFontSize, setTerminalFontSize } from './terminal-font-size'
 
 interface FocusModeProps {
   enabled: boolean
@@ -9,10 +10,14 @@ interface FocusModeProps {
 }
 
 /**
- * Focus Mode overlay — renders the compact status bar when active.
- * The actual 2x2 cell spanning is handled by SessionGrid via inline grid placement.
+ * Focus Mode control panel — renders when focus mode is active.
+ * Full-screen expansion is handled by SessionGrid via grid placement.
+ * This component provides the floating control bar with font size controls.
  */
 export function FocusMode({ enabled, sessionName, contextPct, onDeactivate }: FocusModeProps) {
+  const [fontSize, setFontSize] = useState(() => getTerminalFontSize())
+  const [panelExpanded, setPanelExpanded] = useState(false)
+
   // Escape to deactivate
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && enabled) {
@@ -28,6 +33,22 @@ export function FocusMode({ enabled, sessionName, contextPct, onDeactivate }: Fo
     return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [enabled, handleKeyDown])
 
+  // Restore original font size on deactivate
+  const originalFontSize = useState(() => getTerminalFontSize())[0]
+  useEffect(() => {
+    if (!enabled) {
+      setTerminalFontSize(originalFontSize)
+    }
+  }, [enabled, originalFontSize])
+
+  const adjustFontSize = useCallback((delta: number) => {
+    setFontSize(prev => {
+      const next = Math.max(8, Math.min(36, prev + delta))
+      setTerminalFontSize(next)
+      return next
+    })
+  }, [])
+
   if (!enabled) return null
 
   const ctxClass = contextPct >= 85 ? 'focus-bar__ctx--error' :
@@ -39,6 +60,27 @@ export function FocusMode({ enabled, sessionName, contextPct, onDeactivate }: Fo
       <span class={`focus-bar__ctx ${ctxClass}`} aria-label={`Context: ${contextPct}%`}>
         CTX {contextPct}%
       </span>
+
+      <span class="focus-bar__sep">|</span>
+
+      {/* Font size controls */}
+      <button
+        class="focus-bar__control"
+        onClick={() => setPanelExpanded(!panelExpanded)}
+        title="Font Size Controls"
+      >
+        Aa
+      </button>
+      {panelExpanded && (
+        <span class="focus-bar__font-controls">
+          <button class="focus-bar__font-btn" onClick={() => adjustFontSize(-2)} title="Smaller">-</button>
+          <span class="focus-bar__font-size">{fontSize}px</span>
+          <button class="focus-bar__font-btn" onClick={() => adjustFontSize(2)} title="Larger">+</button>
+        </span>
+      )}
+
+      <span class="focus-bar__sep">|</span>
+
       <button
         class="focus-bar__exit"
         onClick={onDeactivate}

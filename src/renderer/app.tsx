@@ -127,8 +127,6 @@ export function App() {
   const handleFocusMode = useCallback((sessionId: string) => {
     const idx = grid.slots.findIndex(s => s.sessionId === sessionId)
     if (idx === -1) return
-    const { cols, rows } = grid.config
-    if (cols < 2 || rows < 2) return
     setFocusModeSlot(prev => prev === idx ? null : idx)
   }, [grid])
 

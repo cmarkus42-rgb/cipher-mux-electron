@@ -20,7 +20,7 @@ function createCipherTheme() {
   return EditorView.theme({
     '&': {
       height: '100%',
-      fontSize: 'var(--font-size-base)',
+      fontSize: 'var(--note-editor-font-size, var(--font-size-base))',
       fontFamily: 'var(--font-mono)',
       backgroundColor: 'var(--color-bg-terminal)',
       color: 'var(--color-text)',

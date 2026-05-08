@@ -16,6 +16,8 @@ export interface A11ySettings {
   fontFamily: string
   /** Terminal font size in px (8-28). Separate from UI font size. */
   terminalFontSize: number
+  /** Note editor font size in px (10-32). Separate from UI font size. */
+  noteEditorFontSize: number
   /** Focus Mode */
   focusModeEnabled: boolean
 }
@@ -30,6 +32,7 @@ const DEFAULTS: A11ySettings = {
   letterSpacing: 0,
   fontFamily: '',
   terminalFontSize: 13,
+  noteEditorFontSize: 14,
   focusModeEnabled: false,
 }
 
@@ -57,6 +60,13 @@ function applyFontSettings(settings: A11ySettings): void {
       root.style.removeProperty(`--font-size-${key}`)
     }
     root.style.removeProperty('--a11y-font-size')
+  }
+
+  // Note editor font size (independent of UI scaling)
+  if (settings.noteEditorFontSize !== DEFAULTS.noteEditorFontSize) {
+    root.style.setProperty('--note-editor-font-size', `${settings.noteEditorFontSize}px`)
+  } else {
+    root.style.removeProperty('--note-editor-font-size')
   }
 
   if (settings.lineHeight !== DEFAULTS.lineHeight) {
