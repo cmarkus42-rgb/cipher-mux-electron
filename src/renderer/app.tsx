@@ -33,6 +33,7 @@ export function App() {
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [sidebarDetached, setSidebarDetached] = useState(false)
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null)
+  const [topicMap, setTopicMap] = useState<Record<string, string>>({})
   const [bugreportVisible, setBugreportVisible] = useState(false)
   const [infoVisible, setInfoVisible] = useState(false)
   const [infoInitialTab, setInfoInitialTab] = useState<string | undefined>(undefined)
@@ -490,7 +491,7 @@ export function App() {
   const keepWorkingApplied = useRef(false)
   const applyKeepWorkingRestore = useCallback((data: {
     gridConfig: { cols: number; rows: number }
-    slots: Array<{ sessionId: string | null; slotIndex: number }>
+    slots: Array<{ sessionId: string | null; slotIndex: number; topic?: string }>
   }) => {
     const total = data.gridConfig.cols * data.gridConfig.rows
     const newSlots = Array.from({ length: total }, () => ({
@@ -498,11 +499,16 @@ export function App() {
       rowSpan: 1,
       type: 'session' as const,
     }))
-    for (const { sessionId, slotIndex } of data.slots) {
+    const newTopicMap: Record<string, string> = {}
+    for (const { sessionId, slotIndex, topic } of data.slots) {
       if (slotIndex >= 0 && slotIndex < total) {
         newSlots[slotIndex] = { sessionId, rowSpan: 1, type: 'session' }
       }
+      if (sessionId && topic) {
+        newTopicMap[sessionId] = topic
+      }
     }
+    setTopicMap(newTopicMap)
     restoreGrid({ config: data.gridConfig, slots: newSlots })
     const first = data.slots.find(s => s.sessionId)
     if (first?.sessionId) setFocusedSessionId(first.sessionId)
@@ -1255,6 +1261,7 @@ export function App() {
           onDropSession={handleDropSession}
           onDropNoteOnEmpty={handleDropNoteOnEmpty}
           onDropNoteOnSession={handleDropNoteOnSession}
+          topicMap={topicMap}
         />
         {!sidebarDetached && (
           <SidebarPanel
@@ -1271,6 +1278,7 @@ export function App() {
             hasNotesCell={grid.slots.some(s => s.type === 'notes')}
             onOpenNoteInGrid={handleOpenNoteInGrid}
             voiceComState={voiceComState}
+            topicMap={topicMap}
           />
         )}
       </div>

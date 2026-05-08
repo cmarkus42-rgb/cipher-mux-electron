@@ -48,6 +48,7 @@ interface SessionGridProps {
   onDropSession: (sessionId: string, slotIndex: number) => void
   onDropNoteOnEmpty: (note: any, slotIndex: number) => void
   onDropNoteOnSession: (note: any, sessionId: string) => void
+  topicMap?: Record<string, string>
 }
 
 
@@ -63,6 +64,7 @@ export function SessionGrid({
   onStartEntity, onResumeEntity, onFocusEntity, onStartPath,
   onOpenNotes, onOpenNote, onCloseNotes, onToggleExpandSlot, onSwap,
   onDropSession, onDropNoteOnEmpty, onDropNoteOnSession,
+  topicMap,
 }: SessionGridProps) {
   useScrollHandler(grid)
 
@@ -289,6 +291,7 @@ export function SessionGrid({
                 onFork={onFork}
                 onSendToBackground={onSendToBackground}
                 onFocusMode={onFocusMode}
+                topic={topicMap?.[session.id]}
                 onDragStart={() => handleDragStart(idx)}
                 onDragOver={(e: DragEvent) => handleDragOver(idx, e)}
                 onDragLeave={handleDragLeave}

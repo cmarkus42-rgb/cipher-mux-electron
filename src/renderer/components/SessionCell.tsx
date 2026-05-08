@@ -56,12 +56,14 @@ interface SessionCellProps {
   onDragLeave: () => void
   onDrop: (e: DragEvent) => void
   dragOver?: boolean
+  topic?: string
 }
 
 export function SessionCell({
   session, contextUsage, focused, isOrchestrator, isVoiceTarget, isVoicePinned, voiceState, isSpeaking, onToggleVoicePin, theme,
   rowSpan, maxRows, slotCol, slotRow, focusModeStyle,
   onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onFocusMode, onDragStart, onDragOver, onDragLeave, onDrop, dragOver,
+  topic,
 }: SessionCellProps) {
   const { t } = useTranslation()
   const { terminalRef } = useTerminal(session.id, theme, session.createdAt)
@@ -209,7 +211,7 @@ export function SessionCell({
             ? <span class="neon-dot" style={{ background: entityColor, boxShadow: `0 0 4px ${entityColor}` }} aria-hidden="true" />
             : <span class={`neon-dot ${dotClass}`} aria-hidden="true" />}
           <StatusIcon status={session.status} />
-          <span class="cell-name">{session.name}</span>
+          <span class="cell-name" title={topic || undefined}>{session.name}</span>
           {voiceActive && <span class={voiceDotClass} title={voiceDotTitle} aria-hidden="true" />}
           {isVoiceTarget && voiceActive && (
             <VoiceStatusLabel voiceState={voiceState} isSpeaking={isSpeaking} />

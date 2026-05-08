@@ -23,6 +23,7 @@ interface SidebarPanelProps {
   hasNotesCell: boolean
   onOpenNoteInGrid?: (note: any) => void
   voiceComState?: string
+  topicMap?: Record<string, string>
 }
 
 function formatTime(ts: string | number): string {
@@ -41,7 +42,7 @@ function displayName(name: string, projectPath?: string | null): string {
 export function SidebarPanel({
   visible, orchestratorActive, cyberFactoryActive, sessions, gridSessionIds,
   contextUsages, onAddToGrid, onKillSession, onDetach, onReattach, activeWorkspaceId, hasNotesCell,
-  onOpenNoteInGrid, voiceComState,
+  onOpenNoteInGrid, voiceComState, topicMap,
 }: SidebarPanelProps) {
   const { t } = useTranslation()
   const { messages } = useMessages()
@@ -276,6 +277,7 @@ export function SidebarPanel({
             onClick={() => onAddToGrid(s.id)}
             onKill={() => onKillSession(s.id)}
             voiceGlow={s.name === 'Voice' ? voiceComState : undefined}
+            topic={topicMap?.[s.id]}
           />
         ))}
       </section>
@@ -380,9 +382,10 @@ interface BackgroundSessionCardProps {
   onClick: () => void
   onKill: () => void
   voiceGlow?: string
+  topic?: string
 }
 
-function BackgroundSessionCard({ session, contextUsage, onClick, onKill, voiceGlow }: BackgroundSessionCardProps) {
+function BackgroundSessionCard({ session, contextUsage, onClick, onKill, voiceGlow, topic }: BackgroundSessionCardProps) {
   const { t } = useTranslation()
   const [lastOutput, setLastOutput] = useState<string>('')
   const [expanded, setExpanded] = useState(false)
@@ -448,7 +451,7 @@ function BackgroundSessionCard({ session, contextUsage, onClick, onKill, voiceGl
       data-highlight={`side-session-${session.id}`}
       onClick={handleClick}
       onDblClick={handleDblClick}
-      title={expanded ? t('sidebar.clickToPlace') : ''}
+      title={expanded ? t('sidebar.clickToPlace') : (topic || '')}
       draggable
       onDragStart={handleDragStart}
     >
