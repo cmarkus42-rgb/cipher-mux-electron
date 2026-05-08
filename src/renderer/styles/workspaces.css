@@ -2137,6 +2137,18 @@
   color: var(--color-accent);
 }
 
+/* ─── Workspace Onboarding ───────────────────────────── */
+.ws-onboarding {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--color-accent) 15%, var(--color-bg));
+  border: 1px solid var(--color-accent);
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
 /* ─── Tag Manager Merge ─────────────────────────────── */
 .tag-manager__add-btn--active {
   background: var(--color-accent);
