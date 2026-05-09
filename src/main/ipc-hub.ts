@@ -1162,61 +1162,17 @@ export class IpcHub {
 
     ipcMain.handle(IPC.VOICE_START, async () => {
       try {
-        // Bugreport interview needs TTS — if a session-mode VoiceManager (skipTTS)
-        // is running, shut it down and create a fresh one with TTS enabled.
-        if (this.voiceManager) {
-          console.log('[Voice] Shutting down existing VoiceManager for bugreport mode')
-          this.voiceManager.shutdown()
-          this.voiceManager = null as any
+        // New bugreport relay flow: start a bugreport entity session
+        // and route STT to it via VoiceInputRouter.setBugreportSession()
+        const sessionId = await this.bugreportManager.startRelaySession(this.sessionManager)
+        const inputRouter = this.voiceManager?.getInputRouter()
+        if (inputRouter) {
+          inputRouter.setBugreportSession(sessionId)
         }
-
-        this.voiceManager = new VoiceManager()
-        const transport: ConversationTransport = {
-          sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
-          sendStopCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'processing'),
-          sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
-          sendAudioPlayback: (b64) => this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_AUDIO, b64),
-          sendStateChange: (state) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state),
-          sendStopPlayback: () => this.windowManager.sendToMainWindow(IPC.VOICE_STOP_PLAYBACK, undefined),
-          sendGenerationDone: () => this.windowManager.sendToMainWindow(IPC.VOICE_GENERATION_DONE, undefined),
-          dispatchStatus: (text: string, level: string) => console.log(`[Voice:${level}] ${text}`),
-          cancelStream: () => { /* no LLM stream cancel for bugreport */ },
-        }
-        this.voiceManager.setTransport(transport)
-        await this.voiceManager.init()
-
-        const interview = this.voiceManager.startInterview()
-        interview.on('turn-update', (turn: { role: string; content: string }) => {
-          // Only forward assistant turns — user turns reach renderer via VOICE_TRANSCRIPTION
-          if (turn.role === 'assistant') {
-            this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_TEXT, turn.content)
-          }
-        })
-        interview.on('interview-complete', async (report) => {
-          this.windowManager.sendToMainWindow(IPC.VOICE_INTERVIEW_DONE, report)
-          // Submit via BugreportManager (outbox + GitHub delivery)
-          try {
-            const id = await this.bugreportManager.submit(
-              report, this.sessionManager.list(),
-              undefined, undefined, undefined, 'bug',
-            )
-            console.log(`[Voice] Bugreport submitted: ${id}`)
-          } catch (err) {
-            console.error('[Voice] Failed to submit bugreport:', err)
-          }
-        })
-        interview.on('error', (err) => {
-          this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, (err as Error).message)
-        })
-        interview.start()
-        return { ok: true }
+        console.log('[Voice] Bugreport relay session started:', sessionId)
+        return { ok: true, sessionId }
       } catch (err) {
         const msg = (err as Error).message
-        // Reset voice manager on init failure so next attempt retries from scratch
-        if (this.voiceManager && !this.voiceManager.isInitialized()) {
-          this.voiceManager.shutdown()
-          this.voiceManager = undefined as any
-        }
         this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, msg)
         return { ok: false, error: msg }
       }
@@ -1494,6 +1450,68 @@ export class IpcHub {
       }
       try {
         await this.voiceManager.speakText(text)
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: (err as Error).message }
+      }
+    })
+
+    // Voice Catalog
+    ipcMain.handle(IPC.VOICE_LIST_INSTALLED, () => {
+      const { listInstalled } = require('./voice/voice-catalog')
+      const piperDir = path.join(os.homedir(), '.config', 'cipher-mux', 'models', 'piper')
+      return listInstalled(piperDir)
+    })
+
+    ipcMain.handle(IPC.VOICE_CATALOG_SEARCH, async (_e, query?: string) => {
+      const { fetchCatalog } = require('./voice/voice-catalog')
+      return fetchCatalog(query)
+    })
+
+    ipcMain.handle(IPC.VOICE_DOWNLOAD, async (_e, { name }: { name: string }) => {
+      const { downloadVoice } = require('./voice/voice-downloader')
+      const piperDir = path.join(os.homedir(), '.config', 'cipher-mux', 'models', 'piper')
+      const { emitter, promise } = downloadVoice(name, piperDir)
+      const mainWin = this.windowManager.getMainWindow()
+      emitter.on('progress', (progress: any) => {
+        mainWin?.webContents.send(IPC.VOICE_DOWNLOAD_PROGRESS, progress)
+      })
+      try {
+        await promise
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: (err as Error).message }
+      }
+    })
+
+    ipcMain.handle(IPC.VOICE_DELETE, (_e, { name }: { name: string }) => {
+      const { deleteVoice } = require('./voice/voice-downloader')
+      const piperDir = path.join(os.homedir(), '.config', 'cipher-mux', 'models', 'piper')
+      try {
+        deleteVoice(name, piperDir)
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: (err as Error).message }
+      }
+    })
+
+    ipcMain.handle(IPC.VOICE_SET_ACTIVE, (_e, { name }: { name: string }) => {
+      configStore.set('piperVoice', name)
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.VOICE_PREVIEW, async (_e, { name }: { name: string }) => {
+      try {
+        const { PiperTTS } = require('./voice/tts-piper')
+        const piperDir = path.join(os.homedir(), '.config', 'cipher-mux', 'models', 'piper')
+        const tts = new PiperTTS({ voice: name, modelsDir: piperDir })
+        await tts.init()
+        const text = 'Dies ist eine Vorschau der Stimme.'
+        for await (const chunk of tts.speak(text)) {
+          const mainWin = this.windowManager.getMainWindow()
+          mainWin?.webContents.send(IPC.VOICE_AGENT_AUDIO, { audio: chunk.toString('base64') })
+        }
+        tts.shutdown()
         return { ok: true }
       } catch (err) {
         return { ok: false, error: (err as Error).message }
@@ -1793,6 +1811,10 @@ export class IpcHub {
           }
         }
       }
+      // Resolve synonyms before saving
+      if (effectiveTags) {
+        effectiveTags = this.tagClassRepo.resolveSynonyms(effectiveTags)
+      }
       this.noteWatcher.suppressNext(id)
       const note = await this.noteManager.save(id, body, effectiveTags)
       // Update search index + tag index
@@ -1846,6 +1868,8 @@ export class IpcHub {
           }
         }
       }
+      // Resolve synonyms before creating
+      mergedTags = this.tagClassRepo.resolveSynonyms(mergedTags)
       const note = await this.noteManager.create(title, body, mergedTags.length > 0 ? mergedTags : undefined)
       // Update search index + tag index
       const fullBody = body.startsWith('# ') ? body : `# ${title}\n\n${body}`
@@ -1909,9 +1933,10 @@ export class IpcHub {
 
     // REQ-NOTES-005: Bulk tagging
     ipcMain.handle(IPC.NOTES_BULK_TAG_ADD, async (_e, { ids, tag }: { ids: string[]; tag: string }) => {
-      const updated = await this.noteManager.bulkAddTag(ids, tag, MAX_MANUAL_TAGS)
+      const resolvedTag = this.tagClassRepo.resolveSynonym(tag)
+      const updated = await this.noteManager.bulkAddTag(ids, resolvedTag, MAX_MANUAL_TAGS)
       if (updated.length > 0) {
-        this.tagClassRepo.ensureTag(tag)
+        this.tagClassRepo.ensureTag(resolvedTag)
         this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', ids: updated })
       }
       return { updated }
@@ -2051,6 +2076,42 @@ export class IpcHub {
     // Tag Class Repository (REQ-NOTES-010)
     ipcMain.handle(IPC.NOTES_TAG_CLASS_REPO, async () => {
       return this.tagClassRepo.getRepository()
+    })
+
+    // Tag Class CRUD
+    ipcMain.handle(IPC.NOTES_TAG_CLASS_CREATE, async (_e, { name, color }: { name: string; color: string }) => {
+      const ok = this.tagClassRepo.createClass(name, color)
+      if (ok) {
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+      }
+      return { ok }
+    })
+
+    ipcMain.handle(IPC.NOTES_TAG_CLASS_RENAME, async (_e, { oldName, newName }: { oldName: string; newName: string }) => {
+      const ok = this.tagClassRepo.renameClass(oldName, newName)
+      if (ok) {
+        this.tagIndex.rebuild()
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+      }
+      return { ok }
+    })
+
+    ipcMain.handle(IPC.NOTES_TAG_CLASS_DELETE, async (_e, { name }: { name: string }) => {
+      const ok = this.tagClassRepo.deleteClass(name)
+      if (ok) {
+        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+      }
+      return { ok }
+    })
+
+    ipcMain.handle(IPC.NOTES_TAG_CLASS_SET_COLOR, async (_e, { name, color }: { name: string; color: string }) => {
+      this.tagClassRepo.setClassColor(name, color)
+      this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.NOTES_TAG_SYNONYMS_LIST, async () => {
+      return this.tagClassRepo.getSynonyms()
     })
 
     // Tag Index (REQ-NOTES-012)

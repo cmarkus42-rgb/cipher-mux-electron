@@ -11,8 +11,17 @@ import fs from 'node:fs'
 import { fork, type ChildProcess, execFileSync } from 'node:child_process'
 import { TTSEngine } from './tts-engine'
 import { pcmToWav } from './audio-utils'
+import { configStore } from '../config/config-store'
 
 const DEFAULT_VOICE = 'de_DE-cipher_adult-medium'
+
+function getConfiguredVoice(): string {
+  try {
+    return configStore.get('piperVoice') ?? DEFAULT_VOICE
+  } catch {
+    return DEFAULT_VOICE
+  }
+}
 
 /** Well-known locations for system Node.js on macOS */
 const NODE_SEARCH_PATHS = [
@@ -104,7 +113,7 @@ export class PiperTTS extends TTSEngine {
 
   constructor(config?: PiperTTSConfig) {
     super(config as Record<string, unknown>)
-    this.voice = config?.voice ?? DEFAULT_VOICE
+    this.voice = config?.voice ?? getConfiguredVoice()
     this.modelsDir = config?.modelsDir ?? path.join(
       process.env.HOME ?? '',
       'Library', 'Application Support', 'cipher-mux-electron', 'models', 'piper'
