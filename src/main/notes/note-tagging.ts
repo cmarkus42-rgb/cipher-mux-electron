@@ -345,7 +345,27 @@ export class NoteTagging {
     this.saveRepository()
     this.recountTags()
 
+    // Register merged sources as synonyms in .tags.json
+    this.registerSynonyms(toReplace, normTarget)
+
     return { affected }
+  }
+
+  /** Write synonym entries into .tags.json (shared with TagClassRepo). */
+  private registerSynonyms(sources: string[], target: string): void {
+    try {
+      let existing: Record<string, unknown> = {}
+      try {
+        existing = JSON.parse(fs.readFileSync(this.tagsFilePath, 'utf-8'))
+      } catch { /* file may not exist yet */ }
+
+      const synonyms: Record<string, string> = (existing as any).synonyms ?? {}
+      for (const src of sources) {
+        synonyms[src] = target
+      }
+      ;(existing as any).synonyms = synonyms
+      fs.writeFileSync(this.tagsFilePath, JSON.stringify(existing, null, 2), 'utf-8')
+    } catch { /* non-fatal */ }
   }
 
   /**

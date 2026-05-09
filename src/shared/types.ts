@@ -259,6 +259,8 @@ export interface AppConfig {
   ttsEnabled?: boolean
   /** TTS voice preference: 'local' = Piper, 'macos' = macOS say. Default: 'local'. */
   ttsVoice?: 'local' | 'macos'
+  /** Active Piper voice model name (e.g. 'de_DE-cipher_adult-medium'). */
+  piperVoice?: string
   /** Voice commands (scroll, grid nav) enabled. Default: true. */
   voiceCommandsEnabled?: boolean
   /** Update checker configuration. */
@@ -578,6 +580,8 @@ export interface TagClass {
 /** Persisted .tags.json format: classes with values and colors. */
 export interface TagClassRepository {
   classes: Record<string, TagClass>
+  /** Synonym map: synonym tag → canonical tag. Resolved at write-time. */
+  synonyms?: Record<string, string>
 }
 
 // ─── Tag Index (REQ-NOTES-012) ───────────────────────────

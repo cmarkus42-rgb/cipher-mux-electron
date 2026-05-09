@@ -48,6 +48,8 @@ export class TagClassRepo {
       merged[cls] = { values: [...entry.values], color: entry.color }
     }
 
+    let synonyms: Record<string, string> = {}
+
     // Merge persisted
     try {
       const raw = fs.readFileSync(this.filePath, 'utf-8')
@@ -66,11 +68,15 @@ export class TagClassRepo {
           }
         }
       }
+      // Load synonyms (additive field, backward compatible)
+      if (persisted.synonyms && typeof persisted.synonyms === 'object') {
+        synonyms = { ...persisted.synonyms }
+      }
     } catch {
       // File doesn't exist yet — use seeds only
     }
 
-    this.data = { classes: merged }
+    this.data = { classes: merged, synonyms }
   }
 
   private save(): void {
@@ -150,5 +156,105 @@ export class TagClassRepo {
   /** Get values for a class. */
   getClassValues(className: string): string[] {
     return this.data.classes[className]?.values ?? []
+  }
+
+  // ─── Synonyms ─────────────────────────────────────────────
+
+  /** Resolve a single tag through the synonym map. Returns canonical tag or original. */
+  resolveSynonym(tag: string): string {
+    return this.data.synonyms?.[tag] ?? tag
+  }
+
+  /** Resolve multiple tags, replacing synonyms and deduplicating. */
+  resolveSynonyms(tags: string[]): string[] {
+    const resolved = tags.map(t => this.resolveSynonym(t))
+    return [...new Set(resolved)]
+  }
+
+  /** Add a synonym mapping (from → to). Persists immediately. */
+  addSynonym(from: string, to: string): void {
+    if (!this.data.synonyms) this.data.synonyms = {}
+    this.data.synonyms[from] = to
+    this.save()
+  }
+
+  /** Remove a synonym mapping. */
+  removeSynonym(from: string): void {
+    if (!this.data.synonyms?.[from]) return
+    delete this.data.synonyms[from]
+    this.save()
+  }
+
+  /** Get the full synonym map. */
+  getSynonyms(): Record<string, string> {
+    return { ...(this.data.synonyms ?? {}) }
+  }
+
+  // ─── Class CRUD ───────────────────────────────────────────
+
+  /** Create a new tag class. Returns false if it already exists. */
+  createClass(name: string, color: string): boolean {
+    if (this.data.classes[name]) return false
+    this.data.classes[name] = { values: [], color }
+    this.save()
+    return true
+  }
+
+  /** Rename a tag class. Updates all notes with tags in this class. Returns false on conflict. */
+  renameClass(oldName: string, newName: string): boolean {
+    if (!this.data.classes[oldName]) return false
+    if (this.data.classes[newName]) return false
+
+    // Move class data
+    this.data.classes[newName] = { ...this.data.classes[oldName] }
+    delete this.data.classes[oldName]
+    this.save()
+
+    // Rename tags in note frontmatter: oldName:value → newName:value
+    this.propagateClassRename(oldName, newName)
+    return true
+  }
+
+  /** Delete a tag class. Tags remain in notes as unclassified. */
+  deleteClass(className: string): boolean {
+    if (!this.data.classes[className]) return false
+    delete this.data.classes[className]
+    this.save()
+    return true
+  }
+
+  /** Propagate class rename across all notes in the directory. */
+  private propagateClassRename(oldClass: string, newClass: string): void {
+    const matter = require('gray-matter')
+    const dir = path.dirname(this.filePath)
+    let files: string[]
+    try {
+      files = fs.readdirSync(dir).filter(f => f.endsWith('.md'))
+    } catch {
+      return
+    }
+
+    const prefix = oldClass + ':'
+    for (const file of files) {
+      const filePath = path.join(dir, file)
+      try {
+        const raw = fs.readFileSync(filePath, 'utf-8')
+        const parsed = matter(raw)
+        const tags: string[] = parsed.data.tags ?? []
+        let changed = false
+        const newTags = tags.map((t: string) => {
+          if (t.startsWith(prefix)) {
+            changed = true
+            return newClass + ':' + t.slice(prefix.length)
+          }
+          return t
+        })
+        if (changed) {
+          parsed.data.tags = newTags
+          parsed.data.modified = new Date().toISOString()
+          fs.writeFileSync(filePath, matter.stringify(parsed.content, parsed.data), 'utf-8')
+        }
+      } catch { /* skip */ }
+    }
   }
 }
