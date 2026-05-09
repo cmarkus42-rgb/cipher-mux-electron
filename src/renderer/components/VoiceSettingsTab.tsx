@@ -26,6 +26,8 @@ interface CatalogVoice {
 interface VoiceSettingsTabProps {
   ttsEnabled: boolean
   onTtsEnabledChange: (v: boolean) => void
+  ttsLevel: 1 | 2
+  onTtsLevelChange: (v: 1 | 2) => void
   ttsVoice: 'local' | 'macos'
   onTtsVoiceChange: (v: 'local' | 'macos') => void
   voiceCommandsEnabled: boolean
@@ -40,6 +42,7 @@ interface VoiceSettingsTabProps {
 
 export function VoiceSettingsTab({
   ttsEnabled, onTtsEnabledChange,
+  ttsLevel, onTtsLevelChange,
   ttsVoice, onTtsVoiceChange,
   voiceCommandsEnabled, onVoiceCommandsEnabledChange,
   voiceSubmitMode, onVoiceSubmitModeChange,
@@ -168,6 +171,7 @@ export function VoiceSettingsTab({
         </label>
       </div>
       {ttsEnabled && (
+        <>
         <div class="settings-row" style={{ marginTop: '8px' }}>
           <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
             <select
@@ -182,6 +186,21 @@ export function VoiceSettingsTab({
             <span>{t('voice.ttsEngine')}</span>
           </label>
         </div>
+        <div class="settings-row" style={{ marginTop: '8px' }}>
+          <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
+            <select
+              value={String(ttsLevel)}
+              onChange={(e) => onTtsLevelChange(Number((e.target as HTMLSelectElement).value) as 1 | 2)}
+              style={{ marginRight: '8px' }}
+              class="input input--sm"
+            >
+              <option value="1">{t('voice.ttsLevelMinimal', 'Minimal')}</option>
+              <option value="2">{t('voice.ttsLevelFull', 'Alles Relevante')}</option>
+            </select>
+            <span>{t('voice.ttsLevel', 'TTS-Verbosity')}</span>
+          </label>
+        </div>
+        </>
       )}
 
       <div class="settings-row" style={{ marginTop: '8px' }}>

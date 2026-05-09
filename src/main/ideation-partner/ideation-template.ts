@@ -216,11 +216,6 @@ This session is NOT for:
 - Teaching cipher-mux usage (Companion)
 - Architecture decisions
 
-## Voice Output (TTS)
-
-Use mux_tts_speak for summaries and phase gates.
-Never read out the entire requirements package — that belongs in the note.
-
 ## Notes-Tagging
 
 Tags are managed in \\\`~/.config/cipher-mux/notes/.tags.json\\\`. When creating notes via \\\`mux_notes_create\\\`, always include appropriate tags.

@@ -257,6 +257,8 @@ export interface AppConfig {
   voiceSubmitMode?: 'auto' | 'manual'
   /** TTS enabled — if false, mux_tts_speak is silently ignored. Default: true. */
   ttsEnabled?: boolean
+  /** TTS verbosity level: 1 = Minimal (default), 2 = Alles Relevante. */
+  ttsLevel?: 1 | 2
   /** TTS voice preference: 'local' = Piper, 'macos' = macOS say. Default: 'local'. */
   ttsVoice?: 'local' | 'macos'
   /** Active Piper voice model name (e.g. 'de_DE-cipher_adult-medium'). */

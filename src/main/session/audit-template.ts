@@ -99,8 +99,5 @@ This session is NOT for:
 - Making architecture decisions
 - General code reviews of individual PRs
 
-## Voice Output (TTS)
-
-Use mux_tts_speak to read out key results — not everything, only core statements. Examples: summary after each phase, top findings, overall rating. Technical details (file:line, code snippets) belong in the written report, not in TTS.
 `
 }

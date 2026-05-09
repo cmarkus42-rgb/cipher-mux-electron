@@ -33,6 +33,7 @@ export interface ToolContext {
   getVoiceManager?: () => import('../voice/voice-manager').VoiceManager | null
   testingAssistantManager?: import('../testing-assistant/testing-assistant-manager').TestingAssistantManager
   auditManager?: import('../audit/audit-manager').AuditManager
+  getFocusedSessionId?: () => string | null
 }
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']
@@ -1811,9 +1812,18 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         text: z.string().describe('Text to speak aloud'),
         priority: z.enum(['normal', 'interrupt']).optional()
           .describe('normal = queue after current speech, interrupt = stop current speech and play immediately'),
+        sessionId: z.string().optional()
+          .describe('Your cipher-mux session ID. When provided, TTS only plays if your session is in the focused cell.'),
       },
     },
-    async (args: { text: string; priority?: 'normal' | 'interrupt' }) => {
+    async (args: { text: string; priority?: 'normal' | 'interrupt'; sessionId?: string }) => {
+      // Focus gate: if caller passed sessionId, only allow TTS from focused cell
+      if (args.sessionId && ctx.getFocusedSessionId) {
+        const focusedId = ctx.getFocusedSessionId()
+        if (focusedId && args.sessionId !== focusedId) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, skipped: 'not focused' }) }] }
+        }
+      }
       // Broadcast TTS text to renderer (used by BugreportDialog for bot bubbles)
       if (ctx.windowManager) {
         ctx.windowManager.sendToMainWindow(IPC.BUGREPORT_TTS_TEXT, args.text)

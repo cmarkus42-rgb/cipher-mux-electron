@@ -34,6 +34,12 @@ const VOICE_COMMANDS: Array<{ patterns: string[]; keys: string; label: string }>
   { patterns: ['löschen', 'loeschen', 'leeren', 'alles weg', 'clear', 'eingabe löschen', 'eingabe loeschen'], keys: '\x15', label: 'clear-input' },
 ]
 
+// Speech interrupt commands — stops current TTS playback
+const SPEECH_INTERRUPT_PATTERNS: string[] = [
+  'okay danke', 'ok danke', 'stopp', 'stop', 'reicht', 'genug', 'danke reicht',
+  'halt', 'aufhören', 'aufhoeren', 'still',
+]
+
 // Clipboard commands — emits 'clipboard' event for renderer to handle (Cmd+C / Cmd+V)
 const CLIPBOARD_COMMANDS: Array<{
   patterns: string[]
@@ -347,6 +353,18 @@ export class VoiceInputRouter extends EventEmitter {
 
     // Check for voice commands before sending as text
     const normalized = stripPunctuation(text.toLowerCase())
+
+    // Speech interrupt: stop TTS when user says "stopp", "okay danke", etc.
+    if (SPEECH_INTERRUPT_PATTERNS.includes(normalized)) {
+      console.log('[VoiceRouter] speech interrupt:', normalized)
+      this.emit('speechInterrupt')
+      this.emit('dispatched', {
+        sessionId: targetId,
+        sessionName: session?.name ?? targetId,
+        text: '[speech-interrupt]',
+      })
+      return
+    }
 
     // Check for grid navigation and scroll commands (if enabled)
     const voiceCommandsOn = configStore.get('voiceCommandsEnabled') !== false
