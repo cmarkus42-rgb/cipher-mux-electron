@@ -394,7 +394,7 @@ const api = {
   // ─── Entities ──────────────────────────────────────────
   entity: {
     start: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_START, { entityId }),
-    resume: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_RESUME, { entityId }),
+    resume: (entityId: string, sessionId?: string) => ipcRenderer.invoke(IPC.ENTITY_RESUME, { entityId, sessionId }),
     stop: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_STOP, { entityId }),
     status: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_STATUS, { entityId }),
     list: () => ipcRenderer.invoke(IPC.ENTITY_LIST),
