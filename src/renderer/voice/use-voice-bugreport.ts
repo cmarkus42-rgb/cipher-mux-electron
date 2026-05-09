@@ -170,10 +170,16 @@ export function useVoiceBugreport() {
     }
 
 
-    // Restore session voice mode if it was active before bugreport
+    // Restore session voice mode if it was active before bugreport.
+    // Must call startSession() to recreate the session-mode VoiceManager —
+    // the bugreport VOICE_START handler destroyed the previous one.
     if (sessionVoiceWasActiveRef.current) {
-      console.log('[VoiceBugreport] Restoring session voice mode')
-      api().voice.setRoutingMode('session')
+      console.log('[VoiceBugreport] Restoring session voice — recreating VoiceManager')
+      api().voice.startSession().then(() => {
+        api().voice.setRoutingMode('session')
+      }).catch((err: any) => {
+        console.error('[VoiceBugreport] Failed to restore session voice:', err)
+      })
       sessionVoiceWasActiveRef.current = false
     }
 
