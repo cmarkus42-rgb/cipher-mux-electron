@@ -76,10 +76,10 @@ export const EXCLUSIVE_TAG_CLASSES = ['status', 'kind']
 
 /** Default persona assignment per preset (from Pack spec 16-persona-presets.md). */
 export const PRESET_PERSONA_DEFAULTS: Record<string, string> = {
-  companion: 'sokrates',
+  companion: 'theaitetos',
   'cyber-factory': 'cipher',
-  refinement: 'sokrates',
-  'ideation-partner': 'sokrates',
+  refinement: 'theaitetos',
+  'ideation-partner': 'theaitetos',
   debugger: 'cipher',
   'testing-assistant': 'cipher',
   audit: 'relay',
