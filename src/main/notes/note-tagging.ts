@@ -30,7 +30,7 @@ function getLlmConfig() {
 //   phase:    Workflow phase (research, architecture, coding, testing, debugging, automation, monitoring)
 //   scope:    Visibility / lifecycle (workspace:<id>, session, global)
 //
-// Entity-specific functional tags (no class prefix): handoff, testcase
+// Entity-specific functional tags (no class prefix): handoff
 // These are used as programmatic markers and must stay flat.
 
 export const SEED_TAGS: Record<string, TagEntry> = {
@@ -67,9 +67,9 @@ export const SEED_TAGS: Record<string, TagEntry> = {
   'phase:debugging': { count: 0, description: 'Debugging, troubleshooting, error investigation' },
   'phase:automation': { count: 0, description: 'Automation scripts, workflows, CI/CD' },
   'phase:monitoring': { count: 0, description: 'Monitoring, alerts, metrics, dashboards' },
+  'kind:testcase': { count: 0, description: 'Testcase note with checklist format' },
   // Entity-specific functional tags (flat, no class prefix)
   handoff: { count: 0, description: 'Handoff note between sessions' },
-  testcase: { count: 0, description: 'Testcase note with checklist format' },
 }
 
 /** Recommended tag classes for .tags.json documentation */

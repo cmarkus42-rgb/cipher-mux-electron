@@ -115,8 +115,8 @@ export function parseTestcaseBody(body: string): TestcaseSection[] {
     }
   }
 
-  // Push last section
-  if (currentSection.items.length > 0) {
+  // Push last section (preserve named sections even if empty)
+  if (currentSection.items.length > 0 || currentSection.title !== 'General') {
     sections.push(currentSection)
   }
 
@@ -133,7 +133,7 @@ export function parseTestcase(raw: string): ParsedTestcase | null {
 
   const fm = parsed.data as Record<string, unknown>
   const tags = Array.isArray(fm.tags) ? fm.tags : []
-  if (fm.type !== 'testcase' && !tags.includes('testcase')) return null
+  if (fm.type !== 'testcase' && !tags.includes('kind:testcase')) return null
 
   const frontmatter: TestcaseFrontmatter = {
     title: (fm.title as string) ?? 'Untitled Testcase',
@@ -211,7 +211,8 @@ export function serializeTestcase(tc: ParsedTestcase): string {
 export function isTestcaseNote(raw: string): boolean {
   try {
     const parsed = matter(raw)
-    return parsed.data.type === 'testcase'
+    const tags = Array.isArray(parsed.data.tags) ? parsed.data.tags : []
+    return parsed.data.type === 'testcase' || tags.includes('kind:testcase')
   } catch {
     return false
   }

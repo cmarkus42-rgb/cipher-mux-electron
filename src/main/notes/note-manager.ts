@@ -20,6 +20,8 @@ export class NoteManager {
     void fs.mkdir(this.notesDir, { recursive: true })
     // Run migration from scope-based dirs (P.3) — synchronous, runs once
     this.migrateFromScopes()
+    // Migrate raw 'testcase' tags to 'kind:testcase' — runs once
+    this.migrateTestcaseTags()
     // Clean trash on startup (REQ-NOTES-006)
     this.cleanTrash()
   }
@@ -124,6 +126,69 @@ export class NoteManager {
     try { fsSync.writeFileSync(markerPath, new Date().toISOString(), 'utf-8') } catch { /* ignore */ }
   }
 
+  // ─── Testcase Tag Migration ─────────────────────────────
+
+  // One-time migration: replace raw 'testcase' tag with 'kind:testcase'
+  // and ensure type: testcase is set in frontmatter.
+  private migrateTestcaseTags(): void {
+    const markerPath = path.join(this.notesDir, '.testcase-tag-migration-done')
+    if (fsSync.existsSync(markerPath)) return
+
+    let files: string[]
+    try {
+      files = fsSync.readdirSync(this.notesDir).filter(f => f.endsWith('.md'))
+    } catch {
+      return
+    }
+
+    let migrated = 0
+    for (const file of files) {
+      const filePath = path.join(this.notesDir, file)
+      try {
+        const raw = fsSync.readFileSync(filePath, 'utf-8')
+        const parsed = matter(raw)
+        const tags: string[] = parsed.data.tags ?? []
+        const hasRawTag = tags.includes('testcase')
+        const hasKindTag = tags.includes('kind:testcase')
+        const hasType = parsed.data.type === 'testcase'
+
+        if (!hasRawTag && !hasKindTag && !hasType) continue
+
+        let changed = false
+
+        // Replace raw 'testcase' with 'kind:testcase'
+        if (hasRawTag) {
+          const idx = tags.indexOf('testcase')
+          if (hasKindTag) {
+            tags.splice(idx, 1) // remove duplicate
+          } else {
+            tags[idx] = 'kind:testcase'
+          }
+          changed = true
+        }
+
+        // Ensure type: testcase in frontmatter when kind:testcase tag present
+        if (tags.includes('kind:testcase') && !hasType) {
+          parsed.data.type = 'testcase'
+          changed = true
+        }
+
+        if (changed) {
+          parsed.data.tags = tags
+          const updated = matter.stringify('\n' + parsed.content, parsed.data)
+          fsSync.writeFileSync(filePath, updated, 'utf-8')
+          migrated++
+        }
+      } catch { /* skip files that can't be parsed */ }
+    }
+
+    if (migrated > 0) {
+      console.log(`[NoteManager] Migrated ${migrated} notes: testcase → kind:testcase`)
+    }
+
+    try { fsSync.writeFileSync(markerPath, new Date().toISOString(), 'utf-8') } catch { /* ignore */ }
+  }
+
   // ─── Helpers ──────────────────────────────────────────────
 
   private filePath(id: string): string {
@@ -212,7 +277,7 @@ export class NoteManager {
     const tagList = tags ?? ([] as string[])
     const fm: Record<string, unknown> = {
       title: finalTitle,
-      ...(tagList.includes('testcase') ? { type: 'testcase' } : {}),
+      ...(tagList.includes('kind:testcase') ? { type: 'testcase' } : {}),
       tags: tagList,
       created: now,
       modified: now,
@@ -290,10 +355,15 @@ export class NoteManager {
       ? extractedTitle
       : (existingFm.title as string) ?? existing?.info.title ?? 'Untitled'
 
+    const finalTags = tags ?? existing?.info.tags ?? []
+    // Keep type: testcase consistent with kind:testcase tag
+    const hasTestcaseTag = finalTags.includes('kind:testcase')
+    const { type: existingType, ...restFm } = existingFm as Record<string, unknown> & { type?: string }
     const fm: Record<string, unknown> = {
-      ...existingFm,
+      ...restFm,
       title,
-      tags: tags ?? existing?.info.tags ?? [],
+      ...(hasTestcaseTag ? { type: 'testcase' } : (existingType && existingType !== 'testcase' ? { type: existingType } : {})),
+      tags: finalTags,
       created: existing?.info.createdAt ?? now,
       modified: now,
     }

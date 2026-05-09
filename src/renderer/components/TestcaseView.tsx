@@ -249,20 +249,19 @@ export function TestcaseView({
   const [filters, setFilters] = useState<StatusFilters>({ pass: 'neutral', fail: 'neutral', open: 'neutral' })
   // Snapshot: frozen set of item IDs to display when a filter is active.
   // Prevents items from vanishing when their status is toggled while filtered.
-  const snapshotIdsRef = useRef<Set<string> | null>(null)
   const [snapshotGeneration, setSnapshotGeneration] = useState(0)
 
   const hasActiveFilter = filters.pass !== 'neutral' || filters.fail !== 'neutral' || filters.open !== 'neutral'
 
-  // Take a new snapshot whenever filters change (REQ-TCVIEW-001, REQ-TCVIEW-003)
-  useEffect(() => {
-    if (!hasActiveFilter) {
-      snapshotIdsRef.current = null
-      return
-    }
+  // Compute snapshot IDs synchronously (during render, not post-render).
+  // Intentionally omits testcase.sections from deps: snapshot must stay stable
+  // across status toggles — only re-snapshot when filters or generation change.
+  const snapshotIds = useMemo<Set<string> | null>(() => {
+    if (!hasActiveFilter) return null
     const filtered = applyStatusFilters(testcase.sections, filters)
-    snapshotIdsRef.current = new Set(filtered.flatMap(s => s.items.map(i => i.id)))
-  }, [filters, snapshotGeneration]) // eslint-disable-line react-hooks/exhaustive-deps
+    return new Set(filtered.flatMap(s => s.items.map(i => i.id)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, snapshotGeneration])
 
   const handleFilterToggle = useCallback((status: TestcaseStatus) => {
     setFilters(prev => ({ ...prev, [status]: cycleFilterMode(prev[status]) }))
@@ -331,15 +330,11 @@ export function TestcaseView({
 
   // REQ-TCVIEW-002: Render from snapshot IDs (stable) with live item data (fresh status)
   const filteredSections = useMemo(() => {
-    if (!snapshotIdsRef.current) {
-      // No active filter → show all live
-      return testcase.sections
-    }
-    const ids = snapshotIdsRef.current
+    if (!snapshotIds) return testcase.sections
     return testcase.sections
-      .map(s => ({ ...s, items: s.items.filter(i => ids.has(i.id)) }))
+      .map(s => ({ ...s, items: s.items.filter(i => snapshotIds.has(i.id)) }))
       .filter(s => s.items.length > 0)
-  }, [testcase.sections, filters, snapshotGeneration])
+  }, [testcase.sections, snapshotIds])
 
   const handleToggle = useCallback((id: string) => {
     const newSections = testcase.sections.map(s => ({

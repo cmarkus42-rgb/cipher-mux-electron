@@ -33,7 +33,7 @@ describe('SEED_TAGS (REQ-NOTES-013)', () => {
 
   it('preserves entity-specific functional tags', () => {
     assert.ok(SEED_TAGS.handoff, 'handoff tag must exist')
-    assert.ok(SEED_TAGS.testcase, 'testcase tag must exist')
+    assert.ok(SEED_TAGS['kind:testcase'], 'kind:testcase tag must exist')
   })
 
   it('has tags for all required classes', () => {

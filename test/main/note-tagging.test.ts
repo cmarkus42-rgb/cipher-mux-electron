@@ -28,7 +28,7 @@ describe('NoteTagging', () => {
     assert.ok('domain:infra' in repo.tags, 'should have "domain:infra" tag')
     // Functional tags (no prefix)
     assert.ok('handoff' in repo.tags, 'should have "handoff" functional tag')
-    assert.ok('testcase' in repo.tags, 'should have "testcase" functional tag')
+    assert.ok('kind:testcase' in repo.tags, 'should have "kind:testcase" tag')
     // Counts start at 0
     assert.equal(repo.tags['domain:trading'].count, 0)
     assert.equal(repo.tags['tech:typescript'].count, 0)
