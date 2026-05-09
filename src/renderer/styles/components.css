@@ -3169,6 +3169,81 @@
   color: var(--text-primary, #fff);
 }
 
+/* Resolution cycle button (inline, next to checkbox on fail items) */
+.tc-item__resolution {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  line-height: 1.4;
+  min-width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.tc-item__resolution--unresolved {
+  color: var(--color-text-dim);
+  border-color: var(--color-border);
+}
+.tc-item__resolution--in_review {
+  color: #e8a317;
+  border-color: #e8a317;
+}
+.tc-item__resolution--addressed {
+  color: #3b82f6;
+  border-color: #3b82f6;
+}
+.tc-item__resolution--fixed {
+  color: var(--color-neon-green, #0a0);
+  border-color: var(--color-neon-green, #0a0);
+}
+.tc-item__resolution--wont_fix {
+  color: #999;
+  border-color: #999;
+  text-decoration: line-through;
+}
+
+/* Filter bar separator */
+.tc-filter-bar__sep {
+  color: var(--color-text-dim);
+  opacity: 0.4;
+  margin: 0 2px;
+  align-self: center;
+}
+
+/* Resolution filter buttons */
+.tc-filter-btn--res-unresolved.tc-filter-btn--positive {
+  background: var(--color-text-dim);
+  color: var(--color-bg);
+  border-color: var(--color-text-dim);
+}
+.tc-filter-btn--res-in_review.tc-filter-btn--positive {
+  background: #e8a317;
+  color: #000;
+  border-color: #e8a317;
+}
+.tc-filter-btn--res-addressed.tc-filter-btn--positive {
+  background: #3b82f6;
+  color: #fff;
+  border-color: #3b82f6;
+}
+.tc-filter-btn--res-fixed.tc-filter-btn--positive {
+  background: var(--color-neon-green, #0a0);
+  color: #000;
+  border-color: var(--color-neon-green, #0a0);
+}
+.tc-filter-btn--res-wont_fix.tc-filter-btn--positive {
+  background: #999;
+  color: #000;
+  border-color: #999;
+}
+.tc-filter-btn--resolution .tc-filter-btn__badge {
+  font-size: 9px;
+}
+
 /* ================================================================
    Unified Session Dialog
    ================================================================ */

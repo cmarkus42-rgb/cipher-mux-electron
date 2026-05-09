@@ -8,6 +8,7 @@ import {
   serializeTestcaseItem,
   serializeTestcaseBody,
   isTestcaseNote,
+  type TestcaseResolution,
 } from '../../src/main/notes/testcase-parser'
 
 describe('testcase-parser', () => {
@@ -181,5 +182,110 @@ Some content.`
     assert.equal(isTestcaseNote('---\ntype: testcase\ntitle: X\n---\nBody'), true)
     assert.equal(isTestcaseNote('---\ntitle: X\ntags: []\n---\nBody'), false)
     assert.equal(isTestcaseNote('no frontmatter'), false)
+  })
+
+  // ─── Resolution parsing ──────────────────────────────────
+
+  it('parses fail item without resolution as unresolved', () => {
+    const item = parseTestcaseItem('- [-] **T-UI.3** Copy paste broken', 0)
+    assert.ok(item)
+    assert.equal(item.status, 'fail')
+    assert.equal(item.resolution, undefined)
+  })
+
+  it('parses fail item with {in_review} marker', () => {
+    const item = parseTestcaseItem('- [-] **T-UI.3** Copy paste broken {in_review}', 0)
+    assert.ok(item)
+    assert.equal(item.status, 'fail')
+    assert.equal(item.resolution, 'in_review')
+    assert.equal(item.description, 'Copy paste broken')
+  })
+
+  it('parses fail item with {addressed} marker', () => {
+    const item = parseTestcaseItem('- [-] **T-UI.4** Crash on resize {addressed}', 0)
+    assert.ok(item)
+    assert.equal(item.resolution, 'addressed')
+  })
+
+  it('parses fail item with {fixed} marker', () => {
+    const item = parseTestcaseItem('- [-] **T-UI.5** Bug {fixed}', 0)
+    assert.ok(item)
+    assert.equal(item.resolution, 'fixed')
+  })
+
+  it('parses fail item with {wont_fix} marker', () => {
+    const item = parseTestcaseItem('- [-] **T-UI.6** Edge case {wont_fix}', 0)
+    assert.ok(item)
+    assert.equal(item.resolution, 'wont_fix')
+  })
+
+  it('parses fail item with comment AND resolution marker', () => {
+    const item = parseTestcaseItem('- [-] **T-UI.7** Crash // only on M1 {addressed}', 0)
+    assert.ok(item)
+    assert.equal(item.description, 'Crash')
+    assert.equal(item.comment, 'only on M1')
+    assert.equal(item.resolution, 'addressed')
+  })
+
+  it('does not parse resolution on non-fail items', () => {
+    const item = parseTestcaseItem('- [x] **T-UI.8** Pass item {fixed}', 0)
+    assert.ok(item)
+    assert.equal(item.status, 'pass')
+    assert.equal(item.resolution, undefined)
+  })
+
+  // ─── Resolution serialization ────────────────────────────
+
+  it('serializes fail item with resolution', () => {
+    const line = serializeTestcaseItem({
+      id: 'T-1', description: 'Bug', status: 'fail',
+      comment: '', lineIndex: 0, resolution: 'fixed',
+    })
+    assert.equal(line, '- [-] **T-1** Bug {fixed}')
+  })
+
+  it('does not serialize unresolved resolution', () => {
+    const line = serializeTestcaseItem({
+      id: 'T-1', description: 'Bug', status: 'fail',
+      comment: '', lineIndex: 0, resolution: 'unresolved',
+    })
+    assert.equal(line, '- [-] **T-1** Bug')
+  })
+
+  it('does not serialize resolution for non-fail items', () => {
+    const line = serializeTestcaseItem({
+      id: 'T-1', description: 'Test', status: 'pass',
+      comment: '', lineIndex: 0, resolution: 'fixed',
+    })
+    assert.equal(line, '- [x] **T-1** Test')
+  })
+
+  it('serializes fail item with comment and resolution', () => {
+    const line = serializeTestcaseItem({
+      id: 'T-1', description: 'Bug', status: 'fail',
+      comment: 'details', lineIndex: 0, resolution: 'in_review',
+    })
+    assert.equal(line, '- [-] **T-1** Bug // details {in_review}')
+  })
+
+  it('round-trips resolution through parse/serialize', () => {
+    const body = `## Tests
+- [-] **T-1** Bug A {fixed}
+- [-] **T-2** Bug B // comment {addressed}
+- [-] **T-3** Bug C
+- [x] **T-4** Pass
+`
+    const sections = parseTestcaseBody(body)
+    assert.equal(sections[0].items[0].resolution, 'fixed')
+    assert.equal(sections[0].items[1].resolution, 'addressed')
+    assert.equal(sections[0].items[1].comment, 'comment')
+    assert.equal(sections[0].items[2].resolution, undefined)
+    assert.equal(sections[0].items[3].resolution, undefined)
+
+    const serialized = serializeTestcaseBody(sections)
+    const reParsed = parseTestcaseBody(serialized)
+    assert.equal(reParsed[0].items[0].resolution, 'fixed')
+    assert.equal(reParsed[0].items[1].resolution, 'addressed')
+    assert.equal(reParsed[0].items[2].resolution, undefined)
   })
 })

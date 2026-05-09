@@ -894,7 +894,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     {
       description:
         'Structured update for testcase notes. Use this instead of mux_notes_update to modify testcase items. '
-        + 'Supports: set_status (open/pass/fail), add_item (to a section), set_comment, add_section.',
+        + 'Supports: set_status (open/pass/fail), set_comment, add_item (to a section), add_section, '
+        + 'set_resolution (in_review/addressed/fixed/wont_fix/unresolved — only on fail items).',
       inputSchema: {
         noteId: z.string().describe('Note ID (ULID) of the testcase note'),
         operations: z.array(z.union([
@@ -918,6 +919,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
             op: z.literal('add_section'),
             title: z.string().describe('New section title'),
           }),
+          z.object({
+            op: z.literal('set_resolution'),
+            itemId: z.string().describe('Testcase item ID'),
+            resolution: z.enum(['unresolved', 'in_review', 'addressed', 'fixed', 'wont_fix']).describe('Resolution status (only valid on fail items)'),
+          }),
         ])).describe('Array of operations to apply sequentially'),
       },
     },
@@ -928,6 +934,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         | { op: 'set_comment'; itemId: string; comment: string }
         | { op: 'add_item'; section: string; id: string; description: string }
         | { op: 'add_section'; title: string }
+        | { op: 'set_resolution'; itemId: string; resolution: 'unresolved' | 'in_review' | 'addressed' | 'fixed' | 'wont_fix' }
       >
     }) => {
       if (!ctx.noteManager) {
@@ -972,6 +979,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
               continue
             }
             sections.push({ title: op.title, items: [] })
+          } else if (op.op === 'set_resolution') {
+            const item = sections.flatMap(s => s.items).find(i => i.id === op.itemId)
+            if (!item) { errors.push(`Item not found: ${op.itemId}`); continue }
+            if (item.status !== 'fail') { errors.push(`Cannot set resolution on non-fail item: ${op.itemId} (status: ${item.status})`); continue }
+            item.resolution = op.resolution === 'unresolved' ? undefined : op.resolution
           }
         }
 
