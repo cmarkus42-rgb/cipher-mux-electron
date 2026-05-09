@@ -4,14 +4,20 @@ import { useCallback } from 'preact/hooks'
 import { useTerminal } from '../hooks/useTerminal'
 import type { SessionInfo, ContextUsage, EntityId } from '../../shared/types'
 import type { ThemeName } from '../../shared/grid-types'
+import {
+  X, ArrowLeftRight, GitBranch, ChevronDown, ChevronUp,
+  Terminal, Camera, Scan, ArrowUpFromLine, Check, XCircle, Pause, Loader,
+} from 'lucide-preact'
+
+const ICON_SIZE = 14
 
 /** Status icon next to session status dot (REQ-A11Y-002) */
 function StatusIcon({ status }: { status: string }) {
   switch (status) {
-    case 'active': return <span class="status-icon" aria-hidden="true" title="Aktiv">&#x2713;</span>
-    case 'closing': return <span class="status-icon" aria-hidden="true" title="Wird beendet">&#x23F3;</span>
-    case 'error': return <span class="status-icon" aria-hidden="true" title="Fehler">&#x2717;</span>
-    case 'paused': return <span class="status-icon" aria-hidden="true" title="Pausiert">&#x23F8;</span>
+    case 'active': return <span class="status-icon" aria-hidden="true" title="Aktiv"><Check size={10} /></span>
+    case 'closing': return <span class="status-icon" aria-hidden="true" title="Wird beendet"><Loader size={10} class="status-icon--spin" /></span>
+    case 'error': return <span class="status-icon" aria-hidden="true" title="Fehler"><XCircle size={10} /></span>
+    case 'paused': return <span class="status-icon" aria-hidden="true" title="Pausiert"><Pause size={10} /></span>
     default: return null
   }
 }
@@ -118,19 +124,19 @@ export function SessionCell({
   const barWidth = Math.min((pct / 65) * 100, 100)
   const barColor = pct >= 56 ? '#e53935' : pct >= 41 ? '#fb8c00' : pct >= 26 ? '#fdd835' : '#43a047'
 
-  // Entity color mapping — matches EntityConfig.color values
+  // Entity color mapping — references CSS custom properties from themes.json
   const ENTITY_COLORS: Record<EntityId, string> = {
-    orchestrator: '#4fc3f7',
-    'cyber-factory': '#ab47bc',
-    companion: '#ffb74d',
-    refinement: '#ef5350',
-    launcher: '#66bb6a',
-    'voice-relay': '#9b59b6',
-    audit: '#c0392b',
-    'ideation-partner': '#26a69a',
-    debugger: '#ff7043',
-    'testing-assistant': '#2ecc71',
-    bugreport: '#78909c',
+    orchestrator: 'var(--entity-color-1, #4fc3f7)',
+    'cyber-factory': 'var(--entity-color-2, #ab47bc)',
+    companion: 'var(--entity-color-3, #ffb74d)',
+    refinement: 'var(--entity-color-4, #ef5350)',
+    launcher: 'var(--entity-color-5, #66bb6a)',
+    'voice-relay': 'var(--entity-color-6, #9b59b6)',
+    audit: 'var(--entity-color-7, #c0392b)',
+    'ideation-partner': 'var(--entity-color-8, #26a69a)',
+    debugger: 'var(--entity-color-9, #ff7043)',
+    'testing-assistant': 'var(--entity-color-10, #2ecc71)',
+    bugreport: 'var(--entity-color-11, #78909c)',
   }
   const entityColor = session.entityId ? ENTITY_COLORS[session.entityId] : undefined
   const isEntity = !!session.entityId
@@ -234,7 +240,7 @@ export function SessionCell({
               onClick={handleFocusMode}
               title="Focus Mode (Cmd+Shift+F)"
               aria-label="Focus Mode aktivieren"
-            >&#x26F6;</button>
+            ><Scan size={ICON_SIZE} /></button>
           )}
           {maxRows > 1 && (
             <button
@@ -242,16 +248,16 @@ export function SessionCell({
               onClick={handleExpand}
               title={isAtMax ? t('sessionCell.collapseHeight') : t('sessionCell.expandHeight')}
               aria-label={isAtMax ? t('sessionCell.collapseHeight') : t('sessionCell.expandHeight')}
-            >{isAtMax ? '↥' : '↧'}</button>
+            >{isAtMax ? <ChevronUp size={ICON_SIZE} /> : <ChevronDown size={ICON_SIZE} />}</button>
           )}
           {isClaudeSession && (
-            <button class="cell-btn" onClick={handleFork} title={t('sessionCell.forkSession')} aria-label={t('sessionCell.forkSession')}>⑂</button>
+            <button class="cell-btn" onClick={handleFork} title={t('sessionCell.forkSession')} aria-label={t('sessionCell.forkSession')}><GitBranch size={ICON_SIZE} /></button>
           )}
-          <button class="cell-btn" onClick={handleScreenshot} title={t('sessionCell.screenshot', 'Screenshot')} aria-label="Screenshot">&#x1F4F7;</button>
-          <button class="cell-btn" onClick={handleSwitch} title={t('sessionCell.switchProject')} aria-label={t('sessionCell.switchProject')}>⇄</button>
-          <button class="cell-btn" onClick={handleSendToBackground} title={t('sessionCell.sendToBackground')} aria-label={t('sessionCell.sendToBackground')}>⏏</button>
-          <button class="cell-btn" onClick={handleShell} title={t('sessionCell.openShell')} aria-label={t('sessionCell.openShell')}>$</button>
-          <button class="cell-btn" onClick={handleClose} title={t('sessionCell.closeSession')} aria-label={t('sessionCell.closeSession')} disabled={session.status === 'closing'}>✕</button>
+          <button class="cell-btn" onClick={handleScreenshot} title={t('sessionCell.screenshot', 'Screenshot')} aria-label="Screenshot"><Camera size={ICON_SIZE} /></button>
+          <button class="cell-btn" onClick={handleSwitch} title={t('sessionCell.switchProject')} aria-label={t('sessionCell.switchProject')}><ArrowLeftRight size={ICON_SIZE} /></button>
+          <button class="cell-btn" onClick={handleSendToBackground} title={t('sessionCell.sendToBackground')} aria-label={t('sessionCell.sendToBackground')}><ArrowUpFromLine size={ICON_SIZE} /></button>
+          <button class="cell-btn" onClick={handleShell} title={t('sessionCell.openShell')} aria-label={t('sessionCell.openShell')}><Terminal size={ICON_SIZE} /></button>
+          <button class="cell-btn" onClick={handleClose} title={t('sessionCell.closeSession')} aria-label={t('sessionCell.closeSession')} disabled={session.status === 'closing'}><X size={ICON_SIZE} /></button>
         </div>
       </div>
       <div class="cell-terminal" ref={terminalRef} role="application" aria-label={`Terminal: ${session.name}`} />

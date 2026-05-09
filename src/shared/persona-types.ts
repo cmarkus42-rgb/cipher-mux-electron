@@ -33,6 +33,8 @@ export interface Workspace {
   contextPaths?: string[]
   /** Sort order for workspace list (lower = first). Default: 100. */
   sortOrder?: number
+  /** When true, new notes skip the workspace: scope tag and are visible in all workspaces. Default: false. */
+  notesGlobal?: boolean
 }
 
 export type PromptSource = 'cell' | 'workspace-override' | 'persona-default'

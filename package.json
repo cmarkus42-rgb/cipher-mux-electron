@@ -39,6 +39,7 @@
     "flexsearch": "^0.8.212",
     "gray-matter": "^4.0.3",
     "i18next": "^26.0.8",
+    "lucide-preact": "^1.14.0",
     "react-i18next": "^17.0.4",
     "ulidx": "^2.4.0",
     "zod": "^3.23.0"

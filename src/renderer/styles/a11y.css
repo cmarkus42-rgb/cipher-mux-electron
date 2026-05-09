@@ -318,11 +318,24 @@
 /* ── Status Icons (REQ-A11Y-002) ──────────────── */
 
 .status-icon {
-  display: inline-block;
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
   line-height: 1;
   margin-right: 2px;
   vertical-align: middle;
+}
+
+.status-icon svg {
+  display: block;
+}
+
+.status-icon--spin {
+  animation: status-spin 1.2s linear infinite;
+}
+
+@keyframes status-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* ── Cell Header Button A11y (REQ-A11Y-004) ───── */
