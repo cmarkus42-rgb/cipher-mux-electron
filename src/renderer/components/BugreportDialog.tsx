@@ -91,6 +91,7 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   const [relayError, setRelayError] = useState<string | null>(null)
   const [relaySessionId, setRelaySessionId] = useState<string | null>(null)
   const [turns, setTurns] = useState<ChatTurn[]>([])
+  const closingRef = useRef(false)
 
   const relayActive = relayState === 'starting' || relayState === 'ready'
 
@@ -107,6 +108,7 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   // Auto-start relay when dialog opens with STT active
   useEffect(() => {
     if (!visible) return
+    closingRef.current = false
     const w = window as any
     const sttActive = !!w.__cipherMuxSessionVoiceActive
     if (sttActive && relayState === 'idle') {
@@ -147,11 +149,14 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   }, [visible, relaySessionId, relayState])
 
   const startRelay = useCallback(async () => {
+    closingRef.current = false
     setRelayState('starting')
     setRelayError(null)
     setTurns([])
     try {
       const res = await api().bugreport.startRelay()
+      // Dialog may have been closed while awaiting — don't update state
+      if (closingRef.current) return
       if (res?.ok && res.sessionId) {
         setRelaySessionId(res.sessionId)
         // relayState will switch to 'ready' via onRelayReady event
@@ -160,6 +165,7 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
         setRelayError(res?.error ?? 'unknown error')
       }
     } catch (err: any) {
+      if (closingRef.current) return
       setRelayState('error')
       setRelayError(err?.message ?? 'relay start failed')
     }
@@ -226,11 +232,15 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   }, [description, enriched, preview, screenshots, resetForm, reportType])
 
   const handleClose = useCallback(() => {
+    closingRef.current = true
     setResult(null)
     resetForm()
-    if (relayActive) stopRelay()
+    // Always stop relay if it was started (starting or ready)
+    if (relayState !== 'idle') {
+      stopRelay()
+    }
     onClose()
-  }, [onClose, stopRelay, resetForm, relayActive])
+  }, [onClose, stopRelay, resetForm, relayState])
 
   const handleAttachScreenshot = useCallback(async () => {
     const paths: string[] = await api().bugreport.pickScreenshot()
