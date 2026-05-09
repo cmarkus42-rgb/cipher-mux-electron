@@ -17,6 +17,7 @@ import { ConversationEngine, type ConversationTransport } from './conversation-e
 import { VoiceState } from './voice-state'
 import { VoiceInputRouter } from './voice-input-router'
 import { VoiceOutputRouter } from './voice-output-router'
+import { splitSentences, appendSilence, getPauseDuration, type PauseConfig } from './audio-utils'
 
 
 
@@ -331,6 +332,16 @@ export class VoiceManager extends EventEmitter {
     }
   }
 
+  /** Get TTS pause config from ConfigStore. */
+  private _getPauseConfig(): PauseConfig {
+    const tts = configStore.get('tts')
+    return {
+      pauseAfterPeriod: tts?.pauseAfterPeriod ?? 300,
+      pauseAfterQuestion: tts?.pauseAfterQuestion ?? 400,
+      pauseAfterComma: tts?.pauseAfterComma ?? 150,
+    }
+  }
+
   /** Inner speak logic — always runs serialized via _speakChain. */
   private async _speakTextInner(text: string): Promise<void> {
     // Check voice preference — skip Piper and go straight to macOS if preferred
@@ -358,20 +369,13 @@ export class VoiceManager extends EventEmitter {
         }
       }
 
-      // Speak via ConversationEngine if available, else directly via PiperTTS
+      // Speak via ConversationEngine if available (handles state machine),
+      // else use pipelined direct playback
       let piperProducedAudio = false
       if (this.conversation) {
         piperProducedAudio = await this.conversation.speakResponse(text)
       } else {
-        for await (const wavChunk of this.piperTTS.speak(text)) {
-          piperProducedAudio = true
-          if (this.transport) {
-            this.transport.sendAudioPlayback(wavChunk.toString('base64'))
-          } else {
-            // Transport-less playback: write WAV to temp file and play via afplay
-            await this.playWavViaAfplay(wavChunk)
-          }
-        }
+        piperProducedAudio = await this._speakPipelined(text)
       }
 
       if (piperProducedAudio) return
@@ -385,6 +389,69 @@ export class VoiceManager extends EventEmitter {
     this.conversation?.speakEchoGuardOnly()
     await this.speakViaMacosSay(text)
     this.conversation?.releaseEchoGuard()
+  }
+
+  /**
+   * Pipelined TTS: split text into sentences, pre-generate next sentence's WAV
+   * while current sentence plays. Appends silence pauses based on punctuation.
+   * Returns true if any audio was produced.
+   */
+  private _pipelineInterrupted = false
+
+  private async _speakPipelined(text: string): Promise<boolean> {
+    if (!this.piperTTS) return false
+
+    this._pipelineInterrupted = false
+    const segments = splitSentences(text)
+    if (segments.length === 0) return false
+
+    const pauseConfig = this._getPauseConfig()
+    let produced = false
+
+    // Pre-generate first sentence
+    let currentGen = this.piperTTS.generateWav(segments[0].text)
+
+    for (let i = 0; i < segments.length; i++) {
+      if (this._pipelineInterrupted) break
+
+      const result = await currentGen
+      if (!result) continue
+
+      // Start pre-generating NEXT sentence while we play current
+      let nextGen: Promise<{ wav: Buffer; sampleRate: number } | null> | null = null
+      if (i + 1 < segments.length && !this._pipelineInterrupted) {
+        nextGen = this.piperTTS!.generateWav(segments[i + 1].text)
+      }
+
+      // Append silence pause based on trailing punctuation
+      const pauseMs = getPauseDuration(segments[i].trailing, pauseConfig)
+      let wav = result.wav
+      if (pauseMs > 0) {
+        wav = appendSilence(wav, pauseMs, result.sampleRate)
+      }
+
+      if (this._pipelineInterrupted) break
+
+      // Play current sentence
+      produced = true
+      if (this.transport) {
+        this.transport.sendAudioPlayback(wav.toString('base64'))
+      } else {
+        await this.playWavViaAfplay(wav)
+      }
+
+      // Advance to pre-generated next
+      if (nextGen) {
+        currentGen = nextGen
+      }
+    }
+
+    return produced
+  }
+
+  /** Interrupt the pipelined TTS queue (called by stopSpeech / barge-in). */
+  private _interruptPipeline(): void {
+    this._pipelineInterrupted = true
   }
 
   /** Play a WAV buffer via macOS afplay — transport-less Piper playback. */
@@ -435,8 +502,9 @@ export class VoiceManager extends EventEmitter {
     })
   }
 
-  /** Stop all TTS playback (Piper + macOS say + afplay). Called by tts:stop IPC and Escape barge-in. */
+  /** Stop all TTS playback (Piper + macOS say + afplay + pipeline queue). Called by tts:stop IPC and Escape barge-in. */
   stopSpeech(): void {
+    this._interruptPipeline()
     if (this.piperTTS) this.piperTTS.stop()
     this.stopMacosSay()
     this.stopAfplay()

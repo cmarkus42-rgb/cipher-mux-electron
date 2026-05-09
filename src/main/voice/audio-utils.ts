@@ -46,3 +46,85 @@ export function pcmToWav(pcmData: Float32Array, sampleRate: number): Buffer {
 
   return buffer
 }
+
+/** Result of splitting text into sentences. */
+export interface SentenceSegment {
+  /** The sentence text (trimmed). */
+  text: string
+  /** The trailing punctuation character(s), e.g. '.', '?', '!', '...', or '' if none. */
+  trailing: string
+}
+
+/**
+ * Split text into sentence segments at sentence-ending punctuation (.!?)
+ * followed by whitespace or end-of-string.
+ * Preserves trailing punctuation in each segment.
+ */
+export function splitSentences(text: string): SentenceSegment[] {
+  if (!text || !text.trim()) return []
+
+  // Split at sentence boundaries: one or more .!? followed by whitespace or end
+  const parts = text.match(/[^.!?]*[.!?]+(?:\s+|$)|[^.!?]+$/g)
+  if (!parts) return []
+
+  return parts
+    .map(p => p.trim())
+    .filter(p => p.length > 0)
+    .map(p => {
+      const trailingMatch = p.match(/([.!?]+)\s*$/)
+      return {
+        text: p,
+        trailing: trailingMatch ? trailingMatch[1] : '',
+      }
+    })
+}
+
+export interface PauseConfig {
+  pauseAfterPeriod: number
+  pauseAfterQuestion: number
+  pauseAfterComma: number
+}
+
+/**
+ * Get pause duration in ms for a trailing punctuation string.
+ * '.' → period pause, '?'/'!' → question pause, ','/';'/':' → comma pause.
+ */
+export function getPauseDuration(trailing: string, config: PauseConfig): number {
+  if (!trailing) return 0
+  // Check last meaningful character
+  const last = trailing[trailing.length - 1]
+  if (last === '.') return config.pauseAfterPeriod
+  if (last === '?' || last === '!') return config.pauseAfterQuestion
+  if (last === ',' || last === ';' || last === ':') return config.pauseAfterComma
+  return 0
+}
+
+/**
+ * Append silence (zero samples) to a WAV buffer.
+ * Updates RIFF header and data sub-chunk size.
+ *
+ * @param wavBuffer - Valid WAV buffer (44-byte header + PCM data)
+ * @param durationMs - Silence duration in milliseconds
+ * @param sampleRate - Sample rate of the WAV (must match original)
+ * @returns New buffer with silence appended
+ */
+export function appendSilence(wavBuffer: Buffer, durationMs: number, sampleRate: number): Buffer {
+  if (durationMs <= 0) return wavBuffer
+
+  const bytesPerSample = 2 // 16-bit mono
+  const silenceSamples = Math.round(sampleRate * durationMs / 1000)
+  const silenceBytes = silenceSamples * bytesPerSample
+
+  const result = Buffer.alloc(wavBuffer.length + silenceBytes)
+  wavBuffer.copy(result)
+  // Silence bytes are already 0 from Buffer.alloc
+
+  // Update RIFF file size (offset 4): total file size - 8
+  result.writeUInt32LE(result.length - 8, 4)
+
+  // Update data sub-chunk size (offset 40)
+  const oldDataSize = wavBuffer.readUInt32LE(40)
+  result.writeUInt32LE(oldDataSize + silenceBytes, 40)
+
+  return result
+}

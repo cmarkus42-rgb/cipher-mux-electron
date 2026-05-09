@@ -153,6 +153,11 @@ const defaults: AppConfig = {
   entityPersonaOverrides: {} as Record<string, string>,
   voiceSubmitMode: 'auto' as const,
   piperVoice: 'de_DE-cipher_adult-medium',
+  tts: {
+    pauseAfterPeriod: 300,
+    pauseAfterQuestion: 400,
+    pauseAfterComma: 150,
+  },
   sidebarDetached: false,
   sidebarWindowBounds: null as { x: number; y: number; width: number; height: number } | null,
   sidebarCollapsed: {} as Record<string, boolean>,

@@ -296,6 +296,36 @@ export class PiperTTS extends TTSEngine {
     }
   }
 
+  /**
+   * Generate a WAV buffer for a single text segment.
+   * Returns null if interrupted or no audio produced.
+   */
+  async generateWav(text: string): Promise<{ wav: Buffer; sampleRate: number } | null> {
+    if (!this.ready || !this.worker) return null
+    if (this._interrupted) return null
+
+    const trimmed = text.trim()
+    if (!trimmed) return null
+
+    const id = `tts-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    this.worker.send({ cmd: 'generate', text: trimmed, sid: 0, speed: 1.0, id })
+
+    const msg = await new Promise<WorkerMessage>((resolve, reject) => {
+      this.pendingMessages.set(id, { resolve, reject })
+    })
+
+    if (this._interrupted) return null
+    if (msg.type !== 'audio' || !msg.samples || !msg.sampleRate) return null
+
+    const samplesBuf = Buffer.from(msg.samples, 'base64')
+    const float32 = new Float32Array(
+      samplesBuf.buffer,
+      samplesBuf.byteOffset,
+      samplesBuf.byteLength / 4
+    )
+    return { wav: pcmToWav(float32, msg.sampleRate), sampleRate: msg.sampleRate }
+  }
+
   stop(): void {
     this._interrupted = true
   }
