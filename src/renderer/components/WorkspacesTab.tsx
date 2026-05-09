@@ -73,6 +73,12 @@ export function WorkspacesTab() {
 
   useEffect(() => { loadAll() }, [loadAll])
 
+  // Re-sync when another window saves/deletes a workspace
+  useEffect(() => {
+    const unsub = api.workspaces.onChanged?.(() => { loadAll() })
+    return () => { unsub?.() }
+  }, [loadAll])
+
   const ws = workspaces.find((w) => w.id === activeWsId)
 
   const updateWs = (patch: Partial<Workspace>) => {

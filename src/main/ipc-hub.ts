@@ -1727,12 +1727,14 @@ export class IpcHub {
       if (idx >= 0) workspaces[idx] = workspace
       else workspaces.push(workspace)
       configStore.set('workspaces', workspaces)
+      this.windowManager.sendToAllWindows(IPC.WORKSPACES_CHANGED, { reason: 'save', id: workspace.id })
       return { ok: true }
     })
 
     ipcMain.handle(IPC.WORKSPACES_DELETE, (_e, workspaceId: string) => {
       const workspaces = configStore.get('workspaces')
       configStore.set('workspaces', workspaces.filter(w => w.id !== workspaceId))
+      this.windowManager.sendToAllWindows(IPC.WORKSPACES_CHANGED, { reason: 'delete', id: workspaceId })
       return { ok: true }
     })
 

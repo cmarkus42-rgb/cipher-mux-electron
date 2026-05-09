@@ -147,6 +147,7 @@ export const IPC = {
   WORKSPACES_DELETE: 'cipher-mux:workspaces:delete',
   WORKSPACES_APPLY: 'cipher-mux:workspaces:apply',
   WORKSPACES_ACTIVE: 'cipher-mux:workspaces:active',
+  WORKSPACES_CHANGED: 'cipher-mux:workspaces:changed',
 
   // Theme
   THEME_CHANGED: 'cipher-mux:theme:changed',
