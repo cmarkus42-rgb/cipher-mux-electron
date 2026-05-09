@@ -7,6 +7,7 @@ import matter from 'gray-matter'
 // ─── Types ──────────────────────────────────────────────────
 
 export type TestcaseStatus = 'open' | 'pass' | 'fail'
+export type TestcaseResolution = 'unresolved' | 'in_review' | 'addressed' | 'fixed' | 'wont_fix'
 
 export interface TestcaseItem {
   id: string             // e.g. "T-UI.1"
@@ -15,6 +16,7 @@ export interface TestcaseItem {
   comment: string        // user comment (appended after description)
   screenshotRef?: string // relative path to screenshot file
   lineIndex: number      // 0-based line index in original markdown
+  resolution?: TestcaseResolution // only relevant when status === 'fail'
 }
 
 export interface TestcaseSection {
@@ -55,6 +57,7 @@ export interface TestcaseSummary {
 // Also supports without bold: - [ ] T-ID.N Description
 
 const CHECKBOX_RE = /^-\s+\[([ x\-])\]\s+(?:\*\*(.+?)\*\*|(\S+))\s*(.*)/
+const RESOLUTION_RE = /\{(in_review|addressed|fixed|wont_fix)\}\s*$/
 
 export function parseTestcaseItem(line: string, lineIndex: number): TestcaseItem | null {
   const match = line.match(CHECKBOX_RE)
@@ -68,13 +71,24 @@ export function parseTestcaseItem(line: string, lineIndex: number): TestcaseItem
   if (check === 'x') status = 'pass'
   else if (check === '-') status = 'fail'
 
+  // Extract resolution marker from end of line (only for fail items)
+  let resolution: TestcaseResolution | undefined
+  let restWithoutRes = rest
+  if (status === 'fail') {
+    const resMatch = rest.match(RESOLUTION_RE)
+    if (resMatch) {
+      resolution = resMatch[1] as TestcaseResolution
+      restWithoutRes = rest.slice(0, resMatch.index).trimEnd()
+    }
+  }
+
   // Split rest into description and comment (comment after " // " or " — ")
-  let description = rest
+  let description = restWithoutRes
   let comment = ''
-  const commentSep = rest.indexOf(' // ')
+  const commentSep = restWithoutRes.indexOf(' // ')
   if (commentSep !== -1) {
-    description = rest.slice(0, commentSep).trim()
-    comment = rest.slice(commentSep + 4).trim()
+    description = restWithoutRes.slice(0, commentSep).trim()
+    comment = restWithoutRes.slice(commentSep + 4).trim()
   }
 
   // Screenshot ref: ![screenshot](path) — extract and strip from comment
@@ -85,7 +99,7 @@ export function parseTestcaseItem(line: string, lineIndex: number): TestcaseItem
     comment = comment.replace(imgMatch[0], '').trim()
   }
 
-  return { id, description, status, comment, screenshotRef, lineIndex }
+  return { id, description, status, comment, screenshotRef, lineIndex, resolution }
 }
 
 const SECTION_RE = /^##\s+(.+)/
@@ -185,6 +199,10 @@ export function serializeTestcaseItem(item: TestcaseItem): string {
   if (item.screenshotRef) commentParts.push(`![screenshot](${item.screenshotRef})`)
   if (commentParts.length > 0) {
     line += ` // ${commentParts.join(' ')}`
+  }
+  // Append resolution marker for fail items (never write {unresolved})
+  if (item.status === 'fail' && item.resolution && item.resolution !== 'unresolved') {
+    line += ` {${item.resolution}}`
   }
   return line
 }

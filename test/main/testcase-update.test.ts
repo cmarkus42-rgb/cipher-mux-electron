@@ -5,12 +5,15 @@ import {
   serializeTestcaseBody,
 } from '../../src/main/notes/testcase-parser'
 
+import type { TestcaseResolution } from '../../src/main/notes/testcase-parser'
+
 // Helper: apply operations on parsed sections (mirrors mcp-tools.ts logic)
 type TestcaseOp =
   | { op: 'set_status'; itemId: string; status: 'open' | 'pass' | 'fail' }
   | { op: 'set_comment'; itemId: string; comment: string }
   | { op: 'add_item'; section: string; id: string; description: string }
   | { op: 'add_section'; title: string }
+  | { op: 'set_resolution'; itemId: string; resolution: TestcaseResolution }
 
 function applyOps(body: string, ops: TestcaseOp[]): { body: string; errors: string[] } {
   const sections = parseTestcaseBody(body)
@@ -40,6 +43,11 @@ function applyOps(body: string, ops: TestcaseOp[]): { body: string; errors: stri
         continue
       }
       sections.push({ title: op.title, items: [] })
+    } else if (op.op === 'set_resolution') {
+      const item = sections.flatMap(s => s.items).find(i => i.id === op.itemId)
+      if (!item) { errors.push(`Item not found: ${op.itemId}`); continue }
+      if (item.status !== 'fail') { errors.push(`Cannot set resolution on non-fail item: ${op.itemId} (status: ${item.status})`); continue }
+      item.resolution = op.resolution === 'unresolved' ? undefined : op.resolution
     }
   }
   return { body: serializeTestcaseBody(sections), errors }
@@ -183,6 +191,78 @@ describe('testcase-update operations', () => {
     const { body: body2 } = applyOps(body, [{ op: 'set_status', itemId: 'T-MCP.2', status: 'pass' }])
     const sections2 = parseTestcaseBody(body2)
     assert.equal(sections2[1].items[1].status, 'pass')
+  })
+
+  // ─── set_resolution ────────────────────────────────────────
+
+  it('set_resolution: sets resolution on fail item', () => {
+    const body = `## Tests\n- [-] **T-1** Bug\n- [x] **T-2** Pass\n`
+    const { body: updated, errors } = applyOps(body, [
+      { op: 'set_resolution', itemId: 'T-1', resolution: 'addressed' },
+    ])
+    assert.equal(errors.length, 0)
+    const sections = parseTestcaseBody(updated)
+    assert.equal(sections[0].items[0].resolution, 'addressed')
+  })
+
+  it('set_resolution: errors on non-fail item', () => {
+    const body = `## Tests\n- [x] **T-1** Pass\n- [ ] **T-2** Open\n`
+    const { errors: e1 } = applyOps(body, [
+      { op: 'set_resolution', itemId: 'T-1', resolution: 'fixed' },
+    ])
+    assert.equal(e1.length, 1)
+    assert.ok(e1[0].includes('non-fail'))
+
+    const { errors: e2 } = applyOps(body, [
+      { op: 'set_resolution', itemId: 'T-2', resolution: 'in_review' },
+    ])
+    assert.equal(e2.length, 1)
+    assert.ok(e2[0].includes('non-fail'))
+  })
+
+  it('set_resolution: errors on unknown item', () => {
+    const body = `## Tests\n- [-] **T-1** Bug\n`
+    const { errors } = applyOps(body, [
+      { op: 'set_resolution', itemId: 'T-NOPE.99', resolution: 'fixed' },
+    ])
+    assert.equal(errors.length, 1)
+    assert.ok(errors[0].includes('T-NOPE.99'))
+  })
+
+  it('set_resolution: unresolved clears resolution', () => {
+    const body = `## Tests\n- [-] **T-1** Bug {fixed}\n`
+    const { body: updated } = applyOps(body, [
+      { op: 'set_resolution', itemId: 'T-1', resolution: 'unresolved' },
+    ])
+    const sections = parseTestcaseBody(updated)
+    assert.equal(sections[0].items[0].resolution, undefined)
+  })
+
+  it('set_resolution: cycles through resolutions', () => {
+    const body = `## Tests\n- [-] **T-1** Bug\n`
+    const resolutions: TestcaseResolution[] = ['in_review', 'addressed', 'fixed', 'wont_fix']
+    let current = body
+    for (const res of resolutions) {
+      const { body: updated, errors } = applyOps(current, [
+        { op: 'set_resolution', itemId: 'T-1', resolution: res },
+      ])
+      assert.equal(errors.length, 0)
+      const sections = parseTestcaseBody(updated)
+      assert.equal(sections[0].items[0].resolution, res)
+      current = updated
+    }
+  })
+
+  it('set_resolution: round-trip preserves resolution alongside other ops', () => {
+    const body = `## Tests\n- [ ] **T-1** Item\n`
+    // First set to fail, then set resolution
+    const { body: b1 } = applyOps(body, [{ op: 'set_status', itemId: 'T-1', status: 'fail' }])
+    const { body: b2 } = applyOps(b1, [{ op: 'set_resolution', itemId: 'T-1', resolution: 'addressed' }])
+    const { body: b3 } = applyOps(b2, [{ op: 'set_comment', itemId: 'T-1', comment: 'investigating' }])
+    const sections = parseTestcaseBody(b3)
+    assert.equal(sections[0].items[0].status, 'fail')
+    assert.equal(sections[0].items[0].resolution, 'addressed')
+    assert.equal(sections[0].items[0].comment, 'investigating')
   })
 
   // ─── Guard test ──────────────────────────────────────────
