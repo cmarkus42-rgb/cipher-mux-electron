@@ -77,6 +77,47 @@ const THEME_TOKEN_GROUPS: Array<{ labelKey: string; tokens: string[] }> = [
     labelKey: 'themeEditor.groupHighlight',
     tokens: ['--color-highlight', '--color-highlight-dim'],
   },
+  {
+    labelKey: 'themeEditor.groupSession',
+    tokens: ['--color-session-header-bg', '--shadow-inset'],
+  },
+  {
+    labelKey: 'themeEditor.groupEntity',
+    tokens: [
+      '--entity-color-1', '--entity-color-2', '--entity-color-3',
+      '--entity-color-4', '--entity-color-5', '--entity-color-6',
+      '--entity-color-7', '--entity-color-8', '--entity-color-9',
+      '--entity-color-10', '--entity-color-11',
+    ],
+  },
+]
+
+/** Human-readable labels for entity color tokens. */
+const ENTITY_COLOR_LABELS: Record<string, string> = {
+  '--entity-color-1': 'orchestrator',
+  '--entity-color-2': 'cyber-factory',
+  '--entity-color-3': 'companion',
+  '--entity-color-4': 'refinement',
+  '--entity-color-5': 'launcher',
+  '--entity-color-6': 'voice-relay',
+  '--entity-color-7': 'audit',
+  '--entity-color-8': 'ideation',
+  '--entity-color-9': 'debugger',
+  '--entity-color-10': 'testing',
+  '--entity-color-11': 'bugreport',
+}
+
+/** Available monospace fonts for the terminal font picker. */
+const TERMINAL_FONTS = [
+  "'Fira Code', 'Roboto Mono', 'SF Mono', Menlo, monospace",
+  "'JetBrains Mono', 'SF Mono', Menlo, monospace",
+  "'IBM Plex Mono', 'SF Mono', Menlo, monospace",
+  "'Space Mono', 'SF Mono', Menlo, monospace",
+  "'Share Tech Mono', 'Fira Code', monospace",
+  "'VT323', 'Fira Code', monospace",
+  "'SF Mono', Menlo, monospace",
+  "Menlo, monospace",
+  "'Courier New', monospace",
 ]
 
 export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme, onOpenBugreport, registeredShortcuts = [] }: InfoSettingsViewProps) {
@@ -371,6 +412,35 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
 
       {activeTab === 'about' && (
         <section class="settings-section wiki-section">
+          {/* ─── Version & Links ─── */}
+          <div class="wiki-entry">
+            <div class="settings-section__title">cipher-mux</div>
+            <p class="wiki-text">
+              {t('about.version', { version: APP_VERSION })}
+            </p>
+            <p class="wiki-text" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px' }}>
+              <a class="about-link" onClick={() => api.openExternal('https://cipher-mux.dev')}>{t('about.website')}</a>
+              <a class="about-link" onClick={() => api.openExternal('https://cipher-mux.dev/docs')}>{t('about.howTo')}</a>
+              <a class="about-link" onClick={() => api.openExternal('https://cipher-mux.dev/changelog')}>{t('about.changelog')}</a>
+            </p>
+          </div>
+
+          {/* ─── Keyboard Shortcuts ─── */}
+          <div class="wiki-entry">
+            <div class="settings-section__title">{t('about.shortcuts')}</div>
+            <table class="shortcut-table">
+              <tbody>
+                {allShortcuts.map((s) => (
+                  <tr key={s.combo}>
+                    <td class="shortcut-table__combo"><kbd>{s.combo}</kbd></td>
+                    <td class="shortcut-table__label">{s.label}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ─── Features ─── */}
           <div class="wiki-entry">
             <div class="settings-section__title">{t('info.feature.whatIs.title')}</div>
             <p class="wiki-text">{t('info.feature.whatIs.p1')}</p>
@@ -382,67 +452,28 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
           <div class="wiki-entry">
             <div class="settings-section__title">{t('info.feature.grid.title')}</div>
             <p class="wiki-text">{t('info.feature.grid.p1')}</p>
-            <p class="wiki-text">
-              <strong>{t('info.feature.grid.p2strong')}</strong>{t('info.feature.grid.p2')}
-            </p>
-            <p class="wiki-text">
-              <strong>{t('info.feature.grid.p3strong')}</strong>{t('info.feature.grid.p3')}
-            </p>
           </div>
 
           <div class="wiki-entry">
             <div class="settings-section__title">{t('info.feature.orchestrator.title')}</div>
             <p class="wiki-text">{t('info.feature.orchestrator.p1')}</p>
+          </div>
+
+          {/* ─── Credits ─── */}
+          <div class="wiki-entry">
+            <div class="settings-section__title">{t('about.credits')}</div>
             <ul class="wiki-list">
-              <li>{t('info.feature.orchestrator.li1')}</li>
-              <li>{t('info.feature.orchestrator.li2')}</li>
-              <li>{t('info.feature.orchestrator.li3')}</li>
-              <li>{t('info.feature.orchestrator.li4')}</li>
+              <li>{t('about.creditElectron', { version: api.versions?.electron ?? '—' })}</li>
+              <li>{t('about.creditNode', { version: api.versions?.node ?? '—' })}</li>
+              <li>{t('about.creditChromium', { version: api.versions?.chrome ?? '—' })}</li>
+              <li>{t('about.creditPiper')}</li>
+              <li>{t('about.creditWhisper')}</li>
+              <li>{t('about.creditXterm')}</li>
+              <li>{t('about.creditCodeMirror')}</li>
             </ul>
-            <p class="wiki-text">{t('info.feature.orchestrator.p2')}</p>
-          </div>
-
-          <div class="wiki-entry">
-            <div class="settings-section__title">{t('info.feature.messageBus.title')}</div>
-            <p class="wiki-text">{t('info.feature.messageBus.p1')}</p>
-            <p class="wiki-text">
-              <strong>{t('info.feature.messageBus.p2strong')}</strong>{t('info.feature.messageBus.p2')}
+            <p class="wiki-text" style={{ marginTop: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-dim)' }}>
+              {t('about.license')}
             </p>
-          </div>
-
-          <div class="wiki-entry">
-            <div class="settings-section__title">{t('info.feature.mcp.title')}</div>
-            <p class="wiki-text">{t('info.feature.mcp.p1')}</p>
-            <p class="wiki-text">
-              <strong>{t('info.feature.mcp.p2strong')}</strong>{t('info.feature.mcp.p2')}
-            </p>
-          </div>
-
-          <div class="wiki-entry">
-            <div class="settings-section__title">{t('info.feature.context.title')}</div>
-            <p class="wiki-text">{t('info.feature.context.p1')}</p>
-            <ul class="wiki-list">
-              <li><span style={{ color: 'var(--color-neon-green)' }}>{t('info.feature.context.green')}</span>{t('info.feature.context.greenDesc')}</li>
-              <li><span style={{ color: 'var(--color-neon-orange)' }}>{t('info.feature.context.orange')}</span>{t('info.feature.context.orangeDesc')}</li>
-              <li><span style={{ color: 'var(--color-neon-red)' }}>{t('info.feature.context.red')}</span>{t('info.feature.context.redDesc')}</li>
-            </ul>
-            <p class="wiki-text">{t('info.feature.context.p2')}</p>
-          </div>
-
-          <div class="wiki-entry">
-            <div class="settings-section__title">{t('info.feature.bugreport.title')}</div>
-            <p class="wiki-text">{t('info.feature.bugreport.p1')}</p>
-          </div>
-
-          <div class="wiki-entry">
-            <div class="settings-section__title">{t('info.feature.themes.title')}</div>
-            <p class="wiki-text">{t('info.feature.themes.p1')}</p>
-          </div>
-
-          <div class="wiki-entry">
-            <div class="settings-section__title">{t('info.feature.scanner.title')}</div>
-            <p class="wiki-text">{t('info.feature.scanner.p1')}</p>
-            <p class="wiki-text">{t('info.feature.scanner.p2')}</p>
           </div>
         </section>
       )}
@@ -573,7 +604,10 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
                   <div class="theme-editor__grid">
                     {group.tokens.map(prop => {
                       const current = customTokens[prop] ?? getBaseToken(prop)
-                      return (
+                      const isColorToken = !prop.includes('shadow')
+                      const label = ENTITY_COLOR_LABELS[prop]
+                        ?? prop.replace('--color-', '').replace('--', '')
+                      return isColorToken ? (
                         <label key={prop} class="theme-editor__token">
                           <input
                             type="color"
@@ -581,13 +615,71 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
                             onInput={(e) => handleTokenChange(prop, (e.target as HTMLInputElement).value)}
                             class="theme-editor__picker"
                           />
-                          <span class="theme-editor__label">{prop.replace('--color-', '')}</span>
+                          <span class="theme-editor__label">{label}</span>
+                        </label>
+                      ) : (
+                        <label key={prop} class="theme-editor__token theme-editor__token--text">
+                          <input
+                            type="text"
+                            class="input input--sm"
+                            value={current}
+                            onInput={(e) => handleTokenChange(prop, (e.target as HTMLInputElement).value)}
+                            style={{ width: '180px' }}
+                          />
+                          <span class="theme-editor__label">{label}</span>
                         </label>
                       )
                     })}
                   </div>
                 </div>
               ))}
+
+              {/* Terminal font / size / line-height */}
+              <div class="theme-editor__group">
+                <div class="theme-editor__group-label">{t('themeEditor.groupTerminal')}</div>
+                <div class="theme-editor__grid" style={{ flexDirection: 'column', gap: '6px' }}>
+                  <label class="settings-label" style={{ gap: '4px' }}>
+                    <span class="theme-editor__label">{t('themeEditor.terminalFont')}</span>
+                    <select
+                      class="input input--sm"
+                      value={customTokens['--terminal-font-family'] ?? getBaseToken('--terminal-font-family')}
+                      onChange={(e) => handleTokenChange('--terminal-font-family', (e.target as HTMLSelectElement).value)}
+                      style={{ width: '280px', fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-xs)' }}
+                    >
+                      {TERMINAL_FONTS.map(f => (
+                        <option key={f} value={f}>{f.split(',')[0].replace(/'/g, '')}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <label class="settings-label" style={{ gap: '4px' }}>
+                      <span class="theme-editor__label">{t('themeEditor.terminalFontSize')}</span>
+                      <input
+                        type="number"
+                        class="input input--sm"
+                        min={9}
+                        max={24}
+                        value={parseInt(customTokens['--terminal-font-size'] ?? getBaseToken('--terminal-font-size')) || 13}
+                        onInput={(e) => handleTokenChange('--terminal-font-size', `${(e.target as HTMLInputElement).value}px`)}
+                        style={{ width: '60px' }}
+                      />
+                    </label>
+                    <label class="settings-label" style={{ gap: '4px' }}>
+                      <span class="theme-editor__label">{t('themeEditor.terminalLineHeight')}</span>
+                      <input
+                        type="number"
+                        class="input input--sm"
+                        min={1.0}
+                        max={2.0}
+                        step={0.1}
+                        value={parseFloat(customTokens['--terminal-line-height'] ?? getBaseToken('--terminal-line-height')) || 1.3}
+                        onInput={(e) => handleTokenChange('--terminal-line-height', (e.target as HTMLInputElement).value)}
+                        style={{ width: '60px' }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
               <div class="theme-editor__actions">
                 <button class="btn btn--sm btn--primary" onClick={handleThemeSave}>{t('themeEditor.save')}</button>
                 <button class="btn btn--sm" onClick={() => setSaveAsOpen(v => !v)}>{t('themeEditor.saveAs')}</button>
