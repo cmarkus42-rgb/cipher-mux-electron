@@ -623,6 +623,16 @@ const api = {
 
   /** Get native file path from a dropped File object (works with contextIsolation). */
   getFilePath: (file: File) => webUtils.getPathForFile(file),
+
+  /** Open URL in system browser. */
+  openExternal: (url: string) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
+
+  /** Runtime version info for the About page. */
+  versions: {
+    electron: process.versions.electron ?? '—',
+    node: process.versions.node ?? '—',
+    chrome: process.versions.chrome ?? '—',
+  },
 }
 
 contextBridge.exposeInMainWorld('cipherMux', api)

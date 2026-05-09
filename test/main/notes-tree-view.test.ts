@@ -4,7 +4,7 @@
 
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildClassTree, applyTagFilter, filterByWorkspace } from '../../src/renderer/components/NotesTreeView'
+import { buildClassTree, applyTagFilter, filterByWorkspace, isGlobalNote } from '../../src/renderer/components/NotesTreeView'
 import type { NoteInfo, TagClassRepository, TagIndexData } from '../../src/shared/types'
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -185,19 +185,40 @@ describe('filterByWorkspace', () => {
     makeNote('n4', ['workspace:ws-123', 'domain:trading']),
   ]
 
-  it('filters to notes with matching scope tag', () => {
+  it('filters to notes with matching scope tag plus global notes', () => {
     const result = filterByWorkspace(notes, 'ws-123')
-    assert.equal(result.length, 2)
-    assert.deepEqual(result.map(n => n.id).sort(), ['n1', 'n4'])
+    // n1 + n4 (workspace match) + n3 (global, no workspace: tag)
+    assert.equal(result.length, 3)
+    assert.deepEqual(result.map(n => n.id).sort(), ['n1', 'n3', 'n4'])
   })
 
-  it('returns empty when no notes match workspace', () => {
+  it('returns only global notes when no notes match workspace', () => {
     const result = filterByWorkspace(notes, 'ws-999')
-    assert.equal(result.length, 0)
+    // n3 has no workspace: tag → global
+    assert.equal(result.length, 1)
+    assert.equal(result[0].id, 'n3')
   })
 
-  it('does not match partial workspace IDs', () => {
+  it('does not match partial workspace IDs but includes global notes', () => {
     const result = filterByWorkspace(notes, 'ws-12')
-    assert.equal(result.length, 0)
+    // n3 is global
+    assert.equal(result.length, 1)
+    assert.equal(result[0].id, 'n3')
+  })
+})
+
+// ─── isGlobalNote ──────────────────────────────────────────
+
+describe('isGlobalNote', () => {
+  it('returns true for notes without workspace: tag', () => {
+    assert.equal(isGlobalNote(makeNote('n1', ['kind:bugreport', 'domain:trading'])), true)
+  })
+
+  it('returns false for notes with workspace: tag', () => {
+    assert.equal(isGlobalNote(makeNote('n1', ['workspace:my-ws', 'kind:bugreport'])), false)
+  })
+
+  it('returns true for notes with no tags', () => {
+    assert.equal(isGlobalNote(makeNote('n1', [])), true)
   })
 })

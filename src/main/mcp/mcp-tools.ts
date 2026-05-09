@@ -718,8 +718,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
             const workspaces = configStore.get('workspaces') ?? []
             const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
             if (ws) {
-              // Auto-scope tag: always applied when workspace is active
-              tags.push(`workspace:${ws.name ?? ws.id}`)
+              // notesGlobal: skip workspace scope tag so note is visible in all workspaces
+              if (!ws.notesGlobal) {
+                tags.push(`workspace:${ws.name ?? ws.id}`)
+              }
               // User-configured cross-workspace tags
               if (ws.defaultTags?.length) {
                 const tagSet = new Set([...tags, ...ws.defaultTags])

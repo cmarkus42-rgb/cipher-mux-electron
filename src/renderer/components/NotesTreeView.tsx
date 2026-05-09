@@ -122,11 +122,23 @@ export function applyTagFilter(notes: NoteInfo[], filter: TagFilterState): NoteI
   return result
 }
 
-/** Filter notes by workspace tag (workspace:<name> or workspace:<id>). */
+/** Filter notes by workspace tag (workspace:<name> or workspace:<id>).
+ *  Global notes (no workspace: tag at all) are included in every workspace. */
 export function filterByWorkspace(notes: NoteInfo[], workspaceId: string, workspaceName?: string): NoteInfo[] {
   // Match by name (preferred) or by ID (fallback for old tags)
   const candidates = [`workspace:${workspaceName ?? workspaceId}`, `workspace:${workspaceId}`]
-  return notes.filter(n => n.tags.some(t => candidates.includes(t)))
+  return notes.filter(n => {
+    const hasAnyWsTag = n.tags.some(t => t.startsWith('workspace:'))
+    // Global note (no workspace: tag) → visible everywhere
+    if (!hasAnyWsTag) return true
+    // Workspace-scoped note → only if it matches this workspace
+    return n.tags.some(t => candidates.includes(t))
+  })
+}
+
+/** Check if a note is global (has no workspace: tag). */
+export function isGlobalNote(note: NoteInfo): boolean {
+  return !note.tags.some(t => t.startsWith('workspace:'))
 }
 
 // ─── Class Node Renderer ────────────────────────────────────
@@ -609,6 +621,9 @@ export function NotesTreeView({
           >
             {/* Line 1: Title + Delete */}
             <div class="note-card__head">
+              {isGlobalNote(note) && activeWorkspaceId && (
+                <span class="note-card__global" title={t('workspacesTab.notesGlobal', 'Notes visible in all workspaces')}>🌐</span>
+              )}
               <span class="note-card__title">
                 {note.title && note.title !== 'Untitled' ? note.title : t('notesCell.untitled')}
               </span>

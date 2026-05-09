@@ -261,6 +261,15 @@ export interface AppConfig {
   ttsVoice?: 'local' | 'macos'
   /** Active Piper voice model name (e.g. 'de_DE-cipher_adult-medium'). */
   piperVoice?: string
+  /** TTS sentence-pipelining pause configuration (milliseconds). */
+  tts?: {
+    /** Pause after period (default 300ms). */
+    pauseAfterPeriod: number
+    /** Pause after ? or ! (default 400ms). */
+    pauseAfterQuestion: number
+    /** Pause after , ; : (default 150ms). */
+    pauseAfterComma: number
+  }
   /** Voice commands (scroll, grid nav) enabled. Default: true. */
   voiceCommandsEnabled?: boolean
   /** Update checker configuration. */
