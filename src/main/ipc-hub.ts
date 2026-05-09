@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, screen, shell } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
@@ -251,6 +251,7 @@ export class IpcHub {
     this.registerCompanionChannels()
     this.registerSetupChannels()
     this.registerUpdateChannels()
+    ipcMain.handle(IPC.OPEN_EXTERNAL, (_e, url: string) => shell.openExternal(url))
     this.setupEventForwarding()
 
     // Start context usage monitor
@@ -1855,7 +1856,10 @@ export class IpcHub {
           const workspaces = configStore.get('workspaces') ?? []
           const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
           if (ws) {
-            effectiveTags = [...effectiveTags, `workspace:${ws.name ?? ws.id}`]
+            // notesGlobal: skip workspace scope tag so note stays visible in all workspaces
+            if (!ws.notesGlobal) {
+              effectiveTags = [...effectiveTags, `workspace:${ws.name ?? ws.id}`]
+            }
             if (ws.defaultTags?.length) {
               const tagSet = new Set([...effectiveTags, ...ws.defaultTags])
               effectiveTags = [...tagSet]
@@ -1913,7 +1917,10 @@ export class IpcHub {
         const workspaces = configStore.get('workspaces') ?? []
         const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
         if (ws) {
-          mergedTags = [...mergedTags, `workspace:${ws.name ?? ws.id}`]
+          // notesGlobal: skip workspace scope tag so note is visible in all workspaces
+          if (!ws.notesGlobal) {
+            mergedTags = [...mergedTags, `workspace:${ws.name ?? ws.id}`]
+          }
           if (ws.defaultTags?.length) {
             const tagSet = new Set([...mergedTags, ...ws.defaultTags])
             mergedTags = [...tagSet]

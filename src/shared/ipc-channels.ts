@@ -294,6 +294,9 @@ export const IPC = {
   SETUP_INSTALL_ALL: 'cipher-mux:setup:install-all',
   SETUP_PROGRESS: 'cipher-mux:setup:progress',
   SETUP_SKIP: 'cipher-mux:setup:skip',
+
+  // Shell
+  OPEN_EXTERNAL: 'cipher-mux:shell:open-external',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
