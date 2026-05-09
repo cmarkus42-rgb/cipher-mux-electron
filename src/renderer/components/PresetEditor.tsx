@@ -152,6 +152,9 @@ export function PresetEditor() {
   const [newId, setNewId] = useState('')
   const [newName, setNewName] = useState('')
 
+  // Textarea ref for H2 heading navigation (must be at component top level)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
   const loadPresets = useCallback(async () => {
     try {
       const list: PresetInfo[] = await api.presets.list()
@@ -487,7 +490,6 @@ export function PresetEditor() {
           {/* CLAUDE.md editor — full content with H2 navigation */}
           {(() => {
             const headings = extractH2Headings(draftContent)
-            const textareaRef = useRef<HTMLTextAreaElement>(null)
             const scrollToHeading = (lineIndex: number) => {
               const ta = textareaRef.current
               if (!ta) return
