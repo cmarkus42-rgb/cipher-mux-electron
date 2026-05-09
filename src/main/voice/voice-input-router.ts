@@ -2,11 +2,12 @@
  * VoiceInputRouter — routes transcribed text to sessions.
  *
  * Routing priority:
- *   1. Voice-Relay mode: When the voice-relay entity is running, all
+ *   1. Bugreport relay: When bugreportSessionId is set, all transcriptions go there.
+ *   2. Voice-Relay mode: When the voice-relay entity is running, all
  *      transcriptions go there (with auto-Enter, since it's a conversation).
- *   2. Pinned session: If a session is pinned, text goes there regardless of focus.
- *   3. Focused session: text goes to the focused grid session as keystrokes.
- *   4. Off: transcriptions are silently discarded.
+ *   3. Pinned session: If a session is pinned, text goes there regardless of focus.
+ *   4. Focused session: text goes to the focused grid session as keystrokes.
+ *   5. Off: transcriptions are silently discarded.
  *
  * Voice commands (session mode only):
  *   "abschicken" / "absenden" / "senden" / "enter" / "send" → sends Enter
@@ -109,6 +110,7 @@ export class VoiceInputRouter extends EventEmitter {
   private mode: 'session' | 'off' = 'off'
   private focusedSessionId: string | null = null
   private pinnedSessionId: string | null = null
+  private bugreportSessionId: string | null = null
   private notesEditorFocused = false
   private readonly sessionManager: SessionManager
   /** 'auto' = send Enter after STT text, 'manual' = user submits via BT clicker */
@@ -186,6 +188,25 @@ export class VoiceInputRouter extends EventEmitter {
     return this.pinnedSessionId
   }
 
+  /** Route all STT to a bugreport relay session (highest priority). */
+  setBugreportSession(sessionId: string): void {
+    this.bugreportSessionId = sessionId
+    console.log('[VoiceRouter] bugreport session set:', sessionId)
+    this.emit('activeSessionChanged', this.getActiveSessionId())
+  }
+
+  /** Clear bugreport relay routing, restore normal priority chain. */
+  clearBugreportSession(): void {
+    this.bugreportSessionId = null
+    console.log('[VoiceRouter] bugreport session cleared')
+    this.emit('activeSessionChanged', this.getActiveSessionId())
+  }
+
+  /** Get the bugreport relay session ID (null if not active). */
+  getBugreportSessionId(): string | null {
+    return this.bugreportSessionId
+  }
+
   /**
    * Get the voice-relay entity session ID if it's running.
    * Returns null if voice-relay is not active.
@@ -202,7 +223,15 @@ export class VoiceInputRouter extends EventEmitter {
     const trimmed = text.trim()
     if (trimmed === '') return
 
-    // Check if voice-relay entity is running — if so, route there
+    // Priority 1: Bugreport relay — sends text + Enter, skips voice commands
+    if (this.bugreportSessionId) {
+      const brSession = this.sessionManager.get(this.bugreportSessionId)
+      if (brSession && brSession.status === 'active') {
+        return this.routeToBugreportRelay(this.bugreportSessionId, trimmed, brSession.name)
+      }
+    }
+
+    // Priority 2: Voice-relay entity
     const voiceRelayId = this.getVoiceRelaySessionId()
     if (voiceRelayId) {
       const relaySession = this.sessionManager.get(voiceRelayId)
@@ -237,6 +266,25 @@ export class VoiceInputRouter extends EventEmitter {
       console.log('[VoiceRouter] voice-relay dispatch OK')
     } catch (err) {
       console.log('[VoiceRouter] voice-relay sendKeys FAILED:', (err as Error).message)
+      this.emit('error', {
+        code: 'send-failed',
+        message: (err as Error).message,
+      })
+    }
+  }
+
+  /**
+   * Route transcription to the bugreport relay session.
+   * Sends text + Enter (conversational mode). Voice commands are NOT matched.
+   */
+  private async routeToBugreportRelay(sessionId: string, text: string, sessionName: string): Promise<void> {
+    try {
+      console.log('[VoiceRouter] routing to bugreport relay:', JSON.stringify(text.slice(0, 60)))
+      await this.sessionManager.sendKeys(sessionId, text)
+      await this.sessionManager.sendKeys(sessionId, '\r')
+      this.emit('dispatched', { sessionId, sessionName, text })
+    } catch (err) {
+      console.log('[VoiceRouter] bugreport relay sendKeys FAILED:', (err as Error).message)
       this.emit('error', {
         code: 'send-failed',
         message: (err as Error).message,
