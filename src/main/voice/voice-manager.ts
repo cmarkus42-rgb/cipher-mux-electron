@@ -2,8 +2,8 @@
  * VoiceManager — top-level orchestrator for the voice pipeline.
  *
  * Wires together STT (Whisper via STTRouter), TTS (PiperTTS),
- * ConversationEngine (toggle-to-speak turns), OllamaChat (local LLM),
- * and BugreportInterview into a single lifecycle manager.
+ * ConversationEngine (toggle-to-speak turns), and VoiceInputRouter
+ * into a single lifecycle manager.
  *
  * Instantiated in ipc-hub.ts; controls the entire voice pipeline lifecycle.
  */
@@ -15,9 +15,6 @@ import { PiperTTS } from './tts-piper'
 import { configStore } from '../config/config-store'
 import { ConversationEngine, type ConversationTransport } from './conversation-engine'
 import { VoiceState } from './voice-state'
-import { OllamaChat } from './ollama-chat'
-import { ClaudeChat } from './claude-chat'
-import { BugreportInterview, BUGREPORT_SYSTEM_PROMPT } from './bugreport-interview'
 import { VoiceInputRouter } from './voice-input-router'
 import { VoiceOutputRouter } from './voice-output-router'
 
@@ -27,35 +24,17 @@ export interface VoiceManagerConfig {
   whisperModelDir?: string
   piperModelsDir?: string
   piperVoice?: string
-  ollamaHost?: string
-  ollamaPort?: number
-  ollamaModel?: string
   interactionMode?: 'toggle' | 'always-listen'
   skipTTS?: boolean
 }
 
 const DEFAULT_PIPER_VOICE = 'de_DE-cipher_adult-medium'
 
-/** Read Ollama config from configStore (single source of truth). */
-function getOllamaDefaults() {
-  try {
-    const llm = configStore.get('llm')
-    return {
-      host: llm?.ollamaHost ?? '127.0.0.1',
-      port: llm?.ollamaPort ?? 11434,
-      model: llm?.ollamaModel ?? 'gemma4:26b',
-    }
-  } catch {
-    return { host: '127.0.0.1', port: 11434, model: 'gemma4:26b' }
-  }
-}
-
 export class VoiceManager extends EventEmitter {
   private readonly config: Required<VoiceManagerConfig>
   private sttRouter: STTRouter | null = null
   private piperTTS: PiperTTS | null = null
   private conversation: ConversationEngine | null = null
-  private interview: BugreportInterview | null = null
   private inputRouter: VoiceInputRouter | null = null
   private outputRouter: VoiceOutputRouter | null = null
   private transport: ConversationTransport | null = null
@@ -67,7 +46,6 @@ export class VoiceManager extends EventEmitter {
     // Use ~/.config/cipher-mux for model storage — stable across dev/prod
     // (electron getPath('userData') returns different paths in dev vs packaged)
     const userDataDir = path.join(process.env.HOME ?? '', '.config', 'cipher-mux')
-    const ollama = getOllamaDefaults()
 
     this.config = {
       whisperModelDir: config?.whisperModelDir
@@ -75,9 +53,6 @@ export class VoiceManager extends EventEmitter {
       piperModelsDir: config?.piperModelsDir
         ?? path.join(userDataDir, 'models', 'piper'),
       piperVoice: config?.piperVoice ?? DEFAULT_PIPER_VOICE,
-      ollamaHost: config?.ollamaHost ?? ollama.host,
-      ollamaPort: config?.ollamaPort ?? ollama.port,
-      ollamaModel: config?.ollamaModel ?? ollama.model,
       interactionMode: config?.interactionMode ?? 'toggle',
       skipTTS: config?.skipTTS ?? false,
     }
@@ -158,58 +133,6 @@ export class VoiceManager extends EventEmitter {
   /** Whether Piper TTS is available (either via full init or piperOnly). */
   isPiperReady(): boolean {
     return this._piperOnlyInitialized || (this._initialized && this.piperTTS !== null)
-  }
-
-  /**
-   * Start a bugreport interview session.
-   * Creates an OllamaChat with the bugreport system prompt,
-   * wires transcription → interview → TTS playback.
-   */
-  startInterview(): BugreportInterview {
-    if (!this._initialized || !this.conversation) {
-      throw new Error('VoiceManager: not initialized. Call init() first.')
-    }
-
-    // Use llm.bugreportEnrichBackend as the single source of truth for cloud vs local.
-    // This is the same toggle visible in the BugreportDialog UI.
-    const enrichBackend = configStore.get('llm')?.bugreportEnrichBackend ?? 'cloud'
-    const provider = enrichBackend === 'cloud' ? 'haiku' : 'ollama'
-    const chat: { send(msg: string): Promise<string> } = provider === 'haiku'
-      ? new ClaudeChat({ systemPrompt: BUGREPORT_SYSTEM_PROMPT })
-      : new OllamaChat({
-          model: this.config.ollamaModel,
-          host: this.config.ollamaHost,
-          port: this.config.ollamaPort,
-          systemPrompt: BUGREPORT_SYSTEM_PROMPT,
-        })
-    console.log(`[Voice] Bugreport interview using ${provider} backend`)
-    this.interview = new BugreportInterview(chat)
-
-    // Wire: conversation transcription -> interview -> TTS playback
-    this.conversation.removeAllListeners('transcription')
-    this.conversation.on('transcription', (text: string) => {
-      this.interview?.onUserTranscription(text)
-    })
-    this.interview.on('agent-speaking', (text: string) => {
-      this.conversation?.speakResponse(text)
-    })
-
-    // Forward interview lifecycle events to VoiceManager consumers
-    this.interview.on('interview-complete', (report: string) => {
-      this.emit('interview-complete', report)
-    })
-    this.interview.on('turn-update', (data: unknown) => {
-      this.emit('turn-update', data)
-    })
-    this.interview.on('error', (err: Error) => {
-      this.emit('error', err)
-    })
-
-    // Enable always-listen mode for natural conversation flow
-    this.conversation.setInteractionMode('always-listen')
-    this.conversation.stateMachine.transition(VoiceState.READY)
-
-    return this.interview
   }
 
   /**
@@ -298,11 +221,6 @@ export class VoiceManager extends EventEmitter {
   /** Get the conversation engine (null if not initialized) */
   getConversation(): ConversationEngine | null {
     return this.conversation
-  }
-
-  /** Get the current interview (null if none active) */
-  getInterview(): BugreportInterview | null {
-    return this.interview
   }
 
   /** Whether the voice pipeline is initialized and ready */
@@ -491,11 +409,6 @@ export class VoiceManager extends EventEmitter {
     if (this.inputRouter) {
       this.inputRouter.removeAllListeners()
       this.inputRouter = null
-    }
-
-    if (this.interview) {
-      this.interview.removeAllListeners()
-      this.interview = null
     }
 
     if (this.conversation) {

@@ -4,6 +4,7 @@ import * as os from 'os'
 import { app } from 'electron'
 import { ulid } from 'ulidx'
 import type { BugreportData, SessionInfo } from '../../shared/types'
+import type { SessionManager } from '../session/session-manager'
 import { APP_VERSION } from '../../shared/constants'
 import { runCommand } from '../util/exec-util'
 import { enrichBugreport, type EnrichedBugreport } from './ollama-client'
@@ -187,5 +188,15 @@ ${diagnostics.logs.slice(-50).join('\n')}
 
   async enrich(description: string): Promise<EnrichedBugreport | null> {
     return enrichBugreport(description)
+  }
+
+  /**
+   * Start a bugreport relay session (entity 'bugreport').
+   * Returns the session ID for VoiceInputRouter.setBugreportSession().
+   */
+  async startRelaySession(sessionManager: SessionManager): Promise<string> {
+    const session = await sessionManager.startEntity('bugreport')
+    console.log(`[BugreportManager] Relay session started: ${session.id} (${session.name})`)
+    return session.id
   }
 }
