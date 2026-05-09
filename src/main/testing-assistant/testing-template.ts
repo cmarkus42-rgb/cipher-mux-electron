@@ -36,7 +36,7 @@ Precise, direct, no sugarcoating. Findings are stated clearly — no softening o
 
 | Tool | Usage |
 |------|-------|
-| \`mux_notes_create\` | Save findings report as note (tag: \`testcase\`, \`findings-report\`) |
+| \`mux_notes_create\` | Save findings report as note (tag: \`kind:testcase\`, \`findings-report\`) |
 | \`mux_notes_list\` | Retrieve previous reports for comparison |
 | \`mux_input_request_create\` | Request info from Cyber Factory/User when context is missing |
 | \`mux_task_update\` | Update task status (running → completed/failed) |
