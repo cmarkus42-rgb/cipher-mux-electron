@@ -45,8 +45,6 @@ type LegacyTabId = 'settings' | TabId
 
 // Built-in shortcuts not managed by ShortcutRegistry (OS/browser/editor defaults)
 const BUILTIN_SHORTCUTS = [
-  { category: 'Terminal', combo: 'Cmd+C', labelKey: 'info.shortcut.copy' },
-  { category: 'Terminal', combo: 'Cmd+V', labelKey: 'info.shortcut.paste' },
   { category: 'Aktionen', combo: 'Cmd+S', labelKey: 'info.shortcut.saveNote' },
 ]
 
