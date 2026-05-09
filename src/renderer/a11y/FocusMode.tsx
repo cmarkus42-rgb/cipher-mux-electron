@@ -33,10 +33,12 @@ export function FocusMode({ enabled, sessionName, contextPct, onDeactivate }: Fo
     return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [enabled, handleKeyDown])
 
-  // Restore original font size on deactivate
+  // Apply saved font size on activate, restore original on deactivate
   const originalFontSize = useState(() => getTerminalFontSize())[0]
   useEffect(() => {
-    if (!enabled) {
+    if (enabled) {
+      setTerminalFontSize(fontSize)
+    } else {
       setTerminalFontSize(originalFontSize)
     }
   }, [enabled, originalFontSize])

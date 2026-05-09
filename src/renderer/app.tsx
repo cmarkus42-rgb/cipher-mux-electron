@@ -769,7 +769,7 @@ export function App() {
   useEffect(() => {
     const api = (window as any).cipherMux
     if (!api.sidebar?.onReattached) return
-    const unsub = api.sidebar.onReattached(() => { setSidebarDetached(false) })
+    const unsub = api.sidebar.onReattached(() => { setSidebarDetached(false); setSidebarVisible(true) })
     return () => unsub()
   }, [])
 
@@ -1329,7 +1329,7 @@ export function App() {
         onToggleTheme={toggleTheme}
         onToggleWorkspaces={handleToggleWorkspaces}
         onInfo={() => { setInfoInitialTab(undefined); setInfoVisible(true) }}
-        onThemeSettings={() => { setInfoInitialTab('settings'); setInfoVisible(true) }}
+        onThemeSettings={() => { setInfoInitialTab('themes'); setInfoVisible(true) }}
         onGridResize={handleResize}
       />
 
