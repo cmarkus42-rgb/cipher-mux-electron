@@ -9,19 +9,19 @@ interface PaneHeaderProps {
   isSpeaking?: boolean  // true when TTS audio is playing in renderer
 }
 
-/** Entity color mapping — matches EntityConfig.color values. */
+/** Entity color mapping — references CSS custom properties from themes.json. */
 const ENTITY_COLORS: Record<EntityId, string> = {
-  orchestrator: '#4fc3f7',
-  'cyber-factory': '#ab47bc',
-  companion: '#ffb74d',
-  refinement: '#ef5350',
-  launcher: '#66bb6a',
-  'voice-relay': '#9b59b6',
-  audit: '#c0392b',
-  'ideation-partner': '#26a69a',
-  debugger: '#ff7043',
-  'testing-assistant': '#2ecc71',
-  bugreport: '#78909c',
+  orchestrator: 'var(--entity-color-1, #4fc3f7)',
+  'cyber-factory': 'var(--entity-color-2, #ab47bc)',
+  companion: 'var(--entity-color-3, #ffb74d)',
+  refinement: 'var(--entity-color-4, #ef5350)',
+  launcher: 'var(--entity-color-5, #66bb6a)',
+  'voice-relay': 'var(--entity-color-6, #9b59b6)',
+  audit: 'var(--entity-color-7, #c0392b)',
+  'ideation-partner': 'var(--entity-color-8, #26a69a)',
+  debugger: 'var(--entity-color-9, #ff7043)',
+  'testing-assistant': 'var(--entity-color-10, #2ecc71)',
+  bugreport: 'var(--entity-color-11, #78909c)',
 }
 
 function contextColorClass(pct: number): string {
