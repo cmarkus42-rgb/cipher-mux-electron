@@ -1,15 +1,16 @@
 // src/renderer/components/TagBar.tsx
 
-import { useState, useRef, useCallback, useEffect } from 'preact/hooks'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'preact/hooks'
 import { EXCLUSIVE_TAG_CLASSES } from '../../shared/constants'
+import type { TagClass } from '../../shared/types'
 
 const MAX_TAGS = 5
 
-const QUICK_TAGS = [
+const DEFAULT_QUICK_TAGS = [
   'status:open',
-  'status:in-progress',
   'status:done',
-  'status:wichtig',
+  'kind:bugreport',
+  'kind:spec',
 ]
 
 /** Validate tag format: must be klasse:wert */
@@ -20,19 +21,22 @@ function isValidTag(tag: string): boolean {
 interface TagBarProps {
   tags: string[]
   onTagsChange: (tags: string[]) => void
+  quickTags?: string[]
 }
 
-export function TagBar({ tags, onTagsChange }: TagBarProps) {
+export function TagBar({ tags, onTagsChange, quickTags = DEFAULT_QUICK_TAGS }: TagBarProps) {
   const [input, setInput] = useState('')
-  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [suggestions, setSuggestions] = useState<Array<{ tag: string; className?: string; color?: string }>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
   const [allTags, setAllTags] = useState<string[]>([])
   const [classValues, setClassValues] = useState<Record<string, string[]>>({})
+  const [classColors, setClassColors] = useState<Record<string, string>>({})
+  const [highlightIdx, setHighlightIdx] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
-  // Load available tags from .tags.json via IPC
+  // Load available tags + class data
   useEffect(() => {
     const api = (window as any).cipherMux
     if (!api?.notes?.tags) return
@@ -41,33 +45,76 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
     }).catch(() => {})
   }, [])
 
-  // Load class values for cycle-click
   useEffect(() => {
     const api = (window as any).cipherMux
     if (!api?.notes?.tagClassRepo) return
-    api.notes.tagClassRepo().then((repo: { classes: Record<string, { values: string[] }> }) => {
+    api.notes.tagClassRepo().then((repo: { classes: Record<string, TagClass> }) => {
       const cv: Record<string, string[]> = {}
+      const cc: Record<string, string> = {}
       for (const [cls, data] of Object.entries(repo.classes)) {
-        if (EXCLUSIVE_TAG_CLASSES.includes(cls) && data.values.length > 1) {
-          cv[cls] = data.values
-        }
+        cv[cls] = data.values
+        if (data.color) cc[cls] = data.color
       }
       setClassValues(cv)
+      setClassColors(cc)
     }).catch(() => {})
   }, [])
 
-  // Filter suggestions based on input
+  // Parse class prefix from input (e.g. "kind:" → classPrefix="kind")
+  const classPrefix = useMemo(() => {
+    const colonIdx = input.indexOf(':')
+    if (colonIdx > 0 && colonIdx === input.length - 1) {
+      return input.slice(0, colonIdx).toLowerCase()
+    }
+    if (colonIdx > 0) {
+      return input.slice(0, colonIdx).toLowerCase()
+    }
+    return null
+  }, [input])
+
+  // Filter suggestions based on input — class-aware
   useEffect(() => {
     if (!input.trim()) {
       setSuggestions([])
+      setHighlightIdx(-1)
       return
     }
     const lower = input.toLowerCase()
-    const filtered = allTags
-      .filter(t => t.toLowerCase().includes(lower) && !tags.includes(t))
-      .slice(0, 8)
+
+    let candidates: Array<{ tag: string; className?: string; color?: string }>
+
+    if (classPrefix && classValues[classPrefix]) {
+      // Class-scoped: show only values from this class
+      const values = classValues[classPrefix]
+      const partial = lower.includes(':') ? lower.split(':')[1] : ''
+      candidates = values
+        .filter(v => v.toLowerCase().includes(partial))
+        .map(v => ({
+          tag: `${classPrefix}:${v}`,
+          className: classPrefix,
+          color: classColors[classPrefix],
+        }))
+    } else {
+      // Free input: search all tags
+      candidates = allTags
+        .filter(t => t.toLowerCase().includes(lower))
+        .map(t => {
+          const cls = t.includes(':') ? t.split(':')[0] : undefined
+          return {
+            tag: t,
+            className: cls,
+            color: cls ? classColors[cls] : undefined,
+          }
+        })
+    }
+
+    const filtered = candidates
+      .filter(c => !tags.includes(c.tag))
+      .slice(0, 10)
+
     setSuggestions(filtered)
-  }, [input, allTags, tags])
+    setHighlightIdx(-1)
+  }, [input, allTags, tags, classPrefix, classValues, classColors])
 
   // Close suggestions on outside click
   useEffect(() => {
@@ -116,6 +163,7 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
     onTagsChange(newTags)
     setInput('')
     setShowSuggestions(false)
+    setHighlightIdx(-1)
   }, [tags, onTagsChange])
 
   const removeTag = useCallback((tag: string) => {
@@ -123,17 +171,31 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
   }, [tags, onTagsChange])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'ArrowDown') {
       e.preventDefault()
-      if (suggestions.length > 0 && showSuggestions) {
-        addTag(suggestions[0])
+      setHighlightIdx(prev => Math.min(prev + 1, suggestions.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlightIdx(prev => Math.max(prev - 1, -1))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (highlightIdx >= 0 && highlightIdx < suggestions.length) {
+        addTag(suggestions[highlightIdx].tag)
+      } else if (suggestions.length > 0 && showSuggestions) {
+        addTag(suggestions[0].tag)
       } else {
         addTag(input)
       }
     } else if (e.key === 'Escape') {
       setShowSuggestions(false)
+      setHighlightIdx(-1)
+    } else if (e.key === 'Tab' && classPrefix && suggestions.length > 0) {
+      // Tab-complete the first suggestion
+      e.preventDefault()
+      const target = highlightIdx >= 0 ? suggestions[highlightIdx] : suggestions[0]
+      addTag(target.tag)
     }
-  }, [input, suggestions, showSuggestions, addTag])
+  }, [input, suggestions, showSuggestions, addTag, highlightIdx, classPrefix])
 
   const toggleQuickTag = useCallback((tag: string) => {
     if (tags.includes(tag)) {
@@ -165,9 +227,15 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
           const colonIdx = tag.indexOf(':')
           const cls = colonIdx > 0 ? tag.slice(0, colonIdx) : null
           const canCycle = !!(cls && EXCLUSIVE_TAG_CLASSES.includes(cls) && (classValues[cls]?.length ?? 0) > 1)
+          const chipColor = cls ? classColors[cls] : undefined
 
           return (
-            <span key={tag} class={`tag-bar__chip${canCycle ? ' tag-bar__chip--cyclable' : ''}`}>
+            <span
+              key={tag}
+              class={`tag-bar__chip${canCycle ? ' tag-bar__chip--cyclable' : ''}`}
+              style={chipColor ? { borderColor: chipColor } : undefined}
+            >
+              {chipColor && <span class="tag-bar__chip-dot" style={{ background: chipColor }} />}
               <span
                 class="tag-bar__chip-text"
                 onClick={canCycle ? () => cycleTag(tag) : undefined}
@@ -192,7 +260,7 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
             class="tag-bar__input"
             type="text"
             value={input}
-            placeholder={tags.length >= MAX_TAGS ? 'Max erreicht' : 'Tag hinzufuegen...'}
+            placeholder={tags.length >= MAX_TAGS ? 'Max erreicht' : 'klasse:wert...'}
             disabled={tags.length >= MAX_TAGS}
             onInput={(e) => {
               setInput((e.target as HTMLInputElement).value)
@@ -203,13 +271,23 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
           />
           {showSuggestions && suggestions.length > 0 && (
             <div ref={suggestionsRef} class="tag-bar__suggestions">
-              {suggestions.map(s => (
+              {classPrefix && (
+                <div class="tag-bar__suggestions-header">
+                  {classColors[classPrefix] && (
+                    <span class="tag-bar__suggestions-dot" style={{ background: classColors[classPrefix] }} />
+                  )}
+                  {classPrefix}:
+                </div>
+              )}
+              {suggestions.map((s, idx) => (
                 <div
-                  key={s}
-                  class="tag-bar__suggestion"
-                  onMouseDown={(e) => { e.preventDefault(); addTag(s) }}
+                  key={s.tag}
+                  class={`tag-bar__suggestion${idx === highlightIdx ? ' tag-bar__suggestion--highlighted' : ''}`}
+                  onMouseDown={(e) => { e.preventDefault(); addTag(s.tag) }}
+                  onMouseEnter={() => setHighlightIdx(idx)}
                 >
-                  {s}
+                  {s.color && <span class="tag-bar__suggestion-dot" style={{ background: s.color }} />}
+                  {s.tag}
                 </div>
               ))}
             </div>
@@ -219,7 +297,7 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
 
       {/* Quick-select buttons */}
       <div class="tag-bar__quick">
-        {QUICK_TAGS.map(qt => (
+        {quickTags.map(qt => (
           <button
             key={qt}
             class={`tag-bar__quick-btn ${tags.includes(qt) ? 'tag-bar__quick-btn--active' : ''}`}
