@@ -245,6 +245,7 @@ export interface AppConfig {
   keepWorkingSnapshot?: {
     sessions: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }>
     gridConfig?: { cols: number; rows: number }
+    notesSlots?: Array<{ slotIndex: number; notesId?: string; openNoteIds?: string[] }>
   }
   /** Persisted sort order overrides for entity presets (entityId → sortOrder). */
   entitySortOrders?: Record<string, number>

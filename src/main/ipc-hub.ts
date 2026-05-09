@@ -411,6 +411,9 @@ export class IpcHub {
       const snapshotGridConfig = rawSnapshot && !Array.isArray(rawSnapshot)
         ? rawSnapshot.gridConfig
         : undefined
+      const snapshotNotesSlots = rawSnapshot && !Array.isArray(rawSnapshot)
+        ? rawSnapshot.notesSlots
+        : undefined
       if (snapshotSessions && snapshotSessions.length > 0) {
         // keepWorking mode: skip Recovery Dialog, silently kill orphans, restore seamlessly
         console.log(`[IpcHub] keepWorking: restoring ${snapshotSessions.length} sessions from snapshot (${result.recovered.length} recovered, ${result.orphaned.length} orphaned — auto-cleaning)`)
@@ -418,7 +421,7 @@ export class IpcHub {
         for (const orphan of result.orphaned) {
           this.sessionManager.killOrphan(orphan.tmuxSession).catch(() => {})
         }
-        await this.restoreKeepWorkingFromRecovery(snapshotSessions, snapshotGridConfig, result.recovered)
+        await this.restoreKeepWorkingFromRecovery(snapshotSessions, snapshotGridConfig, result.recovered, snapshotNotesSlots)
         configStore.set('keepWorkingSnapshot', undefined as any)
         // Set empty recovery result so RecoveryDialog resolves immediately
         // (null would cause 15s poll timeout before onDone fires)
@@ -1800,8 +1803,14 @@ export class IpcHub {
       if (!tags && !skipTagging) {
         this.noteTagging.autoTag(body).then(async (autoTags) => {
           if (autoTags && autoTags.length > 0) {
+            // Preserve structural tags that auto-tagging must not strip
+            const existing = note.tags ?? []
+            const preserved = existing.filter(t =>
+              t === 'kind:testcase' || t.startsWith('workspace:') || t === 'handoff'
+            )
+            const merged = [...new Set([...preserved, ...autoTags])]
             await this.noteTagging.updateRepository(autoTags)
-            const updated = await this.noteManager.save(id, body, autoTags)
+            const updated = await this.noteManager.save(id, body, merged)
             this.noteSearchIndex.addOrUpdate({ info: updated, body })
             this.tagIndex.updateNote(updated.id, updated.tags)
             this.tagClassRepo.ensureTags(updated.tags)
@@ -1962,7 +1971,7 @@ export class IpcHub {
     ipcMain.handle(IPC.NOTES_PARSE_TESTCASE, async (_e, { id }: { id: string }) => {
       try {
         const result = await this.noteManager.read(id)
-        if (!result || !result.info.tags?.includes('testcase')) return null
+        if (!result || !result.info.tags?.includes('kind:testcase')) return null
         const { parseTestcase } = require('./notes/testcase-parser')
         // Read raw file to get frontmatter intact for parser
         const fsNode = require('fs')
@@ -2599,6 +2608,7 @@ export class IpcHub {
     snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }>,
     gridConfig: { cols: number; rows: number } | undefined,
     recovered: Array<{ id: string; name: string; projectPath: string | null; entityId?: string }>,
+    notesSlots?: Array<{ slotIndex: number; notesId?: string; openNoteIds?: string[] }>,
   ): Promise<void> {
     const effectiveGrid = gridConfig ?? { cols: 1, rows: 1 }
     const adapter = this.sessionManager['adapterRegistry'].getDefault()
@@ -2665,14 +2675,29 @@ export class IpcHub {
     // Persist grid state to ui.grid in configStore so that useGrid's mount load
     // gets the correct session IDs — eliminates the race condition entirely.
     const total = effectiveGrid.cols * effectiveGrid.rows
-    const newSlots = Array.from({ length: total }, () => ({
-      sessionId: null as string | null,
-      rowSpan: 1,
-      type: 'session' as const,
-    }))
+    const newSlots: Array<{ sessionId: string | null; rowSpan: number; type: 'session' | 'notes'; notesId?: string; openNoteIds?: string[] }> =
+      Array.from({ length: total }, () => ({
+        sessionId: null as string | null,
+        rowSpan: 1,
+        type: 'session' as const,
+      }))
     for (const { sessionId, slotIndex } of slotMap) {
       if (slotIndex >= 0 && slotIndex < total) {
         newSlots[slotIndex] = { sessionId, rowSpan: 1, type: 'session' }
+      }
+    }
+    // Restore notes slots
+    if (notesSlots) {
+      for (const ns of notesSlots) {
+        if (ns.slotIndex >= 0 && ns.slotIndex < total && !newSlots[ns.slotIndex].sessionId) {
+          newSlots[ns.slotIndex] = {
+            sessionId: null,
+            rowSpan: 1,
+            type: 'notes',
+            notesId: ns.notesId || `notes-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            openNoteIds: ns.openNoteIds,
+          }
+        }
       }
     }
     const gridState = { config: effectiveGrid, slots: newSlots }
@@ -2683,7 +2708,7 @@ export class IpcHub {
     this.sessionManager.persistGridState(gridState)
 
     // Cache + push for renderer (belt-and-suspenders with config persistence above)
-    const payload = { gridConfig: effectiveGrid, slots: slotMap }
+    const payload = { gridConfig: effectiveGrid, slots: slotMap, notesSlots: notesSlots ?? undefined }
     this.cachedKeepWorkingRestore = payload
     this.windowManager.sendToMainWindow(IPC.KEEP_WORKING_RESTORE, payload)
     console.log(`[IpcHub] keepWorking: restore complete — ${slotMap.length} sessions (${claimed.size} reused, ${slotMap.length - claimed.size} new), grid ${effectiveGrid.cols}x${effectiveGrid.rows}`)
@@ -2695,9 +2720,9 @@ export class IpcHub {
   }
 
   /** Live-update Keep Working snapshot when grid changes (called on every CONFIG_SAVE_GRID). */
-  private async updateKeepWorkingSnapshot(grid: { config: { cols: number; rows: number }; slots: Array<{ sessionId: string | null }> }): Promise<void> {
+  private async updateKeepWorkingSnapshot(grid: { config: { cols: number; rows: number }; slots: Array<{ sessionId: string | null; type?: string; notesId?: string; openNoteIds?: string[] }> }): Promise<void> {
     const sessions = this.sessionManager.list().filter(s => s.status === 'active')
-    if (sessions.length === 0) return
+    if (sessions.length === 0 && !grid.slots.some(s => (s as any).type === 'notes')) return
     const allTasks = this.taskManager ? this.taskManager.list() : []
     const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }> = []
     for (const s of sessions) {
@@ -2715,9 +2740,18 @@ export class IpcHub {
         topic: resolveSessionTopic(s, allTasks, capture),
       })
     }
+    // Collect notes slots for restoration
+    const notesSlots: Array<{ slotIndex: number; notesId?: string; openNoteIds?: string[] }> = []
+    for (let i = 0; i < grid.slots.length; i++) {
+      const slot = grid.slots[i] as any
+      if (slot.type === 'notes') {
+        notesSlots.push({ slotIndex: i, notesId: slot.notesId, openNoteIds: slot.openNoteIds })
+      }
+    }
     configStore.set('keepWorkingSnapshot', {
       sessions: snapshot,
       gridConfig: grid.config,
+      notesSlots: notesSlots.length > 0 ? notesSlots : undefined,
     })
   }
 
@@ -2744,11 +2778,20 @@ export class IpcHub {
             topic: resolveSessionTopic(s, allTasks, capture),
           })
         }
+        // Collect notes slots for restoration
+        const notesSlots: Array<{ slotIndex: number; notesId?: string; openNoteIds?: string[] }> = []
+        for (let i = 0; i < gridState.slots.length; i++) {
+          const slot = gridState.slots[i] as any
+          if (slot.type === 'notes') {
+            notesSlots.push({ slotIndex: i, notesId: slot.notesId, openNoteIds: slot.openNoteIds })
+          }
+        }
         configStore.set('keepWorkingSnapshot', {
           sessions: snapshot,
           gridConfig: gridState.config,
+          notesSlots: notesSlots.length > 0 ? notesSlots : undefined,
         })
-        console.log(`[IpcHub] keepWorking: saved snapshot of ${snapshot.length} sessions (grid: ${gridState.config.cols}x${gridState.config.rows})`)
+        console.log(`[IpcHub] keepWorking: saved snapshot of ${snapshot.length} sessions, ${notesSlots.length} notes slots (grid: ${gridState.config.cols}x${gridState.config.rows})`)
       }
     }
 

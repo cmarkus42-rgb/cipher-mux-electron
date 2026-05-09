@@ -176,7 +176,8 @@ export function useGrid(panelWidth = 0) {
   const setSlotType = useCallback((slotIndex: number, type: 'session' | 'notes') => {
     setGrid((prev) => {
       const newSlots = [...prev.slots]
-      newSlots[slotIndex] = { ...newSlots[slotIndex], type, sessionId: null }
+      const notesId = type === 'notes' ? `notes-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` : undefined
+      newSlots[slotIndex] = { ...newSlots[slotIndex], type, sessionId: null, notesId }
       const next = { ...prev, slots: newSlots }
       persist(next)
       return next
@@ -186,7 +187,23 @@ export function useGrid(panelWidth = 0) {
   const clearSlotType = useCallback((slotIndex: number) => {
     setGrid((prev) => {
       const newSlots = [...prev.slots]
-      newSlots[slotIndex] = { ...newSlots[slotIndex], type: 'session', sessionId: null }
+      newSlots[slotIndex] = { ...newSlots[slotIndex], type: 'session', sessionId: null, notesId: undefined, openNoteIds: undefined }
+      const next = { ...prev, slots: newSlots }
+      persist(next)
+      return next
+    })
+  }, [persist])
+
+  const setSlotOpenNoteIds = useCallback((slotIndex: number, openNoteIds: string[]) => {
+    setGrid((prev) => {
+      if (slotIndex < 0 || slotIndex >= prev.slots.length) return prev
+      const slot = prev.slots[slotIndex]
+      // Only update notes cells; skip if IDs haven't changed
+      if (slot.type !== 'notes') return prev
+      const existing = slot.openNoteIds ?? []
+      if (existing.length === openNoteIds.length && existing.every((id, i) => id === openNoteIds[i])) return prev
+      const newSlots = [...prev.slots]
+      newSlots[slotIndex] = { ...newSlots[slotIndex], openNoteIds }
       const next = { ...prev, slots: newSlots }
       persist(next)
       return next
@@ -242,5 +259,5 @@ export function useGrid(panelWidth = 0) {
     })
   }, [persist])
 
-  return { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot, restoreGrid, cleanupDeadSessions }
+  return { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, setSlotOpenNoteIds, toggleExpandSlot, restoreGrid, cleanupDeadSessions }
 }

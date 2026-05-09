@@ -50,7 +50,7 @@ export function App() {
   // Uses entityId (known BEFORE the await) instead of sessionId (known only AFTER) — this
   // closes the race window where the IPC event arrives before the await resolves (RT-X2).
   const inFlightEntityStarts = useRef(new Set<string>())
-  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, toggleExpandSlot, restoreGrid, cleanupDeadSessions } = useGrid(panelWidthRef.current)
+  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, setSlotOpenNoteIds, toggleExpandSlot, restoreGrid, cleanupDeadSessions } = useGrid(panelWidthRef.current)
   // Always-current grid ref for placeEntity to check against (avoids stale closure in event handlers)
   const gridRef = useRef(grid)
   gridRef.current = grid
@@ -492,13 +492,15 @@ export function App() {
   const applyKeepWorkingRestore = useCallback((data: {
     gridConfig: { cols: number; rows: number }
     slots: Array<{ sessionId: string | null; slotIndex: number; topic?: string }>
+    notesSlots?: Array<{ slotIndex: number; notesId?: string; openNoteIds?: string[] }>
   }) => {
     const total = data.gridConfig.cols * data.gridConfig.rows
-    const newSlots = Array.from({ length: total }, () => ({
-      sessionId: null as string | null,
-      rowSpan: 1,
-      type: 'session' as const,
-    }))
+    const newSlots: Array<{ sessionId: string | null; rowSpan: number; type: 'session' | 'notes'; notesId?: string; openNoteIds?: string[] }> =
+      Array.from({ length: total }, () => ({
+        sessionId: null as string | null,
+        rowSpan: 1,
+        type: 'session' as const,
+      }))
     const newTopicMap: Record<string, string> = {}
     for (const { sessionId, slotIndex, topic } of data.slots) {
       if (slotIndex >= 0 && slotIndex < total) {
@@ -506,6 +508,20 @@ export function App() {
       }
       if (sessionId && topic) {
         newTopicMap[sessionId] = topic
+      }
+    }
+    // Restore notes slots
+    if (data.notesSlots) {
+      for (const ns of data.notesSlots) {
+        if (ns.slotIndex >= 0 && ns.slotIndex < total && !newSlots[ns.slotIndex].sessionId) {
+          newSlots[ns.slotIndex] = {
+            sessionId: null,
+            rowSpan: 1,
+            type: 'notes',
+            notesId: ns.notesId || `notes-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            openNoteIds: ns.openNoteIds,
+          }
+        }
       }
     }
     setTopicMap(newTopicMap)
@@ -1256,6 +1272,7 @@ export function App() {
           onOpenNotes={handleOpenNotes}
           onOpenNote={handleOpenNote}
           onCloseNotes={handleCloseNotes}
+          onOpenNoteIdsChange={setSlotOpenNoteIds}
           onToggleExpandSlot={toggleExpandSlot}
           onSwap={swap}
           onDropSession={handleDropSession}

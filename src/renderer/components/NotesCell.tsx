@@ -28,6 +28,10 @@ interface NotesCellProps {
   slotIndex: number
   slotCol?: number
   slotRow?: number
+  /** Note IDs to auto-open on mount (from grid persistence / keep-working restore). */
+  initialNoteIds?: string[]
+  /** Called when the set of open tab IDs changes (for grid-level persistence). */
+  onOpenNoteIdsChange?: (noteIds: string[]) => void
   onClose: () => void
   onToggleExpand: () => void
   onDragStart: () => void
@@ -44,6 +48,8 @@ export function NotesCell({
   slotIndex,
   slotCol,
   slotRow,
+  initialNoteIds,
+  onOpenNoteIdsChange,
   onClose,
   onToggleExpand,
   onDragStart,
@@ -66,7 +72,7 @@ export function NotesCell({
       if (existing) {
         // Detect noteType change: if testcase tag was added or removed, reload the tab
         const wasTestcase = !!existing.testcase
-        const isTestcase = !!info.tags?.includes('testcase')
+        const isTestcase = !!info.tags?.includes('kind:testcase')
         if (wasTestcase === isTestcase) {
           setActiveTabId(info.id)
           return
@@ -81,7 +87,7 @@ export function NotesCell({
 
       // Detect testcase note — parsing runs in main process via IPC
       let testcase: ParsedTestcase | undefined
-      if (info.tags?.includes('testcase')) {
+      if (info.tags?.includes('kind:testcase')) {
         try {
           const parsed = await apiObj.notes.parseTestcase(info.id)
           testcase = parsed ?? undefined
@@ -189,7 +195,7 @@ export function NotesCell({
       const updated: ParsedTestcase = { ...activeTab.testcase, sections }
       const body = await apiObj.notes.serializeTestcaseBody(sections)
       if (!body) { console.error('[NotesCell] serializeTestcaseBody returned null'); return }
-      const result = await saveNote(activeTab.id, body)
+      const result = await apiObj.notes.save(activeTab.id, body, undefined, true)
       const title = result?.title || activeTab.title
       setTabs((prev) =>
         prev.map((t) =>
@@ -222,7 +228,7 @@ export function NotesCell({
     }
     const body = await apiObj.notes.serializeTestcaseBody(sections)
     if (!body) { console.error('[NotesCell] serializeTestcaseBody returned null on archive'); return }
-    await saveNote(activeTab.id, body)
+    await apiObj.notes.save(activeTab.id, body, undefined, true)
     const updated: ParsedTestcase = { ...activeTab.testcase, frontmatter: fm as any }
     setTabs((prev) =>
       prev.map((t) =>
@@ -263,6 +269,28 @@ export function NotesCell({
     )
   }, [activeTab])
 
+  // Report open tab IDs changes for grid-level persistence
+  const onOpenNoteIdsChangeRef = useRef(onOpenNoteIdsChange)
+  onOpenNoteIdsChangeRef.current = onOpenNoteIdsChange
+  useEffect(() => {
+    onOpenNoteIdsChangeRef.current?.(tabs.map(t => t.id))
+  }, [tabs])
+
+  // Auto-open notes from persisted IDs on mount (keep-working restore)
+  const initialNoteIdsRef = useRef(initialNoteIds)
+  useEffect(() => {
+    const ids = initialNoteIdsRef.current
+    if (!ids || ids.length === 0) return
+    const apiObj = (window as any).cipherMux
+    if (!apiObj?.notes?.list) return
+    apiObj.notes.list().then((allNotes: NoteInfo[]) => {
+      for (const id of ids) {
+        const info = allNotes.find((n: NoteInfo) => n.id === id)
+        if (info) openNote(info)
+      }
+    }).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Expose openNote for external calls (from sidebar / MCP) — per-slot registry
   useEffect(() => {
     const reg = ((window as any).__notesCellRegistry ??= {} as Record<number, typeof openNote>)
@@ -293,7 +321,7 @@ export function NotesCell({
         if (result.body === openTab.content) return
 
         let testcase: ParsedTestcase | undefined
-        if (result.info?.tags?.includes('testcase')) {
+        if (result.info?.tags?.includes('kind:testcase')) {
           const parsed = await apiObj.notes.parseTestcase(noteId)
           testcase = parsed ?? undefined
         }
