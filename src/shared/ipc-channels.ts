@@ -134,6 +134,7 @@ export const IPC = {
   VOICE_DELETE: 'cipher-mux:voice:delete',
   VOICE_SET_ACTIVE: 'cipher-mux:voice:set-active',
   VOICE_PREVIEW: 'cipher-mux:voice:preview',
+  VOICE_RECOMMEND_DOWNLOADS: 'cipher-mux:voice:recommend-downloads',
 
   // Voice Session Input
   VOICE_START_SESSION: 'cipher-mux:voice:start-session',

@@ -552,6 +552,7 @@ const api = {
     deleteVoice: (name: string) => ipcRenderer.invoke(IPC.VOICE_DELETE, { name }),
     setActive: (name: string) => ipcRenderer.invoke(IPC.VOICE_SET_ACTIVE, { name }),
     preview: (name: string) => ipcRenderer.invoke(IPC.VOICE_PREVIEW, { name }),
+    recommendDownloads: () => ipcRenderer.invoke(IPC.VOICE_RECOMMEND_DOWNLOADS),
   },
 
   // ─── BT Shutter Remote ─────────────────────────────────

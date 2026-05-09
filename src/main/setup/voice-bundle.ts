@@ -35,6 +35,38 @@ export function deployBundledVoice(opts: DeployOptions): boolean {
   return true
 }
 
+export interface VoiceRecommendation {
+  name: string
+  language: string
+  label: string
+}
+
+const RECOMMENDED_VOICES: VoiceRecommendation[] = [
+  { name: 'de_DE-mls_dii-high', language: 'de', label: 'German (dii, high quality)' },
+  { name: 'en_US-lessac-medium', language: 'en', label: 'English (lessac, medium quality)' },
+]
+
+const LANGUAGE_VOICE_DEFAULTS: Record<string, string> = {
+  de: 'de_DE-cipher_adult-medium',
+  en: 'en_US-lessac-medium',
+}
+
+/**
+ * Get recommended voices for download after initial install.
+ * These are suggestions, not mandatory.
+ */
+export function getRecommendedDownloads(): VoiceRecommendation[] {
+  return [...RECOMMENDED_VOICES]
+}
+
+/**
+ * Get the default Piper voice for a UI language.
+ * Returns null for unsupported languages.
+ */
+export function getDefaultVoiceForLanguage(language: string): string | null {
+  return LANGUAGE_VOICE_DEFAULTS[language] ?? null
+}
+
 function copyDirRecursive(src: string, dest: string): void {
   const entries = fs.readdirSync(src, { withFileTypes: true })
   for (const entry of entries) {

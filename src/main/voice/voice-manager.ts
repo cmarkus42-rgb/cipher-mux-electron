@@ -39,6 +39,8 @@ export class VoiceManager extends EventEmitter {
   private outputRouter: VoiceOutputRouter | null = null
   private transport: ConversationTransport | null = null
   private _initialized = false
+  private _isSwapping = false
+  private _swapQueue: Promise<void> = Promise.resolve()
 
   constructor(config?: VoiceManagerConfig) {
     super()
@@ -133,6 +135,72 @@ export class VoiceManager extends EventEmitter {
   /** Whether Piper TTS is available (either via full init or piperOnly). */
   isPiperReady(): boolean {
     return this._piperOnlyInitialized || (this._initialized && this.piperTTS !== null)
+  }
+
+  /** Whether a voice swap is in progress. */
+  get isSwapping(): boolean {
+    return this._isSwapping
+  }
+
+  /**
+   * Hot-swap the Piper voice. Does NOT interrupt currently playing TTS —
+   * waits for the active speak chain to finish, then disposes old PiperTTS
+   * and creates a new instance with the new voice.
+   * Queued: concurrent calls execute sequentially.
+   */
+  async swapVoice(newVoiceName: string): Promise<void> {
+    if (this._isSwapping) {
+      // Queue behind current swap
+      const prev = this._swapQueue
+      let release!: () => void
+      this._swapQueue = new Promise<void>(r => { release = r })
+      await prev
+      try {
+        await this._doSwap(newVoiceName)
+      } finally {
+        release()
+      }
+      return
+    }
+
+    this._isSwapping = true
+    try {
+      // Wait for any active TTS to finish
+      await this._speakChain
+      await this._doSwap(newVoiceName)
+    } finally {
+      this._isSwapping = false
+    }
+  }
+
+  private async _doSwap(newVoiceName: string): Promise<void> {
+    console.log(`[Voice] Swapping voice to: ${newVoiceName}`)
+
+    // Dispose old instance
+    if (this.piperTTS) {
+      this.piperTTS.dispose()
+      this.piperTTS = null
+    }
+
+    // Create and init new instance
+    const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
+    this.piperTTS = new PiperTTS({
+      voice: newVoiceName,
+      modelsDir: this.config.piperModelsDir,
+      nodeModulesPath: appNodeModules,
+    })
+    await this.piperTTS.init()
+
+    // Update conversation engine reference
+    if (this.conversation) {
+      this.conversation.setTTS(this.piperTTS)
+    }
+
+    // Persist to config
+    configStore.set('piperVoice', newVoiceName)
+
+    console.log(`[Voice] Voice swapped to: ${newVoiceName}`)
+    this.emit('voice-swapped', newVoiceName)
   }
 
   /**

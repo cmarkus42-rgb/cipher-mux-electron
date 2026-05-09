@@ -538,8 +538,14 @@ export class IpcHub {
       // VoiceOutputRouter (terminal-polling) is disabled — it caused duplicate
       // readback of everything visible in the relay pane.
 
-      // Notify renderer when bugreport relay session is ready
+      // Bugreport relay: entity is now ready — activate STT routing and notify renderer
       if (data.entityId === 'bugreport' && this.bugreportRelaySessionId) {
+        // STT routing is activated HERE (not at start), so no transcriptions are lost
+        const inputRouter = this.voiceManager?.getInputRouter()
+        if (inputRouter) {
+          inputRouter.setBugreportSession(this.bugreportRelaySessionId)
+        }
+        this.bugreportManager.markRelayReady()
         this.windowManager.sendToMainWindow(IPC.BUGREPORT_RELAY_READY, { sessionId: this.bugreportRelaySessionId })
       }
     })
@@ -1087,10 +1093,8 @@ export class IpcHub {
       try {
         const sessionId = await this.bugreportManager.startRelaySession(this.sessionManager)
         this.bugreportRelaySessionId = sessionId
-        const inputRouter = this.voiceManager?.getInputRouter()
-        if (inputRouter) {
-          inputRouter.setBugreportSession(sessionId)
-        }
+        // STT routing is NOT set here — it's activated in entity-started handler
+        // after the session is actually ready, to avoid lost transcriptions.
         console.log('[Bugreport] Relay session started:', sessionId)
         return { ok: true, sessionId }
       } catch (err) {
@@ -1106,14 +1110,8 @@ export class IpcHub {
         if (inputRouter) {
           inputRouter.clearBugreportSession()
         }
-        if (this.bugreportRelaySessionId) {
-          try {
-            await this.sessionManager.stop(this.bugreportRelaySessionId)
-          } catch (err) {
-            console.warn('[Bugreport] Failed to stop relay session:', (err as Error).message)
-          }
-          this.bugreportRelaySessionId = null
-        }
+        this.bugreportRelaySessionId = null
+        await this.bugreportManager.stopRelaySession(this.sessionManager)
         console.log('[Bugreport] Relay stopped')
         return { ok: true }
       } catch (err) {
@@ -1209,15 +1207,8 @@ export class IpcHub {
 
     ipcMain.handle(IPC.VOICE_START, async () => {
       try {
-        // New bugreport relay flow: start a bugreport entity session
-        // and route STT to it via VoiceInputRouter.setBugreportSession()
-        const sessionId = await this.bugreportManager.startRelaySession(this.sessionManager)
-        const inputRouter = this.voiceManager?.getInputRouter()
-        if (inputRouter) {
-          inputRouter.setBugreportSession(sessionId)
-        }
-        console.log('[Voice] Bugreport relay session started:', sessionId)
-        return { ok: true, sessionId }
+        this.voiceManager?.getConversation()?.handleToggle()
+        return { ok: true }
       } catch (err) {
         const msg = (err as Error).message
         this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, msg)
@@ -1542,7 +1533,16 @@ export class IpcHub {
       }
     })
 
-    ipcMain.handle(IPC.VOICE_SET_ACTIVE, (_e, { name }: { name: string }) => {
+    ipcMain.handle(IPC.VOICE_SET_ACTIVE, async (_e, { name }: { name: string }) => {
+      // Hot-swap if VoiceManager is initialized, otherwise just persist
+      if (this.voiceManager && (this.voiceManager.isInitialized() || this.voiceManager.isPiperReady())) {
+        try {
+          await this.voiceManager.swapVoice(name)
+          return { ok: true }
+        } catch (err) {
+          return { ok: false, error: (err as Error).message }
+        }
+      }
       configStore.set('piperVoice', name)
       return { ok: true }
     })
@@ -1563,6 +1563,11 @@ export class IpcHub {
       } catch (err) {
         return { ok: false, error: (err as Error).message }
       }
+    })
+
+    ipcMain.handle(IPC.VOICE_RECOMMEND_DOWNLOADS, () => {
+      const { getRecommendedDownloads } = require('./setup/voice-bundle')
+      return getRecommendedDownloads()
     })
   }
 
