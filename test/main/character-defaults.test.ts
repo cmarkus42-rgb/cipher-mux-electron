@@ -8,7 +8,7 @@ import {
   CIPHER_CHARACTER_BLOCK,
   WAYNE_CHARACTER_BLOCK,
   KYNIKER_CHARACTER_BLOCK,
-  SOKRATES_CHARACTER_BLOCK,
+  THEAITETOS_CHARACTER_BLOCK,
   GLITCH_CHARACTER_BLOCK,
 } from '../../src/main/character/character-defaults'
 
@@ -19,7 +19,7 @@ describe('SEED_CHARACTERS', () => {
 
   it('contains all expected IDs', () => {
     const ids = SEED_CHARACTERS.map(c => c.id)
-    assert.deepEqual(ids.sort(), ['cipher', 'glitch', 'kyniker', 'relay', 'sokrates', 'wayne'])
+    assert.deepEqual(ids.sort(), ['cipher', 'glitch', 'kyniker', 'relay', 'theaitetos', 'wayne'])
   })
 
   it('has relay as default', () => {
@@ -59,7 +59,7 @@ describe('extractCharacterBlock', () => {
       cipher: CIPHER_CHARACTER_BLOCK,
       wayne: WAYNE_CHARACTER_BLOCK,
       kyniker: KYNIKER_CHARACTER_BLOCK,
-      sokrates: SOKRATES_CHARACTER_BLOCK,
+      theaitetos: THEAITETOS_CHARACTER_BLOCK,
       glitch: GLITCH_CHARACTER_BLOCK,
     }
 

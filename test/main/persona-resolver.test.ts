@@ -23,10 +23,10 @@ describe('resolvePersonaForPreset', () => {
     assert.equal(result.id, 'cipher', 'cyber-factory default should be cipher')
   })
 
-  it('returns sokrates for companion by default', () => {
+  it('returns theaitetos for companion by default', () => {
     const deps = makeDeps()
     const result = resolvePersonaForPreset('companion', deps)
-    assert.equal(result.id, 'sokrates')
+    assert.equal(result.id, 'theaitetos')
   })
 
   it('returns relay for audit by default', () => {
