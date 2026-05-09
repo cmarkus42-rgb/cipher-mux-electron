@@ -34,6 +34,33 @@ import { extractCharacterBlock } from '../character/character-defaults'
 import { resolvePersonaForPreset } from './persona-resolver'
 
 /**
+ * Generate the ## Voice Output section content based on ttsLevel.
+ * Level 1: Minimal — summaries, milestones, direct answers only.
+ * Level 2: Alles Relevante — full speech adaptation for accessibility.
+ */
+function getVoiceOutputSection(level: 1 | 2): string {
+  if (level === 2) {
+    return `Use \`mux_tts_speak\` for all relevant content — questions, explanations, results, decisions, summaries, milestones.
+
+**Speech-Adaptation-Regeln:**
+
+- Prosa statt Bullet-Listen. Kein Markdown gesprochen.
+- Aufzaehlungen als Fliesstext: "Erstens... Zweitens... Drittens..."
+- Max 4-5 Saetze pro Turn, dann Pause oder Rueckfrage.
+- Vor Tool-Calls: kurze Ankuendigung was du gleich tust.
+- Aufzaehlungen mit mehr als 5 Punkten: frage ob vorlesen oder lieber anschauen.
+- Dateinamen und Pfade umschreiben: "im Session-Manager" statt "src/main/session/session-manager.ts".
+- Komplexe Inhalte (grosse Listen, Tabellen) als Note ablegen, Kernpunkte vorlesen anbieten.
+- **Nie per TTS:** Code-Bloecke, rohe IDs, Stack-Traces, technische Details — die gehoeren in den schriftlichen Output.`
+  }
+
+  return `Use \`mux_tts_speak\` for key statements only: summaries, milestones, phase gates, direct answers. Keep sentences short and clear.
+
+- Primary channel is written text. TTS is supplementary.
+- **Nie per TTS:** Code, Pfade, IDs, technische Details — gehoeren in schriftlichen Output.`
+}
+
+/**
  * Sanitize a name for use as tmux session suffix.
  * Lowercase, special chars → dash, max 32 chars, no leading/trailing dashes.
  */
@@ -872,7 +899,8 @@ export class SessionManager extends EventEmitter {
    * Assembly order:
    * 1. preset.md content (verbatim)
    * 2. ## Persona (inserted after first H1)
-   * 3. ## Global Rules (appended at end)
+   * 3. ## Voice Output (injected based on ttsLevel, except voice-relay)
+   * 4. ## Global Rules (appended at end)
    */
   private assembleEntityClaudeMd(
     presetContent: string,
@@ -892,6 +920,12 @@ export class SessionManager extends EventEmitter {
       } else {
         result = result + personaSection
       }
+    }
+
+    // Inject Voice Output section (except voice-relay and bugreport which use TTS as primary channel)
+    if (entityId !== 'voice-relay' && entityId !== 'bugreport') {
+      const voiceSection = getVoiceOutputSection(configStore.get('ttsLevel') ?? 1)
+      result = result + `\n\n## Voice Output\n\n${voiceSection}`
     }
 
     // Append Global Rules at end
@@ -1130,6 +1164,22 @@ export class SessionManager extends EventEmitter {
       ...opts,
       _entityInjected: true,
     })
+
+    // Inject session ID into CLAUDE.md so the entity can pass it to mux_tts_speak (focus gate)
+    // Voice-relay and bugreport use TTS as primary channel and are exempt from focus gate.
+    if (entityId !== 'voice-relay' && entityId !== 'bugreport') {
+      try {
+        const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
+        if (fs.existsSync(claudeMdPath)) {
+          const content = fs.readFileSync(claudeMdPath, 'utf-8')
+          const section = `Your cipher-mux session ID is \`${session.id}\`. Pass this as \`sessionId\` parameter in every \`mux_tts_speak\` call.`
+          const updated = this.injectSection(content, 'Session Identity', section)
+          fs.writeFileSync(claudeMdPath, updated, 'utf-8')
+        }
+      } catch (err) {
+        console.warn('[SessionManager] Session identity injection failed:', err)
+      }
+    }
 
     // Tag session with entity
     session.entityId = entityId

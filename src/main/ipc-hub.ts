@@ -371,6 +371,7 @@ export class IpcHub {
       getVoiceManager: () => this.voiceManager,
       testingAssistantManager: this.testingAssistantManager ?? undefined,
       auditManager: this.auditManager ?? undefined,
+      getFocusedSessionId: () => this.focusedSessionId,
     }).then(async () => {
       // Wait for setup to complete before connecting tmux
       if (!this.setupCompleted) {
@@ -1309,6 +1310,10 @@ export class IpcHub {
           console.log('[Voice] Clipboard command:', data.action)
           this.windowManager.sendToMainWindow(IPC.VOICE_CLIPBOARD, data)
         })
+        inputRouter.on('speechInterrupt', () => {
+          console.log('[Voice] Speech interrupt — stopping TTS')
+          this.voiceManager?.stopSpeech()
+        })
         console.log('[Voice] VOICE_START_SESSION => ok')
         this.startBtShutter()
         return { ok: true }
@@ -1378,6 +1383,10 @@ export class IpcHub {
         })
         inputRouter.on('clipboard', (data: { action: string }) => {
           this.windowManager.sendToMainWindow(IPC.VOICE_CLIPBOARD, data)
+        })
+        inputRouter.on('speechInterrupt', () => {
+          console.log('[Voice] COM speech interrupt — stopping TTS')
+          this.voiceManager?.stopSpeech()
         })
 
         // Start voice-relay entity as background session (no grid placement)

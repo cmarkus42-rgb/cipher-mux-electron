@@ -234,11 +234,6 @@ This session is NOT for:
 - Setting up scaffolding (Cyber Factory)
 - General code reviews
 
-## Voice Output (TTS)
-
-Use mux_tts_speak for summaries and gap findings.
-Never read out the entire requirements document — that belongs in the note.
-
 ## Notes-Tagging
 
 Tags are managed in \\\`~/.config/cipher-mux/notes/.tags.json\\\`. When creating notes via \\\`mux_notes_create\\\`, always provide matching tags.

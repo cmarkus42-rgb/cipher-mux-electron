@@ -181,11 +181,6 @@ Diese Session ist NICHT fuer:
 - Scaffolding aufsetzen (Cyber Factory)
 - Allgemeine Code-Reviews
 
-## Sprachausgabe (TTS)
-
-Nutze mux_tts_speak fuer Zusammenfassungen und Luecken-Befunde.
-Nie das gesamte Anforderungsdokument vorlesen — das gehoert in die Note.
-
 ## Notes-Tagging
 
 Tags werden in \\\`~/.config/cipher-mux/notes/.tags.json\\\` verwaltet. Beim Anlegen von Notes via \\\`mux_notes_create\\\` immer passende Tags mitgeben.

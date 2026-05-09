@@ -154,6 +154,7 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
   const [btShutterEnabled, setBtShutterEnabled] = useState(false)
   const [voiceSubmitMode, setVoiceSubmitMode] = useState<'auto' | 'manual'>('auto')
   const [ttsEnabled, setTtsEnabled] = useState(true)
+  const [ttsLevel, setTtsLevel] = useState<1 | 2>(1)
   const [ttsVoice, setTtsVoice] = useState<'local' | 'macos'>('local')
   const [voiceCommandsEnabled, setVoiceCommandsEnabled] = useState(true)
   const [keepWorking, setKeepWorking] = useState(false)
@@ -177,6 +178,8 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
     if (vsm) setVoiceSubmitMode(vsm)
     const ttsEn = await api.config.get('ttsEnabled')
     setTtsEnabled(ttsEn ?? true)
+    const ttsLv = await api.config.get('ttsLevel')
+    setTtsLevel((ttsLv as 1 | 2) ?? 1)
     const ttsV = await api.config.get('ttsVoice')
     if (ttsV) setTtsVoice(ttsV)
     const vcEn = await api.config.get('voiceCommandsEnabled')
@@ -393,6 +396,8 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
         <VoiceSettingsTab
           ttsEnabled={ttsEnabled}
           onTtsEnabledChange={async (v) => { setTtsEnabled(v); await api.config.set('ttsEnabled', v) }}
+          ttsLevel={ttsLevel}
+          onTtsLevelChange={async (v) => { setTtsLevel(v); await api.config.set('ttsLevel', v) }}
           ttsVoice={ttsVoice}
           onTtsVoiceChange={async (v) => { setTtsVoice(v); await api.config.set('ttsVoice', v) }}
           voiceCommandsEnabled={voiceCommandsEnabled}
