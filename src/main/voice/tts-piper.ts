@@ -304,6 +304,42 @@ export class PiperTTS extends TTSEngine {
     return this.ready
   }
 
+  /**
+   * Dispose the worker cleanly — ready=false, worker killed.
+   * Unlike shutdown(), does not reject pending messages (they naturally resolve
+   * via worker exit). Allows creating a new PiperTTS instance afterward.
+   */
+  dispose(): void {
+    this.ready = false
+    this._interrupted = true
+
+    if (!this.worker) return
+
+    const w = this.worker
+    this.worker = null
+
+    try {
+      w.send({ cmd: 'shutdown' })
+    } catch {
+      // Worker may already be dead
+    }
+
+    const termTimer = setTimeout(() => {
+      try { w.kill('SIGTERM') } catch { /* ignore */ }
+    }, 1000)
+
+    const killTimer = setTimeout(() => {
+      try { w.kill('SIGKILL') } catch { /* ignore */ }
+    }, 3000)
+
+    w.once('exit', () => {
+      clearTimeout(termTimer)
+      clearTimeout(killTimer)
+    })
+
+    this.pendingMessages.clear()
+  }
+
   shutdown(): void {
     this.ready = false
     this._interrupted = true
