@@ -490,6 +490,19 @@ export function WorkspacesTab() {
               </div>
             </div>
 
+            {/* Notes Global toggle */}
+            <label class="ws-ed-row" style={{ gap: '6px', alignItems: 'center', cursor: 'pointer', fontSize: '12px' }}>
+              <input
+                type="checkbox"
+                checked={ws.notesGlobal ?? false}
+                onChange={(e) => updateWs({ notesGlobal: (e.target as HTMLInputElement).checked })}
+              />
+              <span>{t('workspacesTab.notesGlobal', 'Notes visible in all workspaces')}</span>
+              <span style={{ fontSize: '10px', color: 'var(--color-text-dim)' }}>
+                {t('workspacesTab.notesGlobalHint', 'New notes skip the workspace tag and appear everywhere')}
+              </span>
+            </label>
+
             {/* Workspace Prompt + Context Directories */}
             <div class="ws-ed-sections">
               <div class="insp-field wide">
@@ -549,15 +562,25 @@ export function WorkspacesTab() {
                       const canMergeDown = row + span - 1 < ws.rows - 1
                       const isMerged = span > 1
 
+                      const cellClasses = [
+                        'ed-cell',
+                        !hasContent ? 'ed-cell--empty' : '',
+                      ].filter(Boolean).join(' ')
+
+                      const presetTooltip = cellPreset
+                        ? `${cellPreset.displayName}${cellPreset.singleInstance ? ' (single instance)' : ''}`
+                        : undefined
+
                       gridCells.push(
                         <div
                           key={`${col}-${row}`}
-                          class="ed-cell"
+                          class={cellClasses}
                           data-idx={idx}
                           data-col={col}
                           data-row={row}
                           data-selected={idx === selectedCell ? 'true' : 'false'}
                           data-merged={isMerged ? 'true' : 'false'}
+                          title={presetTooltip}
                           style={{
                             gridColumn: `${col + 1}`,
                             gridRow: `${row + 1} / span ${span}`,
@@ -567,24 +590,45 @@ export function WorkspacesTab() {
                             if ((e.target as HTMLElement).classList.contains('merge-handle')) return
                             if ((e.target as HTMLElement).classList.contains('split-handle')) return
                             setSelectedCell(idx)
+                            if (!hasContent) setPickerOpen(true)
                           }}
                         >
-                          <div class="ed-cell-row">
-                            <span class="ed-cell-coord" data-span={span}>
-                              [{col},{row}]
-                            </span>
-                          </div>
-                          {cellPreset && (
-                            <div class="ed-cell-preset" style={{ color: cellPreset.color }}>
-                              {cellPreset.displayName}
-                            </div>
+                          {hasContent ? (
+                            <>
+                              <div class="ed-cell-row">
+                                <span class="ed-cell-coord" data-span={span}>
+                                  [{col},{row}]
+                                </span>
+                              </div>
+                              {cellPreset ? (
+                                <div class="ed-cell-preset">
+                                  <span class="ed-cell-preset__dot" style={{ background: cellPreset.color }} />
+                                  <span class="ed-cell-preset__name" style={{ color: cellPreset.color }}>
+                                    {cellPreset.displayName}
+                                  </span>
+                                </div>
+                              ) : hasProject ? (
+                                <div class="ed-cell-project">
+                                  {cell.project}
+                                </div>
+                              ) : null}
+                              <div class="ed-cell-prompt">
+                                {promptDisplay}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div class="ed-cell-row" style={{ position: 'absolute', top: '6px', right: '8px' }}>
+                                <span class="ed-cell-coord" data-span={span}>
+                                  [{col},{row}]
+                                </span>
+                              </div>
+                              <div class="ed-cell-empty-label">
+                                <span class="ed-cell-empty-label__icon">+</span>
+                                <span class="ed-cell-empty-label__text">{t('workspacesTab.emptyCell', 'available')}</span>
+                              </div>
+                            </>
                           )}
-                          <div class="ed-cell-project">
-                            {cell.project || (cellPreset ? '' : '\u2014')}
-                          </div>
-                          <div class="ed-cell-prompt">
-                            {promptDisplay}
-                          </div>
                           {canMergeDown && (
                             <div
                               class="merge-handle"
