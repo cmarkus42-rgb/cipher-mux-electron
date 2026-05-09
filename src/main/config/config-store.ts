@@ -204,6 +204,12 @@ function migrateConfig(config: AppConfig): AppConfig {
       wayne.name = 'Wayne'
       changed = true
     }
+    // Migrate: remove old "sokrates" character — replaced by "theaitetos"
+    const sokrIdx = config.characters.findIndex(c => c.id === 'sokrates')
+    if (sokrIdx >= 0) {
+      config.characters.splice(sokrIdx, 1)
+      changed = true
+    }
   }
 
   if (changed) saveConfig(config)
