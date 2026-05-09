@@ -731,7 +731,8 @@ export class IpcHub {
       fsNode.mkdirSync(screenshotDir, { recursive: true })
 
       const timestamp = Date.now()
-      const filePath = pathNode.join(screenshotDir, `session-${timestamp}.png`)
+      const safeName = (session?.name || 'session').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 80)
+      const filePath = pathNode.join(screenshotDir, `${safeName}-${timestamp}.png`)
       try {
         execFileSync('screencapture', ['-i', filePath], { timeout: 30000 })
         if (!fsNode.existsSync(filePath)) return null
