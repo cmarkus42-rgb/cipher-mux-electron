@@ -741,7 +741,7 @@ export class IpcHub {
         const session = this.sessionManager.list().find((s: any) => s.id === sessionId)
         if (session?.tmuxSession) {
           const escapedPath = filePath.replace(/'/g, "'\\''")
-          await this.sessionManager.sendKeys(session.tmuxSession, `# Screenshot: ${escapedPath}\r`)
+          await this.sessionManager.sendKeys(sessionId, `# Screenshot: ${escapedPath}\r`)
         }
         return { path: filePath }
       } catch {
