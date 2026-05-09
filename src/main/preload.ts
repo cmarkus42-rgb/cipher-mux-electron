@@ -207,6 +207,20 @@ const api = {
       ipcRenderer.invoke(IPC.BUGREPORT_ENRICH, { description }),
     pickScreenshot: (): Promise<string[]> =>
       ipcRenderer.invoke(IPC.BUGREPORT_PICK_SCREENSHOT),
+    startRelay: (): Promise<{ ok: boolean; sessionId?: string; error?: string }> =>
+      ipcRenderer.invoke(IPC.BUGREPORT_RELAY_START),
+    stopRelay: (): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.BUGREPORT_RELAY_STOP),
+    onRelayReady: (cb: (data: { sessionId: string }) => void) => {
+      const handler = (_e: unknown, data: { sessionId: string }) => cb(data)
+      ipcRenderer.on(IPC.BUGREPORT_RELAY_READY, handler)
+      return () => ipcRenderer.removeListener(IPC.BUGREPORT_RELAY_READY, handler)
+    },
+    onTtsText: (cb: (text: string) => void) => {
+      const handler = (_e: unknown, text: string) => cb(text)
+      ipcRenderer.on(IPC.BUGREPORT_TTS_TEXT, handler)
+      return () => ipcRenderer.removeListener(IPC.BUGREPORT_TTS_TEXT, handler)
+    },
   },
 
   // ─── LLM Provider ─────────────────────────────────────────
@@ -278,6 +292,16 @@ const api = {
     tagMerge: (sources: string[], target: string): Promise<{ affected: number; error?: string }> =>
       ipcRenderer.invoke(IPC.NOTES_TAG_MERGE, { sources, target }),
     tagClassRepo: () => ipcRenderer.invoke(IPC.NOTES_TAG_CLASS_REPO),
+    tagClassCreate: (name: string, color: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.NOTES_TAG_CLASS_CREATE, { name, color }),
+    tagClassRename: (oldName: string, newName: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.NOTES_TAG_CLASS_RENAME, { oldName, newName }),
+    tagClassDelete: (name: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.NOTES_TAG_CLASS_DELETE, { name }),
+    tagClassSetColor: (name: string, color: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.NOTES_TAG_CLASS_SET_COLOR, { name, color }),
+    tagSynonymsList: (): Promise<Record<string, string>> =>
+      ipcRenderer.invoke(IPC.NOTES_TAG_SYNONYMS_LIST),
     tagIndex: () => ipcRenderer.invoke(IPC.NOTES_TAG_INDEX),
     tagIndexRefresh: () => ipcRenderer.invoke(IPC.NOTES_TAG_INDEX_REFRESH),
     onChanged: (cb: (data: unknown) => void) => {
@@ -516,6 +540,18 @@ const api = {
     },
     speak: (text: string) => ipcRenderer.invoke('cipher-mux:tts:speak', { text }),
     stopSpeech: () => ipcRenderer.invoke('cipher-mux:tts:stop'),
+    // Voice catalog management
+    listInstalled: () => ipcRenderer.invoke(IPC.VOICE_LIST_INSTALLED),
+    catalogSearch: (query?: string) => ipcRenderer.invoke(IPC.VOICE_CATALOG_SEARCH, query),
+    download: (name: string) => ipcRenderer.invoke(IPC.VOICE_DOWNLOAD, { name }),
+    onDownloadProgress: (cb: (data: { voice: string; file: string; percent: number; bytesDownloaded: number; bytesTotal: number }) => void) => {
+      const handler = (_e: unknown, data: { voice: string; file: string; percent: number; bytesDownloaded: number; bytesTotal: number }) => cb(data)
+      ipcRenderer.on(IPC.VOICE_DOWNLOAD_PROGRESS, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_DOWNLOAD_PROGRESS, handler)
+    },
+    deleteVoice: (name: string) => ipcRenderer.invoke(IPC.VOICE_DELETE, { name }),
+    setActive: (name: string) => ipcRenderer.invoke(IPC.VOICE_SET_ACTIVE, { name }),
+    preview: (name: string) => ipcRenderer.invoke(IPC.VOICE_PREVIEW, { name }),
   },
 
   // ─── BT Shutter Remote ─────────────────────────────────
