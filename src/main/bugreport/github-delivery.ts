@@ -105,12 +105,16 @@ export async function deliverToGitHub(
   const labels = severityToLabels(severity, tags)
   const payload: DeliveryPayload = { title, body, labels }
 
-  // Try gh CLI first — direct, no browser switch
+  // Try gh CLI first — direct creation, then open in browser for user feedback
   const ghAvailable = await isGhAvailable()
   if (ghAvailable) {
     try {
       const issueUrl = await createViaGhCli(repo, payload)
       console.log(`[GitHubDelivery] Issue created via gh CLI: ${issueUrl}`)
+      // Open the created issue in browser so the user sees the result
+      if (issueUrl.startsWith('https://')) {
+        shell.openExternal(issueUrl)
+      }
       return { ok: true, method: 'gh-cli', issueUrl }
     } catch (err) {
       console.warn('[GitHubDelivery] gh CLI failed, falling back to browser:', (err as Error).message)
