@@ -78,6 +78,7 @@ export class IpcHub {
   private taskWatcher: TaskWatcher | null = null
   private taskHooks: TaskHooks | null = null
   private bugreportSource: BugreportTaskSource | null = null
+  private bugreportRelaySessionId: string | null = null
   private inputRequestWatcher: InputRequestWatcher | null = null
   private noteManager!: NoteManager
   private noteTagging!: NoteTagging
@@ -536,6 +537,11 @@ export class IpcHub {
       // Voice-relay uses mux_tts_speak for TTS (like all other sessions).
       // VoiceOutputRouter (terminal-polling) is disabled — it caused duplicate
       // readback of everything visible in the relay pane.
+
+      // Notify renderer when bugreport relay session is ready
+      if (data.entityId === 'bugreport' && this.bugreportRelaySessionId) {
+        this.windowManager.sendToMainWindow(IPC.BUGREPORT_RELAY_READY, { sessionId: this.bugreportRelaySessionId })
+      }
     })
 
     this.sessionManager.on('entity-stopped', (data: { entityId: string }) => {
@@ -1073,6 +1079,47 @@ export class IpcHub {
         properties: ['openFile', 'multiSelections'],
       })
       return result.canceled ? [] : result.filePaths
+    })
+
+    // ── Bugreport Voice Relay ──
+
+    ipcMain.handle(IPC.BUGREPORT_RELAY_START, async () => {
+      try {
+        const sessionId = await this.bugreportManager.startRelaySession(this.sessionManager)
+        this.bugreportRelaySessionId = sessionId
+        const inputRouter = this.voiceManager?.getInputRouter()
+        if (inputRouter) {
+          inputRouter.setBugreportSession(sessionId)
+        }
+        console.log('[Bugreport] Relay session started:', sessionId)
+        return { ok: true, sessionId }
+      } catch (err) {
+        const msg = (err as Error).message
+        console.error('[Bugreport] Relay start failed:', msg)
+        return { ok: false, error: msg }
+      }
+    })
+
+    ipcMain.handle(IPC.BUGREPORT_RELAY_STOP, async () => {
+      try {
+        const inputRouter = this.voiceManager?.getInputRouter()
+        if (inputRouter) {
+          inputRouter.clearBugreportSession()
+        }
+        if (this.bugreportRelaySessionId) {
+          try {
+            await this.sessionManager.stop(this.bugreportRelaySessionId)
+          } catch (err) {
+            console.warn('[Bugreport] Failed to stop relay session:', (err as Error).message)
+          }
+          this.bugreportRelaySessionId = null
+        }
+        console.log('[Bugreport] Relay stopped')
+        return { ok: true }
+      } catch (err) {
+        console.error('[Bugreport] Relay stop failed:', (err as Error).message)
+        return { ok: false }
+      }
     })
   }
 

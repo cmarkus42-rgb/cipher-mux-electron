@@ -1,7 +1,8 @@
 // src/renderer/components/TagManager.tsx
-// Tag Management UI for the Workspaces/Personas window
-import { useState, useEffect, useCallback } from 'preact/hooks'
+// Tag Management UI — class-grouped layout with CRUD, merge, synonyms
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
+import type { TagClass, TagIndexData } from '../../shared/types'
 
 interface TagInfo {
   name: string
@@ -10,112 +11,432 @@ interface TagInfo {
   isSeed: boolean
 }
 
+interface ClassData {
+  name: string
+  color?: string
+  values: TagValueRow[]
+  collapsed: boolean
+}
+
+interface TagValueRow {
+  fullTag: string
+  value: string
+  count: number
+  isSeed: boolean
+}
+
 const api = (window as any).cipherMux
+
+const CLASS_COLORS = [
+  '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b',
+  '#10b981', '#06b6d4', '#3b82f6', '#78716c', '#64748b',
+]
 
 export function TagManager() {
   const { t } = useTranslation()
-  const [tags, setTags] = useState<TagInfo[]>([])
+  const [classes, setClasses] = useState<ClassData[]>([])
+  const [unclassed, setUnclassed] = useState<TagValueRow[]>([])
+  const [synonyms, setSynonyms] = useState<Record<string, string>>({})
   const [search, setSearch] = useState('')
-  const [editingTag, setEditingTag] = useState<string | null>(null)
-  const [editDesc, setEditDesc] = useState('')
+
+  // Merge state
+  const [selectedForMerge, setSelectedForMerge] = useState<Set<string>>(new Set())
+  const [mergeMode, setMergeMode] = useState(false)
+  const [mergePreview, setMergePreview] = useState<number | null>(null)
+
+  // Inline edit
   const [renamingTag, setRenamingTag] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
-  const [newTagName, setNewTagName] = useState('')
-  const [newTagDesc, setNewTagDesc] = useState('')
-  const [showCreate, setShowCreate] = useState(false)
-  const [mergeMode, setMergeMode] = useState(false)
-  const [selectedForMerge, setSelectedForMerge] = useState<Set<string>>(new Set())
 
-  const loadTags = useCallback(async () => {
-    const list = await api.notes.tagList()
-    setTags(list)
+  // Class CRUD
+  const [showClassCreate, setShowClassCreate] = useState(false)
+  const [newClassName, setNewClassName] = useState('')
+  const [newClassColor, setNewClassColor] = useState(CLASS_COLORS[0])
+  const [renamingClass, setRenamingClass] = useState<string | null>(null)
+  const [classRenameValue, setClassRenameValue] = useState('')
+  const [editingClassColor, setEditingClassColor] = useState<string | null>(null)
+
+  const loadData = useCallback(async () => {
+    const [tagList, classRepo, indexData, synMap]: [
+      TagInfo[],
+      { classes: Record<string, TagClass> },
+      TagIndexData,
+      Record<string, string>,
+    ] = await Promise.all([
+      api.notes.tagList(),
+      api.notes.tagClassRepo(),
+      api.notes.tagIndex(),
+      api.notes.tagSynonymsList(),
+    ])
+
+    setSynonyms(synMap || {})
+
+    // Build tag → count from index
+    const tagCounts: Record<string, number> = {}
+    for (const [tag, ids] of Object.entries(indexData.tagToNoteIds)) {
+      tagCounts[tag] = ids.length
+    }
+
+    // Build seed set from tagList
+    const seedSet = new Set(tagList.filter(t => t.isSeed).map(t => t.name))
+
+    // Group by class
+    const classEntries: ClassData[] = []
+    const classedTags = new Set<string>()
+
+    for (const [clsName, clsData] of Object.entries(classRepo.classes)) {
+      const values: TagValueRow[] = clsData.values.map(v => {
+        const fullTag = `${clsName}:${v}`
+        classedTags.add(fullTag)
+        return {
+          fullTag,
+          value: v,
+          count: tagCounts[fullTag] || 0,
+          isSeed: seedSet.has(fullTag),
+        }
+      })
+      values.sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
+      classEntries.push({
+        name: clsName,
+        color: clsData.color,
+        values,
+        collapsed: false,
+      })
+    }
+    classEntries.sort((a, b) => a.name.localeCompare(b.name))
+
+    // Unclassed: tags that exist but don't belong to any class
+    const uncl: TagValueRow[] = tagList
+      .filter(t => !classedTags.has(t.name) && t.name.includes(':'))
+      .map(t => ({
+        fullTag: t.name,
+        value: t.name,
+        count: tagCounts[t.name] || t.count,
+        isSeed: t.isSeed,
+      }))
+
+    setClasses(prev => {
+      // Preserve collapsed state
+      const collapsedMap = new Map(prev.map(c => [c.name, c.collapsed]))
+      return classEntries.map(c => ({
+        ...c,
+        collapsed: collapsedMap.get(c.name) ?? false,
+      }))
+    })
+    setUnclassed(uncl)
   }, [])
 
+  useEffect(() => { loadData() }, [loadData])
+
+  // Listen for tag changes
   useEffect(() => {
-    loadTags()
-  }, [loadTags])
+    if (!api?.notes?.onChanged) return
+    const unsub = api.notes.onChanged((data: any) => {
+      if (data?.action === 'tags-updated' || data?.action === 'saved' || data?.action === 'deleted') {
+        loadData()
+      }
+    })
+    return unsub
+  }, [loadData])
 
-  const filteredTags = tags.filter(tag =>
-    tag.name.toLowerCase().includes(search.toLowerCase()) ||
-    tag.description.toLowerCase().includes(search.toLowerCase())
-  )
-
-  const handleCreate = async () => {
-    const name = newTagName.trim().toLowerCase()
-    if (!name) return
-    const result = await api.notes.tagCreate(name, newTagDesc.trim())
-    if (result.ok) {
-      setNewTagName('')
-      setNewTagDesc('')
-      setShowCreate(false)
-      await loadTags()
-    }
+  // Toggle class collapse
+  const toggleCollapse = (clsName: string) => {
+    setClasses(prev => prev.map(c =>
+      c.name === clsName ? { ...c, collapsed: !c.collapsed } : c
+    ))
   }
 
-  const handleRename = async (oldName: string) => {
+  // Tag value rename
+  const handleRename = async (oldTag: string) => {
     const newName = renameValue.trim().toLowerCase()
-    if (!newName || newName === oldName) {
+    if (!newName || newName === oldTag) {
       setRenamingTag(null)
       return
     }
-    await api.notes.tagRename(oldName, newName)
+    await api.notes.tagRename(oldTag, newName)
     setRenamingTag(null)
     setRenameValue('')
-    await loadTags()
+    await loadData()
   }
 
-  const handleUpdateDesc = async (name: string) => {
-    await api.notes.tagUpdate(name, editDesc)
-    setEditingTag(null)
-    setEditDesc('')
-    await loadTags()
-  }
-
-  const handleDelete = async (name: string) => {
-    const confirmed = window.confirm(t('tags.deleteConfirm', { name }))
+  // Tag value delete
+  const handleDelete = async (tag: string) => {
+    const confirmed = window.confirm(t('tags.deleteConfirm', { name: tag }))
     if (!confirmed) return
-    await api.notes.tagDelete(name)
-    await loadTags()
+    await api.notes.tagDelete(tag)
+    await loadData()
   }
 
-  const toggleMergeSelect = (name: string) => {
+  // Merge
+  const toggleMergeSelect = (tag: string) => {
     setSelectedForMerge(prev => {
       const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
+      if (next.has(tag)) next.delete(tag)
+      else next.add(tag)
       return next
     })
   }
+
+  // Compute merge preview when selection changes
+  useEffect(() => {
+    if (selectedForMerge.size < 2) {
+      setMergePreview(null)
+      return
+    }
+    // Count unique notes affected
+    api.notes.tagIndex().then((idx: TagIndexData) => {
+      const noteSet = new Set<string>()
+      for (const tag of selectedForMerge) {
+        const ids = idx.tagToNoteIds[tag]
+        if (ids) ids.forEach(id => noteSet.add(id))
+      }
+      setMergePreview(noteSet.size)
+    }).catch(() => setMergePreview(null))
+  }, [selectedForMerge])
 
   const handleMerge = async () => {
     if (selectedForMerge.size < 2) return
     const sources = [...selectedForMerge]
     const target = sources[0]
     const confirmed = window.confirm(
-      `Merge ${sources.length} tags into "${target}"?\n\nSource tags: ${sources.join(', ')}\nAll notes will be updated.`
+      t('tags.mergeConfirm', {
+        count: sources.length,
+        target,
+        sources: sources.join(', '),
+        defaultValue: `Merge ${sources.length} tags into "${target}"?\n\nSource tags: ${sources.join(', ')}\nAll notes will be updated.`,
+      })
     )
     if (!confirmed) return
     await api.notes.tagMerge(sources, target)
     setSelectedForMerge(new Set())
     setMergeMode(false)
-    await loadTags()
+    await loadData()
   }
 
-  const handleArchiveLegacy = async () => {
-    // Find notes created before CF update (2026-05-01)
-    const allNotes = await api.notes.list()
-    const cutoff = '2026-05-01T00:00:00.000Z'
-    const legacy = allNotes.filter((n: any) => n.createdAt < cutoff)
-    if (legacy.length === 0) {
-      window.alert('No legacy notes found (all notes are post-CF).')
+  // Class CRUD
+  const handleClassCreate = async () => {
+    const name = newClassName.trim().toLowerCase()
+    if (!name) return
+    await api.notes.tagClassCreate(name, newClassColor)
+    setNewClassName('')
+    setNewClassColor(CLASS_COLORS[0])
+    setShowClassCreate(false)
+    await loadData()
+  }
+
+  const handleClassRename = async (oldName: string) => {
+    const newName = classRenameValue.trim().toLowerCase()
+    if (!newName || newName === oldName) {
+      setRenamingClass(null)
       return
     }
+    await api.notes.tagClassRename(oldName, newName)
+    setRenamingClass(null)
+    setClassRenameValue('')
+    await loadData()
+  }
+
+  const handleClassDelete = async (name: string) => {
+    const cls = classes.find(c => c.name === name)
+    const valueCount = cls?.values.length || 0
     const confirmed = window.confirm(
-      `Archive ${legacy.length} legacy notes (created before 2026-05-01)?\n\nThey will be moved to trash and can be restored.`
+      t('tags.classDeleteConfirm', {
+        name,
+        count: valueCount,
+        defaultValue: `Delete class "${name}" with ${valueCount} values? Values will become unclassed.`,
+      })
     )
     if (!confirmed) return
-    await api.notes.trashMany(legacy.map((n: any) => n.id))
-    await loadTags()
+    await api.notes.tagClassDelete(name)
+    await loadData()
+  }
+
+  const handleClassColorChange = async (name: string, color: string) => {
+    await api.notes.tagClassSetColor(name, color)
+    setEditingClassColor(null)
+    await loadData()
+  }
+
+  // Get synonyms pointing to tags in a class
+  const getSynonymsForTag = (canonicalTag: string): string[] => {
+    return Object.entries(synonyms)
+      .filter(([, target]) => target === canonicalTag)
+      .map(([syn]) => syn)
+  }
+
+  // Search filter
+  const matchesSearch = (tag: string): boolean => {
+    if (!search) return true
+    return tag.toLowerCase().includes(search.toLowerCase())
+  }
+
+  const filteredClasses = classes.map(cls => ({
+    ...cls,
+    values: cls.values.filter(v => matchesSearch(v.fullTag) || matchesSearch(v.value)),
+  })).filter(cls => matchesSearch(cls.name) || cls.values.length > 0)
+
+  const filteredUnclassed = unclassed.filter(v => matchesSearch(v.fullTag))
+
+  const renderValueRow = (row: TagValueRow) => {
+    const syns = getSynonymsForTag(row.fullTag)
+    const isSelected = selectedForMerge.has(row.fullTag)
+    const isTarget = isSelected && [...selectedForMerge][0] === row.fullTag
+
+    return (
+      <div
+        key={row.fullTag}
+        class={`tag-manager__value-row${isSelected ? ' tag-manager__value-row--selected' : ''}${isTarget ? ' tag-manager__value-row--target' : ''}`}
+        onClick={mergeMode ? () => toggleMergeSelect(row.fullTag) : undefined}
+        style={mergeMode ? { cursor: 'pointer' } : undefined}
+      >
+        {mergeMode && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => toggleMergeSelect(row.fullTag)}
+            class="tag-manager__merge-check"
+          />
+        )}
+
+        <div class="tag-manager__value-name">
+          {renamingTag === row.fullTag ? (
+            <input
+              type="text"
+              class="tag-manager__inline-input"
+              value={renameValue}
+              onInput={(e) => setRenameValue((e.target as HTMLInputElement).value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRename(row.fullTag)
+                if (e.key === 'Escape') setRenamingTag(null)
+              }}
+              onBlur={() => handleRename(row.fullTag)}
+              autoFocus
+            />
+          ) : (
+            <span class="tag-manager__value-label">
+              {row.value}
+              {row.isSeed && <span class="tag-manager__badge">{t('tags.seed', 'seed')}</span>}
+              {isTarget && <span class="tag-manager__badge tag-manager__badge--target">{t('tags.mergeTarget', 'target')}</span>}
+            </span>
+          )}
+        </div>
+
+        <span class="tag-manager__value-count">{row.count}</span>
+
+        {syns.length > 0 && (
+          <div class="tag-manager__synonyms">
+            {syns.map(s => (
+              <span key={s} class="tag-manager__synonym-badge" title={t('tags.synonymOf', { target: row.fullTag, defaultValue: `Synonym of ${row.fullTag}` })}>
+                {s}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {!mergeMode && (
+          <div class="tag-manager__value-actions">
+            <button
+              class="tag-manager__action"
+              onClick={(e) => { e.stopPropagation(); setRenamingTag(row.fullTag); setRenameValue(row.fullTag) }}
+              title={t('tags.rename', 'Rename')}
+            >
+              Aa
+            </button>
+            <button
+              class="tag-manager__action tag-manager__action--danger"
+              onClick={(e) => { e.stopPropagation(); handleDelete(row.fullTag) }}
+              title={t('tags.delete', 'Delete')}
+            >
+              x
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderClassSection = (cls: ClassData & { values: TagValueRow[] }) => {
+    const totalCount = cls.values.reduce((sum, v) => sum + v.count, 0)
+
+    return (
+      <div key={cls.name} class="tag-manager__class-section">
+        <div class="tag-manager__class-header" onClick={() => toggleCollapse(cls.name)}>
+          <span class="tag-manager__collapse-icon">{cls.collapsed ? '\u25B6' : '\u25BC'}</span>
+
+          {cls.color && (
+            <span
+              class="tag-manager__class-dot"
+              style={{ background: cls.color }}
+              onClick={(e) => { e.stopPropagation(); setEditingClassColor(editingClassColor === cls.name ? null : cls.name) }}
+              title={t('tags.changeColor', 'Change color')}
+            />
+          )}
+
+          {renamingClass === cls.name ? (
+            <input
+              type="text"
+              class="tag-manager__inline-input"
+              value={classRenameValue}
+              onInput={(e) => setClassRenameValue((e.target as HTMLInputElement).value)}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleClassRename(cls.name)
+                if (e.key === 'Escape') setRenamingClass(null)
+              }}
+              onBlur={() => handleClassRename(cls.name)}
+              autoFocus
+            />
+          ) : (
+            <span class="tag-manager__class-name">{cls.name}</span>
+          )}
+
+          <span class="tag-manager__class-count">{cls.values.length} {t('tags.values', 'values')} / {totalCount} {t('tags.notes', 'notes')}</span>
+
+          <div class="tag-manager__class-actions" onClick={(e) => e.stopPropagation()}>
+            <button
+              class="tag-manager__action"
+              onClick={() => { setRenamingClass(cls.name); setClassRenameValue(cls.name) }}
+              title={t('tags.renameClass', 'Rename class')}
+            >
+              Aa
+            </button>
+            <button
+              class="tag-manager__action tag-manager__action--danger"
+              onClick={() => handleClassDelete(cls.name)}
+              title={t('tags.deleteClass', 'Delete class')}
+            >
+              x
+            </button>
+          </div>
+        </div>
+
+        {editingClassColor === cls.name && (
+          <div class="tag-manager__color-picker" onClick={(e) => e.stopPropagation()}>
+            {CLASS_COLORS.map(c => (
+              <button
+                key={c}
+                class={`tag-manager__color-swatch${cls.color === c ? ' tag-manager__color-swatch--active' : ''}`}
+                style={{ background: c }}
+                onClick={() => handleClassColorChange(cls.name, c)}
+              />
+            ))}
+            <input
+              type="color"
+              class="tag-manager__color-custom"
+              value={cls.color || '#6366f1'}
+              onChange={(e) => handleClassColorChange(cls.name, (e.target as HTMLInputElement).value)}
+              title={t('tags.customColor', 'Custom color')}
+            />
+          </div>
+        )}
+
+        {!cls.collapsed && (
+          <div class="tag-manager__values-list">
+            {cls.values.map(renderValueRow)}
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -124,7 +445,7 @@ export function TagManager() {
         <input
           type="text"
           class="tag-manager__search"
-          placeholder={t('tags.search')}
+          placeholder={t('tags.search', 'Search tags...')}
           value={search}
           onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
         />
@@ -135,155 +456,84 @@ export function TagManager() {
           {mergeMode ? t('tags.cancel', 'Cancel') : t('tags.merge', 'Merge')}
         </button>
         {!mergeMode && (
-          <>
-            <button
-              class="tag-manager__add-btn"
-              onClick={() => setShowCreate(!showCreate)}
-            >
-              {showCreate ? t('tags.cancel') : t('tags.newTag')}
-            </button>
-            <button
-              class="tag-manager__add-btn"
-              onClick={handleArchiveLegacy}
-              title="Move pre-CF notes to trash"
-            >
-              Archive Legacy
-            </button>
-          </>
+          <button
+            class="tag-manager__add-btn"
+            onClick={() => setShowClassCreate(!showClassCreate)}
+          >
+            {showClassCreate ? t('tags.cancel', 'Cancel') : t('tags.newClass', '+ Class')}
+          </button>
         )}
       </div>
 
+      {/* Merge bar */}
       {mergeMode && selectedForMerge.size >= 2 && (
         <div class="tag-manager__merge-bar">
-          <span>{selectedForMerge.size} selected — merge into "{[...selectedForMerge][0]}"</span>
+          <span>
+            {selectedForMerge.size} {t('tags.selected', 'selected')} — {t('tags.mergeInto', 'merge into')} "{[...selectedForMerge][0]}"
+            {mergePreview !== null && (
+              <span class="tag-manager__merge-preview">
+                {' '}({mergePreview} {t('tags.notesAffected', 'notes affected')})
+              </span>
+            )}
+          </span>
           <button class="tag-manager__btn tag-manager__btn--primary" onClick={handleMerge}>
             {t('tags.mergeNow', 'Merge Now')}
           </button>
         </div>
       )}
 
-      {showCreate && !mergeMode && (
+      {/* Class create form */}
+      {showClassCreate && !mergeMode && (
         <div class="tag-manager__create">
           <input
             type="text"
             class="tag-manager__input"
-            placeholder={t('tags.newTagName')}
-            value={newTagName}
-            onInput={(e) => setNewTagName((e.target as HTMLInputElement).value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+            placeholder={t('tags.className', 'Class name')}
+            value={newClassName}
+            onInput={(e) => setNewClassName((e.target as HTMLInputElement).value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleClassCreate()}
           />
-          <input
-            type="text"
-            class="tag-manager__input tag-manager__input--wide"
-            placeholder={t('tags.newTagDesc')}
-            value={newTagDesc}
-            onInput={(e) => setNewTagDesc((e.target as HTMLInputElement).value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-          />
-          <button class="tag-manager__btn tag-manager__btn--primary" onClick={handleCreate}>
-            {t('tags.create')}
+          <div class="tag-manager__color-picker tag-manager__color-picker--inline">
+            {CLASS_COLORS.slice(0, 6).map(c => (
+              <button
+                key={c}
+                class={`tag-manager__color-swatch${newClassColor === c ? ' tag-manager__color-swatch--active' : ''}`}
+                style={{ background: c }}
+                onClick={() => setNewClassColor(c)}
+              />
+            ))}
+            <input
+              type="color"
+              class="tag-manager__color-custom"
+              value={newClassColor}
+              onChange={(e) => setNewClassColor((e.target as HTMLInputElement).value)}
+            />
+          </div>
+          <button class="tag-manager__btn tag-manager__btn--primary" onClick={handleClassCreate}>
+            {t('tags.create', 'Create')}
           </button>
         </div>
       )}
 
-      {filteredTags.length === 0 ? (
-        <div class="tag-manager__empty">{t('tags.empty')}</div>
+      {/* Class sections */}
+      {filteredClasses.length === 0 && filteredUnclassed.length === 0 ? (
+        <div class="tag-manager__empty">{t('tags.empty', 'No tags found')}</div>
       ) : (
-        <table class="tag-manager__table">
-          <thead>
-            <tr>
-              {mergeMode && <th class="tag-manager__col-check" />}
-              <th>{t('tags.name')}</th>
-              <th class="tag-manager__col-count">{t('tags.count')}</th>
-              <th>{t('tags.description')}</th>
-              {!mergeMode && <th class="tag-manager__col-actions">{t('tags.actions')}</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {filteredTags.map((tag) => (
-              <tr
-                key={tag.name}
-                class={`tag-manager__row${selectedForMerge.has(tag.name) ? ' tag-manager__row--selected' : ''}`}
-                onClick={mergeMode ? () => toggleMergeSelect(tag.name) : undefined}
-                style={mergeMode ? { cursor: 'pointer' } : undefined}
-              >
-                {mergeMode && (
-                  <td class="tag-manager__col-check">
-                    <input
-                      type="checkbox"
-                      checked={selectedForMerge.has(tag.name)}
-                      onChange={() => toggleMergeSelect(tag.name)}
-                    />
-                  </td>
-                )}
-                <td class="tag-manager__name-cell">
-                  {renamingTag === tag.name ? (
-                    <input
-                      type="text"
-                      class="tag-manager__inline-input"
-                      value={renameValue}
-                      onInput={(e) => setRenameValue((e.target as HTMLInputElement).value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleRename(tag.name)
-                        if (e.key === 'Escape') setRenamingTag(null)
-                      }}
-                      onBlur={() => handleRename(tag.name)}
-                      autoFocus
-                    />
-                  ) : (
-                    <span class="tag-manager__tag-name">
-                      {tag.name}
-                      {tag.isSeed && <span class="tag-manager__badge">{t('tags.seed')}</span>}
-                    </span>
-                  )}
-                </td>
-                <td class="tag-manager__col-count">{tag.count}</td>
-                <td>
-                  {editingTag === tag.name ? (
-                    <input
-                      type="text"
-                      class="tag-manager__inline-input tag-manager__inline-input--wide"
-                      value={editDesc}
-                      onInput={(e) => setEditDesc((e.target as HTMLInputElement).value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleUpdateDesc(tag.name)
-                        if (e.key === 'Escape') setEditingTag(null)
-                      }}
-                      onBlur={() => handleUpdateDesc(tag.name)}
-                      autoFocus
-                    />
-                  ) : (
-                    <span
-                      class="tag-manager__desc"
-                      onClick={!mergeMode ? () => { setEditingTag(tag.name); setEditDesc(tag.description) } : undefined}
-                      title={!mergeMode ? 'Click to edit' : undefined}
-                    >
-                      {tag.description || '\u2014'}
-                    </span>
-                  )}
-                </td>
-                {!mergeMode && (
-                  <td class="tag-manager__col-actions">
-                    <button
-                      class="tag-manager__action"
-                      onClick={() => { setRenamingTag(tag.name); setRenameValue(tag.name) }}
-                      title={t('tags.rename')}
-                    >
-                      Aa
-                    </button>
-                    <button
-                      class="tag-manager__action tag-manager__action--danger"
-                      onClick={() => handleDelete(tag.name)}
-                      title={t('tags.delete')}
-                    >
-                      x
-                    </button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div class="tag-manager__sections">
+          {filteredClasses.map(renderClassSection)}
+
+          {filteredUnclassed.length > 0 && (
+            <div class="tag-manager__class-section tag-manager__class-section--unclassed">
+              <div class="tag-manager__class-header tag-manager__class-header--unclassed">
+                <span class="tag-manager__class-name">{t('tags.unclassed', 'Unclassed')}</span>
+                <span class="tag-manager__class-count">{filteredUnclassed.length} {t('tags.values', 'values')}</span>
+              </div>
+              <div class="tag-manager__values-list">
+                {filteredUnclassed.map(renderValueRow)}
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
