@@ -1800,6 +1800,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     async (args: { text: string; priority?: 'normal' | 'interrupt' }) => {
+      // Broadcast TTS text to renderer (used by BugreportDialog for bot bubbles)
+      if (ctx.windowManager) {
+        ctx.windowManager.sendToMainWindow(IPC.BUGREPORT_TTS_TEXT, args.text)
+      }
       // Check TTS toggle
       const { configStore: ttsConfigStore } = require('../config/config-store')
       if (ttsConfigStore.get('ttsEnabled') === false) {

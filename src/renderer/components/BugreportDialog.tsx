@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
-import { useVoiceBugreport, type ChatTurn } from '../voice/use-voice-bugreport'
 
 const api = () => (window as any).cipherMux
 
@@ -19,8 +18,15 @@ interface BugreportDialogProps {
   onClose: () => void
 }
 
-/** States where the voice interview is actively running. */
-const VOICE_ACTIVE_STATES = new Set(['initializing', 'ready', 'user_speaking', 'recording', 'processing', 'agent_speaking'])
+export type ReportType = 'bug' | 'feature-request'
+
+/** Relay lifecycle: idle → starting → ready → active (bubbles flowing) */
+type RelayState = 'idle' | 'starting' | 'ready' | 'error'
+
+interface ChatTurn {
+  role: 'user' | 'assistant'
+  text: string
+}
 
 /** Format an enriched bugreport as a Markdown document. */
 function formatEnriched(e: EnrichedBugreport): string {
@@ -67,10 +73,6 @@ function ChatBubbles({ turns }: { turns: ChatTurn[] }) {
   )
 }
 
-export type ReportType = 'bug' | 'feature-request'
-
-type EnrichBackend = 'cloud' | 'local'
-
 export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   const { t } = useTranslation()
   const [reportType, setReportType] = useState<ReportType>('bug')
@@ -83,50 +85,95 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   const [result, setResult] = useState<string | null>(null)
   const [screenshots, setScreenshots] = useState<string[]>([])
   const [voiceAvailable, setVoiceAvailable] = useState(false)
-  const [enrichBackend, setEnrichBackend] = useState<EnrichBackend>('cloud')
 
-  const { voiceState, turns, report, error: voiceError, startVoiceInterview, stopVoiceInterview } = useVoiceBugreport()
+  // Voice relay state
+  const [relayState, setRelayState] = useState<RelayState>('idle')
+  const [relayError, setRelayError] = useState<string | null>(null)
+  const [relaySessionId, setRelaySessionId] = useState<string | null>(null)
+  const [turns, setTurns] = useState<ChatTurn[]>([])
 
-  // Load enrich backend + voice availability on mount
+  const relayActive = relayState === 'starting' || relayState === 'ready'
+
+  // Load voice availability on mount
   useEffect(() => {
     let mounted = true
     api()?.voice?.available?.().then((res: { available: boolean }) => {
       if (!mounted) return
       setVoiceAvailable(res?.available ?? false)
     }).catch(() => { if (mounted) setVoiceAvailable(false) })
-    api()?.config?.get?.('llm').then((llm: any) => {
-      if (!mounted) return
-      if (llm?.bugreportEnrichBackend === 'local' || llm?.bugreportEnrichBackend === 'cloud') {
-        setEnrichBackend(llm.bugreportEnrichBackend)
-      }
-    }).catch(() => {})
     return () => { mounted = false }
   }, [])
 
-  // Pause app-level STT when BugReport opens, resume on close (B12)
-  const sttWasPausedRef = useRef(false)
+  // Auto-start relay when dialog opens with STT active
   useEffect(() => {
+    if (!visible) return
     const w = window as any
-    if (visible && w.__cipherMuxSessionVoiceActive) {
-      console.log('[BugreportDialog] Pausing app STT while BugReport open')
-      api()?.voice?.setRoutingMode?.('off')
-      sttWasPausedRef.current = true
-    }
-    return () => {
-      if (sttWasPausedRef.current) {
-        console.log('[BugreportDialog] Resuming app STT after BugReport close')
-        api()?.voice?.setRoutingMode?.('session')
-        sttWasPausedRef.current = false
-      }
+    const sttActive = !!w.__cipherMuxSessionVoiceActive
+    if (sttActive && relayState === 'idle') {
+      startRelay()
     }
   }, [visible])
 
+  // Listen for relay ready, TTS text (bot bubbles), and dispatched text (user bubbles)
   useEffect(() => {
-    if (report && !description && voiceState === 'complete') {
-      setDescription(report)
-      stopVoiceInterview()
+    if (!visible) return
+    const cleanups: Array<() => void> = []
+
+    const br = api()?.bugreport
+    if (br?.onRelayReady) {
+      cleanups.push(br.onRelayReady((data: { sessionId: string }) => {
+        if (relaySessionId && data.sessionId === relaySessionId) {
+          setRelayState('ready')
+        }
+      }))
     }
-  }, [report, description, voiceState, stopVoiceInterview])
+    if (br?.onTtsText) {
+      cleanups.push(br.onTtsText((text: string) => {
+        if (relayState === 'ready' || relayState === 'starting') {
+          setTurns((prev) => [...prev, { role: 'assistant', text }])
+        }
+      }))
+    }
+    const voice = api()?.voice
+    if (voice?.onDispatched) {
+      cleanups.push(voice.onDispatched((data: { sessionId: string; text: string }) => {
+        if (relaySessionId && data.sessionId === relaySessionId) {
+          setTurns((prev) => [...prev, { role: 'user', text: data.text }])
+        }
+      }))
+    }
+
+    return () => { for (const c of cleanups) c() }
+  }, [visible, relaySessionId, relayState])
+
+  const startRelay = useCallback(async () => {
+    setRelayState('starting')
+    setRelayError(null)
+    setTurns([])
+    try {
+      const res = await api().bugreport.startRelay()
+      if (res?.ok && res.sessionId) {
+        setRelaySessionId(res.sessionId)
+        // relayState will switch to 'ready' via onRelayReady event
+      } else {
+        setRelayState('error')
+        setRelayError(res?.error ?? 'unknown error')
+      }
+    } catch (err: any) {
+      setRelayState('error')
+      setRelayError(err?.message ?? 'relay start failed')
+    }
+  }, [])
+
+  const stopRelay = useCallback(async () => {
+    try {
+      await api()?.bugreport?.stopRelay()
+    } catch { /* best effort */ }
+    setRelayState('idle')
+    setRelaySessionId(null)
+    setTurns([])
+    setRelayError(null)
+  }, [])
 
   const resetForm = useCallback(() => {
     setReportType('bug')
@@ -181,9 +228,9 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   const handleClose = useCallback(() => {
     setResult(null)
     resetForm()
-    stopVoiceInterview()
+    if (relayActive) stopRelay()
     onClose()
-  }, [onClose, stopVoiceInterview, resetForm])
+  }, [onClose, stopRelay, resetForm, relayActive])
 
   const handleAttachScreenshot = useCallback(async () => {
     const paths: string[] = await api().bugreport.pickScreenshot()
@@ -193,20 +240,6 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   const handleRemoveScreenshot = useCallback((idx: number) => {
     setScreenshots((prev) => prev.filter((_, i) => i !== idx))
   }, [])
-
-  const handleBackendToggle = useCallback((backend: EnrichBackend) => {
-    setEnrichBackend(backend)
-    api()?.config?.get?.('llm').then((llm: any) => {
-      api()?.config?.set?.('llm', { ...llm, bugreportEnrichBackend: backend })
-    }).catch(() => {})
-  }, [])
-
-  const isVoiceActive = VOICE_ACTIVE_STATES.has(voiceState)
-
-  const handleVoiceClick = useCallback(() => {
-    if (voiceState === 'idle' || voiceState === 'error') startVoiceInterview()
-    else if (isVoiceActive) stopVoiceInterview()
-  }, [voiceState, startVoiceInterview, stopVoiceInterview, isVoiceActive])
 
   if (!visible) return null
 
@@ -237,32 +270,32 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
                   class={`btn btn--sm ${reportType === 'feature-request' ? 'btn--primary' : ''}`}
                   onClick={() => setReportType('feature-request')}
                 >{t('bugreport.typeFeature')}</button>
-                <span class="bugreport-type-toggle__separator" />
-                <button
-                  class={`btn btn--sm ${enrichBackend === 'cloud' ? 'btn--primary' : ''}`}
-                  onClick={() => handleBackendToggle('cloud')}
-                >{t('bugreport.backendCloud')}</button>
-                <button
-                  class={`btn btn--sm ${enrichBackend === 'local' ? 'btn--primary' : ''}`}
-                  onClick={() => handleBackendToggle('local')}
-                >{t('bugreport.backendLocal')}</button>
               </div>
+
               <p class="bugreport-body__text">
                 {reportType === 'bug'
                   ? (voiceAvailable ? t('bugreport.describeWithVoice') : t('bugreport.describe'))
                   : t('bugreport.describeFeature')}
               </p>
-              {isVoiceActive && <ChatBubbles turns={turns} />}
-              {isVoiceActive && turns.length === 0 && (
-                <p class="bugreport-body__hint">{t('bugreport.voiceHint')}</p>
+
+              {/* Voice relay status */}
+              {relayState === 'starting' && (
+                <p class="bugreport-body__hint">{t('bugreport.relayStarting')}</p>
               )}
-              {voiceAvailable && voiceError && (
-                <p class="bugreport-body__notice">
-                  voice: {voiceError.length > 80 ? voiceError.slice(0, 80) + '…' : voiceError}
-                </p>
+              {relayState === 'ready' && turns.length === 0 && (
+                <p class="bugreport-body__hint">{t('bugreport.relayReady')}</p>
+              )}
+              {relayState === 'error' && relayError && (
+                <p class="bugreport-body__notice">{t('bugreport.relayError', { error: relayError })}</p>
               )}
 
-              <textarea class="bugreport-textarea" rows={5} value={description}
+              {/* Chat bubbles from voice relay */}
+              {relayActive && <ChatBubbles turns={turns} />}
+
+              <textarea
+                class="bugreport-textarea"
+                rows={3}
+                value={description}
                 onInput={(e) => {
                   setDescription((e.target as HTMLTextAreaElement).value)
                   if (enriched) {
@@ -271,16 +304,24 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
                     setEnrichFailed(false)
                   }
                 }}
-                placeholder={reportType === 'bug' ? t('bugreport.placeholder') : t('bugreport.placeholderFeature')} autoFocus disabled={isVoiceActive} />
+                placeholder={reportType === 'bug' ? t('bugreport.placeholder') : t('bugreport.placeholderFeature')}
+                autoFocus
+                disabled={relayActive}
+                style={{ resize: 'vertical', minHeight: '60px' }}
+              />
 
               <div class="bugreport-actions">
-                <button class="btn btn--sm" onClick={handleAttachScreenshot} disabled={isVoiceActive}>
+                <button class="btn btn--sm" onClick={handleAttachScreenshot} disabled={relayActive}>
                   {t('bugreport.screenshot')}
                 </button>
-                {voiceAvailable && (
-                  <button class="btn btn--sm" onClick={handleVoiceClick}
-                    disabled={voiceState === 'initializing'}>
-                    {isVoiceActive ? t('bugreport.voiceStop') : t('bugreport.voice')}
+                {voiceAvailable && !relayActive && relayState !== 'starting' && (
+                  <button class="btn btn--sm" onClick={startRelay}>
+                    {t('bugreport.voice')}
+                  </button>
+                )}
+                {relayActive && (
+                  <button class="btn btn--sm" onClick={stopRelay}>
+                    {t('bugreport.voiceStop')}
                   </button>
                 )}
               </div>
@@ -307,13 +348,13 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
 
               <div class="bugreport-footer">
                 <button class="btn btn--sm" onClick={handleClose}>{t('bugreport.cancel')}</button>
-                {!enriched && !isVoiceActive && (
+                {!enriched && !relayActive && (
                   <button class="btn btn--sm" onClick={handleEnrich} disabled={enriching || !description.trim()}>
                     {enriching ? t('bugreport.analyzing') : t('bugreport.preview')}
                   </button>
                 )}
                 <button class="btn btn--sm btn--primary" onClick={handleSubmit}
-                  disabled={submitting || isVoiceActive || (!description.trim() && !preview.trim())}>
+                  disabled={submitting || relayActive || (!description.trim() && !preview.trim())}>
                   {submitting ? t('bugreport.sending') : t('bugreport.submit')}
                 </button>
               </div>
