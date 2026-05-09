@@ -175,12 +175,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         if (session && session.status === 'active') {
           try {
             // Push-deliver plaintext directly via sendKeys (hex-encoded in
-            // tmux control mode — no escaping or base64 needed). Enter is
-            // sent separately so it works regardless of text length.
-            await ctx.sessionManager.sendKeys(targetId, args.text)
-            if (!args.noEnter) {
-              await ctx.sessionManager.sendKeys(targetId, '\r')
-            }
+            // tmux control mode — no escaping or base64 needed). Text and
+            // Enter are combined into one atomic sendKeys call so the target
+            // TUI (Claude CLI) receives them in a single write.
+            const payload = args.noEnter ? args.text : args.text + '\r'
+            await ctx.sessionManager.sendKeys(targetId, payload)
             delivered = true
           } catch {
             // sendKeys failed — message is still on the bus

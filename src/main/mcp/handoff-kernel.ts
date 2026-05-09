@@ -162,6 +162,14 @@ export async function startEntitySession(
     ...(opts?.projectPath ? { projectPath: opts.projectPath } : {}),
   })
 
+  // Launch Claude CLI in the new tmux session (matches UI path in ipc-hub ENTITY_START)
+  try {
+    ctx.sessionManager.queueEntityClaude(entityId, session.id)
+    ctx.sessionManager.scheduleStartupGreeting(entityId)
+  } catch (err) {
+    console.error(`[startEntitySession] Failed to queue Claude for ${entityId}:`, err)
+  }
+
   // Make session visible
   if (ctx.windowManager) {
     ctx.windowManager.sendToMainWindow(IPC.SESSION_VISIBLE_ADD, { sessionId: session.id })

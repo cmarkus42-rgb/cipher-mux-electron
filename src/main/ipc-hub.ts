@@ -2126,14 +2126,14 @@ export class IpcHub {
       return session
     })
 
-    ipcMain.handle(IPC.ENTITY_RESUME, async (_e, { entityId }: { entityId: EntityId }) => {
+    ipcMain.handle(IPC.ENTITY_RESUME, async (_e, { entityId, sessionId }: { entityId: EntityId; sessionId?: string }) => {
       const mcpConfig = configStore.get('mcp')
       this.sessionManager.setMcpConfig({
         mcpHost: mcpConfig?.host ?? MCP_DEFAULT_HOST,
         mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
         mcpApiKey: mcpConfig?.apiKey ?? '',
       })
-      const session = await this.sessionManager.resumeEntity(entityId)
+      const session = await this.sessionManager.resumeEntity(entityId, sessionId)
       return session
     })
 

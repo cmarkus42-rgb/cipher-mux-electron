@@ -1177,24 +1177,26 @@ export class SessionManager extends EventEmitter {
 
   /**
    * Queue Claude Code launch with --resume for an entity session.
-   * Stops the existing session first, then starts a fresh one with --resume.
+   * For singleInstance entities or when targetSessionId is given: stops the
+   * targeted session first. For multi-instance entities without a target:
+   * starts a new session without killing existing ones.
    */
-  async resumeEntity(entityId: EntityId): Promise<SessionInfo> {
-    // Stop existing session if running
-    if (this.isEntityRunning(entityId)) {
+  async resumeEntity(entityId: EntityId, targetSessionId?: string): Promise<SessionInfo> {
+    const config = this.entityRegistry.get(entityId)
+    if (!config) throw new Error(`Unknown entity: ${entityId}`)
+
+    // Stop only the targeted session, or all for singleInstance entities
+    if (targetSessionId) {
+      await this.stopEntity(entityId, targetSessionId)
+    } else if (config.singleInstance && this.isEntityRunning(entityId)) {
       await this.stopEntity(entityId)
     }
+    // Multi-instance without target: don't kill existing sessions
 
     // Start fresh session
     const session = await this.startEntity(entityId)
 
     // Queue Claude launch with --resume flag
-    const sessionId = this.getFirstEntitySessionId(entityId)
-    if (!sessionId) throw new Error(`${entityId} is not running after restart`)
-
-    const config = this.entityRegistry.get(entityId)
-    if (!config) throw new Error(`Unknown entity: ${entityId}`)
-
     const adapter = this.adapterRegistry.getDefault()
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: config.projectPath,
@@ -1204,7 +1206,7 @@ export class SessionManager extends EventEmitter {
       resume: true,
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
-    this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
+    this.setPendingLaunch(session.id, `clear; ${cmdStr}\n`)
 
     return session
   }
