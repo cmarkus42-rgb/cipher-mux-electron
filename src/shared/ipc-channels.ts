@@ -122,6 +122,15 @@ export const IPC = {
   CF_OPEN_REVIEW: 'cipher-mux:cf:open-review',
   CF_REQUEST_UPDATE: 'cipher-mux:cf:request-update',
 
+  // Voice Catalog
+  VOICE_LIST_INSTALLED: 'cipher-mux:voice:list-installed',
+  VOICE_CATALOG_SEARCH: 'cipher-mux:voice:catalog-search',
+  VOICE_DOWNLOAD: 'cipher-mux:voice:download',
+  VOICE_DOWNLOAD_PROGRESS: 'cipher-mux:voice:download-progress',
+  VOICE_DELETE: 'cipher-mux:voice:delete',
+  VOICE_SET_ACTIVE: 'cipher-mux:voice:set-active',
+  VOICE_PREVIEW: 'cipher-mux:voice:preview',
+
   // Voice Session Input
   VOICE_START_SESSION: 'cipher-mux:voice:start-session',
   VOICE_START_COM: 'cipher-mux:voice:start-com',
@@ -192,6 +201,11 @@ export const IPC = {
   NOTES_SERIALIZE_TESTCASE: 'cipher-mux:notes:serialize-testcase',
   NOTES_SEARCH: 'cipher-mux:notes:search',
   NOTES_TAG_CLASS_REPO: 'cipher-mux:notes:tag-class-repo',
+  NOTES_TAG_CLASS_CREATE: 'cipher-mux:notes:tag-class-create',
+  NOTES_TAG_CLASS_RENAME: 'cipher-mux:notes:tag-class-rename',
+  NOTES_TAG_CLASS_DELETE: 'cipher-mux:notes:tag-class-delete',
+  NOTES_TAG_CLASS_SET_COLOR: 'cipher-mux:notes:tag-class-set-color',
+  NOTES_TAG_SYNONYMS_LIST: 'cipher-mux:notes:tag-synonyms-list',
   NOTES_TAG_INDEX: 'cipher-mux:notes:tag-index',
   NOTES_TAG_INDEX_REFRESH: 'cipher-mux:notes:tag-index-refresh',
   NOTES_CHANGED: 'cipher-mux:notes:changed',

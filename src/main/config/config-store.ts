@@ -152,6 +152,7 @@ const defaults: AppConfig = {
   entityHidden: {} as Record<string, boolean>,
   entityPersonaOverrides: {} as Record<string, string>,
   voiceSubmitMode: 'auto' as const,
+  piperVoice: 'de_DE-cipher_adult-medium',
   sidebarDetached: false,
   sidebarWindowBounds: null as { x: number; y: number; width: number; height: number } | null,
   sidebarCollapsed: {} as Record<string, boolean>,
