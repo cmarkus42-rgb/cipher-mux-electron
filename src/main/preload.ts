@@ -389,6 +389,11 @@ const api = {
     delete: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('cipher-mux:workspaces:delete', id),
     apply: (id: string): Promise<{ applied: boolean; sessionsStarted?: number; warnings?: string[]; sessions?: Array<{ cellIndex: number; sessionId: string }> }> => ipcRenderer.invoke('cipher-mux:workspaces:apply', id),
     active: (id?: string): Promise<string | null> => ipcRenderer.invoke('cipher-mux:workspaces:active', id),
+    onChanged: (cb: (data: unknown) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data)
+      ipcRenderer.on(IPC.WORKSPACES_CHANGED, handler)
+      return () => { ipcRenderer.removeListener(IPC.WORKSPACES_CHANGED, handler) }
+    },
   },
 
   // ─── Entities ──────────────────────────────────────────
