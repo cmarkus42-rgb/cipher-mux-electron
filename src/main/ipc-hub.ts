@@ -723,12 +723,11 @@ export class IpcHub {
       const fsNode = require('fs')
       const pathNode = require('path')
 
-      // Save to workspace-specific dir or global screenshots dir
-      const activeWsId = configStore.get('activeWorkspaceId')
-      const screenshotBase = pathNode.join(os.homedir(), '.config', 'cipher-mux', 'screenshots')
-      const screenshotDir = activeWsId
-        ? pathNode.join(screenshotBase, activeWsId)
-        : screenshotBase
+      // Save to project screenshots dir, or ~/Pictures/cipher-mux/screenshots/ as fallback
+      const session = this.sessionManager.list().find((s: any) => s.id === sessionId)
+      const screenshotDir = session?.projectPath
+        ? pathNode.join(session.projectPath, 'screenshots')
+        : pathNode.join(os.homedir(), 'Pictures', 'cipher-mux', 'screenshots')
       fsNode.mkdirSync(screenshotDir, { recursive: true })
 
       const timestamp = Date.now()
@@ -738,7 +737,6 @@ export class IpcHub {
         if (!fsNode.existsSync(filePath)) return null
 
         // Send path to the session via tmux
-        const session = this.sessionManager.list().find((s: any) => s.id === sessionId)
         if (session?.tmuxSession) {
           const escapedPath = filePath.replace(/'/g, "'\\''")
           await this.sessionManager.sendKeys(sessionId, `# Screenshot: ${escapedPath}\r`)
