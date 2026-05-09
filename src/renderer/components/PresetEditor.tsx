@@ -496,14 +496,22 @@ export function PresetEditor() {
               for (let i = 0; i < lineIndex && i < lines.length; i++) {
                 charPos += lines[i].length + 1
               }
+              // Measure actual scroll position using a mirror div (handles word-wrap correctly)
+              const mirror = document.createElement('div')
+              const style = window.getComputedStyle(ta)
+              mirror.style.cssText = `position:absolute;visibility:hidden;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:break-word;box-sizing:border-box;`
+              mirror.style.width = `${ta.clientWidth}px`
+              mirror.style.font = style.font
+              mirror.style.letterSpacing = style.letterSpacing
+              mirror.style.padding = style.padding
+              mirror.style.lineHeight = style.lineHeight
+              mirror.textContent = draftContent.slice(0, charPos)
+              document.body.appendChild(mirror)
+              const targetY = mirror.scrollHeight
+              document.body.removeChild(mirror)
+              ta.scrollTop = Math.max(0, targetY - ta.clientHeight * 0.15)
               ta.focus()
               ta.setSelectionRange(charPos, charPos)
-              // Scroll textarea so the heading line is visible near the top.
-              // Use computed lineHeight and account for paddingTop.
-              const style = window.getComputedStyle(ta)
-              const lineHeight = parseFloat(style.lineHeight) || 18
-              const paddingTop = parseFloat(style.paddingTop) || 0
-              ta.scrollTop = Math.max(0, lineIndex * lineHeight + paddingTop - lineHeight)
             }
             return (
               <div class="pp-field" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>

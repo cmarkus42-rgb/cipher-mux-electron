@@ -43,6 +43,7 @@ interface SessionGridProps {
   onOpenNotes: (slotIndex: number) => void
   onOpenNote: (note: any, slotIndex: number) => void
   onCloseNotes: (slotIndex: number) => void
+  onOpenNoteIdsChange: (slotIndex: number, noteIds: string[]) => void
   onToggleExpandSlot: (slotIndex: number) => void
   onSwap: (idxA: number, idxB: number) => void
   onDropSession: (sessionId: string, slotIndex: number) => void
@@ -62,7 +63,7 @@ export function SessionGrid({
   onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onFocusMode,
   focusModeSlot, focusModeOverlapped,
   onStartEntity, onResumeEntity, onFocusEntity, onStartPath,
-  onOpenNotes, onOpenNote, onCloseNotes, onToggleExpandSlot, onSwap,
+  onOpenNotes, onOpenNote, onCloseNotes, onOpenNoteIdsChange, onToggleExpandSlot, onSwap,
   onDropSession, onDropNoteOnEmpty, onDropNoteOnSession,
   topicMap,
 }: SessionGridProps) {
@@ -241,13 +242,15 @@ export function SessionGrid({
           if (slot.type === 'notes') {
             return (
               <NotesCell
-                key={`notes-${idx}`}
+                key={slot.notesId || `notes-${idx}`}
                 rowSpan={slot.rowSpan}
                 maxRows={rows}
                 activeWorkspaceId={activeWorkspaceId}
                 slotIndex={idx}
                 slotCol={idx % cols}
                 slotRow={Math.floor(idx / cols)}
+                initialNoteIds={slot.openNoteIds}
+                onOpenNoteIdsChange={(ids: string[]) => onOpenNoteIdsChange(idx, ids)}
                 onClose={() => onCloseNotes(idx)}
                 onToggleExpand={() => onToggleExpandSlot(idx)}
                 onDragStart={() => handleDragStart(idx)}

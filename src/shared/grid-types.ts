@@ -14,6 +14,10 @@ export interface GridSlot {
   rowSpan: number
   /** Cell type: 'session' for terminal sessions, 'notes' for the embedded notes editor. */
   type: 'session' | 'notes'
+  /** Stable identity for notes cells — survives grid swaps so Preact doesn't remount. */
+  notesId?: string
+  /** IDs of notes currently open as tabs in this notes cell (persisted for keep-working restore). */
+  openNoteIds?: string[]
 }
 
 /** Persisted grid state — stored in ConfigStore under ui.grid. */

@@ -1957,6 +1957,7 @@
   display: flex;
   gap: 0;
   border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
 }
 
 .preset-tab {
@@ -1969,12 +1970,19 @@
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  padding: 8px 14px;
+  padding: 6px 10px;
   cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-bottom-color 0.15s;
 }
 
 .preset-tab:hover {
-  color: var(--color-text);
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border-bottom-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+
+.preset-tab:active {
+  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
 }
 
 .preset-tab--active {
