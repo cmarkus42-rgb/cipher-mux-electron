@@ -148,6 +148,14 @@ export interface ContextUsage {
   updatedAt: number
 }
 
+// ─── Detached Windows ────────────────────────────────────────
+
+export interface DetachedWindowEntry {
+  type: 'session' | 'note'
+  entityId: string
+  bounds: { x: number; y: number; width: number; height: number }
+}
+
 // ─── Grid ──────────────────────────────────────────────────
 
 // Re-export grid types for backward compat
@@ -346,6 +354,10 @@ export interface AppConfig {
     /** Enable full Audit with release recommendation. */
     audit_full?: boolean
   }
+  /** Saved bounds for detached session/note windows, keyed by entityId. */
+  detachedWindowBounds?: Record<string, { x: number; y: number; width: number; height: number }>
+  /** Snapshot of detached windows saved on quit — consumed on next start to re-open detached windows. */
+  detachedWindows?: Array<{ type: 'session' | 'note'; entityId: string; bounds: { x: number; y: number; width: number; height: number } }>
   /** Whether the sidebar is detached into its own window. Persisted across restarts. */
   sidebarDetached?: boolean
   /** Saved sidebar window bounds for size/position persistence. */

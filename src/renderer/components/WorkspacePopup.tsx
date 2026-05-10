@@ -77,6 +77,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
   const [tagInput, setTagInput] = useState('')
   const [allTags, setAllTags] = useState<string[]>([])
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
+  const [hasDetached, setHasDetached] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -99,6 +100,12 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     api.config.get('defaultWorkspaceId').then((id: string | null) => {
       if (!mounted) return
       setDefaultWsId(id ?? null)
+    }).catch(() => {})
+
+    // Check for detached windows (blocks save/update)
+    api.detach?.hasDetached?.().then((val: boolean) => {
+      if (!mounted) return
+      setHasDetached(val)
     }).catch(() => {})
 
     // Load available tags for autocomplete
@@ -296,8 +303,8 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
                 <button
                   class="wp-update-btn"
                   onClick={(e) => { e.stopPropagation(); handleUpdateExisting(ws.id) }}
-                  title={t('workspacePopup.updateCurrent')}
-                  disabled={saving}
+                  title={hasDetached ? t('workspacePopup.detachedWarning', 'Dock all detached windows before saving') : t('workspacePopup.updateCurrent')}
+                  disabled={saving || hasDetached}
                 >
                   {'\u21BB'}
                 </button>
@@ -378,7 +385,12 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
         )}
 
         <div class="wp-foot">
-          <button class="ghost" onClick={handleSaveCurrentOpen} disabled={!currentGrid}>{t('workspacePopup.saveCurrent')}</button>
+          <button
+            class="ghost"
+            onClick={handleSaveCurrentOpen}
+            disabled={!currentGrid || hasDetached}
+            title={hasDetached ? t('workspacePopup.detachedWarning', 'Dock all detached windows before saving') : undefined}
+          >{t('workspacePopup.saveCurrent')}</button>
           <button class="ghost" onClick={() => onOpenSettings('workspaces')}>{t('workspacePopup.editBtn')}</button>
           <button onClick={handleLoad} disabled={!selectedId}>{t('workspacePopup.load')}</button>
         </div>

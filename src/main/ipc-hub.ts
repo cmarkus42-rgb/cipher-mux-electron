@@ -149,7 +149,7 @@ export class IpcHub {
     this.noteWatcher = new NoteWatcher(notesDir, (noteId) => {
       console.log(`[NoteWatcher] External change detected: ${noteId}`)
       this.tagIndex.rebuild()
-      this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, {
+      this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, {
         action: 'external-update',
         id: noteId,
       })
@@ -252,6 +252,7 @@ export class IpcHub {
     this.registerSetupChannels()
     this.registerUpdateChannels()
     ipcMain.handle(IPC.OPEN_EXTERNAL, (_e, url: string) => shell.openExternal(url))
+    this.registerDetachChannels()
     this.setupEventForwarding()
 
     // Start context usage monitor
@@ -318,14 +319,16 @@ export class IpcHub {
       console.log('[IpcHub] Cleared stale session IDs from ui.grid on startup')
     }
 
-    // Deploy bundled voice model on first start
+    // Deploy bundled voice models on first start
     try {
       const modelsDir = path.join(process.env.HOME ?? '', '.config', 'cipher-mux', 'models', 'piper')
-      deployBundledVoice({
-        resourcesPath: process.resourcesPath ?? '',
-        modelsDir,
-        voiceName: 'de_DE-cipher_adult-medium',
-      })
+      for (const voiceName of ['de_DE-cipher_adult-medium', 'de_DE-dii-high']) {
+        deployBundledVoice({
+          resourcesPath: process.resourcesPath ?? '',
+          modelsDir,
+          voiceName,
+        })
+      }
     } catch (err) {
       console.warn('[init] Voice bundle deploy failed:', (err as Error).message)
     }
@@ -439,6 +442,9 @@ export class IpcHub {
           this.autoStartDefault()
         }
       }
+      // Restore detached windows from previous session
+      this.restoreDetachedWindows()
+
       // Start BT Shutter if enabled (independent of voice mode)
       this.startBtShutter()
     }).catch((err) => {
@@ -515,7 +521,7 @@ export class IpcHub {
   // ─── Event Forwarding to Renderer ──────────────────────
   private setupEventForwarding(): void {
     this.sessionManager.on('session-changed', (session) => {
-      this.windowManager.sendToMainWindow(IPC.SESSION_CHANGED, session)
+      this.windowManager.sendToAllWindows(IPC.SESSION_CHANGED, session)
     })
 
     this.sessionManager.on('session-closing', (session) => {
@@ -557,7 +563,15 @@ export class IpcHub {
     })
 
     this.tmux.on('output', (paneId: string, data: string) => {
-      this.windowManager.sendToMainWindow(IPC.TERMINAL_DATA, { paneId, data })
+      // Route terminal data to detached window if session is detached, else mainWindow
+      if (this.windowManager.isDetached?.(paneId)) {
+        const detachedWin = this.windowManager.getDetachedWindow?.(paneId)
+        if (detachedWin && !detachedWin.isDestroyed()) {
+          detachedWin.webContents.send(IPC.TERMINAL_DATA, { paneId, data })
+        }
+      } else {
+        this.windowManager.sendToMainWindow(IPC.TERMINAL_DATA, { paneId, data })
+      }
     })
 
     if (this.messageBus) {
@@ -793,6 +807,40 @@ export class IpcHub {
       this.sessionManager.markReady(paneId, cols, rows).catch((err) => {
         console.error('terminal ready error:', err)
       })
+    })
+  }
+
+  // ─── Detachable Windows ────────────────────────────────
+  private registerDetachChannels(): void {
+    ipcMain.handle(IPC.DETACH_SESSION, async (_e, { sessionId }: { sessionId: string }) => {
+      await this.windowManager.openDetachedWindow('session', sessionId)
+      this.windowManager.sendToMainWindow(IPC.DETACH_STATE_CHANGED, {
+        entries: this.windowManager.getDetachedEntries()
+      })
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.DETACH_NOTE, async (_e, { noteId }: { noteId: string }) => {
+      await this.windowManager.openDetachedWindow('note', noteId)
+      this.windowManager.sendToMainWindow(IPC.DETACH_STATE_CHANGED, {
+        entries: this.windowManager.getDetachedEntries()
+      })
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.DOCK_REQUEST, async (_e, { entityId }: { entityId: string }) => {
+      // Mark as dock-initiated so the 'closed' event sends docked entityId
+      this.windowManager.markDockInitiated(entityId)
+      this.windowManager.closeDetachedWindow(entityId)
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.DETACH_LIST, async () => {
+      return this.windowManager.getDetachedEntries()
+    })
+
+    ipcMain.handle(IPC.DETACH_HAS_DETACHED, async () => {
+      return this.windowManager.getDetachedEntries().length > 0
     })
   }
 
@@ -1886,7 +1934,7 @@ export class IpcHub {
       this.noteSearchIndex.addOrUpdate({ info: note, body })
       this.tagIndex.updateNote(note.id, note.tags)
       this.tagClassRepo.ensureTags(note.tags)
-      this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', note })
+      this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'updated', note })
       // Async auto-tagging (fire-and-forget, only on manual Cmd+S save)
       if (!tags && !skipTagging) {
         this.noteTagging.autoTag(body).then(async (autoTags) => {
@@ -1902,7 +1950,7 @@ export class IpcHub {
             this.noteSearchIndex.addOrUpdate({ info: updated, body })
             this.tagIndex.updateNote(updated.id, updated.tags)
             this.tagClassRepo.ensureTags(updated.tags)
-            this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tagged', note: updated })
+            this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tagged', note: updated })
           }
         }).catch(() => { /* Ollama not available — ignore */ })
       }
@@ -1944,7 +1992,7 @@ export class IpcHub {
       this.noteSearchIndex.addOrUpdate({ info: note, body: fullBody })
       this.tagIndex.addNote(note.id, note.tags)
       this.tagClassRepo.ensureTags(note.tags)
-      this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created', note })
+      this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'created', note })
       return note
     })
 
@@ -1954,7 +2002,7 @@ export class IpcHub {
       if (ok) {
         this.noteSearchIndex.remove(id)
         this.tagIndex.removeNote(id)
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'deleted', id })
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'deleted', id })
       }
       return { ok }
     })
@@ -1966,7 +2014,7 @@ export class IpcHub {
       if (ok) {
         this.noteSearchIndex.remove(id)
         this.tagIndex.removeNote(id)
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'deleted', id })
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'deleted', id })
       }
       return { ok }
     })
@@ -1978,7 +2026,7 @@ export class IpcHub {
         this.tagIndex.removeNote(id)
       }
       if (trashed.length > 0) {
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'deleted', ids: trashed })
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'deleted', ids: trashed })
       }
       return { trashed }
     })
@@ -1986,7 +2034,7 @@ export class IpcHub {
     ipcMain.handle(IPC.NOTES_RESTORE, async (_e, { id }: { id: string }) => {
       const ok = await this.noteManager.restore(id)
       if (ok) {
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'restored', id })
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'restored', id })
       }
       return { ok }
     })
@@ -1994,7 +2042,7 @@ export class IpcHub {
     ipcMain.handle(IPC.NOTES_RESTORE_MANY, async (_e, { ids }: { ids: string[] }) => {
       const restored = await this.noteManager.restoreMany(ids)
       if (restored.length > 0) {
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'restored', ids: restored })
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'restored', ids: restored })
       }
       return { restored }
     })
@@ -2005,7 +2053,7 @@ export class IpcHub {
       const updated = await this.noteManager.bulkAddTag(ids, resolvedTag, MAX_MANUAL_TAGS)
       if (updated.length > 0) {
         this.tagClassRepo.ensureTag(resolvedTag)
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', ids: updated })
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'updated', ids: updated })
       }
       return { updated }
     })
@@ -2025,7 +2073,7 @@ export class IpcHub {
       }
       const updated = await this.noteManager.bulkRemoveTag(ids, tag)
       if (updated.length > 0) {
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', ids: updated })
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'updated', ids: updated })
       }
       return { updated }
     })
@@ -2114,7 +2162,7 @@ export class IpcHub {
     ipcMain.handle(IPC.NOTES_TAG_RENAME, async (_e, { oldName, newName }: { oldName: string; newName: string }) => {
       const affected = this.noteTagging.renameTag(oldName, newName)
       if (affected.length > 0) {
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
       }
       return { ok: affected.length >= 0, affected: affected.length }
     })
@@ -2127,7 +2175,7 @@ export class IpcHub {
     ipcMain.handle(IPC.NOTES_TAG_DELETE, async (_e, { name }: { name: string }) => {
       const affected = this.noteTagging.deleteTag(name)
       if (affected.length > 0) {
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
       }
       return { ok: true, affected: affected.length }
     })
@@ -2136,7 +2184,7 @@ export class IpcHub {
       const result = this.noteTagging.mergeTags(sources, target)
       if (result.affected > 0) {
         this.tagIndex.rebuild()
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
       }
       return result
     })
@@ -2150,7 +2198,7 @@ export class IpcHub {
     ipcMain.handle(IPC.NOTES_TAG_CLASS_CREATE, async (_e, { name, color }: { name: string; color: string }) => {
       const ok = this.tagClassRepo.createClass(name, color)
       if (ok) {
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
       }
       return { ok }
     })
@@ -2159,7 +2207,7 @@ export class IpcHub {
       const ok = this.tagClassRepo.renameClass(oldName, newName)
       if (ok) {
         this.tagIndex.rebuild()
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
       }
       return { ok }
     })
@@ -2167,14 +2215,14 @@ export class IpcHub {
     ipcMain.handle(IPC.NOTES_TAG_CLASS_DELETE, async (_e, { name }: { name: string }) => {
       const ok = this.tagClassRepo.deleteClass(name)
       if (ok) {
-        this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
       }
       return { ok }
     })
 
     ipcMain.handle(IPC.NOTES_TAG_CLASS_SET_COLOR, async (_e, { name, color }: { name: string; color: string }) => {
       this.tagClassRepo.setClassColor(name, color)
-      this.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+      this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
       return { ok: true }
     })
 
@@ -2885,6 +2933,37 @@ export class IpcHub {
     })
   }
 
+  /** Restore detached windows saved from previous session. Stale entries are skipped. */
+  private restoreDetachedWindows(): void {
+    const saved = configStore.get('detachedWindows') as Array<{ type: 'session' | 'note'; entityId: string; bounds: { x: number; y: number; width: number; height: number } }> | undefined
+    if (!saved || saved.length === 0) return
+
+    const activeSessions = this.sessionManager.list().filter(s => s.status === 'active')
+    const sessionIds = new Set(activeSessions.map(s => s.id))
+
+    this.windowManager.restoreDetachedWindows(saved, (entry) => {
+      if (entry.type === 'session') {
+        return sessionIds.has(entry.entityId)
+      }
+      // For notes: check if note file still exists
+      try {
+        const note = this.noteManager.read(entry.entityId)
+        return !!note
+      } catch {
+        return false
+      }
+    })
+
+    // Clear consumed snapshot
+    configStore.set('detachedWindows', undefined as any)
+    console.log(`[IpcHub] restored detached windows from snapshot`)
+
+    // Notify main window of detach state
+    this.windowManager.sendToMainWindow(IPC.DETACH_STATE_CHANGED, {
+      entries: this.windowManager.getDetachedEntries()
+    })
+  }
+
   async destroy(): Promise<void> {
     // Keep Working: save snapshot of current sessions before shutdown
     if (configStore.get('keepWorking')) {
@@ -2923,6 +3002,15 @@ export class IpcHub {
         })
         console.log(`[IpcHub] keepWorking: saved snapshot of ${snapshot.length} sessions, ${notesSlots.length} notes slots (grid: ${gridState.config.cols}x${gridState.config.rows})`)
       }
+    }
+
+    // Save detached windows snapshot for restart restoration
+    const detachedEntries = this.windowManager.getDetachedEntries()
+    if (detachedEntries.length > 0) {
+      configStore.set('detachedWindows', detachedEntries)
+      console.log(`[IpcHub] saved ${detachedEntries.length} detached window(s) for restart`)
+    } else {
+      configStore.set('detachedWindows', undefined as any)
     }
 
     this.stopBtShutter()

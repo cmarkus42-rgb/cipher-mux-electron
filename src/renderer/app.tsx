@@ -50,7 +50,7 @@ export function App() {
   // Uses entityId (known BEFORE the await) instead of sessionId (known only AFTER) — this
   // closes the race window where the IPC event arrives before the await resolves (RT-X2).
   const inFlightEntityStarts = useRef(new Set<string>())
-  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, setSlotOpenNoteIds, toggleExpandSlot, restoreGrid, cleanupDeadSessions } = useGrid(panelWidthRef.current)
+  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, setSlotOpenNoteIds, toggleExpandSlot, restoreGrid, cleanupDeadSessions, detachedIds, detachFromGrid, dockToGrid, syncDetachedIds } = useGrid(panelWidthRef.current)
   // Always-current grid ref for placeEntity to check against (avoids stale closure in event handlers)
   const gridRef = useRef(grid)
   gridRef.current = grid
@@ -340,7 +340,7 @@ export function App() {
   const gridSessionIds = grid.slots.filter(s => s.sessionId).map(s => s.sessionId!)
 
   const sidebarHasContent = !!orchestratorSessionId || !!cyberFactorySessionId ||
-    sessions.some(s => s.status === 'active' && !gridSessionIds.includes(s.id)) ||
+    sessions.some(s => s.status === 'active' && !gridSessionIds.includes(s.id) && !detachedIds.has(s.id)) ||
     grid.slots.some(s => s.type === 'notes')
 
   const computedPanelWidth = sidebarVisible && !sidebarDetached ? 280 : 0
@@ -662,6 +662,23 @@ export function App() {
     }
   }, [removeSession, focusedSessionId, grid.slots])
 
+  const handleDetachSession = useCallback(async (sessionId: string) => {
+    const api = (window as any).cipherMux
+    // Find the slot to determine if it's a notes cell
+    const slot = grid.slots.find(s => s.sessionId === sessionId)
+    if (slot?.type === 'notes' && slot.notesId) {
+      await api.detach.note(slot.notesId)
+    } else {
+      await api.detach.session(sessionId)
+    }
+    detachFromGrid(sessionId)
+    // Move focus to next available session
+    if (focusedSessionId === sessionId) {
+      const remaining = grid.slots.find((s) => s.sessionId && s.sessionId !== sessionId)
+      setFocusedSessionId(remaining?.sessionId ?? null)
+    }
+  }, [grid.slots, detachFromGrid, focusedSessionId])
+
   const handleCloseSession = useCallback(async (sessionId: string) => {
     await stopSession(sessionId)
     removeSession(sessionId)
@@ -772,6 +789,37 @@ export function App() {
     const unsub = api.sidebar.onReattached(() => { setSidebarDetached(false); setSidebarVisible(true) })
     return () => unsub()
   }, [])
+
+  // Sync detached windows state on mount + listen for changes
+  const detachedIdsRef = useRef(detachedIds)
+  detachedIdsRef.current = detachedIds
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api.detach) return
+    // Initial sync
+    api.detach.list().then((entries: Array<{ type: string; entityId: string }>) => {
+      syncDetachedIds(entries)
+    }).catch(() => {})
+    // Listen for changes
+    const unsub = api.detach.onStateChanged((data: { entries: Array<{ type: string; entityId: string }>; dockedEntityId?: string }) => {
+      // dockedEntityId is set when dock-button was used (not X-close).
+      // Show placement popup so user can pick a grid slot.
+      if (data.dockedEntityId) {
+        const eid = data.dockedEntityId
+        const inGrid = gridRef.current.slots.some(s => s.sessionId === eid)
+        if (!inGrid) {
+          // Verify session still exists before showing popup
+          const alive = sessionsRef.current.some(s => s.id === eid)
+          if (alive) {
+            setPlacementPopup({ sessionId: eid })
+          }
+        }
+      }
+      // X-close: session just goes to background (no popup) — detachedIds sync is sufficient
+      syncDetachedIds(data.entries)
+    })
+    return () => unsub()
+  }, [syncDetachedIds])
 
   // Sidebar window X-button = close completely (sidebar hidden, not docked)
   useEffect(() => {
@@ -1262,6 +1310,7 @@ export function App() {
           onShell={handleShell}
           onFork={handleFork}
           onSendToBackground={handleSendToBackground}
+          onDetach={handleDetachSession}
           onFocusMode={handleFocusMode}
           focusModeSlot={focusModeSlot}
           focusModeOverlapped={focusModeOverlapped}
@@ -1287,6 +1336,7 @@ export function App() {
             cyberFactoryActive={!!cyberFactorySessionId}
             sessions={sessions}
             gridSessionIds={gridSessionIds}
+            detachedIds={detachedIds}
             contextUsages={contextUsages}
             onAddToGrid={handleAddToGrid}
             onKillSession={stopSession}

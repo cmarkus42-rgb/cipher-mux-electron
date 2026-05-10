@@ -621,6 +621,25 @@ const api = {
     },
   },
 
+  // ─── Detachable Windows ────────────────────────────────
+  detach: {
+    session: (sessionId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.DETACH_SESSION, { sessionId }).then(() => undefined),
+    note: (noteId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.DETACH_NOTE, { noteId }).then(() => undefined),
+    dock: (entityId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.DOCK_REQUEST, { entityId }).then(() => undefined),
+    list: (): Promise<Array<{ type: string; entityId: string }>> =>
+      ipcRenderer.invoke(IPC.DETACH_LIST),
+    hasDetached: (): Promise<boolean> =>
+      ipcRenderer.invoke(IPC.DETACH_HAS_DETACHED),
+    onStateChanged: (cb: (data: { entries: Array<{ type: string; entityId: string }> }) => void) => {
+      const handler = (_e: unknown, data: { entries: Array<{ type: string; entityId: string }> }) => cb(data)
+      ipcRenderer.on(IPC.DETACH_STATE_CHANGED, handler)
+      return () => ipcRenderer.removeListener(IPC.DETACH_STATE_CHANGED, handler)
+    },
+  },
+
   /** Get native file path from a dropped File object (works with contextIsolation). */
   getFilePath: (file: File) => webUtils.getPathForFile(file),
 

@@ -14,6 +14,7 @@ interface SidebarPanelProps {
   cyberFactoryActive: boolean
   sessions: Array<{ id: string; name: string; status: string; projectPath?: string }>
   gridSessionIds: string[]
+  detachedIds?: Set<string>
   contextUsages: Record<string, { usedPercentage: number; used?: number; total?: number }>
   onAddToGrid: (sessionId: string) => void
   onKillSession: (sessionId: string) => void
@@ -40,7 +41,7 @@ function displayName(name: string, projectPath?: string | null): string {
 }
 
 export function SidebarPanel({
-  visible, orchestratorActive, cyberFactoryActive, sessions, gridSessionIds,
+  visible, orchestratorActive, cyberFactoryActive, sessions, gridSessionIds, detachedIds,
   contextUsages, onAddToGrid, onKillSession, onDetach, onReattach, activeWorkspaceId, hasNotesCell,
   onOpenNoteInGrid, voiceComState, topicMap,
 }: SidebarPanelProps) {
@@ -200,7 +201,7 @@ export function SidebarPanel({
   }, [])
 
   const backgroundSessions = sessions.filter(
-    (s) => s.status === 'active' && !gridSessionIds.includes(s.id)
+    (s) => s.status === 'active' && !gridSessionIds.includes(s.id) && !detachedIds?.has(s.id)
   )
 
   const hasNotes = notes.length > 0

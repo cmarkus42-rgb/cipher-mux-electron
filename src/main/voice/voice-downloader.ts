@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 
 const HF_BASE = 'https://huggingface.co/rhasspy/piper-voices/resolve/main'
-const BUNDLED_DATASETS = ['cipher_adult']
+const BUNDLED_DATASETS = ['cipher_adult', 'dii']
 
 export interface DownloadProgress {
   voice: string
@@ -66,17 +66,19 @@ export function downloadVoice(name: string, piperModelsDir: string): { emitter: 
     const voiceDir = path.join(piperModelsDir, `vits-piper-${name}`)
     fs.mkdirSync(voiceDir, { recursive: true })
 
-    const files = ['model.onnx', 'model.onnx.json']
+    // HuggingFace uses <name>.onnx naming; save locally as model.onnx for consistency
+    const remoteFiles = [`${name}.onnx`, `${name}.onnx.json`]
+    const localFiles = ['model.onnx', 'model.onnx.json']
 
     try {
-      for (const file of files) {
-        const url = buildDownloadUrl(parsed.locale, parsed.dataset, parsed.quality, file)
-        const destPath = path.join(voiceDir, file)
+      for (let i = 0; i < remoteFiles.length; i++) {
+        const url = buildDownloadUrl(parsed.locale, parsed.dataset, parsed.quality, remoteFiles[i])
+        const destPath = path.join(voiceDir, localFiles[i])
 
         await downloadFile(url, destPath, (progress) => {
           emitter.emit('progress', {
             voice: name,
-            file,
+            file: localFiles[i],
             ...progress,
           } satisfies DownloadProgress)
         })
