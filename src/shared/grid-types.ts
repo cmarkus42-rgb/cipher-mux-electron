@@ -125,9 +125,65 @@ function getFocusAnchor(cols: number, rows: number, focusSlotIdx: number): { anc
   return { anchorCol: Math.max(0, anchorCol), anchorRow: Math.max(0, anchorRow) }
 }
 
+/** Maximum number of simultaneous focus slots: floor(cols / 2) when rows >= 2, else 1. */
+export function getMaxFocusSlots(cols: number, rows: number): number {
+  if (cols <= 1 && rows <= 1) return 0
+  if (rows < 2 || cols < 2) return 1
+  return Math.floor(cols / 2)
+}
+
+/** Return the set of 4 (or fewer) slot indices that a 2x2 focus block covers,
+ *  including the focus slot itself. For 1-row/1-col grids returns all slots. */
+export function getFocusBlockIndices(cols: number, rows: number, focusSlotIdx: number): Set<number> {
+  const block = new Set<number>()
+  if (cols <= 1 && rows <= 1) { block.add(focusSlotIdx); return block }
+  if (cols <= 1 || rows <= 1) {
+    for (let i = 0; i < cols * rows; i++) block.add(i)
+    return block
+  }
+  const { anchorCol, anchorRow } = getFocusAnchor(cols, rows, focusSlotIdx)
+  for (let r = 0; r < 2; r++) {
+    for (let c = 0; c < 2; c++) {
+      block.add((anchorRow + r) * cols + (anchorCol + c))
+    }
+  }
+  return block
+}
+
+/** Check whether a new focus slot can be added without overlapping existing focus blocks. */
+export function canAddFocusSlot(
+  cols: number, rows: number,
+  existingFocusSlots: Set<number>, newSlotIdx: number,
+): boolean {
+  if (existingFocusSlots.size >= getMaxFocusSlots(cols, rows)) return false
+  const newBlock = getFocusBlockIndices(cols, rows, newSlotIdx)
+  for (const existing of existingFocusSlots) {
+    const existingBlock = getFocusBlockIndices(cols, rows, existing)
+    for (const idx of newBlock) {
+      if (existingBlock.has(idx)) return false
+    }
+  }
+  return true
+}
+
+/** Compute overlapped slots for multiple focus slots.
+ *  Returns the set of indices hidden by focus blocks, excluding the focus slots themselves. */
+export function getMultiFocusOverlappedSlots(state: GridState, focusSlots: Set<number>): Set<number> {
+  const overlapped = new Set<number>()
+  if (focusSlots.size === 0) return overlapped
+  for (const focusIdx of focusSlots) {
+    const block = getFocusBlockIndices(state.config.cols, state.config.rows, focusIdx)
+    for (const idx of block) {
+      if (!focusSlots.has(idx)) overlapped.add(idx)
+    }
+  }
+  return overlapped
+}
+
 /** Compute which slot indices are overlapped when a cell enters focus mode (2x2).
  *  Returns the set of indices that should be hidden, excluding the focus slot itself.
- *  Fallback: 1-row or 1-col grids get full-row/full-col overlap. 1x1 → empty set. */
+ *  Fallback: 1-row or 1-col grids get full-row/full-col overlap. 1x1 → empty set.
+ *  @deprecated Use getMultiFocusOverlappedSlots for multi-focus support. */
 export function getFocusModeOverlappedSlots(state: GridState, focusSlotIdx: number): Set<number> {
   const overlapped = new Set<number>()
   const { cols, rows } = state.config

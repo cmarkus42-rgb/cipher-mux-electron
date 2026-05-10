@@ -22,7 +22,7 @@ import { useGlobalTtsPlayback } from './hooks/useGlobalTtsPlayback'
 import { useA11ySettings } from './a11y/hooks/useA11ySettings'
 import { FocusMode } from './a11y/FocusMode'
 import { useFocusTrap } from './a11y/useFocusTrap'
-import { getFocusModeOverlappedSlots, getCoveredSlots, findNavigationTarget } from '../shared/grid-types'
+import { getMultiFocusOverlappedSlots, canAddFocusSlot, getCoveredSlots, findNavigationTarget } from '../shared/grid-types'
 import { useSetupWizard } from './hooks/useSetupWizard'
 import { SetupWizard } from './components/SetupWizard'
 import { UpdateDialog } from './components/UpdateDialog'
@@ -118,37 +118,62 @@ export function App() {
   const { settings: a11ySettings, toggleFocusMode } = useA11ySettings(handleA11yThemeChange)
   const modalFocusTrapRef = useFocusTrap<HTMLDivElement>(infoVisible)
 
-  // Focus Mode: track which slot is in focus mode (null = off)
-  const [focusModeSlot, setFocusModeSlot] = useState<number | null>(null)
+  // Focus Mode: track which slots are in focus mode (empty Set = off)
+  const [focusModeSlots, setFocusModeSlots] = useState<Set<number>>(new Set())
   const focusModeOverlapped = useMemo(() => {
-    if (focusModeSlot === null) return new Set<number>()
-    return getFocusModeOverlappedSlots(grid, focusModeSlot)
-  }, [focusModeSlot, grid])
+    return getMultiFocusOverlappedSlots(grid, focusModeSlots)
+  }, [focusModeSlots, grid])
 
   const handleFocusModeBySession = useCallback((sessionId: string) => {
     const idx = grid.slots.findIndex(s => s.sessionId === sessionId)
     if (idx === -1) return
-    setFocusModeSlot(prev => prev === idx ? null : idx)
+    setFocusModeSlots(prev => {
+      if (prev.has(idx)) {
+        const next = new Set(prev)
+        next.delete(idx)
+        return next
+      }
+      const { cols, rows } = grid.config
+      if (!canAddFocusSlot(cols, rows, prev, idx)) return prev
+      const next = new Set(prev)
+      next.add(idx)
+      return next
+    })
   }, [grid])
 
   const handleFocusModeBySlot = useCallback((slotIndex: number) => {
-    setFocusModeSlot(prev => prev === slotIndex ? null : slotIndex)
-  }, [])
+    setFocusModeSlots(prev => {
+      if (prev.has(slotIndex)) {
+        const next = new Set(prev)
+        next.delete(slotIndex)
+        return next
+      }
+      const { cols, rows } = grid.config
+      if (!canAddFocusSlot(cols, rows, prev, slotIndex)) return prev
+      const next = new Set(prev)
+      next.add(slotIndex)
+      return next
+    })
+  }, [grid.config])
 
   const exitFocusMode = useCallback(() => {
-    setFocusModeSlot(null)
+    setFocusModeSlots(new Set())
   }, [])
 
-  // Auto-exit focus mode when the focused slot becomes empty (session removed or notes closed)
+  // Auto-exit focus mode when a focused slot becomes empty (session removed or notes closed)
   useEffect(() => {
-    if (focusModeSlot === null) return
-    const slot = grid.slots[focusModeSlot]
-    if (!slot) { setFocusModeSlot(null); return }
-    // Session slot without session → exit
-    if (slot.type === 'session' && !slot.sessionId) setFocusModeSlot(null)
-    // Notes slot that was converted back to session (closed) → exit
-    // (Notes cells always have type='notes', so this catches close)
-  }, [grid.slots, focusModeSlot])
+    if (focusModeSlots.size === 0) return
+    let changed = false
+    const next = new Set(focusModeSlots)
+    for (const idx of focusModeSlots) {
+      const slot = grid.slots[idx]
+      if (!slot || (slot.type === 'session' && !slot.sessionId)) {
+        next.delete(idx)
+        changed = true
+      }
+    }
+    if (changed) setFocusModeSlots(next)
+  }, [grid.slots, focusModeSlots])
 
   // Grid navigation: move focus to adjacent cell in the given direction
   const navigateGrid = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
@@ -186,8 +211,8 @@ export function App() {
       label: 'Focus Mode',
       category: 'Aktionen' as const,
       action: () => {
-        if (focusModeSlot !== null) {
-          setFocusModeSlot(null)
+        if (focusModeSlots.size > 0) {
+          setFocusModeSlots(new Set())
         } else if (focusedSessionId) {
           handleFocusModeBySession(focusedSessionId)
         }
@@ -235,8 +260,8 @@ export function App() {
       category: 'Navigation' as const,
       action: () => {
         // Priority 0: exit focus mode
-        if (focusModeSlot !== null) {
-          setFocusModeSlot(null)
+        if (focusModeSlots.size > 0) {
+          setFocusModeSlots(new Set())
           return
         }
         // Priority 1: close overlays
@@ -258,7 +283,7 @@ export function App() {
         return false
       },
     },
-  ], [t, bugreportVisible, infoVisible, workspacesPopupVisible, placementPopup, grid.slots, isSpeaking, stopSpeech, focusModeSlot, focusedSessionId, handleFocusModeBySession, navigateGrid])
+  ], [t, bugreportVisible, infoVisible, workspacesPopupVisible, placementPopup, grid.slots, isSpeaking, stopSpeech, focusModeSlots, focusedSessionId, handleFocusModeBySession, navigateGrid])
   useShortcuts(shortcutEntries)
 
   const focusedSessionName = useMemo(() => {
@@ -307,7 +332,10 @@ export function App() {
     cleanupDeadSessions(activeIds)
   }, [sessions, cleanupDeadSessions])
 
-  const gridSessionIds = grid.slots.filter(s => s.sessionId).map(s => s.sessionId!)
+  // Exclude overlapped slots so their sessions appear as background in the sidebar
+  const gridSessionIds = grid.slots
+    .filter((s, idx) => s.sessionId && !focusModeOverlapped.has(idx))
+    .map(s => s.sessionId!)
 
   const sidebarHasContent = !!orchestratorSessionId || !!cyberFactorySessionId ||
     sessions.some(s => s.status === 'active' && !gridSessionIds.includes(s.id) && !detachedIds.has(s.id)) ||
@@ -784,21 +812,23 @@ export function App() {
       syncDetachedIds(entries)
     }).catch(() => {})
     // Listen for changes
-    const unsub = api.detach.onStateChanged((data: { entries: Array<{ type: string; entityId: string }>; dockedEntityId?: string }) => {
-      // dockedEntityId is set when dock-button was used (not X-close).
-      // Show placement popup so user can pick a grid slot.
+    const unsub = api.detach.onStateChanged((data: { entries: Array<{ type: string; entityId: string }>; dockedEntityId?: string; dockedType?: string }) => {
       if (data.dockedEntityId) {
         const eid = data.dockedEntityId
-        const inGrid = gridRef.current.slots.some(s => s.sessionId === eid)
-        if (!inGrid) {
-          // Verify session still exists before showing popup
-          const alive = sessionsRef.current.some(s => s.id === eid)
-          if (alive) {
-            setPlacementPopup({ sessionId: eid })
+        if (data.dockedType === 'note') {
+          // Note dock: show placement popup with note info
+          setPlacementPopup({ note: { id: eid } })
+        } else {
+          // Session dock: existing logic
+          const inGrid = gridRef.current.slots.some(s => s.sessionId === eid)
+          if (!inGrid) {
+            const alive = sessionsRef.current.some(s => s.id === eid)
+            if (alive) {
+              setPlacementPopup({ sessionId: eid })
+            }
           }
         }
       }
-      // X-close: session just goes to background (no popup) — detachedIds sync is sufficient
       syncDetachedIds(data.entries)
     })
     return () => unsub()
@@ -1297,7 +1327,7 @@ export function App() {
           onDetachNote={handleDetachNote}
           onFocusMode={handleFocusModeBySession}
           onFocusModeBySlot={handleFocusModeBySlot}
-          focusModeSlot={focusModeSlot}
+          focusModeSlots={focusModeSlots}
           focusModeOverlapped={focusModeOverlapped}
           onStartEntity={handleStartEntity}
           onResumeEntity={handleResumeEntity}
@@ -1336,14 +1366,18 @@ export function App() {
       </div>
 
       <FocusMode
-        enabled={focusModeSlot !== null}
-        cellLabel={focusModeSlot !== null
-          ? (grid.slots[focusModeSlot]?.type === 'notes'
-            ? 'Notes'
-            : sessions.find(s => s.id === grid.slots[focusModeSlot]?.sessionId)?.name ?? null)
+        enabled={focusModeSlots.size > 0}
+        cellLabel={focusModeSlots.size > 0
+          ? [...focusModeSlots].map(idx => {
+              const slot = grid.slots[idx]
+              if (!slot) return null
+              return slot.type === 'notes' ? 'Notes' : sessions.find(s => s.id === slot.sessionId)?.name ?? null
+            }).filter(Boolean).join(' + ') || null
           : null}
-        isNotesCell={focusModeSlot !== null && grid.slots[focusModeSlot]?.type === 'notes'}
-        contextPct={focusModeSlot !== null ? (contextUsages[grid.slots[focusModeSlot]?.sessionId ?? '']?.usedPercentage ?? 0) : 0}
+        isNotesCell={focusModeSlots.size === 1 && grid.slots[[...focusModeSlots][0]]?.type === 'notes'}
+        contextPct={focusModeSlots.size === 1
+          ? (contextUsages[grid.slots[[...focusModeSlots][0]]?.sessionId ?? '']?.usedPercentage ?? 0)
+          : 0}
         onDeactivate={exitFocusMode}
       />
 
