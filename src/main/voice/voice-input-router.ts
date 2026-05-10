@@ -113,9 +113,12 @@ function matchGridNav(normalized: string): { direction: 'up' | 'down' | 'left' |
   return null
 }
 
+export type FocusSource = 'grid' | 'detached'
+
 export class VoiceInputRouter extends EventEmitter {
   private mode: 'session' | 'off' = 'off'
   private focusedSessionId: string | null = null
+  private focusSource: FocusSource = 'grid'
   private pinnedSessionId: string | null = null
   private dialogTarget: 'bugreport' | null = null
   private notesEditorFocused = false
@@ -145,10 +148,17 @@ export class VoiceInputRouter extends EventEmitter {
     return this.mode
   }
 
-  setFocusedSession(sessionId: string | null): void {
+  setFocusedSession(sessionId: string | null, source: FocusSource = 'grid'): void {
     this.focusedSessionId = sessionId
+    this.focusSource = source
     this.notesEditorFocused = false
+    console.log('[VoiceRouter] setFocusedSession:', sessionId, 'source:', source)
     this.emit('activeSessionChanged', this.getActiveSessionId())
+  }
+
+  /** Current focus source ('grid' or 'detached'). */
+  getFocusSource(): FocusSource {
+    return this.focusSource
   }
 
   /** Set notes editor focus state (STT routes to notes when true). */
