@@ -10,7 +10,6 @@ import { TmuxManager } from '../tmux/tmux-manager'
 import { generateAuditClaudeMd } from './audit-template'
 import { generateVoiceRelayClaudeMd } from './voice-relay-template'
 import { generateDebuggerClaudeMd } from '../debugger/debugger-template'
-import { generateBugreportPresetClaudeMd } from '../bugreport/bugreport-preset-template'
 import {
   generateCompanionClaudeMd,
   deployCompanionStartup,
@@ -1030,8 +1029,6 @@ export class SessionManager extends EventEmitter {
         if (!fs.existsSync(presetMdPath)) {
           fs.writeFileSync(presetMdPath, generateDebuggerClaudeMd(), 'utf-8')
         }
-      } else if (config.id === 'bugreport') {
-        fs.writeFileSync(presetMdPath, generateBugreportPresetClaudeMd(), 'utf-8')
       } else if (config.id === 'companion') {
         if (!fs.existsSync(presetMdPath)) {
           fs.writeFileSync(presetMdPath, generateCompanionClaudeMd(), 'utf-8')

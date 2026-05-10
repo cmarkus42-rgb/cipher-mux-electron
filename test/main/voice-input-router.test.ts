@@ -330,78 +330,62 @@ describe('VoiceInputRouter', () => {
     assert.equal(sentKeys.length, 2, 'text should be sent normally')
   })
 
-  // --- Bugreport Relay Routing ---
+  // --- Dialog Target Routing ---
 
-  describe('bugreport relay routing', () => {
-    it('setBugreportSession routes transcriptions to bugreport session', async () => {
+  describe('dialog target routing', () => {
+    it('setDialogTarget routes transcriptions via dialogInsert event', async () => {
       router.setMode('session')
       router.setFocusedSession('sess-1')
-      sessions.set('br-sess', { id: 'br-sess', name: 'Bugreport', status: 'active' })
-      router.setBugreportSession('br-sess')
+      router.setDialogTarget('bugreport')
+      let inserted: any = null
+      router.on('dialogInsert', (data) => { inserted = data })
       await router.routeTranscription('the button is broken')
-      // bugreport relay sends text + CR (like voice-relay)
-      assert.equal(sentKeys.length, 2)
-      assert.equal(sentKeys[0].sessionId, 'br-sess')
-      assert.equal(sentKeys[0].keys, 'the button is broken')
-      assert.equal(sentKeys[1].sessionId, 'br-sess')
-      assert.equal(sentKeys[1].keys, '\r')
+      assert.ok(inserted)
+      assert.equal(inserted.target, 'bugreport')
+      assert.equal(inserted.text, 'the button is broken')
+      assert.equal(sentKeys.length, 0, 'should NOT send keys to any session')
     })
 
-    it('bugreport routing takes priority over voiceRelay', async () => {
+    it('dialog target takes priority over voiceRelay', async () => {
       const sm = makeStubSessionManager(sessions)
       sm.sendKeys = async (id: string, keys: string) => { sentKeys.push({ sessionId: id, keys }) }
-      // Make voice-relay entity "active"
       sm.getEntitySessionId = (entityId: string) => entityId === 'voice-relay' ? 'vr-sess' : null
       sessions.set('vr-sess', { id: 'vr-sess', name: 'Voice Relay', status: 'active' })
-      sessions.set('br-sess', { id: 'br-sess', name: 'Bugreport', status: 'active' })
 
       const r = new VoiceInputRouter({ sessionManager: sm as any })
       r.setMode('session')
       r.setFocusedSession('sess-1')
-      r.setBugreportSession('br-sess')
+      r.setDialogTarget('bugreport')
+      let inserted: any = null
+      r.on('dialogInsert', (data) => { inserted = data })
 
       await r.routeTranscription('bug description')
-      assert.equal(sentKeys[0].sessionId, 'br-sess', 'bugreport must take priority over voice-relay')
+      assert.ok(inserted, 'dialog target must take priority over voice-relay')
+      assert.equal(sentKeys.length, 0)
     })
 
-    it('bugreport routing takes priority over pinned session', async () => {
-      router.setMode('session')
-      sessions.set('br-sess', { id: 'br-sess', name: 'Bugreport', status: 'active' })
-      sessions.set('sess-3', { id: 'sess-3', name: 'pinned', status: 'active' })
-      router.pinToSession('sess-3')
-      router.setBugreportSession('br-sess')
-      await router.routeTranscription('critical bug')
-      assert.equal(sentKeys[0].sessionId, 'br-sess')
-    })
-
-    it('clearBugreportSession restores normal routing', async () => {
+    it('clearDialogTarget restores normal routing', async () => {
       router.setMode('session')
       router.setFocusedSession('sess-1')
-      sessions.set('br-sess', { id: 'br-sess', name: 'Bugreport', status: 'active' })
-      router.setBugreportSession('br-sess')
-      router.clearBugreportSession()
+      router.setDialogTarget('bugreport')
+      router.clearDialogTarget()
       await router.routeTranscription('normal text')
       assert.equal(sentKeys[0].sessionId, 'sess-1', 'should route to focused after clear')
     })
 
-    it('getBugreportSessionId returns current state', () => {
-      assert.equal(router.getBugreportSessionId(), null)
-      router.setBugreportSession('br-sess')
-      assert.equal(router.getBugreportSessionId(), 'br-sess')
-      router.clearBugreportSession()
-      assert.equal(router.getBugreportSessionId(), null)
-    })
-
-    it('bugreport routing skips voice commands (no scroll/grid in bugreport)', async () => {
+    it('dialog target skips voice commands', async () => {
       router.setMode('session')
-      sessions.set('br-sess', { id: 'br-sess', name: 'Bugreport', status: 'active' })
-      router.setBugreportSession('br-sess')
+      router.setFocusedSession('sess-1')
+      router.setDialogTarget('bugreport')
       let scrollEvent: any = null
+      let inserted: any = null
       router.on('scroll', (data) => { scrollEvent = data })
+      router.on('dialogInsert', (data) => { inserted = data })
       await router.routeTranscription('hoch')
-      // "hoch" should be sent as text to bugreport, not as scroll command
-      assert.equal(scrollEvent, null, 'scroll commands should not fire in bugreport mode')
-      assert.equal(sentKeys[0].keys, 'hoch')
+      assert.equal(scrollEvent, null, 'scroll commands should not fire in dialog mode')
+      assert.ok(inserted, '"hoch" should be sent as raw text via dialogInsert')
+      assert.equal(inserted.text, 'hoch')
+      assert.equal(sentKeys.length, 0)
     })
   })
 })
