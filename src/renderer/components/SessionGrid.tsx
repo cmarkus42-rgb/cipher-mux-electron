@@ -8,7 +8,7 @@ import { LauncherCell } from './LauncherCell'
 import type { PathStartOpts } from './LauncherCell'
 import { NotesCell } from './NotesCell'
 import { useScrollHandler } from '../hooks/useScrollHandler'
-import { getTerminal } from '../terminal-registry'
+import { getTerminal, getAllTerminals } from '../terminal-registry'
 import { shellEscapePaths } from '../../shared/shell-escape'
 
 interface SessionGridProps {
@@ -93,16 +93,29 @@ export function SessionGrid({
     const api = (window as any).cipherMux
     if (!api?.terminal?.onVoiceClipboard) return
     const unsub = api.terminal.onVoiceClipboard((data: { action: 'copy' | 'paste' }) => {
-      if (!focusedSessionId) return
       if (data.action === 'copy') {
-        const term = getTerminal(focusedSessionId)
-        if (term?.hasSelection()) {
-          navigator.clipboard.writeText(term.getSelection()).catch(() => {})
+        // Try focused cell first, then scan all terminals for selection
+        let copied = false
+        if (focusedSessionId) {
+          const term = getTerminal(focusedSessionId)
+          if (term?.hasSelection()) {
+            navigator.clipboard.writeText(term.getSelection()).catch(() => {})
+            copied = true
+          }
+        }
+        if (!copied) {
+          getAllTerminals().forEach((term, sid) => {
+            if (!copied && sid !== focusedSessionId && term.hasSelection()) {
+              navigator.clipboard.writeText(term.getSelection()).catch(() => {})
+              copied = true
+            }
+          })
         }
       } else if (data.action === 'paste') {
+        if (!focusedSessionId) return
         navigator.clipboard.readText().then(text => {
           if (text) {
-            api.sessions.sendKeys(focusedSessionId, text).catch(() => {})
+            api.terminal.write(focusedSessionId, text)
           }
         }).catch(() => {})
       }

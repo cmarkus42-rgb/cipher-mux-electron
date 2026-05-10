@@ -1600,8 +1600,7 @@ export class IpcHub {
         await tts.init()
         const text = 'Dies ist eine Vorschau der Stimme.'
         for await (const chunk of tts.speak(text)) {
-          const mainWin = this.windowManager.getMainWindow()
-          mainWin?.webContents.send(IPC.VOICE_AGENT_AUDIO, { audio: chunk.toString('base64') })
+          this.windowManager.sendToAllWindows(IPC.VOICE_AGENT_AUDIO, chunk.toString('base64'))
         }
         tts.shutdown()
         return { ok: true }

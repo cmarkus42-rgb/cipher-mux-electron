@@ -21,6 +21,10 @@ export function getTerminal(sessionId: string): Terminal | undefined {
   return terminals.get(sessionId)
 }
 
+export function getAllTerminals(): Map<string, Terminal> {
+  return terminals
+}
+
 /** Store the scrollback line number at the moment of user submission. */
 export function setMarker(sessionId: string, line: number): void {
   markers.set(sessionId, line)
