@@ -73,7 +73,7 @@ const THEME_TOKEN_GROUPS: Array<{ labelKey: string; tokens: string[] }> = [
   },
   {
     labelKey: 'themeEditor.groupSession',
-    tokens: ['--color-session-header-bg', '--shadow-inset'],
+    tokens: ['--session-bg', '--session-text', '--session-border', '--session-font-size', '--color-session-header-bg', '--shadow-inset'],
   },
   {
     labelKey: 'themeEditor.groupEntity',
@@ -550,7 +550,7 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
                   <div class="theme-editor__grid">
                     {group.tokens.map(prop => {
                       const current = customTokens[prop] ?? getBaseToken(prop)
-                      const isColorToken = !prop.includes('shadow')
+                      const isColorToken = !prop.includes('shadow') && !prop.includes('font-size')
                       const label = ENTITY_COLOR_LABELS[prop]
                         ?? prop.replace('--color-', '').replace('--', '')
                       return isColorToken ? (
