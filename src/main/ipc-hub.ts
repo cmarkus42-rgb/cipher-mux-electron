@@ -37,7 +37,6 @@ import { generateWorkshopClaudeMd } from './workshop/workshop-template'
 import { syncIdeationTemplate } from './ideation-partner/ideation-template'
 import { syncRefinementTemplate } from './refinement/refinement-template'
 import { generateVoiceRelayClaudeMd } from './session/voice-relay-template'
-import { generateBugreportPresetClaudeMd } from './bugreport/bugreport-preset-template'
 import { generateCompanionClaudeMd } from './entity-content/companion-preset'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { getGlobalRules, setGlobalRules, ensureGlobalRulesFile, invalidateGlobalRulesCache } from './config/global-rules'
@@ -77,7 +76,6 @@ export class IpcHub {
   private taskWatcher: TaskWatcher | null = null
   private taskHooks: TaskHooks | null = null
   private bugreportSource: BugreportTaskSource | null = null
-  private bugreportRelaySessionId: string | null = null
   private noteManager!: NoteManager
   private noteTagging!: NoteTagging
   private noteSearchIndex!: NoteSearchIndex
@@ -186,7 +184,6 @@ export class IpcHub {
       deployEntity('cyber-factory', generateCyberFactoryClaudeMd({ mcpHost, mcpPort, mcpApiKey }))
       deployEntity('orchestrator', generateWorkshopClaudeMd({ mcpHost, mcpPort, mcpApiKey }))
       deployEntity('voice-relay', generateVoiceRelayClaudeMd())
-      deployEntity('bugreport', generateBugreportPresetClaudeMd())
       deployEntity('companion', generateCompanionClaudeMd())
 
       // Sync experimental templates (ideation + refinement)
@@ -541,16 +538,6 @@ export class IpcHub {
       // VoiceOutputRouter (terminal-polling) is disabled — it caused duplicate
       // readback of everything visible in the relay pane.
 
-      // Bugreport relay: entity is now ready — activate STT routing and notify renderer
-      if (data.entityId === 'bugreport' && this.bugreportRelaySessionId) {
-        // STT routing is activated HERE (not at start), so no transcriptions are lost
-        const inputRouter = this.voiceManager?.getInputRouter()
-        if (inputRouter) {
-          inputRouter.setBugreportSession(this.bugreportRelaySessionId)
-        }
-        this.bugreportManager.markRelayReady()
-        this.windowManager.sendToMainWindow(IPC.BUGREPORT_RELAY_READY, { sessionId: this.bugreportRelaySessionId })
-      }
     })
 
     this.sessionManager.on('entity-stopped', (data: { entityId: string }) => {
@@ -1135,37 +1122,22 @@ export class IpcHub {
       return result.canceled ? [] : result.filePaths
     })
 
-    // ── Bugreport Voice Relay ──
+    // ── Bugreport Dialog STT Routing ──
 
-    ipcMain.handle(IPC.BUGREPORT_RELAY_START, async () => {
-      try {
-        const sessionId = await this.bugreportManager.startRelaySession(this.sessionManager)
-        this.bugreportRelaySessionId = sessionId
-        // STT routing is NOT set here — it's activated in entity-started handler
-        // after the session is actually ready, to avoid lost transcriptions.
-        console.log('[Bugreport] Relay session started:', sessionId)
-        return { ok: true, sessionId }
-      } catch (err) {
-        const msg = (err as Error).message
-        console.error('[Bugreport] Relay start failed:', msg)
-        return { ok: false, error: msg }
+    ipcMain.handle(IPC.BUGREPORT_DIALOG_OPEN, () => {
+      const inputRouter = this.voiceManager?.getInputRouter()
+      if (inputRouter) {
+        inputRouter.setDialogTarget('bugreport')
       }
+      return { ok: true }
     })
 
-    ipcMain.handle(IPC.BUGREPORT_RELAY_STOP, async () => {
-      try {
-        const inputRouter = this.voiceManager?.getInputRouter()
-        if (inputRouter) {
-          inputRouter.clearBugreportSession()
-        }
-        this.bugreportRelaySessionId = null
-        await this.bugreportManager.stopRelaySession(this.sessionManager)
-        console.log('[Bugreport] Relay stopped')
-        return { ok: true }
-      } catch (err) {
-        console.error('[Bugreport] Relay stop failed:', (err as Error).message)
-        return { ok: false }
+    ipcMain.handle(IPC.BUGREPORT_DIALOG_CLOSE, () => {
+      const inputRouter = this.voiceManager?.getInputRouter()
+      if (inputRouter) {
+        inputRouter.clearDialogTarget()
       }
+      return { ok: true }
     })
   }
 
@@ -1326,6 +1298,9 @@ export class IpcHub {
         inputRouter.on('notesInsert', (text: string) => {
           this.windowManager.sendToAllWindows(IPC.VOICE_NOTES_INSERT, { text: text.trimEnd() + ' ' })
         })
+        inputRouter.on('dialogInsert', (data: { target: string; text: string }) => {
+          this.windowManager.sendToAllWindows(IPC.VOICE_DIALOG_INSERT, data)
+        })
         inputRouter.on('pinChanged', (data: { pinned: boolean; sessionId: string | null }) => {
           this.windowManager.sendToAllWindows(IPC.VOICE_PIN_STATUS, data)
         })
@@ -1418,6 +1393,9 @@ export class IpcHub {
         inputRouter.on('clipboard', (data: { action: string }) => {
           this.windowManager.sendToAllWindows(IPC.VOICE_CLIPBOARD, data)
         })
+        inputRouter.on('dialogInsert', (data: { target: string; text: string }) => {
+          this.windowManager.sendToAllWindows(IPC.VOICE_DIALOG_INSERT, data)
+        })
         inputRouter.on('speechInterrupt', () => {
           console.log('[Voice] COM speech interrupt — stopping TTS')
           this.voiceManager?.stopSpeech()
@@ -1500,11 +1478,13 @@ export class IpcHub {
       this.voiceManager?.getInputRouter()?.setFocusedSession(sessionId)
     })
 
-    // Route STT focus when a detached session window gains OS focus
+    // Route STT focus when a detached window gains OS focus
     this.windowManager.onDetachedFocus((type, entityId) => {
       if (type === 'session') {
         this.focusedSessionId = entityId
         this.voiceManager?.getInputRouter()?.setFocusedSession(entityId)
+      } else if (type === 'note') {
+        this.voiceManager?.getInputRouter()?.setNotesEditorFocused(true)
       }
     })
 
@@ -1603,8 +1583,7 @@ export class IpcHub {
       try {
         const { PiperTTS } = require('./voice/tts-piper')
         const piperDir = path.join(os.homedir(), '.config', 'cipher-mux', 'models', 'piper')
-        const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
-        const tts = new PiperTTS({ voice: name, modelsDir: piperDir, nodeModulesPath: appNodeModules })
+        const tts = new PiperTTS({ voice: name, modelsDir: piperDir })
         await tts.init()
         const text = 'Dies ist eine Vorschau der Stimme.'
         for await (const chunk of tts.speak(text)) {
@@ -2121,6 +2100,7 @@ export class IpcHub {
         this.tagClassRepo.removeValue(parsed.tagClass, parsed.value)
       }
       if (affected.length > 0 || parsed.tagClass) {
+        this.tagIndex.rebuild()
         this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
       }
       return { ok: true, affected: affected.length }
@@ -2301,7 +2281,7 @@ export class IpcHub {
     // Entities whose preset.md is code-generated and refreshed at session start.
     // These are read-only in the PresetEditor ("Copy as Custom" to override).
     const ENTITIES_WITH_TEMPLATE = new Set([
-      'audit', 'voice-relay', 'bugreport', 'testing-assistant',
+      'audit', 'voice-relay', 'testing-assistant',
       'debugger', 'cyber-factory', 'orchestrator', 'companion',
       'refinement', 'ideation-partner',
     ])
@@ -2362,7 +2342,6 @@ export class IpcHub {
       // Last resort: generate template content on-the-fly for known entities
       const templateGenerators: Record<string, () => string> = {
         'voice-relay': generateVoiceRelayClaudeMd,
-        bugreport: generateBugreportPresetClaudeMd,
         audit: generateAuditClaudeMd,
         debugger: generateDebuggerClaudeMd,
         companion: generateCompanionClaudeMd,
@@ -2857,7 +2836,7 @@ export class IpcHub {
   /** Live-update Keep Working snapshot when grid changes (called on every CONFIG_SAVE_GRID). */
   private async updateKeepWorkingSnapshot(grid: { config: { cols: number; rows: number }; slots: Array<{ sessionId: string | null; type?: string; notesId?: string; openNoteIds?: string[] }> }): Promise<void> {
     const sessions = this.sessionManager.list().filter(s => s.status === 'active')
-    if (sessions.length === 0 && !grid.slots.some(s => (s as any).type === 'notes')) return
+    if (sessions.length === 0) return
     const allTasks = this.taskManager ? this.taskManager.list() : []
     const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }> = []
     for (const s of sessions) {
