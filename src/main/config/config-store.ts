@@ -153,6 +153,7 @@ const defaults: AppConfig = {
   entityPersonaOverrides: {} as Record<string, string>,
   voiceSubmitMode: 'auto' as const,
   piperVoice: 'de_DE-cipher_adult-medium',
+  macosVoice: '' as string,
   tts: {
     pauseAfterPeriod: 300,
     pauseAfterQuestion: 400,

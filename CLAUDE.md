@@ -484,3 +484,10 @@ Learning erkannt
 - **Testcases gehoeren in die Notes-System-Testcase-Note** (noteType: testcase, ID: `01KQNBDCH1D4G11PMAEM60TPTX`). NICHT in Dateien unter `docs/archiv/`. Der TestcaseView rendert nur Notes mit `noteType: testcase`.
 - **Format:** `- [ ] **T-PREFIX.N** Beschreibung` — der Parser braucht dieses exakte Checkbox+Bold-ID-Format.
 - **Neue Testcases ans Ende anhaengen**, unter einer neuen `## Section`-Ueberschrift.
+## Workspace Prompt
+
+In diesem Workspace arbeiten wir am CIPEHR-MUX - Coding Cockpit für Claude Code - also an dieser Umgebung selber hier. Continous self improvement.
+
+## Context Directories
+
+- `/Users/Shared/Nextcloud/Claude/CIPHER-MUX/projects/cipher-mux-electron`

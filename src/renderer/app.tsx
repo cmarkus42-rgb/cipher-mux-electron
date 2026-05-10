@@ -22,7 +22,7 @@ import { useGlobalTtsPlayback } from './hooks/useGlobalTtsPlayback'
 import { useA11ySettings } from './a11y/hooks/useA11ySettings'
 import { FocusMode } from './a11y/FocusMode'
 import { useFocusTrap } from './a11y/useFocusTrap'
-import { getFocusModeOverlappedSlots, getCoveredSlots } from '../shared/grid-types'
+import { getFocusModeOverlappedSlots, getCoveredSlots, findNavigationTarget } from '../shared/grid-types'
 import { useSetupWizard } from './hooks/useSetupWizard'
 import { SetupWizard } from './components/SetupWizard'
 import { UpdateDialog } from './components/UpdateDialog'
@@ -144,57 +144,19 @@ export function App() {
 
   // Grid navigation: move focus to adjacent cell in the given direction
   const navigateGrid = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
-    const { config, slots } = gridRef.current
-    const { cols, rows } = config
-    const covered = getCoveredSlots(gridRef.current)
+    const gridState = gridRef.current
+    const { slots } = gridState
+    const covered = getCoveredSlots(gridState)
 
-    // Find current slot index of focused session
-    let currentIdx = slots.findIndex(s => s.sessionId === focusedSessionId)
-    if (currentIdx === -1) {
-      // No focused session — focus first occupied slot
-      const first = slots.findIndex((s, i) => (s.sessionId || s.type === 'notes') && !covered.has(i))
-      if (first >= 0) {
-        const sid = slots[first].sessionId
-        if (sid) setFocusedSessionId(sid)
-      }
+    // No focused session — focus first occupied session slot
+    if (!focusedSessionId || slots.findIndex(s => s.sessionId === focusedSessionId) === -1) {
+      const first = slots.findIndex((s, i) => s.sessionId && !covered.has(i))
+      if (first >= 0) setFocusedSessionId(slots[first].sessionId!)
       return
     }
 
-    const currentCol = currentIdx % cols
-    const currentRow = Math.floor(currentIdx / cols)
-
-    let targetCol = currentCol
-    let targetRow = currentRow
-    switch (direction) {
-      case 'up': targetRow = currentRow - 1; break
-      case 'down': targetRow = currentRow + 1; break
-      case 'left': targetCol = currentCol - 1; break
-      case 'right': targetCol = currentCol + 1; break
-    }
-
-    // Wrap around
-    if (targetCol < 0) targetCol = cols - 1
-    if (targetCol >= cols) targetCol = 0
-    if (targetRow < 0) targetRow = rows - 1
-    if (targetRow >= rows) targetRow = 0
-
-    const targetIdx = targetRow * cols + targetCol
-    // If target is covered by a rowSpan, find the parent cell
-    if (covered.has(targetIdx)) {
-      // Walk upward to find the parent
-      for (let r = targetRow - 1; r >= 0; r--) {
-        const parentIdx = r * cols + targetCol
-        if (!covered.has(parentIdx) && slots[parentIdx].sessionId) {
-          setFocusedSessionId(slots[parentIdx].sessionId!)
-          return
-        }
-      }
-    }
-
-    const targetSlot = slots[targetIdx]
-    if (targetSlot?.sessionId) {
-      setFocusedSessionId(targetSlot.sessionId)
-    }
+    const target = findNavigationTarget(gridState, focusedSessionId, direction)
+    if (target) setFocusedSessionId(target)
   }, [focusedSessionId, setFocusedSessionId])
 
   // Global keyboard shortcuts

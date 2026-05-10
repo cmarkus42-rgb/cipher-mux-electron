@@ -137,6 +137,56 @@ export function getFocusModePlacement(cols: number, rows: number, _focusSlotIdx:
   }
 }
 
+/** Find the next session to navigate to from the current session in a given direction.
+ *  Skips notes cells, empty slots, and covered slots (rowSpan).
+ *  Wraps around grid edges. Returns null if no other session reachable. */
+export function findNavigationTarget(
+  state: GridState,
+  currentSessionId: string | null,
+  direction: 'up' | 'down' | 'left' | 'right',
+): string | null {
+  const { cols, rows } = state.config
+  const { slots } = state
+  const covered = getCoveredSlots(state)
+  const total = cols * rows
+
+  const currentIdx = slots.findIndex(s => s.sessionId === currentSessionId)
+  if (currentIdx === -1) return null
+
+  let col = currentIdx % cols
+  let row = Math.floor(currentIdx / cols)
+
+  for (let attempt = 0; attempt < total; attempt++) {
+    switch (direction) {
+      case 'up': row = (row - 1 + rows) % rows; break
+      case 'down': row = (row + 1) % rows; break
+      case 'left': col = (col - 1 + cols) % cols; break
+      case 'right': col = (col + 1) % cols; break
+    }
+    const idx = row * cols + col
+
+    // If covered by rowSpan, walk upward to find parent
+    if (covered.has(idx)) {
+      for (let r = row - 1; r >= 0; r--) {
+        const parentIdx = r * cols + col
+        if (!covered.has(parentIdx) && slots[parentIdx].sessionId) {
+          const sid = slots[parentIdx].sessionId!
+          return sid === currentSessionId ? null : sid
+        }
+      }
+      continue
+    }
+
+    const slot = slots[idx]
+    if (slot?.sessionId && slot.sessionId !== currentSessionId) {
+      return slot.sessionId
+    }
+    // If we wrapped back to self, no target found
+    if (idx === currentIdx) return null
+  }
+  return null
+}
+
 import { SESSION_CELL_HEIGHT } from './constants'
 
 /** Minimum cell width in pixels — prevents grid compression when window is narrow */
