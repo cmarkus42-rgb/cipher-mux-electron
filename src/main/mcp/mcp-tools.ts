@@ -174,12 +174,16 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         const session = ctx.sessionManager.get(targetId)
         if (session && session.status === 'active') {
           try {
-            // Push-deliver plaintext directly via sendKeys (hex-encoded in
-            // tmux control mode — no escaping or base64 needed). Text and
-            // Enter are combined into one atomic sendKeys call so the target
-            // TUI (Claude CLI) receives them in a single write.
-            const payload = args.noEnter ? args.text : args.text + '\r'
-            await ctx.sessionManager.sendKeys(targetId, payload)
+            // Push-deliver plaintext via sendKeys. Text and Enter are sent as
+            // SEPARATE calls with a delay: Claude Code uses Bracketed Paste for
+            // multi-line input, and \r inside the paste buffer is interpreted as
+            // a newline, not as submit. The delay lets the paste complete before
+            // the Enter arrives as a distinct keypress that triggers submit.
+            await ctx.sessionManager.sendKeys(targetId, args.text)
+            if (!args.noEnter) {
+              await new Promise(r => setTimeout(r, 200))
+              await ctx.sessionManager.sendKeys(targetId, '\r')
+            }
             delivered = true
           } catch {
             // sendKeys failed — message is still on the bus
@@ -264,20 +268,37 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   ;(server.registerTool as any)(
     'mux_create_session',
     {
-      description: 'Create a new cipher-mux session',
+      description:
+        'Create a new cipher-mux session. By default launches Claude Code CLI automatically '
+        + '(matching the UI Launcher behavior). Pass shellOnly: true for a plain terminal.',
       inputSchema: {
         name: z.string().describe('Session name'),
         projectPath: z.string().describe('Project directory path'),
-        command: z.string().optional().describe('Initial command to run'),
+        command: z.string().optional().describe('Initial command to run (overrides Claude CLI launch)'),
         visible: z.boolean().optional().describe('If true, session appears in the grid with focus'),
+        shellOnly: z.boolean().optional().describe('If true, open plain shell without Claude CLI'),
+        resume: z.boolean().optional().describe('If true, launch Claude with --resume flag'),
       },
     },
-    async (args: { name: string; projectPath: string; command?: string; visible?: boolean }) => {
+    async (args: { name: string; projectPath: string; command?: string; visible?: boolean; shellOnly?: boolean; resume?: boolean }) => {
       try {
+        // Build autoLaunch for Claude CLI (matches UI Launcher-Cell path in app.tsx)
+        let autoLaunch: string | undefined
+        if (!args.command && !args.shellOnly) {
+          const escaped = args.projectPath.replace(/'/g, "'\\''")
+          const { configStore: cs } = require('../config/config-store')
+          const skipPerms = cs.get('agent')?.skipPermissions === true
+          const parts = [`cd '${escaped}' && clear; claude`]
+          if (skipPerms) parts.push('--dangerously-skip-permissions')
+          if (args.resume) parts.push('--resume')
+          autoLaunch = parts.join(' ') + '\n'
+        }
+
         const session = await ctx.sessionManager.start({
           name: args.name,
           projectPath: args.projectPath,
           command: args.command,
+          autoLaunch,
         })
 
         if (args.visible && ctx.windowManager) {
