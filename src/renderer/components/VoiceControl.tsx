@@ -34,6 +34,7 @@ export function VoiceControl({ focusedSessionId, focusedSessionName, inline, ses
     switchMode,
     pinned,
     pinnedSessionId,
+    activeVoiceSessionId,
     togglePin,
   } = useVoiceSession(focusedSessionId, focusedSessionName)
 
@@ -50,7 +51,13 @@ export function VoiceControl({ focusedSessionId, focusedSessionName, inline, ses
     ? sessions.find(s => s.id === pinnedSessionId)?.name ?? pinnedSessionId
     : null
 
-  const targetName = pinned ? pinnedSessionName : focusedSessionName
+  // Resolve display name for the actual voice target (may differ from grid focus
+  // when a detached window has OS focus)
+  const activeVoiceSessionName = activeVoiceSessionId && sessions
+    ? sessions.find(s => s.id === activeVoiceSessionId)?.name ?? null
+    : null
+
+  const targetName = pinned ? pinnedSessionName : (activeVoiceSessionName ?? focusedSessionName)
 
   return (
     <div class={`voice-pill${active ? ' voice-pill--active' : ''}${inline ? ' voice-pill--inline' : ''}`}>

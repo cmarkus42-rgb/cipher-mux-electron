@@ -1475,16 +1475,30 @@ export class IpcHub {
 
     ipcMain.on(IPC.VOICE_SESSION_TARGET, (_event, { sessionId }: { sessionId: string | null }) => {
       this.focusedSessionId = sessionId
-      this.voiceManager?.getInputRouter()?.setFocusedSession(sessionId)
+      // Only update voice router if focus is on the grid — detached windows
+      // set their own focus via onDetachedFocus, and we must not override it
+      // with the stale grid-focused session from the renderer.
+      const router = this.voiceManager?.getInputRouter()
+      if (router && router.getFocusSource() !== 'detached') {
+        router.setFocusedSession(sessionId, 'grid')
+      }
     })
 
     // Route STT focus when a detached window gains OS focus
     this.windowManager.onDetachedFocus((type, entityId) => {
       if (type === 'session') {
         this.focusedSessionId = entityId
-        this.voiceManager?.getInputRouter()?.setFocusedSession(entityId)
+        this.voiceManager?.getInputRouter()?.setFocusedSession(entityId, 'detached')
       } else if (type === 'note') {
         this.voiceManager?.getInputRouter()?.setNotesEditorFocused(true)
+      }
+    })
+
+    // Reset STT focus to grid-focused session when main window regains OS focus
+    this.windowManager.onMainWindowFocus(() => {
+      const router = this.voiceManager?.getInputRouter()
+      if (router && router.getFocusSource() === 'detached') {
+        router.setFocusedSession(this.focusedSessionId, 'grid')
       }
     })
 
