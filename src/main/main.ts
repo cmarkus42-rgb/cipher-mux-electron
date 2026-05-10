@@ -28,7 +28,7 @@ let ipcHub: IpcHub
 app.whenReady().then(() => {
   // Grant microphone permission for voice bugreport interview
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    if (permission === 'media') {
+    if (permission === 'media' || permission === 'clipboard-read' || permission === 'clipboard-sanitized-write') {
       callback(true)
       return
     }

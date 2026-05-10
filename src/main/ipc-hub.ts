@@ -1592,7 +1592,8 @@ export class IpcHub {
       try {
         const { PiperTTS } = require('./voice/tts-piper')
         const piperDir = path.join(os.homedir(), '.config', 'cipher-mux', 'models', 'piper')
-        const tts = new PiperTTS({ voice: name, modelsDir: piperDir })
+        const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
+        const tts = new PiperTTS({ voice: name, modelsDir: piperDir, nodeModulesPath: appNodeModules })
         await tts.init()
         const text = 'Dies ist eine Vorschau der Stimme.'
         for await (const chunk of tts.speak(text)) {
@@ -2378,6 +2379,9 @@ export class IpcHub {
         fs.mkdirSync(dir, { recursive: true })
         const template = `# ${displayName}\n\n## Rolle\n\n\n\n## Faehigkeiten\n\n\n\n## Arbeitsregeln\n\n\n\n## Scope\n\n`
         fs.writeFileSync(presetMdPath, template, 'utf-8')
+        // Entity scanner requires CLAUDE.md to register the entity
+        const claudeMdPath = path.join(dir, 'CLAUDE.md')
+        fs.writeFileSync(claudeMdPath, template, 'utf-8')
         // Re-scan to register the new entity
         const registry = this.sessionManager.getEntityRegistry()
         scanAndRegisterEntities(registry)
