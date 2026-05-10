@@ -297,6 +297,14 @@ export const IPC = {
 
   // Shell
   OPEN_EXTERNAL: 'cipher-mux:shell:open-external',
+
+  // Detachable Windows
+  DETACH_SESSION: 'cipher-mux:detach:session',
+  DETACH_NOTE: 'cipher-mux:detach:note',
+  DOCK_REQUEST: 'cipher-mux:dock:request',
+  DETACH_STATE_CHANGED: 'cipher-mux:detach:state-changed',
+  DETACH_LIST: 'cipher-mux:detach:list',
+  DETACH_HAS_DETACHED: 'cipher-mux:detach:has-detached',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

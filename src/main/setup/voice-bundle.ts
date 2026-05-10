@@ -42,7 +42,7 @@ export interface VoiceRecommendation {
 }
 
 const RECOMMENDED_VOICES: VoiceRecommendation[] = [
-  { name: 'de_DE-mls_dii-high', language: 'de', label: 'German (dii, high quality)' },
+  { name: 'de_DE-dii-high', language: 'de', label: 'German (dii, high quality)' },
   { name: 'en_US-lessac-medium', language: 'en', label: 'English (lessac, medium quality)' },
 ]
 

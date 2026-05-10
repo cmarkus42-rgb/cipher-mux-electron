@@ -6,7 +6,7 @@ import type { SessionInfo, ContextUsage, EntityId } from '../../shared/types'
 import type { ThemeName } from '../../shared/grid-types'
 import {
   X, ArrowLeftRight, GitBranch, ChevronDown, ChevronUp,
-  Terminal, Camera, Scan, ArrowUpFromLine, Check, XCircle, Pause, Loader,
+  Terminal, Camera, Scan, ArrowUpFromLine, ExternalLink, Check, XCircle, Pause, Loader,
 } from 'lucide-preact'
 
 const ICON_SIZE = 14
@@ -56,6 +56,7 @@ interface SessionCellProps {
   onShell: (sessionId: string, projectPath: string | null) => void
   onFork: (sessionId: string) => void
   onSendToBackground: (sessionId: string) => void
+  onDetach?: (sessionId: string) => void
   onFocusMode?: (sessionId: string) => void
   onDragStart: (sessionId: string) => void
   onDragOver: (e: DragEvent) => void
@@ -68,7 +69,7 @@ interface SessionCellProps {
 export function SessionCell({
   session, contextUsage, focused, isOrchestrator, isVoiceTarget, isVoicePinned, voiceState, isSpeaking, onToggleVoicePin, theme,
   rowSpan, maxRows, slotCol, slotRow, focusModeStyle,
-  onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onFocusMode, onDragStart, onDragOver, onDragLeave, onDrop, dragOver,
+  onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDetach, onFocusMode, onDragStart, onDragOver, onDragLeave, onDrop, dragOver,
   topic,
 }: SessionCellProps) {
   const { t } = useTranslation()
@@ -100,6 +101,10 @@ export function SessionCell({
     e.stopPropagation()
     onSendToBackground(session.id)
   }, [session.id, onSendToBackground])
+  const handleDetach = useCallback((e: Event) => {
+    e.stopPropagation()
+    onDetach?.(session.id)
+  }, [session.id, onDetach])
   const handleVoicePin = useCallback((e: Event) => {
     e.stopPropagation()
     onToggleVoicePin(session.id)
@@ -257,6 +262,9 @@ export function SessionCell({
           <button class="cell-btn" onClick={handleSwitch} title={t('sessionCell.switchProject')} aria-label={t('sessionCell.switchProject')}><ArrowLeftRight size={ICON_SIZE} /></button>
           <button class="cell-btn" onClick={handleSendToBackground} title={t('sessionCell.sendToBackground')} aria-label={t('sessionCell.sendToBackground')}><ArrowUpFromLine size={ICON_SIZE} /></button>
           <button class="cell-btn" onClick={handleShell} title={t('sessionCell.openShell')} aria-label={t('sessionCell.openShell')}><Terminal size={ICON_SIZE} /></button>
+          {onDetach && (
+            <button class="cell-btn" onClick={handleDetach} title={t('sessionCell.detach', 'Pop Out')} aria-label={t('sessionCell.detach', 'Pop Out')}><ExternalLink size={ICON_SIZE} /></button>
+          )}
           <button class="cell-btn" onClick={handleClose} title={t('sessionCell.closeSession')} aria-label={t('sessionCell.closeSession')} disabled={session.status === 'closing'}><X size={ICON_SIZE} /></button>
         </div>
       </div>

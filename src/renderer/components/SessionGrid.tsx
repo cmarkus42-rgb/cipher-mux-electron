@@ -33,6 +33,7 @@ interface SessionGridProps {
   onShell: (sessionId: string, projectPath: string | null) => void
   onFork: (sessionId: string) => void
   onSendToBackground: (sessionId: string) => void
+  onDetach?: (sessionId: string) => void
   onFocusMode?: (sessionId: string) => void
   focusModeSlot?: number | null
   focusModeOverlapped?: Set<number>
@@ -60,7 +61,7 @@ export function SessionGrid({
   voiceTargetSessionId, voicePinned, voiceState, isSpeaking, onToggleVoicePin,
   workspaceLoading,
   onFocusSession, onCloseSession,
-  onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onFocusMode,
+  onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDetach, onFocusMode,
   focusModeSlot, focusModeOverlapped,
   onStartEntity, onResumeEntity, onFocusEntity, onStartPath,
   onOpenNotes, onOpenNote, onCloseNotes, onOpenNoteIdsChange, onToggleExpandSlot, onSwap,
@@ -293,6 +294,7 @@ export function SessionGrid({
                 onShell={onShell}
                 onFork={onFork}
                 onSendToBackground={onSendToBackground}
+                onDetach={onDetach}
                 onFocusMode={onFocusMode}
                 topic={topicMap?.[session.id]}
                 onDragStart={() => handleDragStart(idx)}

@@ -7,6 +7,7 @@ import {
   SESSION_CELL_HEIGHT,
 } from '../shared/constants'
 import { IPC } from '../shared/ipc-channels'
+import type { DetachedWindowEntry } from '../shared/types'
 import { configStore } from './config/config-store'
 
 /** Optional grid dimensions passed to createMainWindow for initial sizing. */
@@ -19,6 +20,8 @@ export class WindowManager {
   private mainWindow: BrowserWindow | null = null
   private workspacesWindow: BrowserWindow | null = null
   private sidebarWindow: BrowserWindow | null = null
+  private detachedWindows: Map<string, { window: BrowserWindow; entry: DetachedWindowEntry }> = new Map()
+  private dockInitiated: Set<string> = new Set()
 
   createMainWindow(gridHint?: WindowGridHint): BrowserWindow {
     const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize
@@ -98,10 +101,15 @@ export class WindowManager {
     }
   }
 
-  /** Send to all open windows (main, sidebar, workspaces). */
+  /** Send to all open windows (main, sidebar, workspaces, detached). */
   sendToAllWindows(channel: string, data: unknown): void {
     for (const win of [this.mainWindow, this.sidebarWindow, this.workspacesWindow]) {
       if (win && !win.isDestroyed()) {
+        win.webContents.send(channel, data)
+      }
+    }
+    for (const { window: win } of Array.from(this.detachedWindows.values())) {
+      if (!win.isDestroyed()) {
         win.webContents.send(channel, data)
       }
     }
@@ -236,6 +244,147 @@ export class WindowManager {
   closeSidebarWindow(): void {
     if (this.sidebarWindow && !this.sidebarWindow.isDestroyed()) {
       this.sidebarWindow.close()
+    }
+  }
+
+  // ─── Detached Windows ──────────────────────────────────────
+
+  openDetachedWindow(
+    type: 'session' | 'note',
+    entityId: string,
+    bounds?: Partial<Electron.Rectangle>,
+  ): BrowserWindow {
+    // Focus existing window if already detached
+    const existing = this.detachedWindows.get(entityId)
+    if (existing && !existing.window.isDestroyed()) {
+      existing.window.focus()
+      return existing.window
+    }
+
+    // Restore saved bounds or use defaults
+    const savedAll = (configStore.get('detachedWindowBounds') as Record<string, Electron.Rectangle> | undefined) ?? {}
+    const saved = savedAll[entityId]
+    const width = bounds?.width ?? saved?.width ?? 800
+    const height = bounds?.height ?? saved?.height ?? 600
+
+    const opts: Electron.BrowserWindowConstructorOptions = {
+      width,
+      height,
+      minWidth: 400,
+      minHeight: 300,
+      title: `cipher-mux · ${type === 'session' ? 'Session' : 'Notes'} · ${entityId}`,
+      titleBarStyle: 'hiddenInset',
+      backgroundColor: '#1A1A1D',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false,
+      },
+    }
+
+    const x = bounds?.x ?? saved?.x
+    const y = bounds?.y ?? saved?.y
+    if (x != null && y != null) {
+      opts.x = x
+      opts.y = y
+    }
+
+    const win = new BrowserWindow(opts)
+
+    const viewParam = type === 'session' ? 'session' : 'note'
+    if (process.env.VITE_DEV_SERVER_URL) {
+      win.loadURL(`${process.env.VITE_DEV_SERVER_URL}?view=${viewParam}&id=${encodeURIComponent(entityId)}`)
+    } else {
+      win.loadFile(
+        path.join(__dirname, '../../renderer/index.html'),
+        { search: `view=${viewParam}&id=${encodeURIComponent(entityId)}` },
+      )
+    }
+
+    const entry: DetachedWindowEntry = {
+      type,
+      entityId,
+      bounds: win.getBounds(),
+    }
+    this.detachedWindows.set(entityId, { window: win, entry })
+
+    // Save bounds on move/resize
+    const saveBounds = () => {
+      if (!win.isDestroyed()) {
+        const b = win.getBounds()
+        entry.bounds = b
+        const all = (configStore.get('detachedWindowBounds') as Record<string, Electron.Rectangle> | undefined) ?? {}
+        all[entityId] = b
+        configStore.set('detachedWindowBounds', all)
+      }
+    }
+    win.on('resized', saveBounds)
+    win.on('moved', saveBounds)
+
+    win.on('close', () => {
+      saveBounds()
+    })
+
+    win.on('closed', () => {
+      const wasDock = this.dockInitiated.delete(entityId)
+      this.detachedWindows.delete(entityId)
+      // Notify main window so renderer can update detachedIds
+      // (covers both X-button close and programmatic close via dock)
+      this.sendToMainWindow(IPC.DETACH_STATE_CHANGED, {
+        entries: this.getDetachedEntries(),
+        // dockedEntityId tells renderer to show placement popup (dock-button).
+        // X-close omits it — session just goes to background.
+        ...(wasDock ? { dockedEntityId: entityId } : {}),
+      })
+    })
+
+    return win
+  }
+
+  /** Mark an entity as being docked (not just X-closed). Called before closeDetachedWindow. */
+  markDockInitiated(entityId: string): void {
+    this.dockInitiated.add(entityId)
+  }
+
+  closeDetachedWindow(entityId: string): void {
+    const existing = this.detachedWindows.get(entityId)
+    if (existing && !existing.window.isDestroyed()) {
+      existing.window.close()
+    }
+  }
+
+  getDetachedWindow(entityId: string): BrowserWindow | null {
+    const existing = this.detachedWindows.get(entityId)
+    if (existing && !existing.window.isDestroyed()) {
+      return existing.window
+    }
+    return null
+  }
+
+  getDetachedEntries(): DetachedWindowEntry[] {
+    return Array.from(this.detachedWindows.values()).map(({ entry }) => entry)
+  }
+
+  isDetached(entityId: string): boolean {
+    const existing = this.detachedWindows.get(entityId)
+    return !!existing && !existing.window.isDestroyed()
+  }
+
+  /**
+   * Restore detached windows from a saved snapshot (called on app start).
+   * Takes a validator function to skip stale entries (deleted notes, killed sessions).
+   */
+  restoreDetachedWindows(
+    entries: Array<{ type: 'session' | 'note'; entityId: string; bounds: { x: number; y: number; width: number; height: number } }>,
+    isValid: (entry: { type: 'session' | 'note'; entityId: string }) => boolean,
+  ): void {
+    for (const entry of entries) {
+      if (!isValid(entry)) {
+        console.log(`[WindowManager] skipping stale detached window: ${entry.type}/${entry.entityId}`)
+        continue
+      }
+      this.openDetachedWindow(entry.type, entry.entityId, entry.bounds)
     }
   }
 }

@@ -17,6 +17,7 @@ const api = () => (window as any).cipherMux
 
 export function useGrid(panelWidth = 0) {
   const [grid, setGrid] = useState<GridState>(createEmptyGrid())
+  const [detachedIds, setDetachedIds] = useState<Set<string>>(new Set())
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const panelWidthRef = useRef(panelWidth)
   panelWidthRef.current = panelWidth
@@ -241,6 +242,50 @@ export function useGrid(panelWidth = 0) {
     api().window.fitGrid(state.config.cols, state.config.rows, panelWidthRef.current).catch(() => {})
   }, [persist])
 
+  /** Detach a session/note from the grid: clear its slot and track it as detached. */
+  const detachFromGrid = useCallback((entityId: string) => {
+    setGrid((prev) => {
+      const idx = prev.slots.findIndex((s) => s.sessionId === entityId)
+      if (idx === -1) return prev
+      const newSlots = [...prev.slots]
+      newSlots[idx] = { ...newSlots[idx], sessionId: null }
+      const next = { ...prev, slots: newSlots }
+      persist(next)
+      return next
+    })
+    setDetachedIds((prev) => {
+      const next = new Set(prev)
+      next.add(entityId)
+      return next
+    })
+  }, [persist])
+
+  /** Dock a detached session back — optionally place it in a specific slot. */
+  const dockToGrid = useCallback((entityId: string, slotIndex?: number) => {
+    setDetachedIds((prev) => {
+      if (!prev.has(entityId)) return prev
+      const next = new Set(prev)
+      next.delete(entityId)
+      return next
+    })
+    if (slotIndex !== undefined) {
+      setGrid((prev) => {
+        const newSlots = [...prev.slots]
+        if (slotIndex >= 0 && slotIndex < newSlots.length) {
+          newSlots[slotIndex] = { ...newSlots[slotIndex], sessionId: entityId }
+        }
+        const next = { ...prev, slots: newSlots }
+        persist(next)
+        return next
+      })
+    }
+  }, [persist])
+
+  /** Sync detachedIds from the main process detach registry. */
+  const syncDetachedIds = useCallback((entries: Array<{ type: string; entityId: string }>) => {
+    setDetachedIds(new Set(entries.map((e) => e.entityId)))
+  }, [])
+
   /** RT-X1 fix: clear slots that reference sessions not in the given set. Resets rowSpan to 1. */
   const cleanupDeadSessions = useCallback((activeSessionIds: Set<string>) => {
     setGrid((prev) => {
@@ -259,5 +304,5 @@ export function useGrid(panelWidth = 0) {
     })
   }, [persist])
 
-  return { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, setSlotOpenNoteIds, toggleExpandSlot, restoreGrid, cleanupDeadSessions }
+  return { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, setSlotOpenNoteIds, toggleExpandSlot, restoreGrid, cleanupDeadSessions, detachedIds, detachFromGrid, dockToGrid, syncDetachedIds }
 }

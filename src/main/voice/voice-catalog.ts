@@ -12,7 +12,7 @@ export interface InstalledVoice {
 }
 
 const VITS_PIPER_PREFIX = 'vits-piper-'
-const BUNDLED_DATASETS = ['cipher_adult']
+const BUNDLED_DATASETS = ['cipher_adult', 'dii']
 
 interface PiperModelJson {
   audio?: { sample_rate?: number }
@@ -36,8 +36,15 @@ export function listInstalled(piperModelsDir: string): InstalledVoice[] {
     if (!entry.name.startsWith(VITS_PIPER_PREFIX)) continue
 
     const voiceDir = path.join(piperModelsDir, entry.name)
-    const modelPath = path.join(voiceDir, 'model.onnx')
-    const metaPath = path.join(voiceDir, 'model.onnx.json')
+    const voiceName = entry.name.slice(VITS_PIPER_PREFIX.length)
+
+    // Support both naming conventions: model.onnx (bundled) and <voiceName>.onnx (HuggingFace)
+    let modelPath = path.join(voiceDir, 'model.onnx')
+    let metaPath = path.join(voiceDir, 'model.onnx.json')
+    if (!fs.existsSync(modelPath)) {
+      modelPath = path.join(voiceDir, `${voiceName}.onnx`)
+      metaPath = path.join(voiceDir, `${voiceName}.onnx.json`)
+    }
 
     if (!fs.existsSync(modelPath)) continue
     if (!fs.existsSync(metaPath)) continue
@@ -49,7 +56,6 @@ export function listInstalled(piperModelsDir: string): InstalledVoice[] {
       continue
     }
 
-    const voiceName = entry.name.slice(VITS_PIPER_PREFIX.length)
     const locale = meta.language?.code ?? extractLocaleFromName(voiceName)
     const language = locale.split('_')[0]
     const quality = meta.quality ?? extractQualityFromName(voiceName)
