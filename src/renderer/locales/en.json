@@ -279,7 +279,7 @@
   "info.shortcutHint": "most actions are triggered by clicking in the statusbar or grid. keyboard shortcuts are minimal.",
 
   "info.feature.whatIs.title": "what is cipher-mux?",
-  "info.feature.whatIs.p1": "cipher-mux is an electron app that manages multiple claude code sessions simultaneously in a single window. each session runs in its own tmux terminal. sessions can communicate via a message bus and are coordinated by an orchestrator.",
+  "info.feature.whatIs.p1": "cipher-mux is an electron-based command center for claude code projects. multiple AI sessions run simultaneously in a grid of tmux terminals, communicate via a message bus, and are coordinated by specialized entities — from code generation through testing to audit.",
   "info.feature.whatIs.p2strong": "when do you need this?",
   "info.feature.whatIs.p2": " as soon as you work on multiple projects at the same time or a project is so large that a single claude agent hits its context limits. the orchestrator can distribute tasks and merge results.",
 
@@ -471,6 +471,7 @@
   "statusBar.newSession": "+",
 
   "info.tabVoice": "voice",
+  "info.tabSprache": "Language",
   "voice.title": "Voice & TTS",
   "voice.ttsEnabled": "TTS (Text-to-Speech)",
   "voice.ttsEngine": "TTS Engine",

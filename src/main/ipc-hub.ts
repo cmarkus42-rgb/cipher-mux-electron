@@ -19,7 +19,6 @@ import type { BtShutterEvent, BtShutterStatus } from './bluetooth/bt-shutter-man
 import type { ConversationTransport } from './voice/conversation-engine'
 import { TaskManager } from './task/task-manager'
 import { TaskWatcher } from './task/task-watcher'
-import { InputRequestWatcher } from './session/input-request-watcher'
 import { TaskHooks } from './task/task-hooks'
 import { BugreportTaskSource } from './task/sources/bugreport-source'
 import { NoteManager } from './notes/note-manager'
@@ -79,7 +78,6 @@ export class IpcHub {
   private taskHooks: TaskHooks | null = null
   private bugreportSource: BugreportTaskSource | null = null
   private bugreportRelaySessionId: string | null = null
-  private inputRequestWatcher: InputRequestWatcher | null = null
   private noteManager!: NoteManager
   private noteTagging!: NoteTagging
   private noteSearchIndex!: NoteSearchIndex
@@ -232,10 +230,8 @@ export class IpcHub {
     this.registerOrchestratorChannels()
     this.registerCyberFactoryChannels()
     this.registerBugreportChannels()
-    this.registerLlmChannels()
     this.registerVoiceChannels()
     this.registerTaskChannels()
-    this.registerInputRequestChannels()
     this.registerPersonaChannels()
     this.registerCharacterChannels()
     this.registerWorkspaceChannels()
@@ -366,7 +362,6 @@ export class IpcHub {
       statusLineMonitor: this.statusLineMonitor,
       kickoffOrchestrator: this.kickoffOrchestrator,
       taskManager: this.taskManager,
-      inputRequestWatcher: this.inputRequestWatcher,
       windowManager: this.windowManager,
       noteManager: this.noteManager,
       noteSearchIndex: this.noteSearchIndex,
@@ -1171,18 +1166,6 @@ export class IpcHub {
     })
   }
 
-  // ─── LLM Provider ─────────────────────────────────────────
-  private registerLlmChannels(): void {
-    ipcMain.handle(IPC.LLM_TEST_CONNECTION, async (_e, { host, port }: { host?: string; port?: number } = {}) => {
-      const { testOllamaConnection } = await import('./bugreport/ollama-client')
-      return testOllamaConnection(host, port)
-    })
-
-    ipcMain.handle(IPC.LLM_LIST_MODELS, async (_e, { host, port }: { host?: string; port?: number } = {}) => {
-      const { listOllamaModels } = await import('./bugreport/ollama-client')
-      return listOllamaModels(host, port)
-    })
-  }
 
   // ─── Voice ──────────────────────────────────────────────
   private registerVoiceChannels(): void {
@@ -1653,59 +1636,6 @@ export class IpcHub {
     })
   }
 
-  // ─── Input Requests (Cyber Factory) ─────────────────────
-  private registerInputRequestChannels(): void {
-    const INPUT_REQUESTS_PATH = BRAND.inputRequestsPath
-      || path.join(BRAND.cyberFactoryDir.replace(/^~/, os.homedir()), 'input-requests.json')
-
-    // Always register the handler so renderer doesn't get "No handler" errors
-    if (!INPUT_REQUESTS_PATH) {
-      console.warn('[IpcHub] inputRequestsPath is empty — InputRequestWatcher disabled. Check BUILD_PROFILE env var.')
-      ipcMain.handle(IPC.CF_INPUT_REQUESTS, () => ({ requests: [] }))
-      return
-    }
-
-    this.inputRequestWatcher = new InputRequestWatcher(INPUT_REQUESTS_PATH)
-
-    // Forward changes to renderer
-    this.inputRequestWatcher.on('requests-changed', (requests: any[]) => {
-      this.windowManager.sendToMainWindow(IPC.CF_INPUT_REQUESTS, { requests })
-    })
-
-    this.inputRequestWatcher.on('request-update', (update: any) => {
-      this.windowManager.sendToMainWindow(IPC.CF_REQUEST_UPDATE, update)
-    })
-
-    this.inputRequestWatcher.start()
-
-    // Get all requests
-    ipcMain.handle(IPC.CF_INPUT_REQUESTS, () => {
-      return { requests: this.inputRequestWatcher?.getRequests() ?? [] }
-    })
-
-    // Answer a request
-    ipcMain.handle(IPC.CF_REQUEST_ANSWERED, (_e, { id, answer }: { id: string; answer: string }) => {
-      this.inputRequestWatcher?.answerRequest(id, answer)
-      return { ok: true }
-    })
-
-    // Open review file in system editor (platform-aware)
-    ipcMain.handle(IPC.CF_OPEN_REVIEW, async (_e, { filePath }: { filePath: string }) => {
-      const { execFile } = await import('child_process')
-      return new Promise((resolve) => {
-        if (process.platform === 'darwin') {
-          execFile('open', ['-a', 'CotEditor', filePath], (err) => {
-            resolve({ ok: !err, error: err?.message })
-          })
-        } else {
-          // Linux: use xdg-open as fallback
-          execFile('xdg-open', [filePath], (err) => {
-            resolve({ ok: !err, error: err?.message })
-          })
-        }
-      })
-    })
-  }
 
   // ─── Personas ─────────────────────────────────────────
   private registerPersonaChannels(): void {
@@ -3016,7 +2946,6 @@ export class IpcHub {
     this.stopBtShutter()
     this.noteManager.destroy()
     this.memoryStore?.close()
-    this.inputRequestWatcher?.stop()
     this.bugreportSource?.stop()
     this.taskWatcher?.stop()
     this.voiceManager?.shutdown()

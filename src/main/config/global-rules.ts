@@ -37,6 +37,16 @@ export const DEFAULT_GLOBAL_RULES = `### Universelle Regeln
 8. **Token-Disziplin.** Antwort-Laenge passt zur Frage. Kein Wiederholen, keine Floskeln, kein "Hoffe das hilft".
 9. **Sicherheit.** Keine PII leaken, keine Credentials lesen/zitieren, keine Default-Geheimnisse in Code.
 
+### Companion Memory
+
+Alle Entities haben Zugriff auf persistente Memory-Tools:
+- \`companion_memory_write\` — Erinnerung speichern (mit scope: user/workspace/session)
+- \`companion_memory_recall\` — letzte Eintraege abrufen (mit scope-Filter)
+- \`companion_memory_search\` — Volltextsuche in Erinnerungen
+- \`companion_memory_forget\` — Eintrag loeschen
+
+Nutze Memory fuer projekt- oder user-spezifisches Wissen das ueber die Session hinaus gilt: Konventionen, Entscheidungen, Praeferenzen. Nicht fuer temporaere Notizen (dafuer \`mux_notes_create\`).
+
 ### MCP-Tool-Grundregeln
 
 - **Session-Handoff Timing:** Nach \`mux_create_session\` mindestens 8-10s warten bevor Instruktionen gesendet werden. tmux + Shell + Claude CLI brauchen Startzeit.

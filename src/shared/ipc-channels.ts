@@ -120,12 +120,6 @@ export const IPC = {
   VOICE_GENERATION_DONE: 'cipher-mux:voice:generation-done',
   VOICE_STOP_PLAYBACK: 'cipher-mux:voice:stop-playback',
 
-  // Input Requests (Cyber Factory)
-  CF_INPUT_REQUESTS: 'cipher-mux:cf:input-requests',
-  CF_REQUEST_ANSWERED: 'cipher-mux:cf:request-answered',
-  CF_OPEN_REVIEW: 'cipher-mux:cf:open-review',
-  CF_REQUEST_UPDATE: 'cipher-mux:cf:request-update',
-
   // Voice Catalog
   VOICE_LIST_INSTALLED: 'cipher-mux:voice:list-installed',
   VOICE_CATALOG_SEARCH: 'cipher-mux:voice:catalog-search',
@@ -244,10 +238,6 @@ export const IPC = {
   CHARACTERS_GLOBAL_PERSONA_SET: 'cipher-mux:characters:global-persona:set',
   ENTITY_PERSONA_OVERRIDE_GET: 'cipher-mux:entity:persona-override:get',
   ENTITY_PERSONA_OVERRIDE_SET: 'cipher-mux:entity:persona-override:set',
-
-  // LLM Provider
-  LLM_TEST_CONNECTION: 'cipher-mux:llm:test-connection',
-  LLM_LIST_MODELS: 'cipher-mux:llm:list-models',
 
   // UI Control (Companion Demo Mode)
   UI_HIGHLIGHT: 'cipher-mux:ui:highlight',
