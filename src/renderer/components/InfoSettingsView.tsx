@@ -376,8 +376,6 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
               const current = await api.config.get('btShutter') ?? {}
               await api.config.set('btShutter', { ...current, enabled: v })
             }}
-            keepWorking={keepWorking}
-            onKeepWorkingChange={async (v) => { setKeepWorking(v); await api.config.set('keepWorking', v) }}
           />
         </>
       )}
@@ -446,6 +444,24 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
               {t('settings.skipPermissionsWarning')}
             </div>
           )}
+
+          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('voice.keepWorking')}</div>
+          <div class="settings-section__hint">{t('voice.keepWorkingHint')}</div>
+          <div class="settings-row" style={{ marginTop: '8px' }}>
+            <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={keepWorking}
+                onChange={async (e) => {
+                  const v = (e.target as HTMLInputElement).checked
+                  setKeepWorking(v)
+                  await api.config.set('keepWorking', v)
+                }}
+                style={{ marginRight: '8px' }}
+              />
+              <span>{t('voice.keepWorkingLabel')}</span>
+            </label>
+          </div>
 
           <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.bugreport')}</div>
           <div class="settings-section__hint">{t('settings.bugreportHint')}</div>

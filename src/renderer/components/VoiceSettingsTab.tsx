@@ -36,8 +36,6 @@ interface VoiceSettingsTabProps {
   onVoiceSubmitModeChange: (v: 'auto' | 'manual') => void
   btShutterEnabled: boolean
   onBtShutterEnabledChange: (v: boolean) => void
-  keepWorking: boolean
-  onKeepWorkingChange: (v: boolean) => void
 }
 
 export function VoiceSettingsTab({
@@ -47,7 +45,6 @@ export function VoiceSettingsTab({
   voiceCommandsEnabled, onVoiceCommandsEnabledChange,
   voiceSubmitMode, onVoiceSubmitModeChange,
   btShutterEnabled, onBtShutterEnabledChange,
-  keepWorking, onKeepWorkingChange,
 }: VoiceSettingsTabProps) {
   const { t } = useTranslation()
 
@@ -239,21 +236,6 @@ export function VoiceSettingsTab({
             style={{ marginRight: '8px' }}
           />
           <span>{t('voice.btShutter')}</span>
-        </label>
-      </div>
-
-      {/* Keep Working */}
-      <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('voice.keepWorking')}</div>
-      <div class="settings-section__hint">{t('voice.keepWorkingHint')}</div>
-      <div class="settings-row" style={{ marginTop: '8px' }}>
-        <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
-          <input
-            type="checkbox"
-            checked={keepWorking}
-            onChange={(e) => onKeepWorkingChange((e.target as HTMLInputElement).checked)}
-            style={{ marginRight: '8px' }}
-          />
-          <span>{t('voice.keepWorkingLabel')}</span>
         </label>
       </div>
 

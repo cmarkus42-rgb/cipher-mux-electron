@@ -763,10 +763,10 @@ export class IpcHub {
         execFileSync('screencapture', ['-i', filePath], { timeout: 30000 })
         if (!fsNode.existsSync(filePath)) return null
 
-        // Send path to the session via tmux
+        // Send filename to the session via tmux (full path is in clipboard)
         if (session?.tmuxSession) {
-          const escapedPath = filePath.replace(/'/g, "'\\''")
-          await this.sessionManager.sendKeys(sessionId, `# Screenshot: ${escapedPath}\r`)
+          const fileName = pathNode.basename(filePath)
+          await this.sessionManager.sendKeys(sessionId, `# Screenshot: ${fileName} (Pfad im Clipboard)\r`)
         }
         return { path: filePath }
       } catch {
