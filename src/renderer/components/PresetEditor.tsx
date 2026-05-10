@@ -1,5 +1,5 @@
 // src/renderer/components/PresetEditor.tsx — Entity preset CLAUDE.md editor + Global Rules editor
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
+import { useCallback, useEffect, useState } from 'preact/hooks'
 import type { Character } from '../../shared/types'
 import { PRESET_PERSONA_DEFAULTS } from '../../shared/constants'
 
@@ -44,17 +44,6 @@ interface InjectedSection {
   source: string
 }
 
-
-/** Extract H2 headings with their line indices for navigation. */
-function extractH2Headings(content: string): { label: string; lineIndex: number }[] {
-  const headings: { label: string; lineIndex: number }[] = []
-  const lines = content.split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^##\s+(.+)/)
-    if (m) headings.push({ label: m[1].trim(), lineIndex: i })
-  }
-  return headings
-}
 
 // ─── Global Rules Editor ────────────────────────────────────
 function GlobalRulesEditor() {
@@ -151,9 +140,6 @@ export function PresetEditor() {
   const [showCreate, setShowCreate] = useState(false)
   const [newId, setNewId] = useState('')
   const [newName, setNewName] = useState('')
-
-  // Textarea ref for H2 heading navigation (must be at component top level)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const loadPresets = useCallback(async () => {
     try {
@@ -482,81 +468,36 @@ export function PresetEditor() {
                 </select>
               </div>
               <div class="pp-hint" style={{ marginTop: '2px' }}>
-                Personas are created in the Companion tab. Changes apply on next session start.
+                Personas werden im Companion-Tab erstellt. Aenderungen gelten ab dem naechsten Session-Start.
               </div>
             </div>
           )}
 
-          {/* CLAUDE.md editor — full content with H2 navigation */}
-          {(() => {
-            const headings = extractH2Headings(draftContent)
-            const scrollToHeading = (lineIndex: number) => {
-              const ta = textareaRef.current
-              if (!ta || ta.clientWidth === 0) return
-              const lines = draftContent.split('\n')
-              let charPos = 0
-              for (let i = 0; i < lineIndex && i < lines.length; i++) {
-                charPos += lines[i].length + 1
-              }
-              // Measure actual scroll position using a mirror div (handles word-wrap correctly)
-              const mirror = document.createElement('div')
-              const style = window.getComputedStyle(ta)
-              mirror.style.cssText = `position:absolute;visibility:hidden;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:break-word;box-sizing:border-box;overflow:hidden;height:auto;border:none;`
-              mirror.style.width = `${ta.clientWidth}px`
-              mirror.style.font = style.font
-              mirror.style.letterSpacing = style.letterSpacing
-              mirror.style.padding = style.padding
-              mirror.style.lineHeight = style.lineHeight
-              mirror.textContent = draftContent.slice(0, charPos)
-              document.body.appendChild(mirror)
-              const targetY = mirror.scrollHeight
-              document.body.removeChild(mirror)
-              ta.scrollTop = Math.max(0, targetY - ta.clientHeight * 0.15)
-              ta.focus()
-              ta.setSelectionRange(charPos, charPos)
-            }
-            return (
-              <div class="pp-field" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <label style={{ margin: 0 }}>preset.md</label>
-                  <button
-                    onClick={handleShowInjected}
-                    title="Show injected sections"
-                    style={{ width: '18px', height: '18px', borderRadius: '50%', border: '1px solid var(--color-border)', background: 'none', color: 'var(--color-text-dim)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1, fontStyle: 'italic', fontFamily: 'serif' }}
-                  >i</button>
-                  <CopyButton getText={() => draftContent} />
-                </div>
-                <div class="pp-hint">
-                  Editierbarer Preset-Content (Markdown) — definiert Rolle, Regeln und Tools. Injizierte Sections (Persona, Global Rules) werden bei Session-Start automatisch angefuegt.
-                </div>
-                <div class="pp-hint" style={{ marginTop: 4, color: 'var(--color-warning)' }}>
-                  Aenderungen werden erst fuer neu gestartete Sessions wirksam.
-                </div>
-                {headings.length > 0 && (
-                  <div class="preset-tabs" style={{ marginBottom: '4px', flexWrap: 'wrap' }}>
-                    {headings.map((h, i) => (
-                      <button
-                        key={i}
-                        class="preset-tab"
-                        onClick={() => scrollToHeading(h.lineIndex)}
-                        title={`Go to ## ${h.label}`}
-                      >
-                        {h.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <textarea
-                  ref={textareaRef}
-                  value={draftContent}
-                  readOnly={!editConfirmed}
-                  onInput={e => handleContentChange((e.target as HTMLTextAreaElement).value)}
-                  placeholder="# Entity Name&#10;&#10;Rolle, Lifecycle, MCP-Tools, Regeln..."
-                  style={{ minHeight: '360px', flex: 1, fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: '1.5', opacity: editConfirmed ? 1 : 0.7 }}
-                />
-              </div>
-            )
-          })()}
+          {/* CLAUDE.md editor — full content */}
+          <div class="pp-field" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <label style={{ margin: 0 }}>preset.md</label>
+              <button
+                onClick={handleShowInjected}
+                title="Show injected sections"
+                style={{ width: '18px', height: '18px', borderRadius: '50%', border: '1px solid var(--color-border)', background: 'none', color: 'var(--color-text-dim)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1, fontStyle: 'italic', fontFamily: 'serif' }}
+              >i</button>
+              <CopyButton getText={() => draftContent} />
+            </div>
+            <div class="pp-hint">
+              Editierbarer Preset-Content (Markdown) — definiert Rolle, Regeln und Tools. Injizierte Sections (Persona, Global Rules) werden bei Session-Start automatisch angefuegt.
+            </div>
+            <div class="pp-hint" style={{ marginTop: 4, color: 'var(--color-warning)' }}>
+              Aenderungen werden erst fuer neu gestartete Sessions wirksam.
+            </div>
+            <textarea
+              value={draftContent}
+              readOnly={!editConfirmed}
+              onInput={e => handleContentChange((e.target as HTMLTextAreaElement).value)}
+              placeholder="# Entity Name&#10;&#10;Rolle, Lifecycle, MCP-Tools, Regeln..."
+              style={{ minHeight: '360px', flex: 1, fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: '1.5', opacity: editConfirmed ? 1 : 0.7 }}
+            />
+          </div>
 
           {!isBuiltinPreset && (
             <div class="pp-foot-actions">
