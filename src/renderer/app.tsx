@@ -125,21 +125,29 @@ export function App() {
     return getFocusModeOverlappedSlots(grid, focusModeSlot)
   }, [focusModeSlot, grid])
 
-  const handleFocusMode = useCallback((sessionId: string) => {
+  const handleFocusModeBySession = useCallback((sessionId: string) => {
     const idx = grid.slots.findIndex(s => s.sessionId === sessionId)
     if (idx === -1) return
     setFocusModeSlot(prev => prev === idx ? null : idx)
   }, [grid])
 
+  const handleFocusModeBySlot = useCallback((slotIndex: number) => {
+    setFocusModeSlot(prev => prev === slotIndex ? null : slotIndex)
+  }, [])
+
   const exitFocusMode = useCallback(() => {
     setFocusModeSlot(null)
   }, [])
 
-  // Auto-exit focus mode when the focused session is removed from grid
+  // Auto-exit focus mode when the focused slot becomes empty (session removed or notes closed)
   useEffect(() => {
     if (focusModeSlot === null) return
     const slot = grid.slots[focusModeSlot]
-    if (!slot?.sessionId) setFocusModeSlot(null)
+    if (!slot) { setFocusModeSlot(null); return }
+    // Session slot without session → exit
+    if (slot.type === 'session' && !slot.sessionId) setFocusModeSlot(null)
+    // Notes slot that was converted back to session (closed) → exit
+    // (Notes cells always have type='notes', so this catches close)
   }, [grid.slots, focusModeSlot])
 
   // Grid navigation: move focus to adjacent cell in the given direction
@@ -181,7 +189,7 @@ export function App() {
         if (focusModeSlot !== null) {
           setFocusModeSlot(null)
         } else if (focusedSessionId) {
-          handleFocusMode(focusedSessionId)
+          handleFocusModeBySession(focusedSessionId)
         }
       },
     },
@@ -250,7 +258,7 @@ export function App() {
         return false
       },
     },
-  ], [t, bugreportVisible, infoVisible, workspacesPopupVisible, placementPopup, grid.slots, isSpeaking, stopSpeech, focusModeSlot, focusedSessionId, handleFocusMode, navigateGrid])
+  ], [t, bugreportVisible, infoVisible, workspacesPopupVisible, placementPopup, grid.slots, isSpeaking, stopSpeech, focusModeSlot, focusedSessionId, handleFocusModeBySession, navigateGrid])
   useShortcuts(shortcutEntries)
 
   const focusedSessionName = useMemo(() => {
@@ -1273,7 +1281,8 @@ export function App() {
           onFork={handleFork}
           onSendToBackground={handleSendToBackground}
           onDetach={handleDetachSession}
-          onFocusMode={handleFocusMode}
+          onFocusMode={handleFocusModeBySession}
+          onFocusModeBySlot={handleFocusModeBySlot}
           focusModeSlot={focusModeSlot}
           focusModeOverlapped={focusModeOverlapped}
           onStartEntity={handleStartEntity}
@@ -1314,7 +1323,12 @@ export function App() {
 
       <FocusMode
         enabled={focusModeSlot !== null}
-        sessionName={focusModeSlot !== null ? (sessions.find(s => s.id === grid.slots[focusModeSlot]?.sessionId)?.name ?? null) : null}
+        cellLabel={focusModeSlot !== null
+          ? (grid.slots[focusModeSlot]?.type === 'notes'
+            ? 'Notes'
+            : sessions.find(s => s.id === grid.slots[focusModeSlot]?.sessionId)?.name ?? null)
+          : null}
+        isNotesCell={focusModeSlot !== null && grid.slots[focusModeSlot]?.type === 'notes'}
         contextPct={focusModeSlot !== null ? (contextUsages[grid.slots[focusModeSlot]?.sessionId ?? '']?.usedPercentage ?? 0) : 0}
         onDeactivate={exitFocusMode}
       />

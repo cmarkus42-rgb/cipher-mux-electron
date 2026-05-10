@@ -114,26 +114,62 @@ export function nextRowSpan(currentSpan: number, maxRows: number): number {
   return (currentSpan % maxRows) + 1
 }
 
+/** Compute the 2x2 anchor position for focus mode.
+ *  The anchor is the top-left corner of the 2x2 block containing focusSlotIdx.
+ *  Clamps to grid edges so the block never overflows. */
+function getFocusAnchor(cols: number, rows: number, focusSlotIdx: number): { anchorCol: number; anchorRow: number } {
+  const focusCol = focusSlotIdx % cols
+  const focusRow = Math.floor(focusSlotIdx / cols)
+  const anchorCol = Math.min(focusCol, cols - 2)
+  const anchorRow = Math.min(focusRow, rows - 2)
+  return { anchorCol: Math.max(0, anchorCol), anchorRow: Math.max(0, anchorRow) }
+}
+
 /** Compute which slot indices are overlapped when a cell enters focus mode (2x2).
  *  Returns the set of indices that should be hidden, excluding the focus slot itself.
- *  If the grid is too small for 2x2 (1 col or 1 row), returns empty set. */
+ *  Fallback: 1-row or 1-col grids get full-row/full-col overlap. 1x1 → empty set. */
 export function getFocusModeOverlappedSlots(state: GridState, focusSlotIdx: number): Set<number> {
   const overlapped = new Set<number>()
+  const { cols, rows } = state.config
   if (focusSlotIdx < 0 || focusSlotIdx >= state.slots.length) return overlapped
 
-  // Full-screen: all slots except the focused one are overlapped
-  for (let i = 0; i < state.slots.length; i++) {
-    if (i !== focusSlotIdx) overlapped.add(i)
+  // 1x1: no room
+  if (cols <= 1 && rows <= 1) return overlapped
+
+  // Fallback: 1-row or 1-col → full-row/full-col (all except focus)
+  if (cols <= 1 || rows <= 1) {
+    for (let i = 0; i < state.slots.length; i++) {
+      if (i !== focusSlotIdx) overlapped.add(i)
+    }
+    return overlapped
+  }
+
+  // 2x2 block
+  const { anchorCol, anchorRow } = getFocusAnchor(cols, rows, focusSlotIdx)
+  for (let r = 0; r < 2; r++) {
+    for (let c = 0; c < 2; c++) {
+      const idx = (anchorRow + r) * cols + (anchorCol + c)
+      if (idx !== focusSlotIdx) overlapped.add(idx)
+    }
   }
   return overlapped
 }
 
-/** Compute CSS grid placement for a focus-mode cell (full grid).
- *  Returns gridColumn and gridRow CSS values spanning the entire grid. */
-export function getFocusModePlacement(cols: number, rows: number, _focusSlotIdx: number): { gridColumn: string; gridRow: string } {
+/** Compute CSS grid placement for a focus-mode cell (2x2 block).
+ *  Fallback: 1-row or 1-col grids span the full row/column. */
+export function getFocusModePlacement(cols: number, rows: number, focusSlotIdx: number): { gridColumn: string; gridRow: string } {
+  // Fallback: single dimension → span all
+  if (cols <= 1 || rows <= 1) {
+    return {
+      gridColumn: `1 / ${cols + 1}`,
+      gridRow: `1 / ${rows + 1}`,
+    }
+  }
+
+  const { anchorCol, anchorRow } = getFocusAnchor(cols, rows, focusSlotIdx)
   return {
-    gridColumn: `1 / ${cols + 1}`,
-    gridRow: `1 / ${rows + 1}`,
+    gridColumn: `${anchorCol + 1} / ${anchorCol + 3}`,
+    gridRow: `${anchorRow + 1} / ${anchorRow + 3}`,
   }
 }
 
