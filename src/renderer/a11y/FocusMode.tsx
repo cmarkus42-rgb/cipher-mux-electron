@@ -4,17 +4,18 @@ import { getTerminalFontSize, setTerminalFontSize } from './terminal-font-size'
 
 interface FocusModeProps {
   enabled: boolean
-  sessionName: string | null
+  cellLabel: string | null
+  isNotesCell?: boolean
   contextPct: number
   onDeactivate: () => void
 }
 
 /**
  * Focus Mode control panel — renders when focus mode is active.
- * Full-screen expansion is handled by SessionGrid via grid placement.
+ * 2x2 expansion is handled by SessionGrid via grid placement.
  * This component provides the floating control bar with font size controls.
  */
-export function FocusMode({ enabled, sessionName, contextPct, onDeactivate }: FocusModeProps) {
+export function FocusMode({ enabled, cellLabel, isNotesCell, contextPct, onDeactivate }: FocusModeProps) {
   const [fontSize, setFontSize] = useState(() => getTerminalFontSize())
   const [panelExpanded, setPanelExpanded] = useState(false)
 
@@ -58,10 +59,12 @@ export function FocusMode({ enabled, sessionName, contextPct, onDeactivate }: Fo
 
   return (
     <div class="focus-mode-bar" role="status" aria-label="Focus Mode aktiv">
-      <span class="focus-bar__name">{sessionName ?? 'Session'}</span>
-      <span class={`focus-bar__ctx ${ctxClass}`} aria-label={`Context: ${contextPct}%`}>
-        CTX {contextPct}%
-      </span>
+      <span class="focus-bar__name">{cellLabel ?? 'Session'}</span>
+      {!isNotesCell && (
+        <span class={`focus-bar__ctx ${ctxClass}`} aria-label={`Context: ${contextPct}%`}>
+          CTX {contextPct}%
+        </span>
+      )}
 
       <span class="focus-bar__sep">|</span>
 

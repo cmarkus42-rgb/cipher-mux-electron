@@ -8,6 +8,9 @@ import { TestcaseView } from './TestcaseView'
 import { useNotes } from '../hooks/useNotes'
 import type { NoteInfo } from '../../shared/types'
 import type { ParsedTestcase, TestcaseSection } from '../../main/notes/testcase-parser'
+import { ExternalLink, Maximize2, Minimize2, X } from 'lucide-preact'
+
+const ICON_SIZE = 14
 
 interface NoteTab {
   id: string
@@ -34,6 +37,9 @@ interface NotesCellProps {
   onOpenNoteIdsChange?: (noteIds: string[]) => void
   onClose: () => void
   onToggleExpand: () => void
+  onDetach?: () => void
+  onFocusMode?: () => void
+  focusModeStyle?: Record<string, string>
   onDragStart: () => void
   onDragOver: (e: DragEvent) => void
   onDragLeave: () => void
@@ -52,6 +58,9 @@ export function NotesCell({
   onOpenNoteIdsChange,
   onClose,
   onToggleExpand,
+  onDetach,
+  onFocusMode,
+  focusModeStyle,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -356,12 +365,16 @@ export function NotesCell({
   }, [openNote, onDrop])
 
   const isAtMax = rowSpan >= maxRows
-  const cellStyle = rowSpan > 1 ? { gridRow: `span ${rowSpan}` } : undefined
+  const isFocusMode = !!focusModeStyle
+  const cellStyle = {
+    ...(rowSpan > 1 && !isFocusMode ? { gridRow: `span ${rowSpan}` } : {}),
+    ...focusModeStyle,
+  }
 
   return (
     <div
-      class={`session-cell notes-cell${dragOver ? ' session-cell--drag-over' : ''}`}
-      style={cellStyle}
+      class={`session-cell notes-cell${dragOver ? ' session-cell--drag-over' : ''}${isFocusMode ? ' session-cell--focus-mode' : ''}`}
+      style={Object.keys(cellStyle).length > 0 ? cellStyle : undefined}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={handleNoteDrop}
@@ -379,28 +392,36 @@ export function NotesCell({
           )}
         </div>
         <div class="cell-header__right">
+          {onFocusMode && (
+            <button
+              class={`cell-btn${isFocusMode ? ' cell-btn--active' : ''}`}
+              onClick={(e) => { e.stopPropagation(); onFocusMode() }}
+              title={isFocusMode ? 'Focus Mode beenden (Escape)' : 'Focus Mode (Cmd+Shift+F)'}
+              aria-label="Focus Mode"
+            >{isFocusMode ? <Minimize2 size={ICON_SIZE} /> : <Maximize2 size={ICON_SIZE} />}</button>
+          )}
           {maxRows > 1 && (
             <button
               class={`cell-btn ${isAtMax ? 'cell-btn--active' : ''}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                onToggleExpand()
-              }}
+              onClick={(e) => { e.stopPropagation(); onToggleExpand() }}
               title={isAtMax ? t('notesCell.collapseHeight') : t('notesCell.expandHeight')}
-            >
-              {isAtMax ? '↥' : '↧'}
-            </button>
+              aria-label={isAtMax ? 'Collapse' : 'Expand'}
+            >{isAtMax ? <Minimize2 size={ICON_SIZE} /> : <Maximize2 size={ICON_SIZE} />}</button>
+          )}
+          {onDetach && (
+            <button
+              class="cell-btn"
+              onClick={(e) => { e.stopPropagation(); onDetach() }}
+              title={t('notesCell.detach', 'Pop Out')}
+              aria-label="Pop Out"
+            ><ExternalLink size={ICON_SIZE} /></button>
           )}
           <button
             class="cell-btn"
-            onClick={(e) => {
-              e.stopPropagation()
-              onClose()
-            }}
+            onClick={(e) => { e.stopPropagation(); onClose() }}
             title={t('notesCell.closeNotes')}
-          >
-            ✕
-          </button>
+            aria-label="Close"
+          ><X size={ICON_SIZE} /></button>
         </div>
       </div>
 

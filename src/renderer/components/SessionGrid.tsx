@@ -35,6 +35,7 @@ interface SessionGridProps {
   onSendToBackground: (sessionId: string) => void
   onDetach?: (sessionId: string) => void
   onFocusMode?: (sessionId: string) => void
+  onFocusModeBySlot?: (slotIndex: number) => void
   focusModeSlot?: number | null
   focusModeOverlapped?: Set<number>
   onStartEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
@@ -61,7 +62,7 @@ export function SessionGrid({
   voiceTargetSessionId, voicePinned, voiceState, isSpeaking, onToggleVoicePin,
   workspaceLoading,
   onFocusSession, onCloseSession,
-  onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDetach, onFocusMode,
+  onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDetach, onFocusMode, onFocusModeBySlot,
   focusModeSlot, focusModeOverlapped,
   onStartEntity, onResumeEntity, onFocusEntity, onStartPath,
   onOpenNotes, onOpenNote, onCloseNotes, onOpenNoteIdsChange, onToggleExpandSlot, onSwap,
@@ -229,7 +230,7 @@ export function SessionGrid({
             return (
               <NotesCell
                 key={slot.notesId || `notes-${idx}`}
-                rowSpan={slot.rowSpan}
+                rowSpan={isFocusModeTarget ? 1 : slot.rowSpan}
                 maxRows={rows}
                 activeWorkspaceId={activeWorkspaceId}
                 slotIndex={idx}
@@ -239,6 +240,8 @@ export function SessionGrid({
                 onOpenNoteIdsChange={(ids: string[]) => onOpenNoteIdsChange(idx, ids)}
                 onClose={() => onCloseNotes(idx)}
                 onToggleExpand={() => onToggleExpandSlot(idx)}
+                onFocusMode={onFocusModeBySlot ? () => onFocusModeBySlot(idx) : undefined}
+                focusModeStyle={isFocusModeTarget ? focusStyle : undefined}
                 onDragStart={() => handleDragStart(idx)}
                 onDragOver={(e: DragEvent) => handleDragOver(idx, e)}
                 onDragLeave={handleDragLeave}
