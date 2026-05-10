@@ -1244,7 +1244,7 @@ export class IpcHub {
         return { ok: true }
       } catch (err) {
         const msg = (err as Error).message
-        this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, msg)
+        this.windowManager.sendToAllWindows(IPC.VOICE_ERROR, msg)
         return { ok: false, error: msg }
       }
     })
@@ -1293,13 +1293,13 @@ export class IpcHub {
         console.log('[Voice] Creating new VoiceManager (skipTTS: true)')
         this.voiceManager = new VoiceManager({ skipTTS: true })
         const transport: ConversationTransport = {
-          sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
-          sendStopCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'processing'),
-          sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
-          sendAudioPlayback: (b64) => this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_AUDIO, b64),
-          sendStateChange: (state) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state),
-          sendStopPlayback: () => this.windowManager.sendToMainWindow(IPC.VOICE_STOP_PLAYBACK, null),
-          sendGenerationDone: () => this.windowManager.sendToMainWindow(IPC.VOICE_GENERATION_DONE, null),
+          sendStartCapture: () => this.windowManager.sendToAllWindows(IPC.VOICE_STATE, 'recording'),
+          sendStopCapture: () => this.windowManager.sendToAllWindows(IPC.VOICE_STATE, 'processing'),
+          sendTranscription: (text) => this.windowManager.sendToAllWindows(IPC.VOICE_TRANSCRIPTION, text),
+          sendAudioPlayback: (b64) => this.windowManager.sendToAllWindows(IPC.VOICE_AGENT_AUDIO, b64),
+          sendStateChange: (state) => this.windowManager.sendToAllWindows(IPC.VOICE_STATE, state),
+          sendStopPlayback: () => this.windowManager.sendToAllWindows(IPC.VOICE_STOP_PLAYBACK, null),
+          sendGenerationDone: () => this.windowManager.sendToAllWindows(IPC.VOICE_GENERATION_DONE, null),
           dispatchStatus: (text: string, level: string) => console.log(`[Voice:${level}] ${text}`),
           cancelStream: () => {},
         }
@@ -1311,35 +1311,35 @@ export class IpcHub {
         inputRouter.setSubmitMode(configStore.get('voiceSubmitMode') ?? 'auto')
         inputRouter.on('dispatched', (data: { sessionId: string; sessionName: string; text: string }) => {
           console.log('[Voice] Dispatched to session:', data.sessionName, 'text:', data.text.slice(0, 80))
-          this.windowManager.sendToMainWindow(IPC.VOICE_DISPATCHED, data)
+          this.windowManager.sendToAllWindows(IPC.VOICE_DISPATCHED, data)
         })
         inputRouter.on('error', (data: { code: string; message: string }) => {
           console.log('[Voice] InputRouter error:', data.code, data.message)
-          this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, data.message)
+          this.windowManager.sendToAllWindows(IPC.VOICE_ERROR, data.message)
         })
         inputRouter.on('activeSessionChanged', (sessionId: string | null) => {
-          this.windowManager.sendToMainWindow(IPC.VOICE_ACTIVE_SESSION, { sessionId })
+          this.windowManager.sendToAllWindows(IPC.VOICE_ACTIVE_SESSION, { sessionId })
         })
         inputRouter.on('notesInsert', (text: string) => {
-          this.windowManager.sendToMainWindow(IPC.VOICE_NOTES_INSERT, { text: text.trimEnd() + ' ' })
+          this.windowManager.sendToAllWindows(IPC.VOICE_NOTES_INSERT, { text: text.trimEnd() + ' ' })
         })
         inputRouter.on('pinChanged', (data: { pinned: boolean; sessionId: string | null }) => {
-          this.windowManager.sendToMainWindow(IPC.VOICE_PIN_STATUS, data)
+          this.windowManager.sendToAllWindows(IPC.VOICE_PIN_STATUS, data)
         })
         inputRouter.on('scroll', (data: { sessionId: string; action: string }) => {
           console.log('[Voice] Scroll command:', data.action, 'session:', data.sessionId)
-          this.windowManager.sendToMainWindow(IPC.CELL_SCROLL, {
+          this.windowManager.sendToAllWindows(IPC.CELL_SCROLL, {
             sessionId: data.sessionId,
             action: data.action,
           })
         })
         inputRouter.on('gridNav', (data: { direction: string }) => {
           console.log('[Voice] Grid nav:', data.direction)
-          this.windowManager.sendToMainWindow(IPC.GRID_NAV, data)
+          this.windowManager.sendToAllWindows(IPC.GRID_NAV, data)
         })
         inputRouter.on('clipboard', (data: { action: string }) => {
           console.log('[Voice] Clipboard command:', data.action)
-          this.windowManager.sendToMainWindow(IPC.VOICE_CLIPBOARD, data)
+          this.windowManager.sendToAllWindows(IPC.VOICE_CLIPBOARD, data)
         })
         inputRouter.on('speechInterrupt', () => {
           console.log('[Voice] Speech interrupt — stopping TTS')
@@ -1354,7 +1354,7 @@ export class IpcHub {
           this.voiceManager.shutdown()
           this.voiceManager = null
         }
-        this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, msg)
+        this.windowManager.sendToAllWindows(IPC.VOICE_ERROR, msg)
         return { ok: false, error: msg }
       }
     })
@@ -1374,19 +1374,19 @@ export class IpcHub {
         console.log('[Voice] Creating VoiceManager for COM mode (with TTS)')
         this.voiceManager = new VoiceManager({ skipTTS: false })
         const transport: ConversationTransport = {
-          sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
-          sendStopCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'processing'),
-          sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
+          sendStartCapture: () => this.windowManager.sendToAllWindows(IPC.VOICE_STATE, 'recording'),
+          sendStopCapture: () => this.windowManager.sendToAllWindows(IPC.VOICE_STATE, 'processing'),
+          sendTranscription: (text) => this.windowManager.sendToAllWindows(IPC.VOICE_TRANSCRIPTION, text),
           sendAudioPlayback: (b64) => {
-            this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_AUDIO, b64)
-            this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'speaking')
+            this.windowManager.sendToAllWindows(IPC.VOICE_AGENT_AUDIO, b64)
+            this.windowManager.sendToAllWindows(IPC.VOICE_COM_STATE, 'speaking')
           },
           sendStateChange: (state) => {
-            this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state)
-            this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, state)
+            this.windowManager.sendToAllWindows(IPC.VOICE_STATE, state)
+            this.windowManager.sendToAllWindows(IPC.VOICE_COM_STATE, state)
           },
-          sendStopPlayback: () => this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'idle'),
-          sendGenerationDone: () => this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'idle'),
+          sendStopPlayback: () => this.windowManager.sendToAllWindows(IPC.VOICE_COM_STATE, 'idle'),
+          sendGenerationDone: () => this.windowManager.sendToAllWindows(IPC.VOICE_COM_STATE, 'idle'),
           dispatchStatus: (text: string, level: string) => console.log(`[Voice:${level}] ${text}`),
           cancelStream: () => {},
         }
@@ -1398,22 +1398,22 @@ export class IpcHub {
         const inputRouter = this.voiceManager.startSessionMode(this.sessionManager)
         inputRouter.on('dispatched', (data: { sessionId: string; sessionName: string; text: string }) => {
           console.log('[Voice] COM dispatched to:', data.sessionName, 'text:', data.text.slice(0, 80))
-          this.windowManager.sendToMainWindow(IPC.VOICE_DISPATCHED, data)
+          this.windowManager.sendToAllWindows(IPC.VOICE_DISPATCHED, data)
         })
         inputRouter.on('error', (data: { code: string; message: string }) => {
-          this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, data.message)
+          this.windowManager.sendToAllWindows(IPC.VOICE_ERROR, data.message)
         })
         inputRouter.on('scroll', (data: { sessionId: string; action: string }) => {
-          this.windowManager.sendToMainWindow(IPC.CELL_SCROLL, {
+          this.windowManager.sendToAllWindows(IPC.CELL_SCROLL, {
             sessionId: data.sessionId,
             action: data.action,
           })
         })
         inputRouter.on('gridNav', (data: { direction: string }) => {
-          this.windowManager.sendToMainWindow(IPC.GRID_NAV, data)
+          this.windowManager.sendToAllWindows(IPC.GRID_NAV, data)
         })
         inputRouter.on('clipboard', (data: { action: string }) => {
-          this.windowManager.sendToMainWindow(IPC.VOICE_CLIPBOARD, data)
+          this.windowManager.sendToAllWindows(IPC.VOICE_CLIPBOARD, data)
         })
         inputRouter.on('speechInterrupt', () => {
           console.log('[Voice] COM speech interrupt — stopping TTS')
@@ -1436,7 +1436,7 @@ export class IpcHub {
           // Already running — no additional setup needed
         }
 
-        this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'idle')
+        this.windowManager.sendToAllWindows(IPC.VOICE_COM_STATE, 'idle')
         console.log('[Voice] VOICE_START_COM => ok')
         this.startBtShutter()
         return { ok: true }
@@ -1447,7 +1447,7 @@ export class IpcHub {
           this.voiceManager.shutdown()
           this.voiceManager = null
         }
-        this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, msg)
+        this.windowManager.sendToAllWindows(IPC.VOICE_ERROR, msg)
         return { ok: false, error: msg }
       }
     })
@@ -1478,7 +1478,7 @@ export class IpcHub {
           }
           await this.sessionManager.stopEntity('voice-relay')
         }
-        this.windowManager.sendToMainWindow(IPC.VOICE_COM_STATE, 'idle')
+        this.windowManager.sendToAllWindows(IPC.VOICE_COM_STATE, 'idle')
         return { ok: true }
       } catch (err) {
         return { ok: false, error: (err as Error).message }
@@ -1505,11 +1505,11 @@ export class IpcHub {
       } else {
         router.unpinSession()
       }
-      this.windowManager.sendToMainWindow(IPC.VOICE_PIN_STATUS, {
+      this.windowManager.sendToAllWindows(IPC.VOICE_PIN_STATUS, {
         pinned: router.isPinned(),
         sessionId: router.getPinnedSessionId(),
       })
-      this.windowManager.sendToMainWindow(IPC.VOICE_ACTIVE_SESSION, {
+      this.windowManager.sendToAllWindows(IPC.VOICE_ACTIVE_SESSION, {
         sessionId: router.getActiveSessionId(),
       })
     })
