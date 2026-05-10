@@ -223,14 +223,6 @@ const api = {
     },
   },
 
-  // ─── LLM Provider ─────────────────────────────────────────
-  llm: {
-    testConnection: (host?: string, port?: number): Promise<{ ok: boolean; error?: string }> =>
-      ipcRenderer.invoke(IPC.LLM_TEST_CONNECTION, { host, port }),
-    listModels: (host?: string, port?: number): Promise<string[]> =>
-      ipcRenderer.invoke(IPC.LLM_LIST_MODELS, { host, port }),
-  },
-
   // ─── Tasks ──────────────────────────────────────────────
   tasks: {
     list: (filter?: unknown) => ipcRenderer.invoke(IPC.TASKS_LIST, filter),
@@ -367,24 +359,6 @@ const api = {
     },
   },
 
-  // ─── Input Requests (Cyber Factory) ──────────────────────
-  inputRequests: {
-    get: () => ipcRenderer.invoke(IPC.CF_INPUT_REQUESTS),
-    answer: (id: string, answer: string) =>
-      ipcRenderer.invoke(IPC.CF_REQUEST_ANSWERED, { id, answer }),
-    openReview: (filePath: string) =>
-      ipcRenderer.invoke(IPC.CF_OPEN_REVIEW, { filePath }),
-    onChanged: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
-      ipcRenderer.on(IPC.CF_INPUT_REQUESTS, handler)
-      return () => ipcRenderer.removeListener(IPC.CF_INPUT_REQUESTS, handler)
-    },
-    onUpdate: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
-      ipcRenderer.on(IPC.CF_REQUEST_UPDATE, handler)
-      return () => ipcRenderer.removeListener(IPC.CF_REQUEST_UPDATE, handler)
-    },
-  },
 
   // ─── Personas (legacy) ──────────────────────────────────
   personas: {

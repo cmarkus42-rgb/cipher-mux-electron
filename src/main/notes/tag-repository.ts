@@ -8,7 +8,7 @@ const TAGS_FILENAME = '.tags.json'
 
 export const SEED_CLASSES: Record<string, TagClass> = {
   kind: {
-    values: ['bugreport', 'feature', 'research', 'journal', 'reference', 'testcase', 'handoff', 'idea', 'todo'],
+    values: ['bugreport', 'feature-request', 'reference', 'testcase', 'handoff', 'spec', 'todo'],
     color: '#6366f1',
   },
   status: {
@@ -16,11 +16,11 @@ export const SEED_CLASSES: Record<string, TagClass> = {
     color: '#f59e0b',
   },
   domain: {
-    values: ['trading', 'infra', 'coding', 'ai-ml', 'security', 'automation'],
+    values: ['ui'],
     color: '#10b981',
   },
   project: {
-    values: ['cipher-mux', 'cipher-boox', 'openclaw'],
+    values: ['cipher-mux'],
     color: '#8b5cf6',
   },
   scope: {

@@ -34,15 +34,9 @@ interface InfoSettingsViewProps {
 
 const api = (window as any).cipherMux
 
-interface LlmConfig {
-  ollamaHost: string
-  ollamaPort: number
-  ollamaModel: string
-}
-
-type TabId = 'general' | 'voice' | 'themes' | 'models' | 'shortcuts' | 'a11y' | 'about'
+type TabId = 'general' | 'sprache' | 'themes' | 'shortcuts' | 'a11y' | 'about'
 // Legacy alias for external consumers
-type LegacyTabId = 'settings' | TabId
+type LegacyTabId = 'settings' | 'models' | 'voice' | TabId
 
 // Built-in shortcuts not managed by ShortcutRegistry (OS/browser/editor defaults)
 const BUILTIN_SHORTCUTS = [
@@ -123,9 +117,10 @@ const TERMINAL_FONTS = [
 export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme, onOpenBugreport, registeredShortcuts = [] }: InfoSettingsViewProps) {
   const { t } = useTranslation()
   // Map legacy 'settings' tab to 'general', validate tab name
-  const ALL_TABS: TabId[] = ['general', 'voice', 'themes', 'models', 'shortcuts', 'a11y', 'about']
+  const ALL_TABS: TabId[] = ['general', 'sprache', 'themes', 'shortcuts', 'a11y', 'about']
   const resolveTab = (t?: string): TabId => {
-    if (t === 'settings') return 'general'
+    if (t === 'settings' || t === 'models') return 'general'
+    if (t === 'voice') return 'sprache'
     if (ALL_TABS.includes(t as TabId)) return t as TabId
     return 'general'
   }
@@ -140,15 +135,6 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
   const [savedNotice, setSavedNotice] = useState(false)
   const [saveAsName, setSaveAsName] = useState('')
   const [saveAsOpen, setSaveAsOpen] = useState(false)
-
-  // LLM Provider state
-  const [ollamaHost, setOllamaHost] = useState('127.0.0.1')
-  const [ollamaPort, setOllamaPort] = useState(11434)
-  const [ollamaModel, setOllamaModel] = useState('gemma4:26b')
-  const [availableModels, setAvailableModels] = useState<string[]>([])
-  const [llmTestResult, setLlmTestResult] = useState<{ ok: boolean; error?: string } | null>(null)
-  const [llmTesting, setLlmTesting] = useState(false)
-  const [llmSaved, setLlmSaved] = useState(false)
 
   // Voice / Sprachsteuerung state
   const [btShutterEnabled, setBtShutterEnabled] = useState(false)
@@ -186,13 +172,6 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
     setVoiceCommandsEnabled(vcEn ?? true)
     const kw = await api.config.get('keepWorking')
     setKeepWorking(kw ?? false)
-    // Load LLM config
-    const llm: LlmConfig | null = await api.config.get('llm')
-    if (llm) {
-      setOllamaHost(llm.ollamaHost ?? '127.0.0.1')
-      setOllamaPort(llm.ollamaPort ?? 11434)
-      setOllamaModel(llm.ollamaModel ?? 'gemma4:26b')
-    }
     setLoading(false)
   }, [])
 
@@ -288,35 +267,6 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
     setTimeout(() => setSavedNotice(false), 2000)
   }, [saveAsName, theme, customTokens, onSaveCustomTheme])
 
-  // ─── LLM Provider Handlers ─────────────────────────────
-
-  const handleLlmTestConnection = useCallback(async () => {
-    setLlmTesting(true)
-    setLlmTestResult(null)
-    try {
-      const result = await api.llm.testConnection(ollamaHost, ollamaPort)
-      setLlmTestResult(result)
-      if (result.ok) {
-        const models = await api.llm.listModels(ollamaHost, ollamaPort)
-        setAvailableModels(models)
-      }
-    } catch (err: any) {
-      setLlmTestResult({ ok: false, error: err?.message ?? 'Unknown error' })
-    } finally {
-      setLlmTesting(false)
-    }
-  }, [ollamaHost, ollamaPort])
-
-  const handleLlmSave = useCallback(async () => {
-    await api.config.set('llm', {
-      ollamaHost,
-      ollamaPort,
-      ollamaModel,
-    })
-    setLlmSaved(true)
-    setTimeout(() => setLlmSaved(false), 2000)
-  }, [ollamaHost, ollamaPort, ollamaModel])
-
   // Merge live registry shortcuts with built-in (OS/browser) shortcuts
   const builtinMapped = BUILTIN_SHORTCUTS.map(s => ({ combo: s.combo, label: t(s.labelKey), category: s.category }))
   const allShortcuts = [...registeredShortcuts, ...builtinMapped]
@@ -341,9 +291,8 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
 
   const TAB_LABELS: Record<TabId, string> = {
     general: t('info.tabGeneral', 'General'),
-    voice: t('info.tabVoice', 'Voice'),
+    sprache: t('info.tabSprache', 'Sprache'),
     themes: t('info.tabThemes', 'Themes'),
-    models: t('info.tabModels', 'Models'),
     shortcuts: t('info.tabShortcuts'),
     a11y: 'A11y',
     about: t('info.tabAbout'),
@@ -352,7 +301,7 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
   return (
     <div class="settings-view" data-highlight="popup-info">
       <div class="info-tabs">
-        {(['general', 'voice', 'themes', 'models', 'shortcuts', 'a11y', 'about'] as TabId[]).map((tab) => (
+        {(['general', 'sprache', 'themes', 'shortcuts', 'a11y', 'about'] as TabId[]).map((tab) => (
           <button
             key={tab}
             class={`info-tab ${activeTab === tab ? 'info-tab--active' : ''}`}
@@ -392,27 +341,45 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
         </section>
       )}
 
-      {activeTab === 'voice' && !loading && (
-        <VoiceSettingsTab
-          ttsEnabled={ttsEnabled}
-          onTtsEnabledChange={async (v) => { setTtsEnabled(v); await api.config.set('ttsEnabled', v) }}
-          ttsLevel={ttsLevel}
-          onTtsLevelChange={async (v) => { setTtsLevel(v); await api.config.set('ttsLevel', v) }}
-          ttsVoice={ttsVoice}
-          onTtsVoiceChange={async (v) => { setTtsVoice(v); await api.config.set('ttsVoice', v) }}
-          voiceCommandsEnabled={voiceCommandsEnabled}
-          onVoiceCommandsEnabledChange={async (v) => { setVoiceCommandsEnabled(v); await api.config.set('voiceCommandsEnabled', v) }}
-          voiceSubmitMode={voiceSubmitMode}
-          onVoiceSubmitModeChange={async (v) => { setVoiceSubmitMode(v); await api.config.set('voiceSubmitMode', v) }}
-          btShutterEnabled={btShutterEnabled}
-          onBtShutterEnabledChange={async (v) => {
-            setBtShutterEnabled(v)
-            const current = await api.config.get('btShutter') ?? {}
-            await api.config.set('btShutter', { ...current, enabled: v })
-          }}
-          keepWorking={keepWorking}
-          onKeepWorkingChange={async (v) => { setKeepWorking(v); await api.config.set('keepWorking', v) }}
-        />
+      {activeTab === 'sprache' && !loading && (
+        <>
+          <section class="settings-section">
+            <div class="settings-section__title">{t('settings.language')}</div>
+            <div class="settings-section__hint">{t('settings.languageHint')}</div>
+            <div class="settings-row" style={{ marginTop: '8px' }}>
+              <select
+                class="input input--sm"
+                value={language}
+                onChange={(e) => handleLanguageChange((e.target as HTMLSelectElement).value as 'en' | 'de')}
+                style={{ width: '160px' }}
+              >
+                <option value="en">English</option>
+                <option value="de">Deutsch</option>
+              </select>
+            </div>
+          </section>
+
+          <VoiceSettingsTab
+            ttsEnabled={ttsEnabled}
+            onTtsEnabledChange={async (v) => { setTtsEnabled(v); await api.config.set('ttsEnabled', v) }}
+            ttsLevel={ttsLevel}
+            onTtsLevelChange={async (v) => { setTtsLevel(v); await api.config.set('ttsLevel', v) }}
+            ttsVoice={ttsVoice}
+            onTtsVoiceChange={async (v) => { setTtsVoice(v); await api.config.set('ttsVoice', v) }}
+            voiceCommandsEnabled={voiceCommandsEnabled}
+            onVoiceCommandsEnabledChange={async (v) => { setVoiceCommandsEnabled(v); await api.config.set('voiceCommandsEnabled', v) }}
+            voiceSubmitMode={voiceSubmitMode}
+            onVoiceSubmitModeChange={async (v) => { setVoiceSubmitMode(v); await api.config.set('voiceSubmitMode', v) }}
+            btShutterEnabled={btShutterEnabled}
+            onBtShutterEnabledChange={async (v) => {
+              setBtShutterEnabled(v)
+              const current = await api.config.get('btShutter') ?? {}
+              await api.config.set('btShutter', { ...current, enabled: v })
+            }}
+            keepWorking={keepWorking}
+            onKeepWorkingChange={async (v) => { setKeepWorking(v); await api.config.set('keepWorking', v) }}
+          />
+        </>
       )}
 
       {activeTab === 'about' && (
@@ -430,38 +397,10 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
             </p>
           </div>
 
-          {/* ─── Keyboard Shortcuts ─── */}
-          <div class="wiki-entry">
-            <div class="settings-section__title">{t('about.shortcuts')}</div>
-            <table class="shortcut-table">
-              <tbody>
-                {allShortcuts.map((s) => (
-                  <tr key={s.combo}>
-                    <td class="shortcut-table__combo"><kbd>{s.combo}</kbd></td>
-                    <td class="shortcut-table__label">{s.label}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ─── Features ─── */}
+          {/* ─── What is cipher-mux ─── */}
           <div class="wiki-entry">
             <div class="settings-section__title">{t('info.feature.whatIs.title')}</div>
             <p class="wiki-text">{t('info.feature.whatIs.p1')}</p>
-            <p class="wiki-text">
-              <strong>{t('info.feature.whatIs.p2strong')}</strong>{t('info.feature.whatIs.p2')}
-            </p>
-          </div>
-
-          <div class="wiki-entry">
-            <div class="settings-section__title">{t('info.feature.grid.title')}</div>
-            <p class="wiki-text">{t('info.feature.grid.p1')}</p>
-          </div>
-
-          <div class="wiki-entry">
-            <div class="settings-section__title">{t('info.feature.orchestrator.title')}</div>
-            <p class="wiki-text">{t('info.feature.orchestrator.p1')}</p>
           </div>
 
           {/* ─── Credits ─── */}
@@ -486,21 +425,7 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
       {/* ─── General Tab ─────────────────────────────── */}
       {activeTab === 'general' && !loading && (
         <section class="settings-section">
-          <div class="settings-section__title">{t('settings.language')}</div>
-          <div class="settings-section__hint">{t('settings.languageHint')}</div>
-          <div class="settings-row" style={{ marginTop: '8px' }}>
-            <select
-              class="input input--sm"
-              value={language}
-              onChange={(e) => handleLanguageChange((e.target as HTMLSelectElement).value as 'en' | 'de')}
-              style={{ width: '160px' }}
-            >
-              <option value="en">English</option>
-              <option value="de">Deutsch</option>
-            </select>
-          </div>
-
-          <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('settings.agent')}</div>
+          <div class="settings-section__title">{t('settings.agent')}</div>
           <div class="settings-row" style={{ marginTop: '8px' }}>
             <label class="settings-label" style={{ cursor: 'pointer', userSelect: 'none' }}>
               <input
@@ -714,84 +639,6 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
         </section>
       )}
 
-      {/* ─── Models Tab ─────────────────────────────── */}
-      {activeTab === 'models' && !loading && (
-        <section class="settings-section">
-          <div class="settings-section__title">{t('settings.llmProvider')}</div>
-          <div class="settings-section__hint">{t('settings.llmProviderHint')}</div>
-
-          <div class="settings-row" style={{ marginTop: '8px', gap: '8px' }}>
-            <label class="settings-label">
-              <span>{t('settings.ollamaHost')}</span>
-              <input
-                class="input input--sm"
-                type="text"
-                value={ollamaHost}
-                onInput={(e) => setOllamaHost((e.target as HTMLInputElement).value)}
-                style={{ width: '180px' }}
-              />
-            </label>
-            <label class="settings-label">
-              <span>{t('settings.ollamaPort')}</span>
-              <input
-                class="input input--sm"
-                type="number"
-                value={ollamaPort}
-                onInput={(e) => setOllamaPort(Number((e.target as HTMLInputElement).value))}
-                style={{ width: '80px' }}
-              />
-            </label>
-          </div>
-
-          <div class="settings-row" style={{ marginTop: '8px', gap: '8px' }}>
-            <label class="settings-label">
-              <span>{t('settings.ollamaModel')}</span>
-              {availableModels.length > 0 ? (
-                <select
-                  class="input input--sm"
-                  value={ollamaModel}
-                  onChange={(e) => setOllamaModel((e.target as HTMLSelectElement).value)}
-                  style={{ width: '220px' }}
-                >
-                  {!availableModels.includes(ollamaModel) && (
-                    <option value={ollamaModel}>{ollamaModel}</option>
-                  )}
-                  {availableModels.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  class="input input--sm"
-                  type="text"
-                  value={ollamaModel}
-                  onInput={(e) => setOllamaModel((e.target as HTMLInputElement).value)}
-                  style={{ width: '220px' }}
-                />
-              )}
-            </label>
-          </div>
-
-          <div class="settings-row" style={{ marginTop: '8px', gap: '8px' }}>
-            <button class="btn btn--sm" onClick={handleLlmTestConnection} disabled={llmTesting}>
-              {llmTesting ? t('settings.llmTesting') : t('settings.llmTestConnection')}
-            </button>
-            <button class="btn btn--sm btn--primary" onClick={handleLlmSave}>
-              {t('settings.llmSave')}
-            </button>
-            {llmSaved && <span class="theme-editor__notice">{t('settings.llmSaved')}</span>}
-          </div>
-
-          {llmTestResult && (
-            <div class="settings-section__hint" style={{
-              marginTop: '6px',
-              color: llmTestResult.ok ? 'var(--color-neon-green)' : 'var(--color-neon-red)',
-            }}>
-              {llmTestResult.ok ? t('settings.llmConnected') : t('settings.llmConnectionFailed', { error: llmTestResult.error })}
-            </div>
-          )}
-        </section>
-      )}
     </div>
   )
 }
