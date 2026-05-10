@@ -20,8 +20,8 @@
 /* session cell */
 .session-cell {
   position: relative;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  background: var(--session-bg, var(--color-bg-elevated));
+  border: 1px solid var(--session-border, var(--color-border));
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -103,7 +103,7 @@
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: var(--font-size-sm);
-  color: var(--color-text);
+  color: var(--session-text, var(--color-text));
   letter-spacing: 0.04em;
   text-transform: lowercase;
   white-space: nowrap;
