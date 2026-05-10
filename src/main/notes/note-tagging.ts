@@ -226,9 +226,13 @@ export class NoteTagging {
   private saveRepository(): void {
     try {
       fs.mkdirSync(this.notesDir, { recursive: true })
-      // Include tag class documentation in .tags.json
-      const output = { ...this.repo, _tagClasses: TAG_CLASSES }
-      fs.writeFileSync(this.tagsFilePath, JSON.stringify(output, null, 2), 'utf-8')
+      // Merge with existing file to avoid clobbering TagClassRepo's 'classes'/'synonyms' fields
+      let existing: Record<string, unknown> = {}
+      try {
+        existing = JSON.parse(fs.readFileSync(this.tagsFilePath, 'utf-8'))
+      } catch { /* file missing or invalid — start fresh */ }
+      const merged = { ...existing, tags: this.repo.tags, _tagClasses: TAG_CLASSES }
+      fs.writeFileSync(this.tagsFilePath, JSON.stringify(merged, null, 2), 'utf-8')
     } catch {
       // Non-fatal — next call will retry
     }

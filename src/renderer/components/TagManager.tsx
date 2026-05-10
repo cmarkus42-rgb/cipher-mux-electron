@@ -56,6 +56,10 @@ export function TagManager() {
   const [classRenameValue, setClassRenameValue] = useState('')
   const [editingClassColor, setEditingClassColor] = useState<string | null>(null)
 
+  // Add value to class
+  const [addingValueToClass, setAddingValueToClass] = useState<string | null>(null)
+  const [newValueText, setNewValueText] = useState('')
+
   // Inline delete confirmation (replaces window.confirm)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [classDeleteConfirm, setClassDeleteConfirm] = useState<string | null>(null)
@@ -248,6 +252,15 @@ export function TagManager() {
     await loadData()
   }
 
+  const handleAddValue = async (className: string) => {
+    const value = newValueText.trim().toLowerCase()
+    if (!value) return
+    await api.notes.tagClassAddValue(className, value)
+    setAddingValueToClass(null)
+    setNewValueText('')
+    await loadData()
+  }
+
   // Get synonyms pointing to tags in a class
   const getSynonymsForTag = (canonicalTag: string): string[] => {
     return Object.entries(synonyms)
@@ -404,6 +417,13 @@ export function TagManager() {
           <div class="tag-manager__class-actions" onClick={(e) => e.stopPropagation()}>
             <button
               class="tag-manager__action"
+              onClick={() => { setAddingValueToClass(addingValueToClass === cls.name ? null : cls.name); setNewValueText('') }}
+              title={t('tags.addValue', 'Add tag value')}
+            >
+              +
+            </button>
+            <button
+              class="tag-manager__action"
               onClick={() => { setRenamingClass(cls.name); setClassRenameValue(cls.name) }}
               title={t('tags.renameClass', 'Rename class')}
             >
@@ -460,6 +480,29 @@ export function TagManager() {
         {!cls.collapsed && (
           <div class="tag-manager__values-list">
             {cls.values.map(renderValueRow)}
+            {addingValueToClass === cls.name && (
+              <div class="tag-manager__add-value-row">
+                <input
+                  type="text"
+                  class="tag-manager__inline-input"
+                  placeholder={t('tags.newValue', 'New tag value...')}
+                  value={newValueText}
+                  onInput={(e) => setNewValueText((e.target as HTMLInputElement).value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddValue(cls.name)
+                    if (e.key === 'Escape') setAddingValueToClass(null)
+                  }}
+                  autoFocus
+                />
+                <button
+                  class="tag-manager__action"
+                  onClick={() => handleAddValue(cls.name)}
+                  title={t('tags.add', 'Add')}
+                >
+                  {'\u2713'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

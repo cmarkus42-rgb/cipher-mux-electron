@@ -1500,6 +1500,14 @@ export class IpcHub {
       this.voiceManager?.getInputRouter()?.setFocusedSession(sessionId)
     })
 
+    // Route STT focus when a detached session window gains OS focus
+    this.windowManager.onDetachedFocus((type, entityId) => {
+      if (type === 'session') {
+        this.focusedSessionId = entityId
+        this.voiceManager?.getInputRouter()?.setFocusedSession(entityId)
+      }
+    })
+
     ipcMain.on(IPC.VOICE_PIN, (_event, { sessionId }: { sessionId: string | null }) => {
       const router = this.voiceManager?.getInputRouter()
       if (!router) return
@@ -2107,7 +2115,12 @@ export class IpcHub {
 
     ipcMain.handle(IPC.NOTES_TAG_DELETE, async (_e, { name }: { name: string }) => {
       const affected = this.noteTagging.deleteTag(name)
-      if (affected.length > 0) {
+      // Also remove value from class repo so it doesn't reappear in UI
+      const parsed = TagClassRepo.parseTag(name)
+      if (parsed.tagClass) {
+        this.tagClassRepo.removeValue(parsed.tagClass, parsed.value)
+      }
+      if (affected.length > 0 || parsed.tagClass) {
         this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
       }
       return { ok: true, affected: affected.length }
@@ -2157,6 +2170,14 @@ export class IpcHub {
       this.tagClassRepo.setClassColor(name, color)
       this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
       return { ok: true }
+    })
+
+    ipcMain.handle(IPC.NOTES_TAG_CLASS_ADD_VALUE, async (_e, { className, value }: { className: string; value: string }) => {
+      const ok = this.tagClassRepo.addValue(className, value)
+      if (ok) {
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+      }
+      return { ok }
     })
 
     ipcMain.handle(IPC.NOTES_TAG_SYNONYMS_LIST, async () => {

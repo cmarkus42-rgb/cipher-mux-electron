@@ -22,6 +22,7 @@ export class WindowManager {
   private sidebarWindow: BrowserWindow | null = null
   private detachedWindows: Map<string, { window: BrowserWindow; entry: DetachedWindowEntry }> = new Map()
   private dockInitiated: Set<string> = new Set()
+  private detachedFocusCallback: ((type: 'session' | 'note', entityId: string) => void) | null = null
 
   createMainWindow(gridHint?: WindowGridHint): BrowserWindow {
     const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize
@@ -93,6 +94,11 @@ export class WindowManager {
 
   getMainWindow(): BrowserWindow | null {
     return this.mainWindow
+  }
+
+  /** Register callback for when a detached window gains OS focus. */
+  onDetachedFocus(cb: (type: 'session' | 'note', entityId: string) => void): void {
+    this.detachedFocusCallback = cb
   }
 
   sendToMainWindow(channel: string, data: unknown): void {
@@ -334,6 +340,11 @@ export class WindowManager {
         entries: this.getDetachedEntries(),
         ...(wasDock ? { dockedEntityId: entityId, dockedType } : {}),
       })
+    })
+
+    // Notify voice router when detached window gains OS focus
+    win.on('focus', () => {
+      this.detachedFocusCallback?.(type, entityId)
     })
 
     return win
