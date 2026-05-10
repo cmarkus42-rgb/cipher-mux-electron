@@ -72,7 +72,6 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
   const [saving, setSaving] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [showSaveDialog, setShowSaveDialog] = useState(false)
-  const [defaultWsId, setDefaultWsId] = useState<string | null>(null)
   const [saveTags, setSaveTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [allTags, setAllTags] = useState<string[]>([])
@@ -95,11 +94,6 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     api.workspaces.active().then((id: string | null) => {
       if (!mounted) return
       setActiveId(id ?? null)
-    }).catch(() => {})
-
-    api.config.get('defaultWorkspaceId').then((id: string | null) => {
-      if (!mounted) return
-      setDefaultWsId(id ?? null)
     }).catch(() => {})
 
     // Check for detached windows (blocks save/update)
@@ -137,13 +131,6 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
   const handleLoad = useCallback(() => {
     if (selectedId) onApply(selectedId)
   }, [selectedId, onApply])
-
-  const handleSetDefault = useCallback(async (wsId: string) => {
-    const api = (window as any).cipherMux
-    const nextId = defaultWsId === wsId ? null : wsId
-    await api.config.set('defaultWorkspaceId', nextId)
-    setDefaultWsId(nextId)
-  }, [defaultWsId])
 
   const handleTagInputChange = useCallback((value: string) => {
     setTagInput(value)
@@ -309,13 +296,6 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
                   {'\u21BB'}
                 </button>
               )}
-              <button
-                class={`wp-default-star${defaultWsId === ws.id ? ' wp-default-star--active' : ''}`}
-                onClick={(e) => { e.stopPropagation(); handleSetDefault(ws.id) }}
-                title={defaultWsId === ws.id ? t('workspacePopup.unsetDefault') : t('workspacePopup.setDefault')}
-              >
-                {defaultWsId === ws.id ? '\u2605' : '\u2606'}
-              </button>
             </div>
           ))}
         </div>

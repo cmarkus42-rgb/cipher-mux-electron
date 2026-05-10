@@ -30,7 +30,7 @@ import fs from 'node:fs'
 
 /** Whisper produces these on silence/noise — full-line hallucinations */
 const HALLUCINATION_RE =
-  /^\s*(\[.*?\]|\(.*?\)|♪.*?♪|Musik|Gesang|Music|Singing|Untertitel|Subtitles|Vielen Dank|Thank you|Thanks for watching|\.{2,}|MoU|SWR|ZDF|ARD)\s*$/i
+  /^\s*(\[.*?\]|\(.*?\)|♪.*?♪|Musik|Gesang|Music|Singing|Untertitel|Subtitles|Vielen Dank|Thank you|Thanks for watching|\.{2,}|MoU|SWR|ZDF|ARD|Verwendet\.?)\s*$/i
 
 /**
  * Exact-match blocklist for common Whisper hallucinations on silence/noise.

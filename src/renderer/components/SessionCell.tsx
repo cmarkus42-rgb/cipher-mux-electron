@@ -113,10 +113,13 @@ export function SessionCell({
     e.stopPropagation()
     onFocusMode?.(session.id)
   }, [session.id, onFocusMode])
-  const handleScreenshot = useCallback((e: Event) => {
+  const handleScreenshot = useCallback(async (e: Event) => {
     e.stopPropagation()
     const api = (window as any).cipherMux
-    api?.sessions?.screenshot?.(session.id)
+    const result = await api?.sessions?.screenshot?.(session.id)
+    if (result?.path) {
+      await navigator.clipboard.writeText(result.path).catch(() => {})
+    }
   }, [session.id])
 
   // Fork only available for Claude Code sessions (have adapter capabilities)

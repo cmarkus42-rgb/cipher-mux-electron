@@ -492,7 +492,7 @@ export function PresetEditor() {
             const headings = extractH2Headings(draftContent)
             const scrollToHeading = (lineIndex: number) => {
               const ta = textareaRef.current
-              if (!ta) return
+              if (!ta || ta.clientWidth === 0) return
               const lines = draftContent.split('\n')
               let charPos = 0
               for (let i = 0; i < lineIndex && i < lines.length; i++) {
@@ -501,7 +501,7 @@ export function PresetEditor() {
               // Measure actual scroll position using a mirror div (handles word-wrap correctly)
               const mirror = document.createElement('div')
               const style = window.getComputedStyle(ta)
-              mirror.style.cssText = `position:absolute;visibility:hidden;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:break-word;box-sizing:border-box;`
+              mirror.style.cssText = `position:absolute;visibility:hidden;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:break-word;box-sizing:border-box;overflow:hidden;height:auto;border:none;`
               mirror.style.width = `${ta.clientWidth}px`
               mirror.style.font = style.font
               mirror.style.letterSpacing = style.letterSpacing
