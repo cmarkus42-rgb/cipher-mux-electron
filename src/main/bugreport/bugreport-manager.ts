@@ -4,14 +4,12 @@ import * as os from 'os'
 import { app } from 'electron'
 import { ulid } from 'ulidx'
 import type { BugreportData, SessionInfo } from '../../shared/types'
-import type { SessionManager } from '../session/session-manager'
 import { APP_VERSION } from '../../shared/constants'
 import { runCommand } from '../util/exec-util'
 import { enrichBugreport, type EnrichedBugreport } from './ollama-client'
 import { deliverToGitHub } from './github-delivery'
 import type { MessageBus } from '../message-bus/message-bus'
 import { BRAND } from '../../shared/brand'
-import { EventEmitter } from 'node:events'
 
 const BUGREPORT_BASE = path.join(os.homedir(), '.config', BRAND.appName, 'bugreports')
 const DEFAULT_OUTBOX_DIR = path.join(BUGREPORT_BASE, 'outbox')
@@ -53,26 +51,13 @@ function getRecentLogs(maxLines = 100): string[] {
   }
 }
 
-export class BugreportManager extends EventEmitter {
+export class BugreportManager {
   private messageBus: MessageBus | undefined
   private outboxDir: string
-  private relaySessionId: string | null = null
-  private relayStarting = false
 
   constructor(opts: BugreportManagerOptions = {}) {
-    super()
     this.messageBus = opts.messageBus
     this.outboxDir = opts.outboxDir ?? DEFAULT_OUTBOX_DIR
-  }
-
-  /** Get the active relay session ID (null if not active). */
-  getRelaySessionId(): string | null {
-    return this.relaySessionId
-  }
-
-  /** Whether a relay session is currently starting or active. */
-  isRelayActive(): boolean {
-    return this.relayStarting || this.relaySessionId !== null
   }
 
   async collectDiagnostics(sessions: SessionInfo[]): Promise<BugreportData> {
@@ -202,68 +187,5 @@ ${diagnostics.logs.slice(-50).join('\n')}
 
   async enrich(description: string): Promise<EnrichedBugreport | null> {
     return enrichBugreport(description)
-  }
-
-  /**
-   * Start a bugreport relay session (entity 'bugreport').
-   * Returns the session ID. Emits 'relay-ready' when entity-started fires,
-   * or 'relay-error' on failure. STT routing should only be activated
-   * after 'relay-ready' to avoid lost transcriptions.
-   */
-  async startRelaySession(sessionManager: SessionManager): Promise<string> {
-    if (this.relayStarting) {
-      throw new Error('Relay session already starting')
-    }
-    if (this.relaySessionId) {
-      // Already active — return existing
-      return this.relaySessionId
-    }
-
-    this.relayStarting = true
-    try {
-      const session = await sessionManager.startEntity('bugreport')
-      this.relaySessionId = session.id
-      console.log(`[BugreportManager] Relay session started: ${session.id} (${session.name})`)
-      // 'relay-ready' is emitted from outside (ipc-hub) when entity-started fires,
-      // so STT routing can be delayed until session is actually ready.
-      return session.id
-    } catch (err) {
-      this.relayStarting = false
-      this.relaySessionId = null
-      const msg = (err as Error).message
-      console.error('[BugreportManager] Relay start failed:', msg)
-      this.emit('relay-error', { error: msg })
-      throw err
-    }
-  }
-
-  /**
-   * Mark the relay session as ready (called when entity-started fires).
-   * Emits 'relay-ready' — caller should activate STT routing now.
-   */
-  markRelayReady(): void {
-    this.relayStarting = false
-    if (this.relaySessionId) {
-      this.emit('relay-ready', { sessionId: this.relaySessionId })
-    }
-  }
-
-  /**
-   * Stop the relay session. Clears internal state.
-   * Caller is responsible for clearing STT routing and killing the session.
-   */
-  async stopRelaySession(sessionManager: SessionManager): Promise<void> {
-    const sessionId = this.relaySessionId
-    this.relaySessionId = null
-    this.relayStarting = false
-
-    if (sessionId) {
-      try {
-        await sessionManager.stop(sessionId)
-      } catch (err) {
-        console.warn('[BugreportManager] Failed to stop relay session:', (err as Error).message)
-      }
-    }
-    console.log('[BugreportManager] Relay stopped')
   }
 }

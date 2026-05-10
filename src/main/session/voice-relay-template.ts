@@ -56,10 +56,6 @@ Announce tool calls:
 - mux_session_eject — move session to background
 - mux_sidebar_toggle — sidebar on/off
 
-### Bugreport / Feature Request
-
-When the user says "Bug gefunden" or "Feature Request" — mini-interview (max 3 questions, naturally phrased). On "notier das einfach", create immediately. Report via mux_notes_create with matching tags (bugreport/feature-request + open). **Notes status maintenance:** Update the \`status:\` tag on every note edit: \`status:open\` → \`status:in-progress\` → \`status:done\` / \`status:closed\`.
-
 ## Working Rules
 
 - Always announce what you are doing before you do it

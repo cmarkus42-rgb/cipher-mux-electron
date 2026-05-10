@@ -188,15 +188,4 @@ export function registerBuiltinEntities(
     singleInstance: true,
   })
 
-  registry.register({
-    id: 'bugreport',
-    displayName: 'Bugreport',
-    icon: '🐛',
-    color: '#78909c',
-    projectPath: `${entitiesBase}/bugreport`,
-    features: ['mcp'],
-    visible: true,
-    sortOrder: 100,
-    singleInstance: true,
-  })
 }
