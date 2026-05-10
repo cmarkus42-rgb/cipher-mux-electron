@@ -32,6 +32,9 @@ import fs from 'node:fs'
 const HALLUCINATION_RE =
   /^\s*(\[.*?\]|\(.*?\)|♪.*?♪|Musik|Gesang|Music|Singing|Untertitel|Subtitles|Vielen Dank|Thank you|Thanks for watching|\.{2,}|MoU|SWR|ZDF|ARD|Verwendet\.?)\s*$/i
 
+/** Repeated-word hallucination: "verwendet, verwendet, verwendet" etc. */
+const REPEATED_HALLUCINATION_RE = /^[\s,.\-;]*(\w+)[\s,.\-;]+(\1[\s,.\-;]*){2,}$/i
+
 /**
  * Exact-match blocklist for common Whisper hallucinations on silence/noise.
  * Compared case-insensitively against trimmed transcription (with trailing
@@ -79,6 +82,7 @@ export function filterHallucinations(text: string): string {
   if (trimmed === '') return ''
 
   if (HALLUCINATION_RE.test(trimmed)) return ''
+  if (REPEATED_HALLUCINATION_RE.test(trimmed)) return ''
 
   // Exact-match blocklist (case-insensitive)
   const lower = trimmed.toLowerCase()

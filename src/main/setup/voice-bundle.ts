@@ -22,10 +22,17 @@ export function deployBundledVoice(opts: DeployOptions): boolean {
     return false
   }
 
-  // Skip if already deployed
-  if (fs.existsSync(path.join(destDir, 'model.onnx'))) {
-    console.log(`[voice-bundle] Voice already deployed at ${destDir}`)
-    return false
+  // Replace symlinks with real copies; skip if already a real directory
+  const destModel = path.join(destDir, 'model.onnx')
+  if (fs.existsSync(destDir)) {
+    const stat = fs.lstatSync(destDir)
+    if (stat.isSymbolicLink()) {
+      console.log(`[voice-bundle] Replacing symlink at ${destDir} with real copy`)
+      fs.rmSync(destDir, { recursive: true, force: true })
+    } else if (fs.existsSync(destModel)) {
+      console.log(`[voice-bundle] Voice already deployed at ${destDir}`)
+      return false
+    }
   }
 
   console.log(`[voice-bundle] Deploying ${opts.voiceName} to ${destDir}...`)

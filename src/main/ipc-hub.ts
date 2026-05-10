@@ -746,11 +746,14 @@ export class IpcHub {
       const fsNode = require('fs')
       const pathNode = require('path')
 
-      // Save to project screenshots dir, or ~/Pictures/cipher-mux/screenshots/ as fallback
+      // Save to workspace project dir > session projectPath > ~/Pictures fallback
       const session = this.sessionManager.list().find((s: any) => s.id === sessionId)
-      const screenshotDir = session?.projectPath
-        ? pathNode.join(session.projectPath, 'screenshots')
-        : pathNode.join(os.homedir(), 'Pictures', 'cipher-mux', 'screenshots')
+      const activeWsId = configStore.get('activeWorkspaceId')
+      const workspaces = configStore.get('workspaces') ?? []
+      const activeWs = activeWsId ? (workspaces as any[]).find((w: any) => w.id === activeWsId) : null
+      const wsProjectDir = activeWs?.contextPaths?.[0] ?? null
+      const baseDir = wsProjectDir ?? session?.projectPath ?? pathNode.join(os.homedir(), 'Pictures', 'cipher-mux')
+      const screenshotDir = pathNode.join(baseDir, 'screenshots')
       fsNode.mkdirSync(screenshotDir, { recursive: true })
 
       const timestamp = Date.now()

@@ -148,8 +148,6 @@ export function CompanionTab() {
                   </div>
                 </div>
                 {c.id === globalPersonaId && <div class="pp-badge" style={{ background: 'var(--color-accent, #4fc3f7)' }}>GLOBAL</div>}
-                {c.id === activeId && c.id !== globalPersonaId && <div class="pp-badge">ACTIVE</div>}
-                {c.isDefault && <div class="pp-badge" style={{ opacity: 0.5 }}>DEFAULT</div>}
               </div>
             )
           })}
