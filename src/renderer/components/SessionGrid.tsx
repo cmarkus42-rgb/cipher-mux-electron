@@ -37,7 +37,7 @@ interface SessionGridProps {
   onDetachNote?: (slotIndex: number) => void
   onFocusMode?: (sessionId: string) => void
   onFocusModeBySlot?: (slotIndex: number) => void
-  focusModeSlot?: number | null
+  focusModeSlots?: Set<number>
   focusModeOverlapped?: Set<number>
   onStartEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
   onResumeEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
@@ -64,7 +64,7 @@ export function SessionGrid({
   workspaceLoading,
   onFocusSession, onCloseSession,
   onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDetach, onDetachNote, onFocusMode, onFocusModeBySlot,
-  focusModeSlot, focusModeOverlapped,
+  focusModeSlots, focusModeOverlapped,
   onStartEntity, onResumeEntity, onFocusEntity, onStartPath,
   onOpenNotes, onOpenNote, onCloseNotes, onOpenNoteIdsChange, onToggleExpandSlot, onSwap,
   onDropSession, onDropNoteOnEmpty, onDropNoteOnSession,
@@ -205,14 +205,11 @@ export function SessionGrid({
 
   const covered = getCoveredSlots(grid)
 
-  // Compute focus mode placement CSS if active
-  const focusPlacement = focusModeSlot != null && focusModeSlot >= 0
-    ? getFocusModePlacement(cols, rows, focusModeSlot)
-    : null
+  const hasFocusMode = focusModeSlots != null && focusModeSlots.size > 0
 
   return (
     <div class="session-grid-area">
-      <div class={`session-grid${focusModeSlot != null ? ' session-grid--focus-mode' : ''}`} style={gridStyle} onDragEnd={handleDragEnd}>
+      <div class={`session-grid${hasFocusMode ? ' session-grid--focus-mode' : ''}`} style={gridStyle} onDragEnd={handleDragEnd}>
         {grid.slots.map((slot, idx) => {
           // Skip cells covered by a rowSpan above
           if (covered.has(idx)) return null
@@ -221,7 +218,8 @@ export function SessionGrid({
           const isOverlapped = focusModeOverlapped?.has(idx)
           if (isOverlapped) return null
 
-          const isFocusModeTarget = focusModeSlot === idx
+          const isFocusModeTarget = focusModeSlots?.has(idx) ?? false
+          const focusPlacement = isFocusModeTarget ? getFocusModePlacement(cols, rows, idx) : null
           const focusStyle: Record<string, string> = isFocusModeTarget && focusPlacement
             ? { gridColumn: focusPlacement.gridColumn, gridRow: focusPlacement.gridRow }
             : {}

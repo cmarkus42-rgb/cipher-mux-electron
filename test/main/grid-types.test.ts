@@ -13,6 +13,10 @@ import {
   getFocusModeOverlappedSlots,
   getFocusModePlacement,
   findNavigationTarget,
+  getMaxFocusSlots,
+  getFocusBlockIndices,
+  canAddFocusSlot,
+  getMultiFocusOverlappedSlots,
 } from '../../src/shared/grid-types'
 
 describe('grid-types', () => {
@@ -493,6 +497,136 @@ describe('grid-types', () => {
       const p = getFocusModePlacement(4, 3, 11)
       assert.strictEqual(p.gridColumn, '3 / 5')
       assert.strictEqual(p.gridRow, '2 / 4')
+    })
+  })
+
+  describe('getMaxFocusSlots', () => {
+    it('returns 0 for 1x1 grid', () => {
+      assert.strictEqual(getMaxFocusSlots(1, 1), 0)
+    })
+
+    it('returns 1 for 1-row grids (Nx1)', () => {
+      assert.strictEqual(getMaxFocusSlots(3, 1), 1)
+      assert.strictEqual(getMaxFocusSlots(4, 1), 1)
+    })
+
+    it('returns 1 for 1-col grids (1xN)', () => {
+      assert.strictEqual(getMaxFocusSlots(1, 3), 1)
+    })
+
+    it('returns floor(cols/2) for grids with rows >= 2', () => {
+      assert.strictEqual(getMaxFocusSlots(2, 2), 1)
+      assert.strictEqual(getMaxFocusSlots(3, 2), 1)
+      assert.strictEqual(getMaxFocusSlots(4, 2), 2)
+      assert.strictEqual(getMaxFocusSlots(5, 2), 2)
+      assert.strictEqual(getMaxFocusSlots(6, 2), 3)
+      assert.strictEqual(getMaxFocusSlots(4, 3), 2)
+    })
+  })
+
+  describe('getFocusBlockIndices', () => {
+    it('returns 2x2 block for standard grid', () => {
+      // 4x2, slot 0 → anchor (0,0) → block: 0, 1, 4, 5
+      const block = getFocusBlockIndices(4, 2, 0)
+      assert.strictEqual(block.size, 4)
+      assert.ok(block.has(0))
+      assert.ok(block.has(1))
+      assert.ok(block.has(4))
+      assert.ok(block.has(5))
+    })
+
+    it('clamps at right edge', () => {
+      // 4x2, slot 3 (row=0, col=3) → anchor (0,2) → block: 2, 3, 6, 7
+      const block = getFocusBlockIndices(4, 2, 3)
+      assert.strictEqual(block.size, 4)
+      assert.ok(block.has(2))
+      assert.ok(block.has(3))
+      assert.ok(block.has(6))
+      assert.ok(block.has(7))
+    })
+
+    it('returns all slots for 1-row grid', () => {
+      const block = getFocusBlockIndices(3, 1, 1)
+      assert.strictEqual(block.size, 3)
+    })
+
+    it('returns single slot for 1x1 grid', () => {
+      const block = getFocusBlockIndices(1, 1, 0)
+      assert.strictEqual(block.size, 1)
+      assert.ok(block.has(0))
+    })
+  })
+
+  describe('canAddFocusSlot', () => {
+    it('allows first focus slot in 4x2 grid', () => {
+      assert.ok(canAddFocusSlot(4, 2, new Set(), 0))
+    })
+
+    it('allows second non-overlapping focus in 4x2 grid', () => {
+      // Slot 0 block: 0,1,4,5 — Slot 2 block: 2,3,6,7 → no overlap
+      assert.ok(canAddFocusSlot(4, 2, new Set([0]), 2))
+    })
+
+    it('rejects second focus when blocks overlap in 4x2', () => {
+      // Slot 0 block: 0,1,4,5 — Slot 1 block: 0,1,4,5 → overlap!
+      assert.ok(!canAddFocusSlot(4, 2, new Set([0]), 1))
+    })
+
+    it('rejects third focus in 4x2 grid (max = 2)', () => {
+      assert.ok(!canAddFocusSlot(4, 2, new Set([0, 2]), 4))
+    })
+
+    it('allows three focuses in 6x2 grid', () => {
+      // Slot 0 block: 0,1,6,7 — Slot 2 block: 2,3,8,9 — Slot 4 block: 4,5,10,11
+      assert.ok(canAddFocusSlot(6, 2, new Set([0, 2]), 4))
+    })
+
+    it('rejects fourth focus in 6x2 grid (max = 3)', () => {
+      assert.ok(!canAddFocusSlot(6, 2, new Set([0, 2, 4]), 1))
+    })
+
+    it('rejects when max is 1 for 2x2 grid', () => {
+      assert.ok(!canAddFocusSlot(2, 2, new Set([0]), 1))
+    })
+  })
+
+  describe('getMultiFocusOverlappedSlots', () => {
+    it('returns empty set for no focus slots', () => {
+      const grid = createEmptyGrid({ cols: 4, rows: 2 })
+      assert.strictEqual(getMultiFocusOverlappedSlots(grid, new Set()).size, 0)
+    })
+
+    it('single focus — same result as legacy getFocusModeOverlappedSlots', () => {
+      const grid = createEmptyGrid({ cols: 4, rows: 2 })
+      const legacy = getFocusModeOverlappedSlots(grid, 0)
+      const multi = getMultiFocusOverlappedSlots(grid, new Set([0]))
+      assert.deepStrictEqual([...multi].sort(), [...legacy].sort())
+    })
+
+    it('two focuses in 4x2 — overlaps all non-focus slots', () => {
+      // Focus 0 block: 0,1,4,5 — Focus 2 block: 2,3,6,7
+      // Overlapped = {1,4,5,3,6,7} (all except focus slots 0,2)
+      const grid = createEmptyGrid({ cols: 4, rows: 2 })
+      const overlapped = getMultiFocusOverlappedSlots(grid, new Set([0, 2]))
+      assert.strictEqual(overlapped.size, 6)
+      assert.ok(!overlapped.has(0), 'focus slot 0 not overlapped')
+      assert.ok(!overlapped.has(2), 'focus slot 2 not overlapped')
+      assert.ok(overlapped.has(1))
+      assert.ok(overlapped.has(3))
+      assert.ok(overlapped.has(4))
+      assert.ok(overlapped.has(5))
+      assert.ok(overlapped.has(6))
+      assert.ok(overlapped.has(7))
+    })
+
+    it('three focuses in 6x2 — overlaps all non-focus slots', () => {
+      const grid = createEmptyGrid({ cols: 6, rows: 2 })
+      const overlapped = getMultiFocusOverlappedSlots(grid, new Set([0, 2, 4]))
+      // 12 total slots - 3 focus slots = 9 overlapped
+      assert.strictEqual(overlapped.size, 9)
+      assert.ok(!overlapped.has(0))
+      assert.ok(!overlapped.has(2))
+      assert.ok(!overlapped.has(4))
     })
   })
 })
