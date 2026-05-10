@@ -10,7 +10,7 @@ import type { EntityId } from '../../shared/types'
 const api = (window as any).cipherMux
 
 /** Clipboard copy button with checkmark feedback. */
-function CopyButton({ getText }: { getText: () => string }) {
+function CopyButton({ getText, title }: { getText: () => string; title?: string }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = async () => {
     try {
@@ -22,7 +22,7 @@ function CopyButton({ getText }: { getText: () => string }) {
   return (
     <button
       onClick={handleCopy}
-      title="Copy to clipboard"
+      title={title}
       style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '12px', color: copied ? 'var(--color-success, #4caf50)' : 'var(--color-text-dim)', display: 'inline-flex', alignItems: 'center', gap: '2px', lineHeight: 1 }}
     >
       {copied ? '\u2713' : '\u2398'}
@@ -194,7 +194,7 @@ export function WorkspacesTab() {
 
   const handleWsContextPathAdd = async () => {
     if (!ws) return
-    const result = await api.dialog.openDir({ title: 'Add Context Directory' })
+    const result = await api.dialog.openDir({ title: t('workspacesTab.addDirectory') })
     if (!result) return
     const existing = ws.contextPaths ?? []
     if (!existing.includes(result)) {
@@ -212,7 +212,7 @@ export function WorkspacesTab() {
 
   const handleContextPathAdd = async () => {
     if (!ws) return
-    const result = await api.dialog.openDir({ title: 'Add Context Directory' })
+    const result = await api.dialog.openDir({ title: t('workspacesTab.addDirectory') })
     if (!result) return
     const cells = [...ws.cells]
     const cell = cells[selectedCell]
@@ -354,7 +354,7 @@ export function WorkspacesTab() {
     <div class="ws-pane">
       {onboardingHint && (
         <div class="ws-onboarding" role="status">
-          <span>Your first workspace! A workspace bundles grid layout, presets, notes, and prompts for a project. Set it as default (star) to auto-load on startup.</span>
+          <span>{t('workspacesTab.onboardingHint')}</span>
           <button onClick={() => setOnboardingHint(false)} style={{ marginLeft: '8px', cursor: 'pointer', background: 'none', border: 'none', color: 'inherit', fontSize: '14px' }}>&times;</button>
         </div>
       )}
@@ -381,8 +381,8 @@ export function WorkspacesTab() {
                     {w.name}
                   </div>
                   <div class="ws-item-sub">
-                    {w.cols}&times;{w.rows} &middot; {filledCount} slot{filledCount === 1 ? '' : 's'}
-                    {presetCount > 0 && ` \u00B7 ${presetCount} preset${presetCount === 1 ? '' : 's'}`}
+                    {w.cols}&times;{w.rows} &middot; {t('workspacesTab.slotCount', { count: filledCount })}
+                    {presetCount > 0 && ` \u00B7 ${t('workspacesTab.presetCount', { count: presetCount })}`}
                   </div>
                   {w.defaultTags && w.defaultTags.length > 0 && (
                     <div class="ws-item-tags">
@@ -428,7 +428,7 @@ export function WorkspacesTab() {
 
             {/* Sort order */}
             <div class="ws-ed-row" style={{ gap: '6px', alignItems: 'center' }}>
-              <span style={{ fontSize: '11px', color: 'var(--color-text-dim)' }}>Sort</span>
+              <span style={{ fontSize: '11px', color: 'var(--color-text-dim)' }}>{t('workspacesTab.sort')}</span>
               <input
                 type="number"
                 min={1}
@@ -457,7 +457,7 @@ export function WorkspacesTab() {
 
             {/* Tags */}
             <div class="ws-ed-tags">
-              <span class="dim-label">{t('workspacesTab.tags', 'Tags')}</span>
+              <span class="dim-label">{t('workspacesTab.tags')}</span>
               <div class="ws-ed-tags__chips">
                 {(ws.defaultTags ?? []).map(tag => (
                   <span key={tag} class="ws-tag-chip ws-tag-chip--editable">
@@ -477,7 +477,7 @@ export function WorkspacesTab() {
                         handleAddTag(tagInput)
                       }
                     }}
-                    placeholder={t('workspacesTab.addTag', '+ klasse:wert')}
+                    placeholder={t('workspacesTab.addTag')}
                   />
                   {tagSuggestions.length > 0 && (
                     <div class="ws-ed-tags__suggestions">
@@ -497,9 +497,9 @@ export function WorkspacesTab() {
                 checked={ws.notesGlobal ?? false}
                 onChange={(e) => updateWs({ notesGlobal: (e.target as HTMLInputElement).checked })}
               />
-              <span>{t('workspacesTab.notesGlobal', 'Notes visible in all workspaces')}</span>
+              <span>{t('workspacesTab.notesGlobal')}</span>
               <span style={{ fontSize: '10px', color: 'var(--color-text-dim)' }}>
-                {t('workspacesTab.notesGlobalHint', 'New notes skip the workspace tag and appear everywhere')}
+                {t('workspacesTab.notesGlobalHint')}
               </span>
             </label>
 
@@ -507,21 +507,21 @@ export function WorkspacesTab() {
             <div class="ws-ed-sections">
               <div class="insp-field wide">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                  <label style={{ margin: 0 }}>WORKSPACE PROMPT</label>
-                  <CopyButton getText={() => ws.workspacePrompt ?? ''} />
+                  <label style={{ margin: 0 }}>{t('workspacesTab.workspacePrompt')}</label>
+                  <CopyButton getText={() => ws.workspacePrompt ?? ''} title={t('workspacesTab.copyToClipboard')} />
                 </div>
                 <div class="pp-hint" style={{ color: 'var(--color-warning)', marginBottom: 4 }}>
-                  Aenderungen werden erst fuer neu gestartete Sessions wirksam.
+                  {t('workspacesTab.changeHint')}
                 </div>
                 <textarea
                   value={ws.workspacePrompt ?? ''}
-                  placeholder="Prompt for all project cells (injected as ## Workspace Prompt in CLAUDE.md)"
+                  placeholder={t('workspacesTab.workspacePromptPlaceholder')}
                   onInput={(e) => updateWs({ workspacePrompt: (e.target as HTMLTextAreaElement).value || undefined })}
                   style={{ minHeight: '50px' }}
                 />
               </div>
               <div class="insp-field wide">
-                <label>CONTEXT DIRECTORIES</label>
+                <label>{t('workspacesTab.contextDirectories')}</label>
                 <div class="context-path-list">
                   {(ws.contextPaths ?? []).map((p) => (
                     <div key={p} class="context-path-item">
@@ -529,7 +529,7 @@ export function WorkspacesTab() {
                       <button
                         class="context-path-remove"
                         onClick={() => handleWsContextPathRemove(p)}
-                        title="Remove"
+                        title={t('workspacesTab.remove')}
                       >&times;</button>
                     </div>
                   ))}
@@ -537,7 +537,7 @@ export function WorkspacesTab() {
                     class="btn btn--sm context-path-add"
                     onClick={handleWsContextPathAdd}
                     style={{ fontSize: '11px', marginTop: '4px' }}
-                  >+ Add Directory</button>
+                  >{t('workspacesTab.addDirectory')}</button>
                 </div>
               </div>
             </div>
@@ -625,7 +625,7 @@ export function WorkspacesTab() {
                               </div>
                               <div class="ed-cell-empty-label">
                                 <span class="ed-cell-empty-label__icon">+</span>
-                                <span class="ed-cell-empty-label__text">{t('workspacesTab.emptyCell', 'available')}</span>
+                                <span class="ed-cell-empty-label__text">{t('workspacesTab.emptyCell')}</span>
                               </div>
                             </>
                           )}
@@ -665,26 +665,26 @@ export function WorkspacesTab() {
                   <span>{t('workspacesTab.cellInspector')}</span>
                   <span class="coord">
                     [{cellCol}, {cellRow}]
-                    {cellSpan > 1 ? ` \u00B7 ${cellSpan}\u00D7 tall` : ''}
+                    {cellSpan > 1 ? ` \u00B7 ${cellSpan}\u00D7 ${t('workspacesTab.tall')}` : ''}
                   </span>
                 </div>
                 <div class="insp-grid">
                   <div class="insp-field">
-                    <label>{t('workspacesTab.cellType', 'Cell Type')}</label>
+                    <label>{t('workspacesTab.cellType')}</label>
                     <div style={{ display: 'flex', gap: '4px' }}>
                       <button
                         class={`btn btn--sm${cellData.type !== 'notes' ? ' btn--active' : ''}`}
                         onClick={() => handleCellUpdate('type', undefined)}
                         style={{ padding: '2px 10px', fontSize: '11px' }}
                       >
-                        Session
+                        {t('workspacesTab.cellTypeSession')}
                       </button>
                       <button
                         class={`btn btn--sm${cellData.type === 'notes' ? ' btn--active' : ''}`}
                         onClick={() => handleCellUpdate('type', 'notes')}
                         style={{ padding: '2px 10px', fontSize: '11px' }}
                       >
-                        Notes
+                        {t('workspacesTab.cellTypeNotes')}
                       </button>
                     </div>
                   </div>
@@ -713,7 +713,7 @@ export function WorkspacesTab() {
                         <button
                           class="btn btn--sm"
                           onClick={() => handleCellAssign('', '')}
-                          title="Clear"
+                          title={t('workspacesTab.clear')}
                           style={{ padding: '2px 6px', fontSize: '11px', color: 'var(--color-text-dim)' }}
                         >
                           &times;
@@ -724,14 +724,14 @@ export function WorkspacesTab() {
                   <div class="insp-field wide">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                       <label style={{ margin: 0 }}>{t('workspacesTab.cellPrompt')}</label>
-                      <CopyButton getText={() => cellData.prompt} />
+                      <CopyButton getText={() => cellData.prompt} title={t('workspacesTab.copyToClipboard')} />
                     </div>
                     <div class="pp-hint" style={{ color: 'var(--color-warning)', marginBottom: 4 }}>
-                      Aenderungen werden erst fuer neu gestartete Sessions wirksam.
+                      {t('workspacesTab.changeHint')}
                     </div>
                     <textarea
                       value={cellData.prompt}
-                      placeholder="Optional cell-specific prompt (overrides workspace prompt for this cell)"
+                      placeholder={t('workspacesTab.cellPromptPlaceholder')}
                       onInput={(e) =>
                         handleCellUpdate('prompt', (e.target as HTMLTextAreaElement).value)
                       }
@@ -740,7 +740,7 @@ export function WorkspacesTab() {
                   {/* Context Directories — only for project-path cells */}
                   {cellData.project && !cellData.presetId && (
                     <div class="insp-field wide">
-                      <label>Context Directories</label>
+                      <label>{t('workspacesTab.contextDirectories')}</label>
                       <div class="context-path-list">
                         {(cellData.contextPaths ?? []).map((p) => (
                           <div key={p} class="context-path-item">
@@ -748,7 +748,7 @@ export function WorkspacesTab() {
                             <button
                               class="context-path-remove"
                               onClick={() => handleContextPathRemove(p)}
-                              title="Remove"
+                              title={t('workspacesTab.remove')}
                             >&times;</button>
                           </div>
                         ))}
@@ -756,7 +756,7 @@ export function WorkspacesTab() {
                           class="btn btn--sm context-path-add"
                           onClick={handleContextPathAdd}
                           style={{ fontSize: '11px', marginTop: '4px' }}
-                        >+ Add Directory</button>
+                        >{t('workspacesTab.addDirectory')}</button>
                       </div>
                     </div>
                   )}
@@ -764,7 +764,7 @@ export function WorkspacesTab() {
                   {cellData.type === 'notes' && (
                     <div class="insp-field wide">
                       <span style={{ color: 'var(--color-text-dim)', fontSize: '12px' }}>
-                        Notes cell — opens Notes Editor when workspace is applied. No session spawned.
+                        {t('workspacesTab.notesCellHint')}
                       </span>
                     </div>
                   )}
