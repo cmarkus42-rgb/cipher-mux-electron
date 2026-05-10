@@ -195,19 +195,19 @@ export function CompanionTab() {
                   setGlobalPersonaId(newVal)
                 }}
               />
-              <span>Global override — use this persona for ALL presets</span>
+              <span>Globaler Override — diese Persona fuer ALLE Presets verwenden</span>
             </label>
             {globalPersonaId && globalPersonaId === selected.id && (
               <div class="pp-hint" style={{ color: 'var(--color-accent)', marginTop: '4px' }}>
-                This persona overrides all preset-specific persona assignments.
+                Diese Persona ueberschreibt alle preset-spezifischen Persona-Zuweisungen.
               </div>
             )}
           </div>
 
           <div class="pp-field">
-            <label>Persona Prompt</label>
+            <label>Persona-Prompt</label>
             <div class="pp-hint">
-              This prompt is injected into all entity sessions (Orchestrator, Cyber Factory, Companion, Audit, etc.)
+              Dieser Prompt wird in alle Entity-Sessions injiziert (Orchestrator, Cyber Factory, Companion, Audit, etc.)
             </div>
             <textarea
               value={draftPrompt}
