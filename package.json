@@ -25,7 +25,7 @@
     "profile-lint": "tsx scripts/profile-lint.ts",
     "lint": "eslint src/ --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps && npm run rebuild:voice"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
