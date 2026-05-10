@@ -649,6 +649,19 @@ export function App() {
     }
   }, [grid.slots, detachFromGrid, focusedSessionId])
 
+  const handleDetachNote = useCallback(async (slotIndex: number) => {
+    const slot = grid.slots[slotIndex]
+    if (!slot || slot.type !== 'notes') return
+    const noteIds = slot.openNoteIds ?? []
+    const api = (window as any).cipherMux
+    // Detach the first open note (or the notesId)
+    const noteId = noteIds[0] ?? slot.notesId
+    if (noteId) {
+      await api.detach.note(noteId)
+    }
+    clearSlotType(slotIndex)
+  }, [grid.slots, clearSlotType])
+
   const handleCloseSession = useCallback(async (sessionId: string) => {
     await stopSession(sessionId)
     removeSession(sessionId)
@@ -1281,6 +1294,7 @@ export function App() {
           onFork={handleFork}
           onSendToBackground={handleSendToBackground}
           onDetach={handleDetachSession}
+          onDetachNote={handleDetachNote}
           onFocusMode={handleFocusModeBySession}
           onFocusModeBySlot={handleFocusModeBySlot}
           focusModeSlot={focusModeSlot}

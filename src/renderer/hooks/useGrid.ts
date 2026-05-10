@@ -282,10 +282,28 @@ export function useGrid(panelWidth = 0) {
     }
   }, [persist])
 
-  /** Sync detachedIds from the main process detach registry. */
+  /** Sync detachedIds from the main process detach registry. Also clear grid slots for detached sessions. */
   const syncDetachedIds = useCallback((entries: Array<{ type: string; entityId: string }>) => {
-    setDetachedIds(new Set(entries.map((e) => e.entityId)))
-  }, [])
+    const ids = new Set(entries.map((e) => e.entityId))
+    setDetachedIds(ids)
+    // Clear grid slots for detached sessions to avoid dual-presence
+    if (ids.size > 0) {
+      setGrid((prev) => {
+        let changed = false
+        const newSlots = prev.slots.map((slot) => {
+          if (slot.sessionId && ids.has(slot.sessionId)) {
+            changed = true
+            return { ...slot, sessionId: null }
+          }
+          return slot
+        })
+        if (!changed) return prev
+        const next = { ...prev, slots: newSlots }
+        persist(next)
+        return next
+      })
+    }
+  }, [persist])
 
   /** RT-X1 fix: clear slots that reference sessions not in the given set. Resets rowSpan to 1. */
   const cleanupDeadSessions = useCallback((activeSessionIds: Set<string>) => {
