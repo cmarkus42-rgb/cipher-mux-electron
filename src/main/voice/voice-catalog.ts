@@ -32,7 +32,7 @@ export function listInstalled(piperModelsDir: string): InstalledVoice[] {
   const voices: InstalledVoice[] = []
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
     if (!entry.name.startsWith(VITS_PIPER_PREFIX)) continue
 
     const voiceDir = path.join(piperModelsDir, entry.name)

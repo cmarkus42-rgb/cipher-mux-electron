@@ -431,20 +431,15 @@ export class VoiceManager extends EventEmitter {
     const pauseConfig = this._getPauseConfig()
     let produced = false
 
-    // Pre-generate first sentence
-    let currentGen = this.piperTTS.generateWav(segments[0].text)
+    // Kick off ALL syntheses concurrently so later sentences render
+    // while earlier ones are still playing — eliminates inter-sentence gaps.
+    const genPromises = segments.map(seg => this.piperTTS!.generateWav(seg.text))
 
     for (let i = 0; i < segments.length; i++) {
       if (this._pipelineInterrupted) break
 
-      const result = await currentGen
+      const result = await genPromises[i]
       if (!result) continue
-
-      // Start pre-generating NEXT sentence while we play current
-      let nextGen: Promise<{ wav: Buffer; sampleRate: number } | null> | null = null
-      if (i + 1 < segments.length && !this._pipelineInterrupted) {
-        nextGen = this.piperTTS!.generateWav(segments[i + 1].text)
-      }
 
       // Append silence pause based on trailing punctuation
       const pauseMs = getPauseDuration(segments[i].trailing, pauseConfig)
@@ -455,17 +450,12 @@ export class VoiceManager extends EventEmitter {
 
       if (this._pipelineInterrupted) break
 
-      // Play current sentence
+      // Send to renderer queue (plays sequentially via onended chain)
       produced = true
       if (this.transport) {
         this.transport.sendAudioPlayback(wav.toString('base64'))
       } else {
         await this.playWavViaAfplay(wav)
-      }
-
-      // Advance to pre-generated next
-      if (nextGen) {
-        currentGen = nextGen
       }
     }
 

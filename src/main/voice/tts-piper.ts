@@ -262,34 +262,34 @@ export class PiperTTS extends TTSEngine {
       return
     }
 
-    for (const sentence of sentences) {
-      if (this._interrupted) break
+    const trimmed = sentences.map(s => s.trim()).filter(s => s.length > 0)
+    if (trimmed.length === 0) return
 
-      const trimmed = sentence.trim()
-      if (!trimmed) continue
-
+    // Fire ALL synthesis requests to the worker immediately.
+    // The worker processes them sequentially, but we eliminate any
+    // inter-sentence overhead by having the next request already queued.
+    const promises: Promise<WorkerMessage>[] = trimmed.map(sentence => {
       const id = `tts-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-
-      // Send generate command
-      this.worker.send({ cmd: 'generate', text: trimmed, sid: 0, speed: 1.0, id })
-
-      // Wait for audio response
-      const msg = await new Promise<WorkerMessage>((resolve, reject) => {
+      this.worker!.send({ cmd: 'generate', text: sentence, sid: 0, speed: 1.0, id })
+      return new Promise<WorkerMessage>((resolve, reject) => {
         this.pendingMessages.set(id, { resolve, reject })
       })
+    })
 
+    // Yield results in order as they resolve
+    for (const promise of promises) {
+      if (this._interrupted) break
+
+      const msg = await promise
       if (this._interrupted) break
 
       if (msg.type === 'audio' && msg.samples && msg.sampleRate) {
-        // Decode base64 Float32LE samples
         const samplesBuf = Buffer.from(msg.samples, 'base64')
         const float32 = new Float32Array(
           samplesBuf.buffer,
           samplesBuf.byteOffset,
           samplesBuf.byteLength / 4
         )
-
-        // Convert to WAV
         const wav = pcmToWav(float32, msg.sampleRate)
         yield wav
       }
