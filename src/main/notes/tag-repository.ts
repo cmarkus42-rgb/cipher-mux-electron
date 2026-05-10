@@ -83,7 +83,13 @@ export class TagClassRepo {
     try {
       const dir = path.dirname(this.filePath)
       fs.mkdirSync(dir, { recursive: true })
-      fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf-8')
+      // Merge with existing file to avoid clobbering NoteTagging's 'tags' field
+      let existing: Record<string, unknown> = {}
+      try {
+        existing = JSON.parse(fs.readFileSync(this.filePath, 'utf-8'))
+      } catch { /* file missing or invalid — start fresh */ }
+      const merged = { ...existing, classes: this.data.classes, synonyms: this.data.synonyms }
+      fs.writeFileSync(this.filePath, JSON.stringify(merged, null, 2), 'utf-8')
     } catch {
       // Non-fatal
     }
@@ -219,6 +225,28 @@ export class TagClassRepo {
   deleteClass(className: string): boolean {
     if (!this.data.classes[className]) return false
     delete this.data.classes[className]
+    this.save()
+    return true
+  }
+
+  /** Add a single value to an existing class. Returns true if added (false if class missing or duplicate). */
+  addValue(className: string, value: string): boolean {
+    const cls = this.data.classes[className]
+    if (!cls) return false
+    const normalized = value.toLowerCase().trim()
+    if (!normalized || cls.values.includes(normalized)) return false
+    cls.values.push(normalized)
+    this.save()
+    return true
+  }
+
+  /** Remove a single value from a class. Returns true if the value was found and removed. */
+  removeValue(className: string, value: string): boolean {
+    const cls = this.data.classes[className]
+    if (!cls) return false
+    const idx = cls.values.indexOf(value)
+    if (idx === -1) return false
+    cls.values.splice(idx, 1)
     this.save()
     return true
   }
