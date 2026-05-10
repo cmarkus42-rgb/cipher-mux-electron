@@ -392,8 +392,8 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
             </p>
             <p class="wiki-text" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px' }}>
               <a class="about-link" onClick={() => api.openExternal('https://cipher-mux.dev')}>{t('about.website')}</a>
-              <a class="about-link" onClick={() => api.openExternal('https://cipher-mux.dev/docs')}>{t('about.howTo')}</a>
-              <a class="about-link" onClick={() => api.openExternal('https://cipher-mux.dev/changelog')}>{t('about.changelog')}</a>
+              <a class="about-link" onClick={() => api.openExternal('https://cipher-mux.dev/anleitung')}>{t('about.howTo')}</a>
+              <a class="about-link" onClick={() => api.openExternal('https://github.com/cmarkus42-rgb/cipher-mux-electron/releases')}>{t('about.changelog')}</a>
             </p>
           </div>
 
