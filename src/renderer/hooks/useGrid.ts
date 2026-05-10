@@ -111,6 +111,7 @@ export function useGrid(panelWidth = 0) {
 
   const setSessionAtSlot = useCallback((slotIndex: number, sessionId: string | null) => {
     setGrid((prev) => {
+      if (slotIndex < 0 || slotIndex >= prev.slots.length) return prev
       const newSlots = [...prev.slots]
       newSlots[slotIndex] = { ...newSlots[slotIndex], sessionId }
       const next = { ...prev, slots: newSlots }
