@@ -1,7 +1,6 @@
 import { h } from 'preact'
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import { useMessages } from '../hooks/useMessages'
-import { useInputRequests } from '../hooks/useInputRequests'
 import { useNotes } from '../hooks/useNotes'
 import { NotesTreeView } from './NotesTreeView'
 import type { TagFilterState } from './NotesTreeView'
@@ -47,14 +46,11 @@ export function SidebarPanel({
 }: SidebarPanelProps) {
   const { t } = useTranslation()
   const { messages } = useMessages()
-  const { requests, openCount, answerRequest, openReview } = useInputRequests()
-
   // Collapse states — loaded from configStore on mount, persisted on change
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
     notes: false,
     background: false,
     orphans: false,
-    requests: false,
     memory: true,
     messages: false,
   })
@@ -207,7 +203,6 @@ export function SidebarPanel({
   const hasNotes = notes.length > 0
   const hasBackground = backgroundSessions.length > 0
   const hasOrphans = orphans.length > 0
-  const hasRequests = cyberFactoryActive && requests.length > 0
   const hasMessages = messages.length > 0
 
   if (!visible) return null
@@ -313,25 +308,6 @@ export function SidebarPanel({
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* ─── Requests (conditional) ─── */}
-      {hasRequests && (
-        <section class="sidebar-section" data-highlight="side-requests">
-          <div class="sidebar-section__head" onClick={() => toggleSection('requests')}>
-            <span>
-              {collapsed.requests ? '▸' : '▾'} {t('sidebar.requests')}
-              {openCount > 0 && <span class="sidebar-section__badge">{openCount}</span>}
-            </span>
-          </div>
-          {!collapsed.requests && (
-            <div class="sidebar-section__feed">
-              {requests.map((req: any) => (
-                <RequestCard key={req.id} request={req} onAnswer={answerRequest} onOpenReview={openReview} />
               ))}
             </div>
           )}
@@ -505,97 +481,3 @@ function BackgroundSessionCard({ session, contextUsage, onClick, onKill, voiceGl
   )
 }
 
-// ─── Request Card ────────────────────────────────────────
-
-interface RequestCardProps {
-  request: any
-  onAnswer: (id: string, answer: string) => void
-  onOpenReview: (filePath: string) => void
-}
-
-function RequestCard({ request, onAnswer, onOpenReview }: RequestCardProps) {
-  const { t } = useTranslation()
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-  const textareaRef = useRef<HTMLTextAreaElement>(null!)
-
-  useEffect(() => {
-    if (editing && textareaRef.current) {
-      textareaRef.current.focus()
-    }
-  }, [editing])
-
-  const handleSave = useCallback(() => {
-    if (!draft.trim()) return
-    onAnswer(request.id, draft.trim())
-    setEditing(false)
-  }, [draft, onAnswer, request.id])
-
-  if (request.type === 'review-link') {
-    return (
-      <div class="bg-card" onClick={() => onOpenReview(request.filePath)} style={{ cursor: 'pointer' }}>
-        <div class="bg-card__head">
-          <span class="bg-card__name">Review: {request.projectId}</span>
-        </div>
-        <div class="bg-card__preview">{request.filePath?.split('/').pop()}</div>
-        <div class="bg-card__preview" style={{ fontSize: 'var(--font-size-xs)', opacity: 0.6 }}>{request.title}</div>
-      </div>
-    )
-  }
-
-  return (
-    <div class="bg-card">
-      <div class="bg-card__head">
-        <span class="bg-card__name">{request.projectId}</span>
-      </div>
-      <div class="bg-card__preview">{request.question}</div>
-      {request.options && request.options.length > 0 && (
-        <div class="bg-card__preview" style={{ marginTop: '4px' }}>
-          {request.options.map((o: any) => (
-            <div
-              key={o.key}
-              style={{ cursor: request.status === 'open' ? 'pointer' : 'default' }}
-              onClick={() => {
-                if (request.status === 'open') {
-                  setDraft(o.key)
-                  setEditing(true)
-                }
-              }}
-            >
-              • <strong>{o.key}</strong> {o.label}
-              {o.key === request.recommendation && <span style={{ color: 'var(--color-neon)', marginLeft: '4px' }}>{t('sidebar.recommended')}</span>}
-            </div>
-          ))}
-        </div>
-      )}
-      {request.status === 'answered' ? (
-        <div class="bg-card__preview" style={{ color: 'var(--color-neon)', marginTop: '4px' }}>
-          → {request.answer}
-        </div>
-      ) : editing ? (
-        <div style={{ marginTop: 'var(--space-xs)' }}>
-          <textarea
-            ref={textareaRef}
-            class="request-textarea"
-            value={draft}
-            onInput={(e) => setDraft((e.target as HTMLTextAreaElement).value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && e.metaKey) {
-                e.preventDefault()
-                handleSave()
-              }
-            }}
-            rows={2}
-          />
-          <button class="btn btn--primary btn--sm" onClick={handleSave}>
-            {t('sidebar.send')}
-          </button>
-        </div>
-      ) : (
-        <button class="btn btn--sm" style={{ marginTop: 'var(--space-xs)' }} onClick={() => setEditing(true)}>
-          {t('sidebar.answer')}
-        </button>
-      )}
-    </div>
-  )
-}

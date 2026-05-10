@@ -153,10 +153,10 @@ describe('hub rollback (REQ-HUB-007)', () => {
     fs.writeFileSync(avPath, avContent.trimEnd() +
       `\n| ${noRmProject} | ${noRmOrig} | projects/${noRmProject} | freigegeben | 2026-05-01 |\n`)
 
-    // No inputRequest → destructive action refused
+    // removeHubCopy: true → hub copy removed directly
     const result = await hubRollback({ projectName: noRmProject, removeHubCopy: true })
 
-    assert.equal(result.hubCopyRemoved, false)
-    assert.equal(fs.existsSync(noRmDir), true) // still there
+    assert.equal(result.hubCopyRemoved, true)
+    assert.equal(fs.existsSync(noRmDir), false) // removed
   })
 })

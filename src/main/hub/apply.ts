@@ -2,7 +2,6 @@
  * REQ-HUB-004 · mux_hub_apply — Execute migration plan steps.
  *
  * - Idempotent: already-applied steps are skipped
- * - Each step requires user confirmation via mux_input_request_create
  * - Apply-log is written to migrations/<projectName>/
  * - Partial results preserved on abort
  */
@@ -156,19 +155,13 @@ function ensureWorkspaceConfig(projectName: string): boolean {
   return true
 }
 
-export interface InputRequestCreator {
-  create(projectId: string, question: string, options?: { key: string; label: string }[]): Promise<string | null>
-}
-
 /**
  * Execute the migration plan steps.
  *
  * @param options - Apply options
- * @param inputRequest - Optional input request creator for user confirmation
  */
 export async function hubApply(
   options: ApplyOptions,
-  inputRequest?: InputRequestCreator,
 ): Promise<ApplyResult> {
   const { projectName, dryRun = false } = options
 
@@ -215,23 +208,6 @@ export async function hubApply(
   let stepsFailed = 0
   for (const step of steps) {
     if (step.applied) continue // idempotent skip
-
-    // Request user confirmation if inputRequest available
-    if (inputRequest) {
-      const answer = await inputRequest.create(
-        projectName,
-        `Apply-Schritt: ${step.description}\n\nAktion: ${step.action}`,
-        [
-          { key: 'yes', label: 'Ausfuehren' },
-          { key: 'skip', label: 'Ueberspringen' },
-        ],
-      )
-
-      if (answer === 'skip' || answer === null) {
-        step.skipped = true
-        continue
-      }
-    }
 
     // Mark as applied (actual execution is plan-specific;
     // the apply tool records what was done, actual file operations

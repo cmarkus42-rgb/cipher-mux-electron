@@ -13,7 +13,6 @@ import { execFileSync } from 'child_process'
 import { projectDir, workspacesDir } from './hub-paths'
 import { updateStatus, getEntry } from './archiv-verweis'
 import type { RollbackOptions, RollbackResult, ProjectMeta } from './types'
-import type { InputRequestCreator } from './apply'
 
 /**
  * Read .project-meta.json to get original_push_url.
@@ -87,7 +86,6 @@ function removeDir(dirPath: string): void {
  */
 export async function hubRollback(
   options: RollbackOptions,
-  inputRequest?: InputRequestCreator,
 ): Promise<RollbackResult> {
   const { projectName, removeHubCopy = false } = options
 
@@ -125,24 +123,8 @@ export async function hubRollback(
   // Optionally remove hub copy
   let hubCopyRemoved = false
   if (removeHubCopy && fs.existsSync(hubPath)) {
-    // Require user confirmation for destructive action
-    if (inputRequest) {
-      const answer = await inputRequest.create(
-        projectName,
-        `Hub-Kopie loeschen: ${hubPath}\n\nDiese Aktion ist nicht rueckgaengig zu machen.`,
-        [
-          { key: 'yes', label: 'Loeschen' },
-          { key: 'no', label: 'Behalten' },
-        ],
-      )
-      if (answer === 'yes') {
-        removeDir(hubPath)
-        hubCopyRemoved = true
-      }
-    } else {
-      // Without input request mechanism, refuse destructive action
-      // (safety: never delete without confirmation)
-    }
+    removeDir(hubPath)
+    hubCopyRemoved = true
   }
 
   // Update ARCHIV-VERWEIS.md status

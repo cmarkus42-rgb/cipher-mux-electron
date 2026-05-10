@@ -35,8 +35,6 @@ export interface BrandConfig {
   readonly qualityBaselineDir: string
   /** IPC channel prefix — always "cipher-mux". */
   readonly ipcPrefix: string
-  /** Path to Cyber Factory input-requests.json file. Empty = feature disabled. */
-  readonly inputRequestsPath: string
 }
 
 const COMMUNITY_DEFAULTS: BrandConfig = {
@@ -49,7 +47,6 @@ const COMMUNITY_DEFAULTS: BrandConfig = {
   projectLauncherDir: '',
   qualityBaselineDir: '',
   ipcPrefix: 'cipher-mux',
-  inputRequestsPath: '',
 }
 
 /**
@@ -118,7 +115,6 @@ export function loadProfile(filePath: string): BrandConfig {
       projectLauncherDir: typeof parsed.projectLauncherDir === 'string' ? parsed.projectLauncherDir : COMMUNITY_DEFAULTS.projectLauncherDir,
       qualityBaselineDir: typeof parsed.qualityBaselineDir === 'string' ? parsed.qualityBaselineDir : COMMUNITY_DEFAULTS.qualityBaselineDir,
       ipcPrefix: typeof parsed.ipcPrefix === 'string' ? parsed.ipcPrefix : COMMUNITY_DEFAULTS.ipcPrefix,
-      inputRequestsPath: typeof parsed.inputRequestsPath === 'string' ? parsed.inputRequestsPath : COMMUNITY_DEFAULTS.inputRequestsPath,
     }
   } catch {
     return { ...COMMUNITY_DEFAULTS }

@@ -25,7 +25,6 @@ export interface ToolContext {
   statusLineMonitor: StatusLineMonitor | null
   kickoffOrchestrator: KickoffOrchestrator | null
   taskManager: TaskManager | null
-  inputRequestWatcher: import('../session/input-request-watcher').InputRequestWatcher | null
   windowManager: { sendToMainWindow(channel: string, data: unknown): void } | null
   noteManager: NoteManager | null
   noteSearchIndex: NoteSearchIndex | null
@@ -636,55 +635,6 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     }
   )
 
-  // 14. mux_input_request_create — Create an input request for the Cyber Factory sidebar
-  ;(server.registerTool as any)(
-    'mux_input_request_create',
-    {
-      description: 'Create an input request bubble for the cipher-mux sidebar (used by Cyber Factory to ask the user questions)',
-      inputSchema: {
-        projectId: z.string().describe('Project identifier'),
-        question: z.string().describe('The question to ask the user'),
-        context: z.string().optional().describe('Additional context (2-3 sentences)'),
-        options: z.array(z.object({
-          key: z.string(),
-          label: z.string(),
-          description: z.string().optional().default(''),
-        })).optional().describe('Answer options (max 4)'),
-        recommendation: z.string().optional().describe('Recommended option key'),
-      },
-    },
-    async (args: {
-      projectId: string
-      question: string
-      context?: string
-      options?: Array<{ key: string; label: string; description?: string }>
-      recommendation?: string
-    }) => {
-      if (!ctx.inputRequestWatcher) {
-        return { content: [{ type: 'text' as const, text: 'InputRequestWatcher not available' }], isError: true }
-      }
-
-      const id = `ir-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      const request: import('../../shared/types').InputRequestBubble = {
-        id,
-        type: 'bubble',
-        projectId: args.projectId,
-        question: args.question,
-        context: args.context ?? '',
-        options: (args.options ?? []).map(o => ({ key: o.key, label: o.label, description: o.description ?? '' })),
-        recommendation: args.recommendation,
-        status: 'open',
-        answer: null,
-        createdAt: new Date().toISOString(),
-        answeredAt: null,
-      }
-      ctx.inputRequestWatcher.createRequest(request)
-
-      return {
-        content: [{ type: 'text' as const, text: `Input request created: ${id} — "${args.question}"` }],
-      }
-    }
-  )
 
   // 15. mux_notes_create — Create a note in cipher-mux
   ;(server.registerTool as any)(
@@ -1869,8 +1819,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       // Fallback: macOS say (works without voice mode being active)
       try {
         const { execFile } = require('child_process')
+        const macosVoice = ttsConfigStore.get('macosVoice') as string | undefined
+        const sayArgs = macosVoice ? ['-v', macosVoice, args.text] : [args.text]
         await new Promise<void>((resolve, reject) => {
-          execFile('say', [args.text], (err: Error | null) => err ? reject(err) : resolve())
+          execFile('say', sayArgs, (err: Error | null) => err ? reject(err) : resolve())
         })
         return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, spoken: args.text.slice(0, 100), via: 'macos-say' }) }] }
       } catch (err) {

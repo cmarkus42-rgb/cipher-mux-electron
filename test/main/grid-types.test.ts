@@ -12,6 +12,7 @@ import {
   nextRowSpan,
   getFocusModeOverlappedSlots,
   getFocusModePlacement,
+  findNavigationTarget,
 } from '../../src/shared/grid-types'
 
 describe('grid-types', () => {
@@ -255,6 +256,119 @@ describe('grid-types', () => {
       const grid = createEmptyGrid({ cols: 2, rows: 2 })
       assert.strictEqual(getFocusModeOverlappedSlots(grid, -1).size, 0)
       assert.strictEqual(getFocusModeOverlappedSlots(grid, 99).size, 0)
+    })
+  })
+
+  describe('findNavigationTarget', () => {
+    it('navigates right to next session', () => {
+      const grid = createEmptyGrid({ cols: 3, rows: 1 })
+      grid.slots[0].sessionId = 'ses-A'
+      grid.slots[1].sessionId = 'ses-B'
+      const target = findNavigationTarget(grid, 'ses-A', 'right')
+      assert.strictEqual(target, 'ses-B')
+    })
+
+    it('skips notes cell when navigating right', () => {
+      // 3x1: [ses-A] [notes] [ses-B]
+      const grid = createEmptyGrid({ cols: 3, rows: 1 })
+      grid.slots[0].sessionId = 'ses-A'
+      grid.slots[1] = { sessionId: null, rowSpan: 1, type: 'notes', notesId: 'n1' }
+      grid.slots[2].sessionId = 'ses-B'
+      const target = findNavigationTarget(grid, 'ses-A', 'right')
+      assert.strictEqual(target, 'ses-B', 'should skip notes cell at slot 1')
+    })
+
+    it('skips notes cell when navigating left', () => {
+      // 3x1: [ses-A] [notes] [ses-B]
+      const grid = createEmptyGrid({ cols: 3, rows: 1 })
+      grid.slots[0].sessionId = 'ses-A'
+      grid.slots[1] = { sessionId: null, rowSpan: 1, type: 'notes', notesId: 'n1' }
+      grid.slots[2].sessionId = 'ses-B'
+      const target = findNavigationTarget(grid, 'ses-B', 'left')
+      assert.strictEqual(target, 'ses-A', 'should skip notes cell at slot 1')
+    })
+
+    it('skips multiple notes cells', () => {
+      // 4x1: [ses-A] [notes] [notes] [ses-B]
+      const grid = createEmptyGrid({ cols: 4, rows: 1 })
+      grid.slots[0].sessionId = 'ses-A'
+      grid.slots[1] = { sessionId: null, rowSpan: 1, type: 'notes', notesId: 'n1' }
+      grid.slots[2] = { sessionId: null, rowSpan: 1, type: 'notes', notesId: 'n2' }
+      grid.slots[3].sessionId = 'ses-B'
+      const target = findNavigationTarget(grid, 'ses-A', 'right')
+      assert.strictEqual(target, 'ses-B', 'should skip two notes cells')
+    })
+
+    it('skips empty slots too', () => {
+      // 3x1: [ses-A] [empty] [ses-B]
+      const grid = createEmptyGrid({ cols: 3, rows: 1 })
+      grid.slots[0].sessionId = 'ses-A'
+      grid.slots[2].sessionId = 'ses-B'
+      const target = findNavigationTarget(grid, 'ses-A', 'right')
+      assert.strictEqual(target, 'ses-B', 'should skip empty cell at slot 1')
+    })
+
+    it('wraps around when skipping notes at edge', () => {
+      // 3x1: [ses-A] [ses-B] [notes]
+      const grid = createEmptyGrid({ cols: 3, rows: 1 })
+      grid.slots[0].sessionId = 'ses-A'
+      grid.slots[1].sessionId = 'ses-B'
+      grid.slots[2] = { sessionId: null, rowSpan: 1, type: 'notes', notesId: 'n1' }
+      const target = findNavigationTarget(grid, 'ses-B', 'right')
+      assert.strictEqual(target, 'ses-A', 'should wrap and find ses-A')
+    })
+
+    it('returns null when only notes cells remain (no session to navigate to)', () => {
+      // 3x1: [ses-A] [notes] [notes]
+      const grid = createEmptyGrid({ cols: 3, rows: 1 })
+      grid.slots[0].sessionId = 'ses-A'
+      grid.slots[1] = { sessionId: null, rowSpan: 1, type: 'notes', notesId: 'n1' }
+      grid.slots[2] = { sessionId: null, rowSpan: 1, type: 'notes', notesId: 'n2' }
+      const target = findNavigationTarget(grid, 'ses-A', 'right')
+      assert.strictEqual(target, null, 'no other session to navigate to')
+    })
+
+    it('navigates vertically skipping notes', () => {
+      // 2x2: [ses-A] [empty]
+      //       [notes] [ses-B]
+      const grid = createEmptyGrid({ cols: 2, rows: 2 })
+      grid.slots[0].sessionId = 'ses-A'
+      grid.slots[2] = { sessionId: null, rowSpan: 1, type: 'notes', notesId: 'n1' }
+      grid.slots[3].sessionId = 'ses-B'
+      // down from ses-A (col 0) → notes at slot 2 → wrap to row 0 col 0 = self → null
+      const target = findNavigationTarget(grid, 'ses-A', 'down')
+      assert.strictEqual(target, null, 'only notes below in same column, should return null')
+    })
+
+    it('handles covered slots from rowSpan', () => {
+      // 2x2: [ses-A(span2)] [ses-B]
+      //       [covered]       [ses-C]
+      const grid = createEmptyGrid({ cols: 2, rows: 2 })
+      grid.slots[0] = { sessionId: 'ses-A', rowSpan: 2, type: 'session' }
+      grid.slots[1].sessionId = 'ses-B'
+      grid.slots[3].sessionId = 'ses-C'
+      // right from ses-A (col 0) → ses-B at slot 1
+      const target = findNavigationTarget(grid, 'ses-A', 'right')
+      assert.strictEqual(target, 'ses-B')
+    })
+
+    it('navigates to parent of covered slot', () => {
+      // 2x2: [ses-A(span2)] [ses-B]
+      //       [covered]       [ses-C]
+      const grid = createEmptyGrid({ cols: 2, rows: 2 })
+      grid.slots[0] = { sessionId: 'ses-A', rowSpan: 2, type: 'session' }
+      grid.slots[1].sessionId = 'ses-B'
+      grid.slots[3].sessionId = 'ses-C'
+      // left from ses-C (row1, col1) → covered at slot 2 → parent ses-A at slot 0
+      const target = findNavigationTarget(grid, 'ses-C', 'left')
+      assert.strictEqual(target, 'ses-A', 'should find parent of covered slot')
+    })
+
+    it('returns null for unknown currentSessionId', () => {
+      const grid = createEmptyGrid({ cols: 2, rows: 1 })
+      grid.slots[0].sessionId = 'ses-A'
+      const target = findNavigationTarget(grid, 'unknown', 'right')
+      assert.strictEqual(target, null)
     })
   })
 

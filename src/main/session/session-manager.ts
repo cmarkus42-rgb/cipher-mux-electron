@@ -94,7 +94,6 @@ const BASE_PERMISSIONS = [
   `${MCP_PREFIX}mux_task_update`,
   `${MCP_PREFIX}mux_task_list`,
   `${MCP_PREFIX}mux_task_get`,
-  `${MCP_PREFIX}mux_input_request_create`,
   `${MCP_PREFIX}mux_notes_create`,
   `${MCP_PREFIX}mux_notes_list`,
   `${MCP_PREFIX}mux_notes_search`,

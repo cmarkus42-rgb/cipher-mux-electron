@@ -271,6 +271,8 @@ export interface AppConfig {
   ttsVoice?: 'local' | 'macos'
   /** Active Piper voice model name (e.g. 'de_DE-cipher_adult-medium'). */
   piperVoice?: string
+  /** macOS say voice name (e.g. 'Anna', 'Daniel'). Empty = system default. */
+  macosVoice?: string
   /** TTS sentence-pipelining pause configuration (milliseconds). */
   tts?: {
     /** Pause after period (default 300ms). */
@@ -420,52 +422,6 @@ export interface KickoffCompletedEvent {
   /** Welcher Pfad hat den Complete ausgelöst. */
   reason: KickoffCompleteReason
 }
-
-// ─── Input Requests (Cyber Factory) ──────────────────────────────
-
-export interface InputRequestOption {
-  key: string
-  label: string
-  description?: string
-}
-
-export interface InputRequestBubble {
-  id: string
-  type: 'bubble'
-  projectId: string
-  question: string
-  context?: string
-  options?: InputRequestOption[]
-  recommendation?: string
-  status: 'open' | 'answered'
-  answer: string | null
-  createdAt: string
-  answeredAt: string | null
-}
-
-export interface InputRequestReviewLink {
-  id: string
-  type: 'review-link'
-  projectId: string
-  title: string
-  filePath: string
-  status: 'open' | 'answered'
-  createdAt: string
-  answeredAt: string | null
-}
-
-export type InputRequest = InputRequestBubble | InputRequestReviewLink
-
-export interface InputRequestsFile {
-  requests: InputRequest[]
-  lastUpdated: string
-}
-
-export interface InputRequestUpdate {
-  action: 'added' | 'updated' | 'removed'
-  request: InputRequest
-}
-
 // ─── Bugreport ─────────────────────────────────────────────
 
 export interface BugreportData {

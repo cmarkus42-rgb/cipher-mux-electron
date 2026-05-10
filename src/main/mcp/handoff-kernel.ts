@@ -19,7 +19,6 @@ export interface HandoffConfig {
   projectPath?: string
   payload: Record<string, unknown>
   createNote?: { title: string; body: string; tags: string[] }
-  createInputRequest?: { question: string; context: string }
 }
 
 export interface HandoffResult {
@@ -45,7 +44,6 @@ export interface HandoffToolDef {
   buildProjectPath?: (args: any) => string | undefined
   sideEffects?: {
     createNote?: (args: any) => { title: string; body: string; tags: string[] }
-    createInputRequest?: (args: any) => { question: string; context: string }
   }
 }
 
@@ -293,20 +291,6 @@ export async function executeHandoff(
       noteId = note.id
     }
 
-    if (config.createInputRequest && ctx.inputRequestWatcher) {
-      const irId = `ir-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      ctx.inputRequestWatcher.createRequest({
-        id: irId,
-        type: 'bubble' as const,
-        projectId: config.targetEntityId,
-        question: config.createInputRequest.question,
-        context: config.createInputRequest.context,
-        status: 'open' as const,
-        answer: null,
-        createdAt: new Date().toISOString(),
-        answeredAt: null,
-      })
-    }
 
     return {
       ok: true,
@@ -352,7 +336,6 @@ export function registerHandoffTool(
         projectPath,
         payload: def.buildPayload(args),
         createNote: def.sideEffects?.createNote?.(args),
-        createInputRequest: def.sideEffects?.createInputRequest?.(args),
       }
 
       const result = await executeHandoff(ctx, handoffConfig)
@@ -470,12 +453,6 @@ export function registerAllHandoffTools(server: McpServer, ctx: ToolContext): vo
       gaps: args.gaps,
     }),
     buildSessionName: () => 'Ideation',
-    sideEffects: {
-      createInputRequest: (args) => ({
-        question: `Refinement: Zurueck zum Ideation Partner — ${args.reason}`,
-        context: `Identifizierte Luecken:\n${(args.gaps as string[]).map((g: string) => `- ${g}`).join('\n')}`,
-      }),
-    },
   })
 
   // ─── REQ-TOOLS-004: mux_cyber_factory_handoff_testing ─────

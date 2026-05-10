@@ -55,7 +55,7 @@ export class VoiceManager extends EventEmitter {
         ?? path.join(userDataDir, 'models', 'whisper'),
       piperModelsDir: config?.piperModelsDir
         ?? path.join(userDataDir, 'models', 'piper'),
-      piperVoice: config?.piperVoice ?? DEFAULT_PIPER_VOICE,
+      piperVoice: config?.piperVoice ?? configStore.get('piperVoice') ?? DEFAULT_PIPER_VOICE,
       interactionMode: config?.interactionMode ?? 'toggle',
       skipTTS: config?.skipTTS ?? false,
     }
@@ -124,7 +124,7 @@ export class VoiceManager extends EventEmitter {
     console.log('[Voice] VoiceManager.initPiperOnly() starting...')
     const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
     this.piperTTS = new PiperTTS({
-      voice: this.config.piperVoice,
+      voice: configStore.get('piperVoice') ?? this.config.piperVoice,
       modelsDir: this.config.piperModelsDir,
       nodeModulesPath: appNodeModules,
     })
@@ -359,7 +359,7 @@ export class VoiceManager extends EventEmitter {
       if (!this.piperTTS) {
         const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
         this.piperTTS = new PiperTTS({
-          voice: this.config.piperVoice,
+          voice: configStore.get('piperVoice') ?? this.config.piperVoice,
           modelsDir: this.config.piperModelsDir,
           nodeModulesPath: appNodeModules,
         })
@@ -381,8 +381,31 @@ export class VoiceManager extends EventEmitter {
       if (piperProducedAudio) return
       console.warn('[VoiceManager] PiperTTS produced no audio, falling back to macOS say')
     } catch (err) {
-      console.warn('[VoiceManager] PiperTTS failed, falling back to macOS say:', (err as Error).message)
-      this.piperTTS = null
+      console.warn('[VoiceManager] PiperTTS failed:', (err as Error).message)
+      // Attempt one re-init before falling back to macOS say
+      if (this.piperTTS) {
+        this.piperTTS.dispose()
+        this.piperTTS = null
+      }
+      try {
+        console.log('[VoiceManager] Attempting Piper re-init...')
+        const appNodeModules = path.join(__dirname, '..', '..', '..', '..', 'node_modules')
+        this.piperTTS = new PiperTTS({
+          voice: configStore.get('piperVoice') ?? this.config.piperVoice,
+          modelsDir: this.config.piperModelsDir,
+          nodeModulesPath: appNodeModules,
+        })
+        await this.piperTTS.init()
+        if (this.conversation) this.conversation.setTTS(this.piperTTS)
+        console.log('[VoiceManager] Piper re-init successful, retrying speak')
+        const retry = this.conversation
+          ? await this.conversation.speakResponse(text)
+          : await this._speakPipelined(text)
+        if (retry) return
+      } catch (retryErr) {
+        console.warn('[VoiceManager] Piper re-init failed, falling back to macOS say:', (retryErr as Error).message)
+        this.piperTTS = null
+      }
     }
 
     // Fallback: macOS say (direct, no renderer pipeline needed)
@@ -488,7 +511,9 @@ export class VoiceManager extends EventEmitter {
     this.stopMacosSay()
     return new Promise((resolve, reject) => {
       const { execFile } = require('child_process')
-      this.sayProcess = execFile('say', [text], (err: Error | null) => {
+      const macosVoice = configStore.get('macosVoice') as string | undefined
+      const args = macosVoice ? ['-v', macosVoice, text] : [text]
+      this.sayProcess = execFile('say', args, (err: Error | null) => {
         this.sayProcess = null
         if (err && (err as any).killed) {
           resolve() // intentionally killed via stop — not an error

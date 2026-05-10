@@ -38,13 +38,12 @@ interface MockCtxOpts {
   startEntityError?: string
 }
 
-function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[][]; messageBusCalls: any[]; visibleAddCalls: any[]; noteCreateCalls: any[]; inputRequestCalls: any[] } {
+function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[][]; messageBusCalls: any[]; visibleAddCalls: any[]; noteCreateCalls: any[] } {
   const sessions = opts.sessions ?? []
   const sendKeysCalls: string[][] = []
   const messageBusCalls: any[] = []
   const visibleAddCalls: any[] = []
   const noteCreateCalls: any[] = []
-  const inputRequestCalls: any[] = []
 
   const entityRegistry = {
     get: (entityId: EntityId) => {
@@ -104,19 +103,12 @@ function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[
     },
   } as any
 
-  const inputRequestWatcher = {
-    createRequest: (req: any) => {
-      inputRequestCalls.push(req)
-    },
-  } as any
-
   return {
     sessionManager,
     messageBus,
     statusLineMonitor: null,
     kickoffOrchestrator: null,
     taskManager: null,
-    inputRequestWatcher,
     windowManager,
     noteManager,
     noteSearchIndex: null,
@@ -125,7 +117,6 @@ function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[
     messageBusCalls,
     visibleAddCalls,
     noteCreateCalls,
-    inputRequestCalls,
   }
 }
 
@@ -228,24 +219,6 @@ describe('handoff-kernel: executeHandoff', () => {
     assert.equal((result as HandoffResult).noteId, 'note-123')
     assert.equal(ctx.noteCreateCalls.length, 1)
     assert.equal(ctx.noteCreateCalls[0].title, 'Bug Findings')
-  })
-
-  it('creates input request when createInputRequest is set', async () => {
-    const existingSession = makeSession({ entityId: 'ideation-partner' as EntityId })
-    const ctx = makeCtx({ sessions: [existingSession], paneCommand: 'zsh' })
-
-    const config: HandoffConfig = {
-      targetEntityId: 'ideation-partner',
-      senderEntityId: 'refinement',
-      sessionName: 'Ideation',
-      payload: { reason: 'gaps found' },
-      createInputRequest: { question: 'Review gaps?', context: 'Details' },
-    }
-
-    const result = await executeHandoff(ctx, config)
-    assert.equal((result as HandoffResult).ok, true)
-    assert.equal(ctx.inputRequestCalls.length, 1)
-    assert.equal(ctx.inputRequestCalls[0].question, 'Review gaps?')
   })
 
   it('writes to MessageBus when windowManager is null (background fallback)', async () => {

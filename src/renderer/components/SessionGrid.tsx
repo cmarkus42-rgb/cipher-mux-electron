@@ -1,7 +1,7 @@
 // src/renderer/components/SessionGrid.tsx
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import type { SessionInfo, ContextUsage, EntityId } from '../../shared/types'
-import { computeGridStyle, getCoveredSlots, getFocusModePlacement } from '../../shared/grid-types'
+import { computeGridStyle, getCoveredSlots, getFocusModePlacement, findNavigationTarget } from '../../shared/grid-types'
 import type { GridState, ThemeName } from '../../shared/grid-types'
 import { SessionCell } from './SessionCell'
 import { LauncherCell } from './LauncherCell'
@@ -77,25 +77,10 @@ export function SessionGrid({
     // Build set of session IDs actually visible in the grid
     const visibleSessionIds = new Set(sessions.map(s => s.id))
     const unsub = api.terminal.onGridNav((data: { direction: string }) => {
-      const { cols, rows } = grid.config
-      // Find current focused slot — must be a visible session
-      const currentIdx = grid.slots.findIndex(s => s.sessionId === focusedSessionId && visibleSessionIds.has(s.sessionId ?? ''))
-      if (currentIdx < 0) return
-      const col = currentIdx % cols
-      const row = Math.floor(currentIdx / cols)
-      let targetCol = col
-      let targetRow = row
-      switch (data.direction) {
-        case 'up':    targetRow = Math.max(0, row - 1); break
-        case 'down':  targetRow = Math.min(rows - 1, row + 1); break
-        case 'left':  targetCol = Math.max(0, col - 1); break
-        case 'right': targetCol = Math.min(cols - 1, col + 1); break
-      }
-      const targetIdx = targetRow * cols + targetCol
-      const targetSession = grid.slots[targetIdx]?.sessionId
-      // Only navigate to sessions that are actually visible in the grid
-      if (targetSession && targetSession !== focusedSessionId && visibleSessionIds.has(targetSession)) {
-        onFocusSession(targetSession)
+      const dir = data.direction as 'up' | 'down' | 'left' | 'right'
+      const target = findNavigationTarget(grid, focusedSessionId, dir)
+      if (target && visibleSessionIds.has(target)) {
+        onFocusSession(target)
       }
     })
     return () => unsub()
