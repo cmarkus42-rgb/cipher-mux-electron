@@ -1221,6 +1221,7 @@ export class SessionManager extends EventEmitter {
       isCyberFactory: entityId === 'cyber-factory',
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
+    this.autoLaunchedSessions.add(sessionId)
     this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
   }
 
@@ -1255,6 +1256,7 @@ export class SessionManager extends EventEmitter {
       resume: true,
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
+    this.autoLaunchedSessions.add(session.id)
     this.setPendingLaunch(session.id, `clear; ${cmdStr}\n`)
 
     return session
