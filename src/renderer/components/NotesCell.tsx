@@ -8,7 +8,7 @@ import { TestcaseView } from './TestcaseView'
 import { useNotes } from '../hooks/useNotes'
 import type { NoteInfo } from '../../shared/types'
 import type { ParsedTestcase, TestcaseSection } from '../../main/notes/testcase-parser'
-import { ExternalLink, Maximize2, Minimize2, X } from 'lucide-preact'
+import { ExternalLink, Scan, ChevronDown, ChevronUp, X } from 'lucide-preact'
 
 const ICON_SIZE = 14
 
@@ -398,7 +398,7 @@ export function NotesCell({
               onClick={(e) => { e.stopPropagation(); onFocusMode() }}
               title={isFocusMode ? 'Focus Mode beenden (Escape)' : 'Focus Mode (Cmd+Shift+F)'}
               aria-label="Focus Mode"
-            >{isFocusMode ? <Minimize2 size={ICON_SIZE} /> : <Maximize2 size={ICON_SIZE} />}</button>
+            ><Scan size={ICON_SIZE} /></button>
           )}
           {maxRows > 1 && (
             <button
@@ -406,7 +406,7 @@ export function NotesCell({
               onClick={(e) => { e.stopPropagation(); onToggleExpand() }}
               title={isAtMax ? t('notesCell.collapseHeight') : t('notesCell.expandHeight')}
               aria-label={isAtMax ? 'Collapse' : 'Expand'}
-            >{isAtMax ? <Minimize2 size={ICON_SIZE} /> : <Maximize2 size={ICON_SIZE} />}</button>
+            >{isAtMax ? <ChevronUp size={ICON_SIZE} /> : <ChevronDown size={ICON_SIZE} />}</button>
           )}
           {onDetach && (
             <button

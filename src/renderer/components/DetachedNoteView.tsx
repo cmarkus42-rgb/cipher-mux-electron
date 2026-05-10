@@ -4,7 +4,9 @@ import { h } from 'preact'
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import { useTheme } from '../hooks/useTheme'
 import { NoteEditor } from './NoteEditor'
+import { TestcaseView } from './TestcaseView'
 import { TagBar } from './TagBar'
+import type { ParsedTestcase, TestcaseSection } from '../../main/notes/testcase-parser'
 
 interface DetachedNoteViewProps {
   noteId: string
@@ -16,6 +18,8 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
   const [content, setContent] = useState<string | null>(null)
   const [tags, setTags] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [testcase, setTestcase] = useState<ParsedTestcase | null>(null)
+  const [voiceState, setVoiceState] = useState<string>('idle')
   const loadedRef = useRef(false)
 
   // Dynamic window title
@@ -38,6 +42,14 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [noteId])
 
+  // Voice state tracking for STT indicator
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.voice?.onState) return
+    const unsub = api.voice.onState((state: string) => setVoiceState(state))
+    return () => unsub()
+  }, [])
+
   useEffect(() => {
     if (loadedRef.current) return
     const api = (window as any).cipherMux
@@ -45,7 +57,7 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
       setError('Notes API not available')
       return
     }
-    api.notes.read(noteId).then((result: any) => {
+    api.notes.read(noteId).then(async (result: any) => {
       if (!result) {
         setError(`Note "${noteId}" not found`)
         return
@@ -54,6 +66,15 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
       setTitle(result.info?.title ?? 'Untitled')
       setContent(result.body ?? '')
       setTags(result.info?.tags ?? [])
+      // Detect testcase note
+      if (result.info?.tags?.includes('kind:testcase')) {
+        try {
+          const parsed = await api.notes.parseTestcase(noteId)
+          if (parsed) setTestcase(parsed)
+        } catch (err) {
+          console.error('[DetachedNoteView] Failed to parse testcase:', err)
+        }
+      }
     }).catch((err: Error) => {
       setError(err.message)
     })
@@ -83,6 +104,19 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
     const api = (window as any).cipherMux
     api?.detach?.dock?.(noteId)
   }, [noteId])
+
+  const handleTestcaseUpdate = useCallback(async (sections: TestcaseSection[]) => {
+    if (!testcase) return
+    const api = (window as any).cipherMux
+    const updated: ParsedTestcase = { ...testcase, sections }
+    const body = await api.notes.serializeTestcaseBody(sections)
+    if (!body) { console.error('[DetachedNoteView] serializeTestcaseBody returned null'); return }
+    const result = await api.notes.save(noteId, body, undefined, true)
+    if (result?.title) setTitle(result.title)
+    latestContentRef.current = body
+    setContent(body)
+    setTestcase(updated)
+  }, [noteId, testcase])
 
   if (error) {
     return (
@@ -136,17 +170,39 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
         </button>
       </div>
 
-      {/* Tag bar */}
-      <TagBar tags={tags} onTagsChange={handleTagsChange} />
+      {/* STT recording indicator */}
+      {voiceState === 'recording' && (
+        <div style={{
+          padding: '2px 8px',
+          fontSize: 10,
+          color: 'var(--color-neon-red, #ef4444)',
+          background: 'var(--color-bg-sunken, #111)',
+          textAlign: 'center',
+          flexShrink: 0,
+        }}>
+          STT recording...
+        </div>
+      )}
 
-      {/* Editor fills remaining space */}
+      {/* Tag bar — hide for testcase notes */}
+      {!testcase && <TagBar tags={tags} onTagsChange={handleTagsChange} />}
+
+      {/* Editor or TestcaseView */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} class="notes-editor-area">
-        <NoteEditor
-          key={noteId}
-          content={content}
-          onSave={handleSave}
-          onAutoSave={handleAutoSave}
-        />
+        {testcase ? (
+          <TestcaseView
+            key={noteId}
+            testcase={testcase}
+            onUpdate={handleTestcaseUpdate}
+          />
+        ) : (
+          <NoteEditor
+            key={noteId}
+            content={content}
+            onSave={handleSave}
+            onAutoSave={handleAutoSave}
+          />
+        )}
       </div>
     </div>
   )
