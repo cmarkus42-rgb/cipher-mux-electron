@@ -5,7 +5,7 @@ import type { Persona, Workspace } from '../../shared/persona-types'
 import { PERSONA_SWATCHES } from '../../shared/persona-types'
 
 /** Clipboard copy button with checkmark feedback. */
-function CopyButton({ getText }: { getText: () => string }) {
+function CopyButton({ getText, title }: { getText: () => string; title?: string }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = async () => {
     try {
@@ -17,7 +17,7 @@ function CopyButton({ getText }: { getText: () => string }) {
   return (
     <button
       onClick={handleCopy}
-      title="Copy to clipboard"
+      title={title}
       style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '12px', color: copied ? 'var(--color-success, #4caf50)' : 'var(--color-text-dim)', display: 'inline-flex', alignItems: 'center', gap: '2px', lineHeight: 1 }}
     >
       {copied ? '\u2713' : '\u2398'}
@@ -255,13 +255,13 @@ export function PersonasTab() {
           <div class="pp-field">
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <label style={{ margin: 0 }}>{t('personasTab.defaultPrompt')}</label>
-              <CopyButton getText={() => draftPrompt} />
+              <CopyButton getText={() => draftPrompt} title={t('personasTab.copyToClipboard')} />
             </div>
             <div class="pp-hint">
               {t('personasTab.promptHint')}
             </div>
             <div class="pp-hint" style={{ marginTop: 4, color: 'var(--color-warning)' }}>
-              Aenderungen werden erst fuer neu gestartete Sessions wirksam.
+              {t('personasTab.changeHint')}
             </div>
             <textarea
               value={draftPrompt}
@@ -282,8 +282,7 @@ export function PersonasTab() {
           <div class="pp-usage">
             {usage.cellCount > 0 ? (
               <span>
-                Used in <b>{usage.wsNames.length}</b> workspace{usage.wsNames.length === 1 ? '' : 's'},{' '}
-                <b>{usage.cellCount}</b> cell{usage.cellCount === 1 ? '' : 's'}:{' '}
+                {t('personasTab.usageText', { wsCount: usage.wsNames.length, cellCount: usage.cellCount })}{' '}
                 {usage.wsNames.map((n, i) => (
                   <span key={n}>
                     {i > 0 && ', '}

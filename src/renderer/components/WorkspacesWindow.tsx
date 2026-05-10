@@ -13,8 +13,8 @@ type TabId = 'workspaces' | 'companion' | 'presets' | 'tags'
 
 const TAB_LABELS: Record<TabId, string> = {
   workspaces: 'workspacesWindow.workspaces',
-  companion: 'Companion',
-  presets: 'Presets',
+  companion: 'workspacesWindow.companion',
+  presets: 'workspacesWindow.presets',
   tags: 'workspacesWindow.tags',
 }
 
@@ -45,7 +45,7 @@ export function WorkspacesWindow() {
               class={`ws-window__tab ${activeTab === tab ? 'ws-window__tab--active' : ''}`}
               onClick={() => setActiveTab(tab)}
             >
-              {tab === 'companion' ? 'Companion' : tab === 'presets' ? 'Presets' : t(TAB_LABELS[tab])}
+              {t(TAB_LABELS[tab])}
             </button>
           ))}
         </div>

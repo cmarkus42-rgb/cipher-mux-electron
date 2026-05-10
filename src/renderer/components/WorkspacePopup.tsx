@@ -59,9 +59,9 @@ function WorkspaceThumbnail({ ws }: { ws: Workspace }) {
   )
 }
 
-function buildSubtitle(ws: Workspace): string {
+function buildSubtitle(ws: Workspace, t: (key: string, opts?: any) => string): string {
   const filledCount = ws.cells.filter(c => c.project && c.project !== '').length
-  return `${ws.cols}\u00D7${ws.rows} \u00B7 ${filledCount} slot${filledCount === 1 ? '' : 's'}`
+  return `${ws.cols}\u00D7${ws.rows} \u00B7 ${t('workspacePopup.slotCount', { count: filledCount })}`
 }
 
 export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, currentGrid, sessions: currentSessions }: WorkspacePopupProps) {
@@ -282,7 +282,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
                   )}
                 </div>
                 <div class="wp-sub">
-                  {buildSubtitle(ws)}
+                  {buildSubtitle(ws, t)}
                   {ws.defaultTags?.length ? ` · ${ws.defaultTags.join(', ')}` : ''}
                 </div>
               </div>
@@ -290,7 +290,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
                 <button
                   class="wp-update-btn"
                   onClick={(e) => { e.stopPropagation(); handleUpdateExisting(ws.id) }}
-                  title={hasDetached ? t('workspacePopup.detachedWarning', 'Dock all detached windows before saving') : t('workspacePopup.updateCurrent')}
+                  title={hasDetached ? t('workspacePopup.detachedWarning') : t('workspacePopup.updateCurrent')}
                   disabled={saving || hasDetached}
                 >
                   {'\u21BB'}
@@ -317,7 +317,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
               {/* Tag input */}
               <div style={{ marginBottom: '8px' }}>
                 <div style={{ fontSize: '11px', color: 'var(--color-text-dim)', marginBottom: '4px' }}>
-                  {t('workspacePopup.projectTags', 'Project Tags')}
+                  {t('workspacePopup.projectTags')}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '4px' }}>
                   {saveTags.map(tag => (
@@ -339,7 +339,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
                         handleAddTag(tagInput)
                       }
                     }}
-                    placeholder={t('workspacePopup.tagPlaceholder', 'Add tag...')}
+                    placeholder={t('workspacePopup.tagPlaceholder')}
                     style={{ width: '100%' }}
                   />
                   {tagSuggestions.length > 0 && (
@@ -369,7 +369,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
             class="ghost"
             onClick={handleSaveCurrentOpen}
             disabled={!currentGrid || hasDetached}
-            title={hasDetached ? t('workspacePopup.detachedWarning', 'Dock all detached windows before saving') : undefined}
+            title={hasDetached ? t('workspacePopup.detachedWarning') : undefined}
           >{t('workspacePopup.saveCurrent')}</button>
           <button class="ghost" onClick={() => onOpenSettings('workspaces')}>{t('workspacePopup.editBtn')}</button>
           <button onClick={handleLoad} disabled={!selectedId}>{t('workspacePopup.load')}</button>
