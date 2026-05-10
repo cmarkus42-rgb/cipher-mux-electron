@@ -56,6 +56,11 @@ export function TagManager() {
   const [classRenameValue, setClassRenameValue] = useState('')
   const [editingClassColor, setEditingClassColor] = useState<string | null>(null)
 
+  // Inline delete confirmation (replaces window.confirm)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [classDeleteConfirm, setClassDeleteConfirm] = useState<string | null>(null)
+  const [mergeConfirmPending, setMergeConfirmPending] = useState(false)
+
   const loadData = useCallback(async () => {
     const [tagList, classRepo, indexData, synMap]: [
       TagInfo[],
@@ -161,9 +166,8 @@ export function TagManager() {
 
   // Tag value delete
   const handleDelete = async (tag: string) => {
-    const confirmed = window.confirm(t('tags.deleteConfirm', { name: tag }))
-    if (!confirmed) return
     await api.notes.tagDelete(tag)
+    setDeleteConfirm(null)
     await loadData()
   }
 
@@ -196,20 +200,16 @@ export function TagManager() {
 
   const handleMerge = async () => {
     if (selectedForMerge.size < 2) return
+    if (!mergeConfirmPending) {
+      setMergeConfirmPending(true)
+      return
+    }
     const sources = [...selectedForMerge]
     const target = sources[0]
-    const confirmed = window.confirm(
-      t('tags.mergeConfirm', {
-        count: sources.length,
-        target,
-        sources: sources.join(', '),
-        defaultValue: `Merge ${sources.length} tags into "${target}"?\n\nSource tags: ${sources.join(', ')}\nAll notes will be updated.`,
-      })
-    )
-    if (!confirmed) return
     await api.notes.tagMerge(sources, target)
     setSelectedForMerge(new Set())
     setMergeMode(false)
+    setMergeConfirmPending(false)
     await loadData()
   }
 
@@ -237,17 +237,8 @@ export function TagManager() {
   }
 
   const handleClassDelete = async (name: string) => {
-    const cls = classes.find(c => c.name === name)
-    const valueCount = cls?.values.length || 0
-    const confirmed = window.confirm(
-      t('tags.classDeleteConfirm', {
-        name,
-        count: valueCount,
-        defaultValue: `Delete class "${name}" with ${valueCount} values? Values will become unclassed.`,
-      })
-    )
-    if (!confirmed) return
     await api.notes.tagClassDelete(name)
+    setClassDeleteConfirm(null)
     await loadData()
   }
 
@@ -342,13 +333,31 @@ export function TagManager() {
             >
               Aa
             </button>
-            <button
-              class="tag-manager__action tag-manager__action--danger"
-              onClick={(e) => { e.stopPropagation(); handleDelete(row.fullTag) }}
-              title={t('tags.delete', 'Delete')}
-            >
-              x
-            </button>
+            {deleteConfirm === row.fullTag ? (
+              <>
+                <button
+                  class="tag-manager__action tag-manager__action--danger"
+                  onClick={(e) => { e.stopPropagation(); handleDelete(row.fullTag) }}
+                  title={t('tags.delete', 'Delete')}
+                >
+                  {t('tags.confirmYes', 'Yes')}
+                </button>
+                <button
+                  class="tag-manager__action"
+                  onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null) }}
+                >
+                  {t('tags.confirmNo', 'No')}
+                </button>
+              </>
+            ) : (
+              <button
+                class="tag-manager__action tag-manager__action--danger"
+                onClick={(e) => { e.stopPropagation(); setDeleteConfirm(row.fullTag) }}
+                title={t('tags.delete', 'Delete')}
+              >
+                x
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -400,13 +409,31 @@ export function TagManager() {
             >
               Aa
             </button>
-            <button
-              class="tag-manager__action tag-manager__action--danger"
-              onClick={() => handleClassDelete(cls.name)}
-              title={t('tags.deleteClass', 'Delete class')}
-            >
-              x
-            </button>
+            {classDeleteConfirm === cls.name ? (
+              <>
+                <button
+                  class="tag-manager__action tag-manager__action--danger"
+                  onClick={() => handleClassDelete(cls.name)}
+                  title={t('tags.deleteClass', 'Delete class')}
+                >
+                  {t('tags.confirmYes', 'Yes')}
+                </button>
+                <button
+                  class="tag-manager__action"
+                  onClick={() => setClassDeleteConfirm(null)}
+                >
+                  {t('tags.confirmNo', 'No')}
+                </button>
+              </>
+            ) : (
+              <button
+                class="tag-manager__action tag-manager__action--danger"
+                onClick={() => setClassDeleteConfirm(cls.name)}
+                title={t('tags.deleteClass', 'Delete class')}
+              >
+                x
+              </button>
+            )}
           </div>
         </div>
 
@@ -476,9 +503,23 @@ export function TagManager() {
               </span>
             )}
           </span>
-          <button class="tag-manager__btn tag-manager__btn--primary" onClick={handleMerge}>
-            {t('tags.mergeNow', 'Merge Now')}
-          </button>
+          {mergeConfirmPending ? (
+            <>
+              <span style={{ color: 'var(--color-neon-red, #ef4444)', fontSize: 11 }}>
+                {t('tags.mergeConfirmInline', 'Sure?')}
+              </span>
+              <button class="tag-manager__btn tag-manager__btn--primary" onClick={handleMerge}>
+                {t('tags.confirmYes', 'Yes')}
+              </button>
+              <button class="tag-manager__btn" onClick={() => setMergeConfirmPending(false)}>
+                {t('tags.confirmNo', 'No')}
+              </button>
+            </>
+          ) : (
+            <button class="tag-manager__btn tag-manager__btn--primary" onClick={handleMerge}>
+              {t('tags.mergeNow', 'Merge Now')}
+            </button>
+          )}
         </div>
       )}
 

@@ -328,14 +328,11 @@ export class WindowManager {
 
     win.on('closed', () => {
       const wasDock = this.dockInitiated.delete(entityId)
+      const dockedType = this.detachedWindows.get(entityId)?.entry.type
       this.detachedWindows.delete(entityId)
-      // Notify main window so renderer can update detachedIds
-      // (covers both X-button close and programmatic close via dock)
       this.sendToMainWindow(IPC.DETACH_STATE_CHANGED, {
         entries: this.getDetachedEntries(),
-        // dockedEntityId tells renderer to show placement popup (dock-button).
-        // X-close omits it — session just goes to background.
-        ...(wasDock ? { dockedEntityId: entityId } : {}),
+        ...(wasDock ? { dockedEntityId: entityId, dockedType } : {}),
       })
     })
 
