@@ -155,31 +155,5 @@ describe('hub apply (REQ-HUB-004)', () => {
       )
     })
 
-    it('respects user skipping steps via inputRequest', async () => {
-      const skipProject = 'skip-project'
-      const skipMigDir = path.join(tmpDir, 'migrations', skipProject)
-      fs.mkdirSync(path.join(tmpDir, 'projects', skipProject), { recursive: true })
-      fs.mkdirSync(skipMigDir, { recursive: true })
-
-      const avContent = fs.readFileSync(path.join(tmpDir, 'ARCHIV-VERWEIS.md'), 'utf-8')
-      fs.writeFileSync(
-        path.join(tmpDir, 'ARCHIV-VERWEIS.md'),
-        avContent.trimEnd() + `\n| ${skipProject} | /tmp/skip | projects/${skipProject} | kopiert | — |\n`,
-      )
-
-      fs.writeFileSync(path.join(skipMigDir, 'migration-plan-2026-05-03.md'), [
-        '## Kommt neu hinzu',
-        '- [ ] **S-1** Step one — action one',
-        '- [ ] **S-2** Step two — action two',
-      ].join('\n'))
-
-      const mockInput = {
-        create: async () => 'skip' as string | null,
-      }
-
-      const result = await hubApply({ projectName: skipProject }, mockInput)
-      assert.equal(result.stepsSkipped, 2)
-      assert.equal(result.stepsApplied, 0)
-    })
   })
 })

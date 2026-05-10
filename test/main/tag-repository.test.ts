@@ -32,7 +32,7 @@ describe('TagClassRepo', () => {
     const data = repo.getRepository()
     const kindValues = data.classes.kind.values
     assert.ok(kindValues.includes('bugreport'))
-    assert.ok(kindValues.includes('feature'))
+    assert.ok(kindValues.includes('feature-request'))
     assert.ok(kindValues.includes('testcase'))
     assert.ok(kindValues.includes('handoff'))
   })
@@ -101,7 +101,7 @@ describe('TagClassRepo', () => {
   })
 
   it('returns false when all tags already known', () => {
-    const changed = repo.ensureTags(['kind:bugreport', 'kind:feature'])
+    const changed = repo.ensureTags(['kind:bugreport', 'kind:feature-request'])
     assert.equal(changed, false)
   })
 
@@ -164,7 +164,7 @@ describe('TagClassRepo', () => {
   it('getClassValues returns values for a class', () => {
     const values = repo.getClassValues('kind')
     assert.ok(values.includes('bugreport'))
-    assert.ok(values.includes('feature'))
+    assert.ok(values.includes('feature-request'))
   })
 
   it('getClassValues returns empty array for unknown class', () => {

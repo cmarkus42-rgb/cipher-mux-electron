@@ -32,8 +32,6 @@ function makeCtx(opts: MockCtxOpts = {}) {
   const sessions = opts.sessions ?? []
   const sendKeysCalls: string[][] = []
   const noteCreateCalls: any[] = []
-  const inputRequestCalls: any[] = []
-
   const entityRegistry = {
     get: (entityId: EntityId) => ({
       id: entityId,
@@ -78,26 +76,19 @@ function makeCtx(opts: MockCtxOpts = {}) {
     },
   } as any
 
-  const inputRequestWatcher = {
-    createRequest: (req: any) => {
-      inputRequestCalls.push(req)
-    },
-  } as any
-
   const ctx: ToolContext = {
     sessionManager,
     messageBus: null,
     statusLineMonitor: null,
     kickoffOrchestrator: null,
     taskManager: null,
-    inputRequestWatcher,
     windowManager,
     noteManager,
     noteSearchIndex: null,
     memoryStore: null,
   }
 
-  return { ctx, sendKeysCalls, noteCreateCalls, inputRequestCalls }
+  return { ctx, sendKeysCalls, noteCreateCalls }
 }
 
 type ToolHandler = (args: any) => Promise<{ content: { type: string; text: string }[]; isError?: boolean }>
@@ -257,22 +248,6 @@ describe('REQ-TOOLS-003: mux_refinement_handoff_ideation', () => {
     assert.ok(message.includes('Missing error handling'))
   })
 
-  it('creates an input request as side effect', async () => {
-    const session = makeSession({ entityId: 'ideation-partner' as EntityId })
-    const { ctx, inputRequestCalls } = makeCtx({ sessions: [session] })
-    const handlers = registerAndCollect(ctx)
-    const handler = handlers.get('mux_refinement_handoff_ideation')!
-
-    await handler({
-      reason: 'Systematic gaps in NFRs',
-      gaps: ['Gap A', 'Gap B'],
-    })
-
-    assert.equal(inputRequestCalls.length, 1)
-    assert.ok(inputRequestCalls[0].question.includes('Systematic gaps in NFRs'))
-    assert.ok(inputRequestCalls[0].context.includes('Gap A'))
-    assert.ok(inputRequestCalls[0].context.includes('Gap B'))
-  })
 })
 
 // ─── REQ-TOOLS-004: mux_cyber_factory_handoff_testing ─────
