@@ -244,7 +244,7 @@ export class TagClassRepo {
   removeValue(className: string, value: string): boolean {
     const cls = this.data.classes[className]
     if (!cls) return false
-    const idx = cls.values.indexOf(value)
+    const idx = cls.values.indexOf(value.toLowerCase().trim())
     if (idx === -1) return false
     cls.values.splice(idx, 1)
     this.save()

@@ -207,19 +207,14 @@ const api = {
       ipcRenderer.invoke(IPC.BUGREPORT_ENRICH, { description }),
     pickScreenshot: (): Promise<string[]> =>
       ipcRenderer.invoke(IPC.BUGREPORT_PICK_SCREENSHOT),
-    startRelay: (): Promise<{ ok: boolean; sessionId?: string; error?: string }> =>
-      ipcRenderer.invoke(IPC.BUGREPORT_RELAY_START),
-    stopRelay: (): Promise<{ ok: boolean }> =>
-      ipcRenderer.invoke(IPC.BUGREPORT_RELAY_STOP),
-    onRelayReady: (cb: (data: { sessionId: string }) => void) => {
-      const handler = (_e: unknown, data: { sessionId: string }) => cb(data)
-      ipcRenderer.on(IPC.BUGREPORT_RELAY_READY, handler)
-      return () => ipcRenderer.removeListener(IPC.BUGREPORT_RELAY_READY, handler)
-    },
-    onTtsText: (cb: (text: string) => void) => {
-      const handler = (_e: unknown, text: string) => cb(text)
-      ipcRenderer.on(IPC.BUGREPORT_TTS_TEXT, handler)
-      return () => ipcRenderer.removeListener(IPC.BUGREPORT_TTS_TEXT, handler)
+    dialogOpen: (): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.BUGREPORT_DIALOG_OPEN),
+    dialogClose: (): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.BUGREPORT_DIALOG_CLOSE),
+    onDialogInsert: (cb: (data: { target: string; text: string }) => void) => {
+      const handler = (_e: unknown, data: { target: string; text: string }) => cb(data)
+      ipcRenderer.on(IPC.VOICE_DIALOG_INSERT, handler)
+      return () => ipcRenderer.removeListener(IPC.VOICE_DIALOG_INSERT, handler)
     },
   },
 

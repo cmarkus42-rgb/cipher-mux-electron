@@ -97,10 +97,9 @@ export const IPC = {
   BUGREPORT_SUBMIT: 'cipher-mux:bugreport:submit',
   BUGREPORT_ENRICH: 'cipher-mux:bugreport:enrich',
   BUGREPORT_PICK_SCREENSHOT: 'cipher-mux:bugreport:pick-screenshot',
-  BUGREPORT_RELAY_START: 'cipher-mux:bugreport:relay-start',
-  BUGREPORT_RELAY_STOP: 'cipher-mux:bugreport:relay-stop',
-  BUGREPORT_RELAY_READY: 'cipher-mux:bugreport:relay-ready',
-  BUGREPORT_TTS_TEXT: 'cipher-mux:bugreport:tts-text',
+  BUGREPORT_DIALOG_OPEN: 'cipher-mux:bugreport:dialog-open',
+  BUGREPORT_DIALOG_CLOSE: 'cipher-mux:bugreport:dialog-close',
+  VOICE_DIALOG_INSERT: 'cipher-mux:voice:dialog-insert',
 
   // Voice
   VOICE_AVAILABLE: 'cipher-mux:voice:available',
