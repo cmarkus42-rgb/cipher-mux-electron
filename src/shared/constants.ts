@@ -36,8 +36,8 @@ export const GRID_SAVE_DEBOUNCE_MS = 300
 /** Message cleanup interval (ms) — every 6 hours */
 export const MESSAGE_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000
 
-/** Orchestrator max retries */
-export const ORCHESTRATOR_MAX_RETRIES = 2
+/** Workshop max retries */
+export const WORKSHOP_MAX_RETRIES = 2
 
 /** Cyber Factory max retries per sub-project session */
 export const CF_MAX_RETRIES = 2
@@ -84,7 +84,7 @@ export const PRESET_PERSONA_DEFAULTS: Record<string, string> = {
   'testing-assistant': 'cipher',
   audit: 'relay',
   'voice-relay': 'relay',
-  orchestrator: 'relay',
+  workshop: 'relay',
   launcher: 'relay',
 }
 

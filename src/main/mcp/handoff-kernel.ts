@@ -356,7 +356,7 @@ function registerEntityStartTool(server: McpServer, ctx: ToolContext): void {
     {
       description:
         'Start an entity session (same code path as UI preset button). '
-        + 'Use for Orchestrator, Cyber Factory, Refinement, Ideation Partner, '
+        + 'Use for Workshop, Cyber Factory, Refinement, Ideation Partner, '
         + 'Testing Assistant, Debugger, Audit, etc.',
       inputSchema: {
         entityId: z.string().describe('Entity identifier (e.g. "cyber-factory", "refinement", "debugger")'),

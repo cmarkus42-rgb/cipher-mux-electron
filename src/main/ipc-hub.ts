@@ -12,7 +12,7 @@ import { getActiveWorkspace } from './workspace/workspace-utils'
 import { StatusLineMonitor } from './monitoring/statusline-monitor'
 import { McpServerManager } from './mcp/mcp-server'
 import { generateApiKey } from './mcp/mcp-auth'
-import { KickoffOrchestrator } from './project/kickoff-orchestrator'
+import { KickoffWorkshop } from './project/kickoff-orchestrator'
 import { BugreportManager } from './bugreport/bugreport-manager'
 import { VoiceManager } from './voice/voice-manager'
 import { BtShutterManager } from './bluetooth/bt-shutter-manager'
@@ -70,7 +70,7 @@ export class IpcHub {
   private projectScanner: ProjectScanner
   private statusLineMonitor: StatusLineMonitor
   private mcpServer: McpServerManager
-  private kickoffOrchestrator: KickoffOrchestrator
+  private kickoffWorkshop: KickoffWorkshop
   private bugreportManager: BugreportManager
   private voiceManager: VoiceManager | null = null
   private taskManager: TaskManager | null = null
@@ -105,8 +105,27 @@ export class IpcHub {
       this.setupCompleteResolve = resolve
     })
     this.adapterRegistry = new AdapterRegistry()
+    // Migrate orchestrator → workshop directory
+    const oldDir = path.join(os.homedir(), '.config/cipher-mux/entities/orchestrator')
+    const newDir = path.join(os.homedir(), '.config/cipher-mux/entities/workshop')
+    if (fs.existsSync(oldDir) && !fs.existsSync(newDir)) {
+      try {
+        fs.renameSync(oldDir, newDir)
+        console.log('[IpcHub] Migrated orchestrator → workshop entity directory')
+      } catch (err) {
+        console.error('[IpcHub] Failed to migrate orchestrator directory:', err)
+      }
+    }
+    // Migrate config key
+    const oldConfig = configStore.get('orchestrator' as any)
+    if (oldConfig) {
+      configStore.set('workshop', oldConfig)
+      configStore.set('orchestrator' as any, undefined as any)
+      console.log('[IpcHub] Migrated orchestrator → workshop config key')
+    }
+
     const entityRegistry = new EntityRegistry()
-    registerBuiltinEntities(entityRegistry, BRAND.orchestratorDir, BRAND.cyberFactoryDir)
+    registerBuiltinEntities(entityRegistry, BRAND.workshopDir, BRAND.cyberFactoryDir)
     // Scan ~/.config/cipher-mux/entities/ for additional entity directories
     const scanned = scanAndRegisterEntities(entityRegistry)
     if (scanned.length > 0) {
@@ -128,7 +147,7 @@ export class IpcHub {
     this.statusLineMonitor = new StatusLineMonitor()
     this.mcpServer = new McpServerManager()
     const appConfig = configStore.get('app')
-    this.kickoffOrchestrator = new KickoffOrchestrator({
+    this.kickoffWorkshop = new KickoffWorkshop({
       sessionManager: this.sessionManager,
       adapterRegistry: this.adapterRegistry,
       projectlauncherPath: appConfig?.projectlauncherPath || BRAND.projectLauncherDir,
@@ -183,7 +202,7 @@ export class IpcHub {
       deployEntity('audit', generateAuditClaudeMd())
       deployEntity('debugger', generateDebuggerClaudeMd())
       deployEntity('cyber-factory', generateCyberFactoryClaudeMd({ mcpHost, mcpPort, mcpApiKey }))
-      deployEntity('orchestrator', generateWorkshopClaudeMd({ mcpHost, mcpPort, mcpApiKey }))
+      deployEntity('workshop', generateWorkshopClaudeMd({ mcpHost, mcpPort, mcpApiKey }))
       deployEntity('voice-relay', generateVoiceRelayClaudeMd())
       deployEntity('companion', generateCompanionClaudeMd())
 
@@ -225,7 +244,7 @@ export class IpcHub {
     this.registerConfigChannels()
     this.registerWindowChannels()
     this.registerDialogChannels()
-    this.registerOrchestratorChannels()
+    this.registerWorkshopChannels()
     this.registerCyberFactoryChannels()
     this.registerBugreportChannels()
     this.registerVoiceChannels()
@@ -254,7 +273,7 @@ export class IpcHub {
 
     // Start Task infrastructure
     if (this.taskManager) {
-      const orchConfig = configStore.get('orchestrator')
+      const orchConfig = configStore.get('workshop')
 
       this.taskHooks = new TaskHooks(orchConfig?.defaultHooks ? {
         beforeRun: orchConfig.defaultHooks.beforeRun,
@@ -358,7 +377,7 @@ export class IpcHub {
       sessionManager: this.sessionManager,
       messageBus: this.messageBus,
       statusLineMonitor: this.statusLineMonitor,
-      kickoffOrchestrator: this.kickoffOrchestrator,
+      kickoffWorkshop: this.kickoffWorkshop,
       taskManager: this.taskManager,
       windowManager: this.windowManager,
       noteManager: this.noteManager,
@@ -469,7 +488,7 @@ export class IpcHub {
    * With default workspace → workspace loading is handled by the renderer
    * (the active workspace ID is persisted in config and loaded on mount).
    *
-   * Orchestrator does NOT auto-start — it must be in a workspace or
+   * Workshop does NOT auto-start — it must be in a workspace or
    * started manually via the StatusBar button.
    */
   private autoStartDefault(): void {
@@ -575,7 +594,7 @@ export class IpcHub {
       this.sessionManager.updateClaudeSessionId(sessionId, claudeSessionId)
     })
 
-    this.kickoffOrchestrator.on('kickoff-complete', (event) => {
+    this.kickoffWorkshop.on('kickoff-complete', (event) => {
       // Persist the project's parent directory as a scan path, so that the
       // renderer's post-completion rescan (and any future manual rescan) finds
       // the new project even if it lives outside the default scan paths.
@@ -605,14 +624,14 @@ export class IpcHub {
       )
     })
 
-    this.kickoffOrchestrator.on('kickoff-timeout', (data) => {
+    this.kickoffWorkshop.on('kickoff-timeout', (data) => {
       this.windowManager.sendToMainWindow(
         IPC.PROJECT_KICKOFF_COMPLETED,
         { status: 'timeout', ...data },
       )
     })
 
-    this.kickoffOrchestrator.on('kickoff-error', (data) => {
+    this.kickoffWorkshop.on('kickoff-error', (data) => {
       this.windowManager.sendToMainWindow(
         IPC.PROJECT_KICKOFF_COMPLETED,
         {
@@ -870,7 +889,7 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.PROJECTS_KICKOFF, async (_e, req: KickoffRequest) => {
-      const handle = await this.kickoffOrchestrator.start(req)
+      const handle = await this.kickoffWorkshop.start(req)
       return handle
     })
   }
@@ -1027,28 +1046,28 @@ export class IpcHub {
     })
   }
 
-  // ─── Orchestrator ────────────────────────────────────────
-  private registerOrchestratorChannels(): void {
-    ipcMain.handle(IPC.ORCHESTRATOR_START, async () => {
-      const session = await this.sessionManager.startEntity('orchestrator')
+  // ─── Workshop ────────────────────────────────────────
+  private registerWorkshopChannels(): void {
+    ipcMain.handle(IPC.WORKSHOP_START, async () => {
+      const session = await this.sessionManager.startEntity('workshop')
       // Queue Claude launch — fires when renderer reports real terminal size
       try {
-        this.sessionManager.queueEntityClaude('orchestrator', session.id)
+        this.sessionManager.queueEntityClaude('workshop', session.id)
       } catch (err) {
-        console.error('[IpcHub] Failed to queue orchestrator claude:', err)
+        console.error('[IpcHub] Failed to queue workshop claude:', err)
       }
       return session
     })
 
-    ipcMain.handle(IPC.ORCHESTRATOR_STOP, async () => {
-      await this.sessionManager.stopEntity('orchestrator')
+    ipcMain.handle(IPC.WORKSHOP_STOP, async () => {
+      await this.sessionManager.stopEntity('workshop')
       return { ok: true }
     })
 
-    ipcMain.handle(IPC.ORCHESTRATOR_STATUS, async () => {
+    ipcMain.handle(IPC.WORKSHOP_STATUS, async () => {
       return {
-        running: this.sessionManager.isEntityRunning('orchestrator'),
-        sessionId: this.sessionManager.getEntitySessionId('orchestrator'),
+        running: this.sessionManager.isEntityRunning('workshop'),
+        sessionId: this.sessionManager.getEntitySessionId('workshop'),
       }
     })
   }
@@ -2283,7 +2302,7 @@ export class IpcHub {
     // These are read-only in the PresetEditor ("Copy as Custom" to override).
     const ENTITIES_WITH_TEMPLATE = new Set([
       'audit', 'voice-relay', 'testing-assistant',
-      'debugger', 'cyber-factory', 'orchestrator', 'companion',
+      'debugger', 'cyber-factory', 'workshop', 'companion',
       'refinement', 'ideation-partner',
     ])
 
@@ -2955,7 +2974,7 @@ export class IpcHub {
     await this.mcpServer.stop().catch(() => {})
     this.statusLineMonitor.stop()
     this.projectScanner.stopWatch()
-    this.kickoffOrchestrator.destroy()
+    this.kickoffWorkshop.destroy()
     if (this.messageBus) this.messageBus.destroy()
     await this.sessionManager.destroy()
   }

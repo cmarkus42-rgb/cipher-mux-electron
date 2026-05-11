@@ -34,8 +34,8 @@ export interface LaunchOpts {
   projectPath: string
   /** Session display name */
   sessionName: string
-  /** Whether this is an orchestrator session */
-  isOrchestrator?: boolean
+  /** Whether this is a workshop session */
+  isWorkshop?: boolean
   /** Whether this is a Cyber Factory session */
   isCyberFactory?: boolean
   /** Fork from an existing Claude session (--fork-session <id>) */
@@ -98,9 +98,9 @@ export interface AgentAdapter {
   /** Send a prompt into the agent's tmux pane. */
   sendPrompt(tmuxTarget: string, prompt: string, opts?: SendOpts): Promise<void>
 
-  // --- prompt fragments for orchestrator and launcher (antifragility) ---
-  /** Agent-specific instructions injected into the orchestrator template. */
-  buildOrchestratorPromptFragment(lang: 'de' | 'en'): string
+  // --- prompt fragments for workshop and launcher (antifragility) ---
+  /** Agent-specific instructions injected into the workshop template. */
+  buildWorkshopPromptFragment(lang: 'de' | 'en'): string
   /** Agent-specific launcher suffix (e.g. '/launch' for Claude Code). */
   buildLauncherPromptFragment(lang: 'de' | 'en'): string
   /** Agent-specific instructions injected into the Cyber Factory template. */

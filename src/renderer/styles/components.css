@@ -1187,7 +1187,7 @@
 .theme-row--active .theme-mode { color: var(--color-accent); }
 
 /* ================================================================
-   Session Indicator Dots (orchestrator / mpo buttons)
+   Session Indicator Dots (workshop / mpo buttons)
    ================================================================ */
 
 .status-bar__dot {
@@ -1197,13 +1197,13 @@
   margin-right: 4px;
   vertical-align: middle;
 }
-.status-bar__dot--orchestrator { background: #4fc3f7; }
+.status-bar__dot--workshop { background: #4fc3f7; }
 .status-bar__dot--mpo { background: #ab47bc; }
 .status-bar__dot--companion { background: #ffb74d; }
 .status-bar__dot--refinement { background: #ef5350; }
 .status-bar__dot--voice-relay { background: #9b59b6; }
 .status-bar__dot--audit { background: #c0392b; }
-.status-bar__btn--active .status-bar__dot--orchestrator { box-shadow: 0 0 4px #4fc3f7; }
+.status-bar__btn--active .status-bar__dot--workshop { box-shadow: 0 0 4px #4fc3f7; }
 .status-bar__btn--active .status-bar__dot--mpo { box-shadow: 0 0 4px #ab47bc; }
 .status-bar__btn--active .status-bar__dot--companion { box-shadow: 0 0 4px #ffb74d; }
 .status-bar__btn--active .status-bar__dot--refinement { box-shadow: 0 0 4px #ef5350; }

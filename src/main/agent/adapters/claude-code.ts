@@ -190,7 +190,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     throw new Error('sendPrompt should be called via SessionManager.sendKeys')
   }
 
-  buildOrchestratorPromptFragment(lang: 'de' | 'en'): string {
+  buildWorkshopPromptFragment(lang: 'de' | 'en'): string {
     if (lang === 'de') {
       return `### Worker-Session-Startup (Claude Code)
 

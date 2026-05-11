@@ -6,7 +6,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { SessionManager } from '../session/session-manager'
 import type { MessageBus } from '../message-bus/message-bus'
 import type { StatusLineMonitor } from '../monitoring/statusline-monitor'
-import type { KickoffOrchestrator } from '../project/kickoff-orchestrator'
+import type { KickoffWorkshop } from '../project/kickoff-orchestrator'
 import type { TaskManager } from '../task/task-manager'
 import type { Topic } from '../../shared/types'
 import type { NoteManager } from '../notes/note-manager'
@@ -23,7 +23,7 @@ export interface ToolContext {
   sessionManager: SessionManager
   messageBus: MessageBus | null
   statusLineMonitor: StatusLineMonitor | null
-  kickoffOrchestrator: KickoffOrchestrator | null
+  kickoffWorkshop: KickoffWorkshop | null
   taskManager: TaskManager | null
   windowManager: { sendToMainWindow(channel: string, data: unknown): void } | null
   noteManager: NoteManager | null
@@ -402,14 +402,14 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     async (args: { projectPath: string; projectName: string; detectedStack?: string }) => {
-      if (!ctx.kickoffOrchestrator) {
+      if (!ctx.kickoffWorkshop) {
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'KickoffOrchestrator not available' }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'KickoffWorkshop not available' }) }],
           isError: true,
         }
       }
       try {
-        ctx.kickoffOrchestrator.handleCompletion({
+        ctx.kickoffWorkshop.handleCompletion({
           projectPath: args.projectPath,
           projectName: args.projectName,
           detectedStack: args.detectedStack,
@@ -466,7 +466,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           : `failed nach Analyse`
         ctx.messageBus.send({
           topic: 'chat' as Topic,
-          sender: 'bugreport-orchestrator',
+          sender: 'bugreport-workshop',
           payload: { text: `${args.bugId}: ${statusText}. ${args.summary}` },
         })
       }
@@ -485,7 +485,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: {
         title: z.string().describe('Task title'),
         description: z.string().optional().describe('Task description'),
-        source: z.string().optional().describe('Task source (default: orchestrator)'),
+        source: z.string().optional().describe('Task source (default: workshop)'),
         parent_id: z.string().optional().describe('Parent task ID'),
         policy: z.object({
           stall_timeout: z.number().optional(),
@@ -516,7 +516,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         const task = ctx.taskManager.create({
           title: args.title,
           description: args.description,
-          source: args.source ?? 'orchestrator',
+          source: args.source ?? 'workshop',
           parentId: args.parent_id,
           policy: args.policy ? {
             stallTimeout: args.policy.stall_timeout,

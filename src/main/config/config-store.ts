@@ -18,7 +18,7 @@ import {
   KICKOFF_TIMEOUT_MIN_DEFAULT,
   MCP_DEFAULT_PORT,
   MCP_DEFAULT_HOST,
-  ORCHESTRATOR_MAX_RETRIES,
+  WORKSHOP_MAX_RETRIES,
   TASK_STALL_TIMEOUT_MS,
   TASK_WATCH_INTERVAL_MS,
   DEFAULT_WINDOW_WIDTH,
@@ -48,9 +48,9 @@ const defaults: AppConfig = {
     host: MCP_DEFAULT_HOST,
     apiKey: '',
   },
-  orchestrator: {
-    dir: BRAND.orchestratorDir,
-    maxRetries: ORCHESTRATOR_MAX_RETRIES,
+  workshop: {
+    dir: BRAND.workshopDir,
+    maxRetries: WORKSHOP_MAX_RETRIES,
     stallTimeout: TASK_STALL_TIMEOUT_MS,
     watchInterval: TASK_WATCH_INTERVAL_MS,
     defaultHooks: {},

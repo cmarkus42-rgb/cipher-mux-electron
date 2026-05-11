@@ -76,7 +76,7 @@ Left to right:
 | spalten +/− | Add/remove grid columns |
 | zeilen +/− | Add/remove grid rows |
 | workspaces | Open Workspace/Persona editor (separate window) |
-| orchestrator | Start/stop Orchestrator session. Dot indicator when active |
+| workshop | Start/stop Workshop session. Dot indicator when active |
 | mpo | Start/stop Multi-Project Orchestrator. Dot indicator when active |
 | bugreport | Open bug report dialog |
 | sidebar | Toggle sidebar. LED when content available |
@@ -148,13 +148,13 @@ Left to right:
 
 ---
 
-## Orchestrator
+## Workshop
 
 **Purpose** — Delegates tasks to worker sessions, monitors progress, handles failures and bug reports.
 
-**Start** — Click "orchestrator" in status bar.
+**Start** — Click "workshop" in status bar.
 
-**Template** — Generated CLAUDE.md at \\\`~/.config/cipher-mux/orchestrator/CLAUDE.md\\\`. Configurable: MCP host/port, API key, max retries.
+**Template** — Generated CLAUDE.md at \\\`~/.config/cipher-mux/entities/workshop/CLAUDE.md\\\`. Configurable: MCP host/port, API key, max retries.
 
 **Worker Management** — Creates sessions via MCP tools. Worker-Startup Protocol: create → wait 8-10s → verify prompt → send instruction via tmux → monitor every 2 min.
 
@@ -245,7 +245,7 @@ Each theme defines: colors, geometry (border radius, spacing), fonts, ANSI palet
 
 **ConfigStore** — JSON file at \\\`~/.config/cipher-mux/cipher-mux-config.json\\\`.
 
-Key sections: personas, workspaces, activeWorkspaceId, app (scan paths, launcher path, timeouts), mcp (port, host, key), orchestrator (retries, intervals), agent (skipPermissions), ui (theme, grid state, sidebar), windows (position, size).
+Key sections: personas, workspaces, activeWorkspaceId, app (scan paths, launcher path, timeouts), mcp (port, host, key), workshop (retries, intervals), agent (skipPermissions), ui (theme, grid state, sidebar), windows (position, size).
 
 **Grid Persistence** — Saved after 300ms debounce. Auto-loaded on startup.
 
@@ -374,7 +374,7 @@ Create a task in the persistent queue.
 |---|---|---|---|
 | title | string | yes | Task title |
 | description | string | no | Detailed task description |
-| source | string | no | Task origin (default: "orchestrator") |
+| source | string | no | Task origin (default: "workshop") |
 | parent_id | string | no | Parent task ID (for sub-tasks) |
 | policy | object | no | Execution policy (stall_timeout, max_retries, hooks) |
 
@@ -572,7 +572,7 @@ Quick reference for all input methods in cipher-mux.
 | zeilen + | Add grid row (max 3) |
 | zeilen − | Remove grid row (min 1) |
 | workspaces | Open Workspace/Persona editor window |
-| orchestrator | Start or stop Orchestrator session |
+| workshop | Start or stop Workshop session |
 | mpo | Start or stop Multi-Project Orchestrator |
 | bugreport | Open bugreport dialog |
 | sidebar | Show or hide sidebar panel |

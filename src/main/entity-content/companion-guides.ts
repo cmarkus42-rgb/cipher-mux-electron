@@ -54,7 +54,7 @@ The main window has two areas:
 - **Voice pill** — push-to-talk voice input (more on this in Guide 02)
 - **spalten/zeilen +/−** — add or remove grid columns and rows
 - **workspaces** — open the workspace and persona editor
-- **orchestrator** — start/stop the Orchestrator (Guide 03)
+- **workshop** — start/stop the Workshop (Guide 03)
 - **mpo** — start/stop the Multi-Project Orchestrator (Guide 03)
 - **bugreport** — submit a bug report
 - **sidebar** — toggle the sidebar panel (messages, notes, background sessions)
@@ -370,7 +370,7 @@ It is a Claude Code session with a special template that gives it access to MCP 
 
 ### How to Start It
 
-Click **"orchestrator"** in the status bar. A dot indicator appears when it is active. The Orchestrator session spawns in the next free grid slot.
+Click **"workshop"** in the status bar. A dot indicator appears when it is active. The Workshop session spawns in the next free grid slot.
 
 ### What Happens Behind the Scenes
 

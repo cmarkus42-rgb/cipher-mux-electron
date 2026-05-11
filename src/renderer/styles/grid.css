@@ -38,17 +38,17 @@
   box-shadow: 0 0 6px var(--color-accent-soft);
 }
 
-.session-cell--orchestrator {
+.session-cell--workshop {
   border-color: var(--color-neon-cyan);
   border-width: 2px;
   box-shadow: inset 0 0 0 1px var(--color-neon-cyan), 0 0 8px rgba(0, 122, 138, 0.15);
 }
 
-.session-cell--orchestrator .cell-header {
+.session-cell--workshop .cell-header {
   border-bottom-color: var(--color-neon-cyan);
 }
 
-.session-cell--orchestrator .cell-name {
+.session-cell--workshop .cell-name {
   color: var(--color-neon-cyan);
 }
 

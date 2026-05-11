@@ -88,7 +88,7 @@ const THEME_TOKEN_GROUPS: Array<{ labelKey: string; tokens: string[] }> = [
 
 /** Human-readable labels for entity color tokens. */
 const ENTITY_COLOR_LABELS: Record<string, string> = {
-  '--entity-color-1': 'orchestrator',
+  '--entity-color-1': 'workshop',
   '--entity-color-2': 'cyber-factory',
   '--entity-color-3': 'companion',
   '--entity-color-4': 'refinement',

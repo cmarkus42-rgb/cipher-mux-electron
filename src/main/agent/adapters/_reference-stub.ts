@@ -109,14 +109,14 @@ export class ReferenceStubAdapter implements AgentAdapter {
   }
 
   /**
-   * TODO (optional): Return agent-specific instructions for the orchestrator prompt.
+   * TODO (optional): Return agent-specific instructions for the workshop prompt.
    *
-   * This fragment is injected into the orchestrator's CLAUDE.md template.
-   * Use it to tell the orchestrator how to interact with sessions running
+   * This fragment is injected into the workshop's CLAUDE.md template.
+   * Use it to tell the workshop how to interact with sessions running
    * your agent (e.g. different delegation semantics, different skill names).
-   * Return empty string if your agent needs no special orchestrator guidance.
+   * Return empty string if your agent needs no special workshop guidance.
    */
-  buildOrchestratorPromptFragment(_lang: 'de' | 'en'): string {
+  buildWorkshopPromptFragment(_lang: 'de' | 'en'): string {
     return ''
   }
 

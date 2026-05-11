@@ -13,7 +13,7 @@ import type {
 import { buildLauncherPrompt } from './launcher-prompt'
 import { KickoffWatcher } from './kickoff-watcher'
 
-export interface KickoffOrchestratorDeps {
+export interface KickoffWorkshopDeps {
   sessionManager: SessionManager
   adapterRegistry: AdapterRegistry
   projectlauncherPath: string
@@ -36,10 +36,10 @@ interface ActiveKickoff {
 const DEFAULT_PROMPT_SEND_DELAY_MS = 5_000
 const DEFAULT_INTERVIEW_SEND_DELAY_MS = 5_000
 
-export class KickoffOrchestrator extends EventEmitter {
+export class KickoffWorkshop extends EventEmitter {
   private active: ActiveKickoff | null = null
 
-  constructor(private deps: KickoffOrchestratorDeps) {
+  constructor(private deps: KickoffWorkshopDeps) {
     super()
   }
 
@@ -110,7 +110,7 @@ export class KickoffOrchestrator extends EventEmitter {
       this.deps.sessionManager
         .sendKeys(session.id, prompt + '\n')
         .catch((err) => {
-          console.error('[KickoffOrchestrator] sendKeys failed:', err)
+          console.error('[KickoffWorkshop] sendKeys failed:', err)
         })
     }, promptDelay)
 
@@ -151,7 +151,7 @@ export class KickoffOrchestrator extends EventEmitter {
     const effectiveName = payload.projectName || active.handle.projectName
     const effectivePath = payload.projectPath || active.handle.projectDir
     console.log(
-      `[KickoffOrchestrator] kickoff-result reason=${reason} `
+      `[KickoffWorkshop] kickoff-result reason=${reason} `
       + `project=${effectiveName} path=${effectivePath}`,
     )
 
@@ -177,7 +177,7 @@ export class KickoffOrchestrator extends EventEmitter {
         this.deps.sessionManager
           .sendKeys(followup.id, followUpCmd + '\n')
           .catch((err) => {
-            console.error('[KickoffOrchestrator] follow-up sendKeys failed:', err)
+            console.error('[KickoffWorkshop] follow-up sendKeys failed:', err)
           })
       }, interviewDelay)
 
@@ -193,7 +193,7 @@ export class KickoffOrchestrator extends EventEmitter {
       }
       this.emit('kickoff-complete', event)
     }).catch((err) => {
-      console.error('[KickoffOrchestrator] follow-up session start failed:', err)
+      console.error('[KickoffWorkshop] follow-up session start failed:', err)
       this.emit('kickoff-error', { handle: active.handle, error: err })
     })
   }
@@ -211,7 +211,7 @@ export class KickoffOrchestrator extends EventEmitter {
 
     if (hasClaudeMd) {
       console.warn(
-        `[KickoffOrchestrator] Implicit complete via CLAUDE.md presence — `
+        `[KickoffWorkshop] Implicit complete via CLAUDE.md presence — `
         + `/launch skill skipped exit gate for project ${handle.projectName}`,
       )
       this.handleCompletion({
@@ -222,7 +222,7 @@ export class KickoffOrchestrator extends EventEmitter {
     }
 
     console.error(
-      `[KickoffOrchestrator] kickoff-result reason=hard-fail `
+      `[KickoffWorkshop] kickoff-result reason=hard-fail `
       + `project=${handle.projectName} path=${handle.projectDir}`,
     )
     this.cleanupActive()

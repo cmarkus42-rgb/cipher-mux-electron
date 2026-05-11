@@ -4,7 +4,7 @@ import type { EntityConfig, EntityId } from '../../shared/types'
 /**
  * EntityRegistry — Registry for functional entity configurations.
  *
- * Entities are special sessions (Orchestrator, Cyber Factory, Companion, Refinement)
+ * Entities are special sessions (Workshop, Cyber Factory, Companion, Refinement)
  * with predefined behavior, assets, and UI styling. The registry holds their
  * configs and maps running sessions back to their entity type.
  */
@@ -58,23 +58,23 @@ function expandHome(p: string): string {
 /**
  * Register all built-in entities. Called at app startup.
  * @param registry The entity registry to populate.
- * @param orchestratorDir Orchestrator working directory (from BRAND).
+ * @param workshopDir Workshop working directory (from BRAND).
  * @param cyberFactoryDir Cyber Factory working directory (from BRAND).
  * @param appRoot App root for resolving template paths (process.resourcesPath or project root).
  */
 export function registerBuiltinEntities(
   registry: EntityRegistry,
-  _orchestratorDir?: string,
+  _workshopDir?: string,
   _cyberFactoryDir?: string,
 ): void {
   const entitiesBase = expandHome('~/.config/cipher-mux/entities')
 
   registry.register({
-    id: 'orchestrator',
+    id: 'workshop',
     displayName: 'Workshop',
     icon: '🔨',
     color: '#4fc3f7',
-    projectPath: `${entitiesBase}/orchestrator`,
+    projectPath: `${entitiesBase}/workshop`,
     features: ['mcp'],
     visible: true,
     sortOrder: 70,
