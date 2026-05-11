@@ -116,6 +116,7 @@ export const IPC = {
   VOICE_VAD_SPEECH_START: 'cipher-mux:voice:vad-speech-start',
   VOICE_VAD_SPEECH_END: 'cipher-mux:voice:vad-speech-end',
   VOICE_VAD_MISFIRE: 'cipher-mux:voice:vad-misfire',
+  VOICE_BARGE_IN: 'cipher-mux:voice:barge-in',
   VOICE_GENERATION_DONE: 'cipher-mux:voice:generation-done',
   VOICE_STOP_PLAYBACK: 'cipher-mux:voice:stop-playback',
 

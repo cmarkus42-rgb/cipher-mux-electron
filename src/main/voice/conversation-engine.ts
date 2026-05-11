@@ -18,6 +18,7 @@ import { EventEmitter } from 'node:events'
 import { VoiceStateMachine, VoiceState } from './voice-state'
 import { STTRouter } from './stt-router'
 import { TTSEngine } from './tts-engine'
+import { BargeInDetector } from './barge-in-detector'
 
 /** IPC bridge between the ConversationEngine (main process) and the renderer. */
 export interface ConversationTransport {
@@ -87,6 +88,7 @@ export class ConversationEngine extends EventEmitter {
   private _bargeInEnabled: boolean
   private _bargeInPending = false
   private _bargeInMisfireTimestamps: number[] = []
+  private _bargeInDetector: BargeInDetector
   private readonly _bargeInMisfireThreshold = 3
   private readonly _bargeInMisfireWindowMs = 2000
   private _lastSpokenText = ''
@@ -130,6 +132,25 @@ export class ConversationEngine extends EventEmitter {
       if (oldState === VoiceState.AGENT_SPEAKING && newState === VoiceState.READY) {
         this._activateEchoGuard()
       }
+
+      // Enable amplitude-based barge-in detector during agent speech
+      if (newState === VoiceState.AGENT_SPEAKING) {
+        this._bargeInDetector.setEnabled(true)
+      }
+      if (oldState === VoiceState.AGENT_SPEAKING) {
+        this._bargeInDetector.setEnabled(false)
+      }
+    })
+
+    this._bargeInDetector = new BargeInDetector({
+      thresholdDb: -30,
+      minDurationMs: 50,
+      onBargeIn: () => {
+        if (this.state === VoiceState.AGENT_SPEAKING) {
+          console.log('[ConvEngine] Barge-in detected via amplitude monitor')
+          this._handleBargeIn()
+        }
+      },
     })
   }
 
@@ -550,6 +571,23 @@ export class ConversationEngine extends EventEmitter {
       this.transport.sendGenerationDone()
     }
     return produced
+  }
+
+  /** Feed raw audio frames for amplitude-based barge-in detection. */
+  feedAudioFrame(samples: Int16Array): void {
+    this._bargeInDetector.processFrame(samples)
+  }
+
+  /**
+   * Trigger barge-in directly from an external amplitude signal.
+   * Called when the renderer-side amplitude monitor detects a loud onset
+   * during AGENT_SPEAKING (bypassing the echo guard on the VAD/STT path).
+   */
+  triggerAmplitudeBargeIn(): void {
+    if (this.state === VoiceState.AGENT_SPEAKING) {
+      console.log('[ConvEngine] Barge-in triggered via renderer amplitude monitor')
+      this._handleBargeIn()
+    }
   }
 
   /** Called by the renderer when audio playback finishes. Transitions back to READY. */

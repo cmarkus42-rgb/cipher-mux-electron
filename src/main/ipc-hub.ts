@@ -1281,6 +1281,11 @@ export class IpcHub {
       this.voiceManager?.onVADMisfire()
     })
 
+    ipcMain.on(IPC.VOICE_BARGE_IN, () => {
+      console.log('[Voice] IPC: BARGE_IN received from amplitude monitor')
+      this.voiceManager?.getConversation()?.triggerAmplitudeBargeIn()
+    })
+
     // ── Session Voice Mode ──
 
     ipcMain.handle(IPC.VOICE_START_SESSION, async () => {
