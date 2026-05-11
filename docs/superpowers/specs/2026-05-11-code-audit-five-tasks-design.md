@@ -1,4 +1,4 @@
-# Design Spec: Code-Audit 2026-05-11 — 5 Auftraege
+# Design Spec: Code-Audit 2026-05-11 — 6 Auftraege
 
 **Datum:** 2026-05-11
 **Quelle:** Testing-Assistant Code-Audit + Findings-Report
@@ -9,7 +9,7 @@
 
 ## Uebersicht
 
-Fuenf Auftraege aus dem Code-Audit, aufgeteilt in drei sequentielle Wellen:
+Sechs Auftraege aus dem Code-Audit, aufgeteilt in drei sequentielle Wellen:
 
 | # | Auftrag | Testcases | Welle |
 |---|---------|-----------|-------|
@@ -18,6 +18,7 @@ Fuenf Auftraege aus dem Code-Audit, aufgeteilt in drei sequentielle Wellen:
 | A3 | Theme-Editor Bereinigung | T-THEME.1/3/4, T-FW.10 | 3 |
 | A4 | Keep-Working Race Fix | T-FW.22 | 1 |
 | A5 | Barge-In Echo Guard Fix | T-VOICE.12 | 3 |
+| A6 | Preset-Editor: Copy as Custom entfernen, Template verbessern | T-PRESET.1 | 1 |
 
 ---
 
@@ -261,9 +262,69 @@ class BargeInDetector
 
 ---
 
+## A6: Preset-Editor — Copy as Custom entfernen, Template verbessern (T-PRESET.1)
+
+### Problem
+
+"Copy as Custom" kopiert nur `preset.md` + leere `CLAUDE.md`. Skills, Assets und Unterverzeichnisse des Quell-Entity werden nicht kopiert. User denkt die Kopie kann dasselbe — kann sie nicht.
+
+### Aenderungen
+
+**1. "Copy as Custom" Button entfernen:**
+- `PresetEditor.tsx`: `handleCopyAsCustom` Funktion (Zeile 301) und Button (Zeile 391-397) entfernen
+- Hinweistext "Built-in preset (read-only). Use Copy as Custom..." (Zeile 514) anpassen
+- Zugehoeriger IPC-Handler im Main-Process ggf. bereinigen
+
+**2. "Neu anlegen" Template verbessern:**
+
+Aktuelles Template (`ipc-hub.ts:2383`): Nur leere H2-Sektionen ohne Erklaerung.
+
+Neues Template:
+
+```markdown
+# [Name]
+
+## Rolle
+
+Beschreibe hier die Rolle und Persoenlichkeit des Entity.
+Wer ist es, wie spricht es, was ist sein Auftrag?
+
+## Faehigkeiten
+
+Welche MCP-Tools nutzt dieses Entity?
+Welche besonderen Workflows beherrscht es?
+
+## Arbeitsregeln
+
+Verhaltensregeln, Grenzen, Off-Limits.
+Was darf das Entity, was nicht?
+
+## Scope
+
+Auf welche Projekte, Verzeichnisse oder Themen
+ist dieses Entity fokussiert?
+
+---
+
+> Tipp: Schreib erst selbst einen Entwurf — das schaerft dein eigenes Verstaendnis.
+> Dann starte eine Session mit dem Coding Companion und bitte ihn,
+> daraus einen guten Prompt zu machen.
+```
+
+### Betroffene Dateien
+
+| Datei | Aenderung |
+|-------|-----------|
+| `src/renderer/components/PresetEditor.tsx` | `handleCopyAsCustom` + Button + Hinweistext entfernen |
+| `src/main/ipc-hub.ts` | Template-String (Zeile 2383) durch neues Template ersetzen |
+| `src/renderer/locales/en.json` | Ggf. "Copy as Custom" Strings entfernen |
+| `src/renderer/locales/de.json` | Ggf. Strings entfernen |
+
+---
+
 ## Wave-Plan
 
-### Wave 1: Rename + Race Fix (2 parallele Worker)
+### Wave 1: Rename + Race Fix + Preset-Editor (3 parallele Worker)
 
 **Worker 1-A: Workshop Rename**
 - Alle Code-Referenzen `orchestrator` → `workshop`
@@ -276,10 +337,16 @@ class BargeInDetector
 - `ipc-hub.ts` cachedRecoveryResult Timing fixen
 - Sicherstellen dass RecoveryDialog wartet bis keepWorking-Restore durch ist
 
+**Worker 1-C: Preset-Editor Cleanup**
+- "Copy as Custom" Button + Handler entfernen
+- Template-String in `ipc-hub.ts` durch beschreibendes Template ersetzen
+- Companion-Tipp am Ende einfuegen
+
 **Wave 1 Exit-Kriterien:**
 - App startet ohne Fehler
 - Workshop-Entity startet und laeuft korrekt
 - Keep-Working → Restart → keine doppelten Sessions
+- Preset-Editor: kein "Copy as Custom" Button, neues Template bei "Neu anlegen"
 
 ### Wave 2: Bugreport Session-Umbau (2 parallele Worker)
 
