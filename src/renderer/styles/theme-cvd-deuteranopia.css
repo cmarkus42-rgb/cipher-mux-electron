@@ -59,7 +59,6 @@ body[data-theme="cvd-deuteranopia"] {
   --shadow-sm:              0 1px 2px rgba(0,0,0,0.20), 0 2px 6px rgba(0,0,0,0.16);
   --shadow-md:              0 2px 4px rgba(0,0,0,0.24), 0 4px 16px rgba(0,0,0,0.20);
   --shadow-lg:              0 4px 8px rgba(0,0,0,0.28), 0 8px 32px rgba(0,0,0,0.24);
-  --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.16);
 
   /* session action buttons */
   --session-action-btn-text:       #56B4E9;
@@ -67,6 +66,28 @@ body[data-theme="cvd-deuteranopia"] {
   --session-action-btn-border:     #3C3C4A;
   --session-action-btn-text-hover: #7CCAF0;
   --session-action-btn-bg-hover:   rgba(86, 180, 233, 0.14);
+
+  /* terminal colors (xterm.js) — Okabe-Ito safe */
+  --terminal-bg:                    #141418;
+  --terminal-foreground:            #E8E8F0;
+  --terminal-cursor:                #56B4E9;
+  --terminal-selection:             rgba(86, 180, 233, 0.35);
+  --terminal-ansi-black:            #141418;
+  --terminal-ansi-red:              #CC79A7;
+  --terminal-ansi-green:            #56B4E9;
+  --terminal-ansi-yellow:           #E69F00;
+  --terminal-ansi-blue:             #0072B2;
+  --terminal-ansi-magenta:          #9B7AB8;
+  --terminal-ansi-cyan:             #009E73;
+  --terminal-ansi-white:            #B0B0C0;
+  --terminal-ansi-bright-black:     #3C3C4A;
+  --terminal-ansi-bright-red:       #D89BC0;
+  --terminal-ansi-bright-green:     #7CCAF0;
+  --terminal-ansi-bright-yellow:    #F0B830;
+  --terminal-ansi-bright-blue:      #3090D0;
+  --terminal-ansi-bright-magenta:   #BB9AD8;
+  --terminal-ansi-bright-cyan:      #30B890;
+  --terminal-ansi-bright-white:     #E8E8F0;
 
   /* ANSI terminal palette 0-15 — Okabe-Ito safe */
   --ansi-0:                 #141418;

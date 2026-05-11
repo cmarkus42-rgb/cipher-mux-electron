@@ -73,7 +73,17 @@ const THEME_TOKEN_GROUPS: Array<{ labelKey: string; tokens: string[] }> = [
   },
   {
     labelKey: 'themeEditor.groupSession',
-    tokens: ['--session-bg', '--session-text', '--session-border', '--session-font-size', '--color-session-header-bg', '--shadow-inset'],
+    tokens: ['--session-bg', '--session-text', '--session-border', '--color-session-header-bg'],
+  },
+  {
+    labelKey: 'themeEditor.groupTerminalColors',
+    tokens: [
+      '--terminal-bg', '--terminal-foreground', '--terminal-cursor', '--terminal-selection',
+      '--terminal-ansi-black', '--terminal-ansi-red', '--terminal-ansi-green', '--terminal-ansi-yellow',
+      '--terminal-ansi-blue', '--terminal-ansi-magenta', '--terminal-ansi-cyan', '--terminal-ansi-white',
+      '--terminal-ansi-bright-black', '--terminal-ansi-bright-red', '--terminal-ansi-bright-green', '--terminal-ansi-bright-yellow',
+      '--terminal-ansi-bright-blue', '--terminal-ansi-bright-magenta', '--terminal-ansi-bright-cyan', '--terminal-ansi-bright-white',
+    ],
   },
   {
     labelKey: 'themeEditor.groupEntity',
@@ -101,18 +111,6 @@ const ENTITY_COLOR_LABELS: Record<string, string> = {
   '--entity-color-11': 'bugreport',
 }
 
-/** Available monospace fonts for the terminal font picker. */
-const TERMINAL_FONTS = [
-  "'Fira Code', 'Roboto Mono', 'SF Mono', Menlo, monospace",
-  "'JetBrains Mono', 'SF Mono', Menlo, monospace",
-  "'IBM Plex Mono', 'SF Mono', Menlo, monospace",
-  "'Space Mono', 'SF Mono', Menlo, monospace",
-  "'Share Tech Mono', 'Fira Code', monospace",
-  "'VT323', 'Fira Code', monospace",
-  "'SF Mono', Menlo, monospace",
-  "Menlo, monospace",
-  "'Courier New', monospace",
-]
 
 export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme, onOpenBugreport, registeredShortcuts = [] }: InfoSettingsViewProps) {
   const { t } = useTranslation()
@@ -580,52 +578,6 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
                 </div>
               ))}
 
-              {/* Terminal font / size / line-height */}
-              <div class="theme-editor__group">
-                <div class="theme-editor__group-label">{t('themeEditor.groupTerminal')}</div>
-                <div class="theme-editor__grid" style={{ flexDirection: 'column', gap: '6px' }}>
-                  <label class="settings-label" style={{ gap: '4px' }}>
-                    <span class="theme-editor__label">{t('themeEditor.terminalFont')}</span>
-                    <select
-                      class="input input--sm"
-                      value={customTokens['--terminal-font-family'] ?? getBaseToken('--terminal-font-family')}
-                      onChange={(e) => handleTokenChange('--terminal-font-family', (e.target as HTMLSelectElement).value)}
-                      style={{ width: '280px', fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-xs)' }}
-                    >
-                      {TERMINAL_FONTS.map(f => (
-                        <option key={f} value={f}>{f.split(',')[0].replace(/'/g, '')}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <label class="settings-label" style={{ gap: '4px' }}>
-                      <span class="theme-editor__label">{t('themeEditor.terminalFontSize')}</span>
-                      <input
-                        type="number"
-                        class="input input--sm"
-                        min={9}
-                        max={24}
-                        value={parseInt(customTokens['--terminal-font-size'] ?? getBaseToken('--terminal-font-size')) || 13}
-                        onInput={(e) => handleTokenChange('--terminal-font-size', `${(e.target as HTMLInputElement).value}px`)}
-                        style={{ width: '60px' }}
-                      />
-                    </label>
-                    <label class="settings-label" style={{ gap: '4px' }}>
-                      <span class="theme-editor__label">{t('themeEditor.terminalLineHeight')}</span>
-                      <input
-                        type="number"
-                        class="input input--sm"
-                        min={1.0}
-                        max={2.0}
-                        step={0.1}
-                        value={parseFloat(customTokens['--terminal-line-height'] ?? getBaseToken('--terminal-line-height')) || 1.3}
-                        onInput={(e) => handleTokenChange('--terminal-line-height', (e.target as HTMLInputElement).value)}
-                        style={{ width: '60px' }}
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
               <div class="theme-editor__actions">
                 <button class="btn btn--sm btn--primary" onClick={handleThemeSave}>{t('themeEditor.save')}</button>
                 <button class="btn btn--sm" onClick={() => setSaveAsOpen(v => !v)}>{t('themeEditor.saveAs')}</button>
