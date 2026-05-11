@@ -20,6 +20,8 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
   const [error, setError] = useState<string | null>(null)
   const [testcase, setTestcase] = useState<ParsedTestcase | null>(null)
   const [voiceState, setVoiceState] = useState<string>('idle')
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const dirtyRef = useRef(false)
   const loadedRef = useRef(false)
 
   // Dynamic window title
@@ -32,15 +34,23 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
 
   // Flush pending save on window close
   useEffect(() => {
-    const onBeforeUnload = () => {
-      if (latestContentRef.current != null) {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (dirtyRef.current) {
         const api = (window as any).cipherMux
-        api?.notes?.save?.(noteId, latestContentRef.current, undefined, true)
+        api?.notes?.save?.(noteId, latestContentRef.current!, undefined, true)
+        e.preventDefault()
       }
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [noteId])
+
+  // Auto-dismiss save errors after 5s
+  useEffect(() => {
+    if (!saveError) return
+    const t = setTimeout(() => setSaveError(null), 5000)
+    return () => clearTimeout(t)
+  }, [saveError])
 
   // Voice state tracking for STT indicator
   useEffect(() => {
@@ -82,22 +92,40 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
 
   const handleSave = useCallback(async (body: string) => {
     latestContentRef.current = body
-    const api = (window as any).cipherMux
-    const result = await api.notes.save(noteId, body)
-    if (result?.title) setTitle(result.title)
+    dirtyRef.current = true
+    try {
+      const api = (window as any).cipherMux
+      const result = await api.notes.save(noteId, body)
+      if (result?.title) setTitle(result.title)
+      dirtyRef.current = false
+      setSaveError(null)
+    } catch (err: any) {
+      setSaveError(err?.message ?? 'Save failed')
+    }
   }, [noteId])
 
   const handleAutoSave = useCallback(async (body: string) => {
     latestContentRef.current = body
-    const api = (window as any).cipherMux
-    const result = await api.notes.save(noteId, body, undefined, true)
-    if (result?.title) setTitle(result.title)
+    dirtyRef.current = true
+    try {
+      const api = (window as any).cipherMux
+      const result = await api.notes.save(noteId, body, undefined, true)
+      if (result?.title) setTitle(result.title)
+      dirtyRef.current = false
+      setSaveError(null)
+    } catch (err: any) {
+      setSaveError(err?.message ?? 'Auto-save failed')
+    }
   }, [noteId])
 
   const handleTagsChange = useCallback(async (newTags: string[]) => {
-    const api = (window as any).cipherMux
-    await api.notes.save(noteId, content ?? '', newTags, true)
-    setTags(newTags)
+    try {
+      const api = (window as any).cipherMux
+      await api.notes.save(noteId, content ?? '', newTags, true)
+      setTags(newTags)
+    } catch (err: any) {
+      setSaveError(err?.message ?? 'Tag save failed')
+    }
   }, [noteId, content])
 
   const handleDock = useCallback(() => {
@@ -107,15 +135,21 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
 
   const handleTestcaseUpdate = useCallback(async (sections: TestcaseSection[]) => {
     if (!testcase) return
-    const api = (window as any).cipherMux
-    const updated: ParsedTestcase = { ...testcase, sections }
-    const body = await api.notes.serializeTestcaseBody(sections)
-    if (!body) { console.error('[DetachedNoteView] serializeTestcaseBody returned null'); return }
-    const result = await api.notes.save(noteId, body, undefined, true)
-    if (result?.title) setTitle(result.title)
-    latestContentRef.current = body
-    setContent(body)
-    setTestcase(updated)
+    try {
+      const api = (window as any).cipherMux
+      const updated: ParsedTestcase = { ...testcase, sections }
+      const body = await api.notes.serializeTestcaseBody(sections)
+      if (!body) { console.error('[DetachedNoteView] serializeTestcaseBody returned null'); return }
+      dirtyRef.current = true
+      const result = await api.notes.save(noteId, body, undefined, true)
+      if (result?.title) setTitle(result.title)
+      latestContentRef.current = body
+      dirtyRef.current = false
+      setContent(body)
+      setTestcase(updated)
+    } catch (err: any) {
+      setSaveError(err?.message ?? 'Testcase save failed')
+    }
   }, [noteId, testcase])
 
   if (error) {
@@ -169,6 +203,21 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
           Dock
         </button>
       </div>
+
+      {/* Save error banner */}
+      {saveError && (
+        <div style={{
+          padding: '3px 8px',
+          fontSize: 11,
+          color: '#fff',
+          background: 'var(--color-neon-red, #ef4444)',
+          textAlign: 'center',
+          flexShrink: 0,
+          cursor: 'pointer',
+        }} onClick={() => setSaveError(null)}>
+          Save failed: {saveError}
+        </div>
+      )}
 
       {/* STT recording indicator */}
       {voiceState === 'recording' && (
