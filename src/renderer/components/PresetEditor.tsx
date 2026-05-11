@@ -298,21 +298,6 @@ export function PresetEditor() {
     }
   }
 
-  const handleCopyAsCustom = async () => {
-    if (!selected) return
-    const copyId = selected.id + '-custom-' + Date.now()
-    const copyName = selected.displayName + ' (Custom)'
-    const res = await api.presets.create(copyId, copyName)
-    if (res.ok) {
-      // Write current content into the new preset
-      await api.presets.save(copyId, draftContent)
-      await loadPresets()
-      setSelectedId(copyId)
-      setEditConfirmed(true)
-    } else {
-      alert(res.error || 'Failed to create copy')
-    }
-  }
 
   const selected = presets.find(p => p.id === selectedId)
   const isGlobal = selectedId === GLOBAL_ID
@@ -388,13 +373,9 @@ export function PresetEditor() {
               {selected.displayName}
             </span>
             {isBuiltinPreset ? (
-              <button
-                onClick={handleCopyAsCustom}
-                title="Create an editable copy of this built-in preset"
-                style={{ marginLeft: 'auto', fontSize: '11px', padding: '2px 8px', background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-dim)', cursor: 'pointer' }}
-              >
-                Copy as Custom
-              </button>
+              <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--color-text-dim)', fontFamily: 'var(--font-mono)' }}>
+                built-in (read-only)
+              </span>
             ) : (
               <label
                 style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', marginLeft: 'auto', cursor: 'pointer', color: editConfirmed ? 'var(--color-accent)' : 'var(--color-text-dim)' }}
@@ -511,7 +492,7 @@ export function PresetEditor() {
           {isBuiltinPreset && (
             <div class="pp-foot-actions">
               <span style={{ fontSize: '11px', color: 'var(--color-text-dim)', fontFamily: 'var(--font-mono)' }}>
-                Built-in preset (read-only). Use "Copy as Custom" to create an editable version.
+                Built-in preset (read-only). Use "+ New" to create your own entity.
               </span>
             </div>
           )}
