@@ -2404,7 +2404,34 @@ export class IpcHub {
           return { ok: false, error: 'Preset directory already exists' }
         }
         fs.mkdirSync(dir, { recursive: true })
-        const template = `# ${displayName}\n\n## Rolle\n\n\n\n## Faehigkeiten\n\n\n\n## Arbeitsregeln\n\n\n\n## Scope\n\n`
+        const template = `# ${displayName}
+
+## Rolle
+
+Beschreibe hier die Rolle und Persoenlichkeit des Entity.
+Wer ist es, wie spricht es, was ist sein Auftrag?
+
+## Faehigkeiten
+
+Welche MCP-Tools nutzt dieses Entity?
+Welche besonderen Workflows beherrscht es?
+
+## Arbeitsregeln
+
+Verhaltensregeln, Grenzen, Off-Limits.
+Was darf das Entity, was nicht?
+
+## Scope
+
+Auf welche Projekte, Verzeichnisse oder Themen
+ist dieses Entity fokussiert?
+
+---
+
+> Tipp: Schreib erst selbst einen Entwurf — das schaerft dein eigenes Verstaendnis.
+> Dann starte eine Session mit dem Coding Companion und bitte ihn,
+> daraus einen guten Prompt zu machen.
+`
         fs.writeFileSync(presetMdPath, template, 'utf-8')
         // Entity scanner requires CLAUDE.md to register the entity
         const claudeMdPath = path.join(dir, 'CLAUDE.md')
