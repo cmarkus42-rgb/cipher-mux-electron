@@ -441,9 +441,14 @@ export class IpcHub {
         }
         await this.restoreKeepWorkingFromRecovery(snapshotSessions, snapshotGridConfig, result.recovered, snapshotNotesSlots)
         configStore.set('keepWorkingSnapshot', undefined as any)
-        // Set empty recovery result so RecoveryDialog resolves immediately
-        // (null would cause 15s poll timeout before onDone fires)
-        this.cachedRecoveryResult = { recovered: [], orphaned: [], killed: [], gridState: null }
+        // Delay setting cachedRecoveryResult: the renderer needs time to process
+        // the KEEP_WORKING_RESTORE event (sent by restoreKeepWorkingFromRecovery)
+        // and set keepWorkingApplied.current = true. If we set cachedRecoveryResult
+        // immediately, RecoveryDialog resolves before keepWorkingApplied is set,
+        // triggering default workspace load → duplicate sessions (T-FW.22).
+        setTimeout(() => {
+          this.cachedRecoveryResult = { recovered: [], orphaned: [], killed: [], gridState: null }
+        }, 1500)
       } else {
         // No keepWorking snapshot — show Recovery Dialog if there are sessions to handle
         if (result.orphaned.length > 0 || result.recovered.length > 0) {
