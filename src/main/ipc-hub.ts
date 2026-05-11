@@ -400,8 +400,6 @@ export class IpcHub {
     }).then(() => {
       return this.sessionManager.recover()
     }).then(async (result) => {
-      // Cache for pull-based retrieval by the renderer
-      this.cachedRecoveryResult = result
       console.log(`[IpcHub] recovery complete: ${result.recovered.length} recovered, ${result.orphaned.length} orphaned, gridState=${!!result.gridState}`)
       this.sessionManager.startOrphanDetection()
       this.sessionManager.startExitDetection()
@@ -451,7 +449,9 @@ export class IpcHub {
           this.cachedRecoveryResult = { recovered: [], orphaned: [], killed: [], gridState: null }
         }, 1500)
       } else {
-        // No keepWorking snapshot — show Recovery Dialog if there are sessions to handle
+        // No keepWorking — cache recovery result for pull-based retrieval by RecoveryDialog
+        this.cachedRecoveryResult = result
+        // Show Recovery Dialog if there are sessions to handle
         if (result.orphaned.length > 0 || result.recovered.length > 0) {
           this.windowManager.sendToMainWindow(IPC.SESSIONS_RECOVERY_RESULT, result)
         }
