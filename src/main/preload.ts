@@ -462,6 +462,7 @@ const api = {
     vadSpeechStart: () => ipcRenderer.send(IPC.VOICE_VAD_SPEECH_START),
     vadSpeechEnd: (audioData: number[]) => ipcRenderer.send(IPC.VOICE_VAD_SPEECH_END, audioData),
     vadMisfire: () => ipcRenderer.send(IPC.VOICE_VAD_MISFIRE),
+    bargeIn: () => ipcRenderer.send(IPC.VOICE_BARGE_IN),
     onGenerationDone: (cb: () => void) => {
       const handler = () => cb()
       ipcRenderer.on(IPC.VOICE_GENERATION_DONE, handler)

@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import type { MicVADInstance } from '../voice/vad-loader'
+import { BargeInMonitor } from '../voice/barge-in-monitor'
 
 export type VoiceMode = 'off' | 'stt' | 'com'
 
@@ -34,6 +35,7 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
   const vadRef = useRef<MicVADInstance | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
+  const bargeInMonitorRef = useRef<BargeInMonitor | null>(null)
 
   // Derived: active means STT or COM
   const active = mode !== 'off'
@@ -51,8 +53,12 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
     api.voice.setSessionTarget(focusedSessionId)
   }, [focusedSessionId])
 
-  /** Teardown VAD + mic stream + AudioContext */
+  /** Teardown VAD + mic stream + AudioContext + barge-in monitor */
   const teardownVAD = useCallback(() => {
+    if (bargeInMonitorRef.current) {
+      bargeInMonitorRef.current.detach()
+      bargeInMonitorRef.current = null
+    }
     if (vadRef.current) {
       vadRef.current.destroy()
       vadRef.current = null
@@ -97,6 +103,17 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
       preSpeechPadFrames: 5,
     })
     vadRef.current.start()
+
+    // Attach amplitude-based barge-in monitor (side-chain, does not affect VAD)
+    const monitor = new BargeInMonitor({
+      thresholdDb: -30,
+      minDurationMs: 50,
+      onBargeIn: () => {
+        api.voice.bargeIn()
+      },
+    })
+    monitor.attach(stream, audioCtx)
+    bargeInMonitorRef.current = monitor
   }, [])
 
   /** Switch to a new voice mode */
@@ -190,6 +207,10 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
       setVoiceState(state)
       setRecording(state === 'recording')
       setProcessing(state === 'processing')
+      // Enable amplitude barge-in monitor only during agent speech
+      if (bargeInMonitorRef.current) {
+        bargeInMonitorRef.current.setEnabled(state === 'agent_speaking')
+      }
     }))
 
     unsubs.push(api.voice.onTranscription((text: string) => {
