@@ -8,6 +8,7 @@ import { TmuxManager } from './tmux/tmux-manager'
 import { MessageBus } from './message-bus/message-bus'
 import { ProjectScanner } from './project/project-scanner'
 import { configStore } from './config/config-store'
+import { getActiveWorkspace } from './workspace/workspace-utils'
 import { StatusLineMonitor } from './monitoring/statusline-monitor'
 import { McpServerManager } from './mcp/mcp-server'
 import { generateApiKey } from './mcp/mcp-auth'
@@ -735,9 +736,7 @@ export class IpcHub {
 
       // Save to workspace project dir > session projectPath > ~/Pictures fallback
       const session = this.sessionManager.list().find((s: any) => s.id === sessionId)
-      const activeWsId = configStore.get('activeWorkspaceId')
-      const workspaces = configStore.get('workspaces') ?? []
-      const activeWs = activeWsId ? (workspaces as any[]).find((w: any) => w.id === activeWsId) : null
+      const activeWs = getActiveWorkspace()
       const wsProjectDir = activeWs?.contextPaths?.[0] ?? null
       const baseDir = wsProjectDir ?? session?.projectPath ?? pathNode.join(os.homedir(), 'Pictures', 'cipher-mux')
       const screenshotDir = pathNode.join(baseDir, 'screenshots')
@@ -1842,19 +1841,15 @@ export class IpcHub {
       // REQ-NOTES-008: re-merge workspace scope tag + defaultTags so auto-tagging doesn't drop them
       let effectiveTags = tags
       if (effectiveTags) {
-        const activeWsId = configStore.get('activeWorkspaceId')
-        if (activeWsId) {
-          const workspaces = configStore.get('workspaces') ?? []
-          const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
-          if (ws) {
-            // notesGlobal: skip workspace scope tag so note stays visible in all workspaces
-            if (!ws.notesGlobal) {
-              effectiveTags = [...effectiveTags, `workspace:${ws.name ?? ws.id}`]
-            }
-            if (ws.defaultTags?.length) {
-              const tagSet = new Set([...effectiveTags, ...ws.defaultTags])
-              effectiveTags = [...tagSet]
-            }
+        const ws = getActiveWorkspace()
+        if (ws) {
+          // notesGlobal: skip workspace scope tag so note stays visible in all workspaces
+          if (!ws.notesGlobal) {
+            effectiveTags = [...effectiveTags, `workspace:${ws.name ?? ws.id}`]
+          }
+          if (ws.defaultTags?.length) {
+            const tagSet = new Set([...effectiveTags, ...ws.defaultTags])
+            effectiveTags = [...tagSet]
           }
         }
       }
@@ -1903,19 +1898,15 @@ export class IpcHub {
 
       // P.2: auto-apply workspace scope tag + defaultTags when workspace is active
       let mergedTags = manualTags
-      const activeWsId = configStore.get('activeWorkspaceId')
-      if (activeWsId) {
-        const workspaces = configStore.get('workspaces') ?? []
-        const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
-        if (ws) {
-          // notesGlobal: skip workspace scope tag so note is visible in all workspaces
-          if (!ws.notesGlobal) {
-            mergedTags = [...mergedTags, `workspace:${ws.name ?? ws.id}`]
-          }
-          if (ws.defaultTags?.length) {
-            const tagSet = new Set([...mergedTags, ...ws.defaultTags])
-            mergedTags = [...tagSet]
-          }
+      const ws = getActiveWorkspace()
+      if (ws) {
+        // notesGlobal: skip workspace scope tag so note is visible in all workspaces
+        if (!ws.notesGlobal) {
+          mergedTags = [...mergedTags, `workspace:${ws.name ?? ws.id}`]
+        }
+        if (ws.defaultTags?.length) {
+          const tagSet = new Set([...mergedTags, ...ws.defaultTags])
+          mergedTags = [...tagSet]
         }
       }
       // Resolve synonyms before creating
@@ -1994,16 +1985,12 @@ export class IpcHub {
 
     ipcMain.handle(IPC.NOTES_BULK_TAG_REMOVE, async (_e, { ids, tag }: { ids: string[]; tag: string }) => {
       // REQ-NOTES-008: protect workspace scope tag + default tags from removal
-      const activeWsId = configStore.get('activeWorkspaceId')
-      if (activeWsId) {
-        const workspaces = configStore.get('workspaces') ?? []
-        const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
-        if (ws && tag === `workspace:${ws.name ?? ws.id}`) {
-          return { updated: [], blocked: true }
-        }
-        if (ws?.defaultTags?.includes(tag)) {
-          return { updated: [], blocked: true }
-        }
+      const ws = getActiveWorkspace()
+      if (ws && tag === `workspace:${ws.name ?? ws.id}`) {
+        return { updated: [], blocked: true }
+      }
+      if (ws?.defaultTags?.includes(tag)) {
+        return { updated: [], blocked: true }
       }
       const updated = await this.noteManager.bulkRemoveTag(ids, tag)
       if (updated.length > 0) {
@@ -2439,17 +2426,13 @@ export class IpcHub {
       sections.push({ name: 'Persona', source: `character: ${resolved.name}` })
 
       // Workspace Prompt + Context Directories — from active workspace if it has them
-      const activeWsId = configStore.get('activeWorkspaceId') as string | null
-      if (activeWsId) {
-        const workspaces = configStore.get('workspaces') ?? []
-        const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
-        if (ws) {
-          if (ws.workspacePrompt?.trim()) {
-            sections.push({ name: 'Workspace Prompt', source: `workspace: ${ws.name ?? activeWsId}` })
-          }
-          if (ws.contextPaths?.length) {
-            sections.push({ name: 'Context Directories', source: `workspace: ${ws.name ?? activeWsId}` })
-          }
+      const ws = getActiveWorkspace()
+      if (ws) {
+        if (ws.workspacePrompt?.trim()) {
+          sections.push({ name: 'Workspace Prompt', source: `workspace: ${ws.name ?? ws.id}` })
+        }
+        if (ws.contextPaths?.length) {
+          sections.push({ name: 'Context Directories', source: `workspace: ${ws.name ?? ws.id}` })
         }
       }
 

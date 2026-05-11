@@ -684,21 +684,17 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           : undefined
         // P.2: auto-apply workspace scope tag + workspace defaultTags
         try {
-          const { configStore } = require('../config/config-store')
-          const activeWsId = configStore.get('activeWorkspaceId')
-          if (activeWsId) {
-            const workspaces = configStore.get('workspaces') ?? []
-            const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
-            if (ws) {
-              // notesGlobal: skip workspace scope tag so note is visible in all workspaces
-              if (!ws.notesGlobal) {
-                tags.push(`workspace:${ws.name ?? ws.id}`)
-              }
-              // User-configured cross-workspace tags
-              if (ws.defaultTags?.length) {
-                const tagSet = new Set([...tags, ...ws.defaultTags])
-                tags = [...tagSet]
-              }
+          const { getActiveWorkspace } = require('../workspace/workspace-utils')
+          const ws = getActiveWorkspace()
+          if (ws) {
+            // notesGlobal: skip workspace scope tag so note is visible in all workspaces
+            if (!ws.notesGlobal) {
+              tags.push(`workspace:${ws.name ?? ws.id}`)
+            }
+            // User-configured cross-workspace tags
+            if (ws.defaultTags?.length) {
+              const tagSet = new Set([...tags, ...ws.defaultTags])
+              tags = [...tagSet]
             }
           }
         } catch { /* configStore not available */ }

@@ -28,6 +28,7 @@ import type { PersistedSession, PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
 import { configStore } from '../config/config-store'
+import { getActiveWorkspace } from '../workspace/workspace-utils'
 import { getCachedGlobalRules } from '../config/global-rules'
 import { extractCharacterBlock } from '../character/character-defaults'
 import { resolvePersonaForPreset } from './persona-resolver'
@@ -1123,14 +1124,10 @@ export class SessionManager extends EventEmitter {
         let wsPaths = opts?.contextPaths
         if (!wsPrompt && !wsPaths) {
           try {
-            const activeWsId = configStore.get('activeWorkspaceId')
-            if (activeWsId) {
-              const workspaces = configStore.get('workspaces') ?? []
-              const ws = (workspaces as any[]).find((w: any) => w.id === activeWsId)
-              if (ws) {
-                if (ws.workspacePrompt?.trim()) wsPrompt = ws.workspacePrompt.trim()
-                if (ws.contextPaths?.length) wsPaths = ws.contextPaths
-              }
+            const ws = getActiveWorkspace()
+            if (ws) {
+              if (ws.workspacePrompt?.trim()) wsPrompt = ws.workspacePrompt.trim()
+              if (ws.contextPaths?.length) wsPaths = ws.contextPaths
             }
           } catch { /* configStore not available */ }
         }
