@@ -196,6 +196,24 @@ export class TagClassRepo {
     return { ...(this.data.synonyms ?? {}) }
   }
 
+  /** Check if a tag string is registered (class name, value within any class, or workspace:* pattern). */
+  isKnownTag(tag: string): boolean {
+    // workspace:* tags are auto-generated, always valid
+    if (tag.startsWith('workspace:')) return true
+
+    const { tagClass, value } = TagClassRepo.parseTag(tag)
+
+    if (tagClass !== null) {
+      // tag has class:value format — check that the class exists and the value is registered
+      const cls = this.data.classes[tagClass]
+      if (!cls) return false
+      return cls.values.includes(value)
+    }
+
+    // No colon — check if it matches a bare class name (tag === value here, tagClass is null)
+    return Object.prototype.hasOwnProperty.call(this.data.classes, value)
+  }
+
   // ─── Class CRUD ───────────────────────────────────────────
 
   /** Create a new tag class. Returns false if it already exists. */
