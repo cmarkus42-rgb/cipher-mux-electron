@@ -95,7 +95,7 @@ export const IPC = {
   // Bugreport
   BUGREPORT_COLLECT: 'cipher-mux:bugreport:collect',
   BUGREPORT_SUBMIT: 'cipher-mux:bugreport:submit',
-  BUGREPORT_ENRICH: 'cipher-mux:bugreport:enrich',
+  BUGREPORT_PROCESS: 'cipher-mux:bugreport:process',
   BUGREPORT_PICK_SCREENSHOT: 'cipher-mux:bugreport:pick-screenshot',
   BUGREPORT_DIALOG_OPEN: 'cipher-mux:bugreport:dialog-open',
   BUGREPORT_DIALOG_CLOSE: 'cipher-mux:bugreport:dialog-close',

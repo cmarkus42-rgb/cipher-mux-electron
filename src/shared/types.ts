@@ -235,8 +235,6 @@ export interface AppConfig {
     ollamaPort: number
     /** Ollama model for enrichment/tagging (default gemma4:26b). */
     ollamaModel: string
-    /** Bug report enrichment backend: 'cloud' (Claude/Haiku) or 'local' (Ollama). Default: 'cloud'. */
-    bugreportEnrichBackend: 'cloud' | 'local'
   }
   windows: {
     main: { x: number; y: number; width: number; height: number }
