@@ -12,6 +12,7 @@ import type { Topic } from '../../shared/types'
 import type { NoteManager } from '../notes/note-manager'
 import type { NoteSearchIndex } from '../notes/note-search-index'
 import type { MemoryStore } from '../companion/memory-store'
+import type { TagClassRepo } from '../notes/tag-repository'
 import { IPC } from '../../shared/ipc-channels'
 import { registerAllHandoffTools } from './handoff-kernel'
 import { integrate, inventory, migrationPlan, hubApply, hubVerify, hubRelease, hubRollback } from '../hub'
@@ -29,6 +30,7 @@ export interface ToolContext {
   noteManager: NoteManager | null
   noteSearchIndex: NoteSearchIndex | null
   memoryStore: MemoryStore | null
+  tagClassRepo: TagClassRepo | null
   getVoiceManager?: () => import('../voice/voice-manager').VoiceManager | null
   testingAssistantManager?: import('../testing-assistant/testing-assistant-manager').TestingAssistantManager
   auditManager?: import('../audit/audit-manager').AuditManager
@@ -682,6 +684,17 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         const tagLimitWarning = manualTagCount > 5
           ? `Warning: ${manualTagCount} manual tags exceed recommended limit of 5.`
           : undefined
+        // Validate tags against tag repository (strict rejection of unknown tags)
+        if (tags.length > 0 && ctx.tagClassRepo) {
+          const unknownTags = tags.filter((t: string) => !ctx.tagClassRepo!.isKnownTag(t))
+          if (unknownTags.length > 0) {
+            return {
+              content: [{ type: 'text' as const, text: `Error: Unknown tags: ${unknownTags.join(', ')}. Tags must be registered in .tags.json. Use tag classes and values defined there.` }],
+              isError: true,
+            }
+          }
+        }
+
         // P.2: auto-apply workspace scope tag + workspace defaultTags
         try {
           const { getActiveWorkspace } = require('../workspace/workspace-utils')

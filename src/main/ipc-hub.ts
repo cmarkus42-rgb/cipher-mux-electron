@@ -383,6 +383,7 @@ export class IpcHub {
       noteManager: this.noteManager,
       noteSearchIndex: this.noteSearchIndex,
       memoryStore: this.memoryStore,
+      tagClassRepo: this.tagClassRepo,
       getVoiceManager: () => this.voiceManager,
       testingAssistantManager: this.testingAssistantManager ?? undefined,
       auditManager: this.auditManager ?? undefined,
