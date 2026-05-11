@@ -6,6 +6,13 @@
  * Capabilities, Working Rules, Scope, TTS.
  */
 
+import {
+  userProfileBlock,
+  companionMemoryBlock,
+  guideRoutingBlock,
+  learningPathsBlock,
+} from '../entity-content/shared-companion-blocks';
+
 export function generateVoiceRelayClaudeMd(): string {
   return `# Voice Relay Session
 
@@ -55,6 +62,16 @@ Announce tool calls:
 - mux_session_focus — focus session ("Zeig mir die Payment-Session")
 - mux_session_eject — move session to background
 - mux_sidebar_toggle — sidebar on/off
+
+${userProfileBlock()}
+
+${companionMemoryBlock()}
+
+${guideRoutingBlock()}
+
+**Voice adaptation for guides:** When teaching from a guide file, summarize and explain verbally. Use flowing prose, not bullet lists. Break complex guides into multiple turns — max four to five sentences, then check in with the user.
+
+${learningPathsBlock()}
 
 ## Working Rules
 
