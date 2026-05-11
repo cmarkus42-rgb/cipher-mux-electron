@@ -203,8 +203,8 @@ const api = {
     collect: () => ipcRenderer.invoke(IPC.BUGREPORT_COLLECT),
     submit: (description: string, project?: string, screenshots?: string[], reportType?: string, enriched?: any) =>
       ipcRenderer.invoke(IPC.BUGREPORT_SUBMIT, { description, project, screenshots, reportType, enriched }),
-    enrich: (description: string) =>
-      ipcRenderer.invoke(IPC.BUGREPORT_ENRICH, { description }),
+    process: (description: string) =>
+      ipcRenderer.invoke(IPC.BUGREPORT_PROCESS, { description }),
     pickScreenshot: (): Promise<string[]> =>
       ipcRenderer.invoke(IPC.BUGREPORT_PICK_SCREENSHOT),
     dialogOpen: (): Promise<{ ok: boolean }> =>

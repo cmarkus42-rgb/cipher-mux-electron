@@ -68,7 +68,6 @@ const defaults: AppConfig = {
     ollamaHost: '127.0.0.1',
     ollamaPort: 11434,
     ollamaModel: 'gemma4:26b',
-    bugreportEnrichBackend: 'cloud' as const,
   },
   ui: {
     chatroomVisible: false,

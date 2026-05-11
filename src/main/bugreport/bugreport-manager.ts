@@ -6,7 +6,7 @@ import { ulid } from 'ulidx'
 import type { BugreportData, SessionInfo } from '../../shared/types'
 import { APP_VERSION } from '../../shared/constants'
 import { runCommand } from '../util/exec-util'
-import { enrichBugreport, type EnrichedBugreport } from './ollama-client'
+import { parseEnrichedOutput, type EnrichedBugreport } from './ollama-client'
 import { deliverToGitHub } from './github-delivery'
 import type { MessageBus } from '../message-bus/message-bus'
 import { BRAND } from '../../shared/brand'
@@ -185,7 +185,55 @@ ${diagnostics.logs.slice(-50).join('\n')}
     return id
   }
 
-  async enrich(description: string): Promise<EnrichedBugreport | null> {
-    return enrichBugreport(description)
+  async processBugreport(
+    description: string,
+    sessionManager: any,
+  ): Promise<EnrichedBugreport | null> {
+    const TIMEOUT_MS = 120_000
+    const POLL_INTERVAL_MS = 3_000
+    const MARKER_START = '```yaml'
+    const MARKER_END = '```'
+
+    const session = await sessionManager.startEntity('bugreport')
+    const tmuxSession = session.tmuxSession
+
+    try {
+      // Wait for Claude to be ready
+      await new Promise(resolve => setTimeout(resolve, 10_000))
+
+      // Send the description as prompt
+      const escaped = description.replace(/'/g, "'\\''")
+      await runCommand('tmux', [
+        'send-keys', '-t', tmuxSession,
+        `Verarbeite diesen Bugreport und gib das Ergebnis als YAML-Block aus:\n\n${escaped}`,
+        'Enter',
+      ], { timeout: 5000 })
+
+      // Poll for structured output
+      const startTime = Date.now()
+      while (Date.now() - startTime < TIMEOUT_MS) {
+        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+        try {
+          const capture = await runCommand('tmux', [
+            'capture-pane', '-t', tmuxSession, '-p',
+          ], { timeout: 5000 })
+          const yamlStart = capture.lastIndexOf(MARKER_START)
+          if (yamlStart !== -1) {
+            const afterStart = capture.slice(yamlStart + MARKER_START.length)
+            const yamlEnd = afterStart.indexOf(MARKER_END)
+            if (yamlEnd !== -1) {
+              const yamlText = afterStart.slice(0, yamlEnd).trim()
+              const result = parseEnrichedOutput(yamlText)
+              if (result) return result
+            }
+          }
+        } catch { /* capture failed, retry */ }
+      }
+      return null
+    } finally {
+      try {
+        await sessionManager.stop(session.id)
+      } catch { /* session may already be gone */ }
+    }
   }
 }

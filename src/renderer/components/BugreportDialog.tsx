@@ -52,7 +52,7 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   const [reportType, setReportType] = useState<ReportType>('bug')
   const [description, setDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [enriching, setEnriching] = useState(false)
+  const [processing, setProcessing] = useState(false)
   const [enriched, setEnriched] = useState<EnrichedBugreport | null>(null)
   const [enrichFailed, setEnrichFailed] = useState(false)
   const [preview, setPreview] = useState('')
@@ -90,24 +90,24 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
     setScreenshots([])
   }, [])
 
-  const handleEnrich = useCallback(async () => {
+  const handleProcess = useCallback(async () => {
     if (!description.trim()) return
-    setEnriching(true)
+    setProcessing(true)
     setEnrichFailed(false)
     setEnriched(null)
     try {
-      const res: EnrichedBugreport | null = await api().bugreport.enrich(description)
-      if (res) {
-        setEnriched(res)
-        setPreview(formatEnriched(res))
+      const res = await api().bugreport.process(description)
+      if (res.ok && res.result) {
+        setEnriched(res.result)
+        setPreview(formatEnriched(res.result))
       } else {
         setEnrichFailed(true)
       }
     } catch (err) {
-      console.error('[BugreportDialog] enrich failed:', err)
+      console.error('[BugreportDialog] process failed:', err)
       setEnrichFailed(true)
     } finally {
-      setEnriching(false)
+      setProcessing(false)
     }
   }, [description])
 
@@ -227,8 +227,8 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
               <div class="bugreport-footer">
                 <button class="btn btn--sm" onClick={handleClose}>{t('bugreport.cancel')}</button>
                 {!enriched && (
-                  <button class="btn btn--sm" onClick={handleEnrich} disabled={enriching || !description.trim()}>
-                    {enriching ? t('bugreport.analyzing') : t('bugreport.preview')}
+                  <button class="btn btn--sm" onClick={handleProcess} disabled={processing || !description.trim()}>
+                    {processing ? t('bugreport.processing') : t('bugreport.preview')}
                   </button>
                 )}
                 <button class="btn btn--sm btn--primary" onClick={handleSubmit}

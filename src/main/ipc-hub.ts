@@ -1131,8 +1131,14 @@ export class IpcHub {
       return { id }
     })
 
-    ipcMain.handle(IPC.BUGREPORT_ENRICH, async (_event, { description }: { description: string }) => {
-      return this.bugreportManager.enrich(description)
+    ipcMain.handle(IPC.BUGREPORT_PROCESS, async (_e, { description }: { description: string }) => {
+      try {
+        const result = await this.bugreportManager.processBugreport(description, this.sessionManager)
+        return { ok: true, result }
+      } catch (err: any) {
+        console.error('[IpcHub] bugreport process failed:', err)
+        return { ok: false, error: err.message }
+      }
     })
 
     ipcMain.handle(IPC.BUGREPORT_PICK_SCREENSHOT, async () => {
