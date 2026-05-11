@@ -79,7 +79,7 @@ const MCP_PREFIX = 'mcp__cipher-mux__'
 
 /**
  * Return pre-approved MCP tool permissions for a given entity.
- * All entities get the full base set; orchestrators also get tmux + kickoff.
+ * All entities get the full base set; workshop/cyber-factory also get tmux + kickoff.
  */
 /** Base permissions every entity gets. */
 const BASE_PERMISSIONS = [
@@ -119,10 +119,10 @@ const BASE_PERMISSIONS = [
 ]
 
 function getMcpPermissionsForEntity(entityId: EntityId): string[] {
-  // All entities get the full base set. Orchestrators also get tmux + kickoff.
+  // All entities get the full base set. Workshop/Cyber Factory also get tmux + kickoff.
   const perms = [...BASE_PERMISSIONS]
   switch (entityId) {
-    case 'orchestrator':
+    case 'workshop':
     case 'cyber-factory':
     case 'launcher':
       perms.push(`${MCP_PREFIX}kickoff_complete`, 'Bash(tmux:*)')
@@ -137,7 +137,7 @@ function getMcpPermissionsForEntity(entityId: EntityId): string[] {
  * Manages session lifecycle (create, stop, recover) and enforces
  * the MAX_SESSIONS limit. Each session maps to a tmux session.
  */
-export interface OrchestratorConfig {
+export interface WorkshopConfig {
   mcpHost: string
   mcpPort: number
   mcpApiKey: string
@@ -148,9 +148,9 @@ export class SessionManager extends EventEmitter {
   private tmux: TmuxManager
   private adapterRegistry: AdapterRegistry
   private sessionAdapters: Map<string, AgentAdapter> = new Map()
-  private orchestratorSessionId: string | null = null
+  private workshopSessionId: string | null = null
   private cyberFactorySessionId: string | null = null
-  private mcpConfig: OrchestratorConfig | null = null
+  private mcpConfig: WorkshopConfig | null = null
   /** Entity registry for functional entities. */
   private entityRegistry: EntityRegistry
   /** Maps entity IDs to their active session IDs (supports multi-instance). */
@@ -224,7 +224,7 @@ export class SessionManager extends EventEmitter {
    * When set, every new session gets CIPHER_MUX_MCP_URL and CIPHER_MUX_MCP_KEY
    * as environment variables.
    */
-  setMcpConfig(config: OrchestratorConfig | null): void {
+  setMcpConfig(config: WorkshopConfig | null): void {
     this.mcpConfig = config
   }
 
@@ -380,7 +380,7 @@ export class SessionManager extends EventEmitter {
       const entityId = session.entityId as EntityId
       this.removeEntitySession(entityId, sessionId)
       this.entityRegistry.unlinkSession(sessionId)
-      if (entityId === 'orchestrator') this.orchestratorSessionId = null
+      if (entityId === 'workshop') this.workshopSessionId = null
       if (entityId === 'cyber-factory') this.cyberFactorySessionId = null
     }
     this.sessionStore.removeSession(sessionId)
@@ -486,7 +486,7 @@ export class SessionManager extends EventEmitter {
       const entityId = session.entityId as EntityId
       this.removeEntitySession(entityId, sessionId)
       this.entityRegistry.unlinkSession(sessionId)
-      if (entityId === 'orchestrator') this.orchestratorSessionId = null
+      if (entityId === 'workshop') this.workshopSessionId = null
       if (entityId === 'cyber-factory') this.cyberFactorySessionId = null
     }
 
@@ -562,7 +562,7 @@ export class SessionManager extends EventEmitter {
           if (ps.entityId) {
             this.addEntitySession(ps.entityId, session.id)
             this.entityRegistry.linkSession(session.id, ps.entityId)
-            if (ps.entityId === 'orchestrator') this.orchestratorSessionId = session.id
+            if (ps.entityId === 'workshop') this.workshopSessionId = session.id
             if (ps.entityId === 'cyber-factory') this.cyberFactorySessionId = session.id
           }
         } else {
@@ -618,8 +618,8 @@ export class SessionManager extends EventEmitter {
     // ── Step 3: Fallback entity name matching for sessions recovered without store ──
     if (!hasStore) {
       const entityNameMap: Record<string, EntityId> = {
-        'Workshop': 'orchestrator',
-        'Orchestrator': 'orchestrator',
+        'Workshop': 'workshop',
+        'Orchestrator': 'workshop',
         'Cyber Factory': 'cyber-factory',
         'Coding Companion': 'companion',
         'Refinement': 'refinement',
@@ -631,7 +631,7 @@ export class SessionManager extends EventEmitter {
           session.entityId = entityId
           this.addEntitySession(entityId, session.id)
           this.entityRegistry.linkSession(session.id, entityId)
-          if (entityId === 'orchestrator') this.orchestratorSessionId = session.id
+          if (entityId === 'workshop') this.workshopSessionId = session.id
           if (entityId === 'cyber-factory') this.cyberFactorySessionId = session.id
         }
       }
@@ -1016,7 +1016,7 @@ export class SessionManager extends EventEmitter {
     // Write preset.md — source-of-truth for preset-owned content.
     // CLAUDE.md is generated at session start by assembling preset.md + injected layers.
     // Code-generated presets (voice-relay, audit) are always refreshed so
-    // updates propagate on next session start. Orchestrator and Cyber Factory use
+    // updates propagate on next session start. Workshop and Cyber Factory use
     // pre-authored preset.md in their entity directories (no code generation).
     // Only truly generic fallback preset.md is write-once (preserves manual edits).
     {
@@ -1179,8 +1179,8 @@ export class SessionManager extends EventEmitter {
     this.addEntitySession(entityId, session.id)
     this.entityRegistry.linkSession(session.id, entityId)
 
-    // Backward compat: update orchestrator/cyber-factory session ID refs
-    if (entityId === 'orchestrator') this.orchestratorSessionId = session.id
+    // Backward compat: update workshop/cyber-factory session ID refs
+    if (entityId === 'workshop') this.workshopSessionId = session.id
     if (entityId === 'cyber-factory') this.cyberFactorySessionId = session.id
 
     // Re-persist with entity ID and notify renderer so entityStatus updates
@@ -1211,7 +1211,7 @@ export class SessionManager extends EventEmitter {
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: config.projectPath,
       sessionName: config.displayName,
-      isOrchestrator: entityId === 'orchestrator',
+      isWorkshop: entityId === 'workshop',
       isCyberFactory: entityId === 'cyber-factory',
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
@@ -1245,7 +1245,7 @@ export class SessionManager extends EventEmitter {
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: config.projectPath,
       sessionName: config.displayName,
-      isOrchestrator: entityId === 'orchestrator',
+      isWorkshop: entityId === 'workshop',
       isCyberFactory: entityId === 'cyber-factory',
       resume: true,
     })
@@ -1299,7 +1299,7 @@ export class SessionManager extends EventEmitter {
     }
 
     // Backward compat
-    if (entityId === 'orchestrator') this.orchestratorSessionId = null
+    if (entityId === 'workshop') this.workshopSessionId = null
     if (entityId === 'cyber-factory') this.cyberFactorySessionId = null
 
     this.emit('entity-stopped', { entityId })
@@ -1343,7 +1343,7 @@ export class SessionManager extends EventEmitter {
     if (this.entityRegistry) {
       this.entityRegistry.linkSession(sessionId, entityId as EntityId)
     }
-    if (entityId === 'orchestrator') this.orchestratorSessionId = sessionId
+    if (entityId === 'workshop') this.workshopSessionId = sessionId
     if (entityId === 'cyber-factory') this.cyberFactorySessionId = sessionId
     this.persistSession(session)
     this.emit('session-changed', session)
@@ -1555,7 +1555,7 @@ export class SessionManager extends EventEmitter {
               const entityId = session.entityId as EntityId
               this.removeEntitySession(entityId, sessionId)
               this.entityRegistry.unlinkSession(sessionId)
-              if (entityId === 'orchestrator') this.orchestratorSessionId = null
+              if (entityId === 'workshop') this.workshopSessionId = null
               if (entityId === 'cyber-factory') this.cyberFactorySessionId = null
             }
             this.emit('session-stopped', session)

@@ -16,7 +16,7 @@ interface SessionSlice {
 
 /** Entity ID → human-readable display name. */
 const ENTITY_DISPLAY_NAMES: Record<string, string> = {
-  orchestrator: 'Orchestrator',
+  workshop: 'Workshop',
   'cyber-factory': 'Cyber Factory',
   companion: 'Companion',
   refinement: 'Refinement',

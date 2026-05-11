@@ -32,7 +32,7 @@ const CUSTOM_START: Partial<Record<string, {
   start: (api: any) => Promise<any>
   extractId: (s: any) => string | undefined
 }>> = {
-  'orchestrator': { start: (api) => api.orchestrator.start(), extractId: (s) => s?.sessionId ?? s?.id },
+  'workshop': { start: (api) => api.workshop.start(), extractId: (s) => s?.sessionId ?? s?.id },
   'cyber-factory': { start: (api) => api.cyberFactory.start(), extractId: (s) => s?.sessionId ?? s?.id },
 }
 
@@ -309,7 +309,7 @@ export function App() {
     return session?.name ?? null
   }, [focusedSessionId, sessions])
 
-  const [orchestratorSessionId, setOrchestratorSessionId] = useState<string | null>(null)
+  const [workshopSessionId, setWorkshopSessionId] = useState<string | null>(null)
   const [cyberFactorySessionId, setCyberFactorySessionId] = useState<string | null>(null)
   const [companionSessionId, setCompanionSessionId] = useState<string | null>(null)
   const [refinementSessionId, setRefinementSessionId] = useState<string | null>(null)
@@ -319,7 +319,7 @@ export function App() {
   // Entity session dispatch maps — eliminate repeated entityId→setter conditionals.
   // useState setters are referentially stable, so empty deps is correct.
   const entitySetters = useMemo<Record<string, (sid: string | null) => void>>(() => ({
-    'orchestrator': setOrchestratorSessionId,
+    'workshop': setWorkshopSessionId,
     'cyber-factory': setCyberFactorySessionId,
     'companion': setCompanionSessionId,
     'refinement': setRefinementSessionId,
@@ -329,13 +329,13 @@ export function App() {
 
   // Current entity→sessionId map (reactive, updates when any entity session changes)
   const entitySessionMap = useMemo<Record<string, string | null>>(() => ({
-    'orchestrator': orchestratorSessionId,
+    'workshop': workshopSessionId,
     'cyber-factory': cyberFactorySessionId,
     'companion': companionSessionId,
     'refinement': refinementSessionId,
     'voice-relay': voiceRelaySessionId,
     'audit': auditSessionId,
-  }), [orchestratorSessionId, cyberFactorySessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
+  }), [workshopSessionId, cyberFactorySessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
 
   // RT-X1 fix: after initial session list load, clean up grid slots referencing dead sessions.
   // Runs once after a short delay to let recovery/restore complete first.
@@ -375,7 +375,7 @@ export function App() {
     .filter((s, idx) => s.sessionId && !focusModeOverlapped.has(idx))
     .map(s => s.sessionId!)
 
-  const sidebarHasContent = !!orchestratorSessionId || !!cyberFactorySessionId ||
+  const sidebarHasContent = !!workshopSessionId || !!cyberFactorySessionId ||
     sessions.some(s => s.status === 'active' && !gridSessionIds.includes(s.id) && !detachedIds.has(s.id)) ||
     grid.slots.some(s => s.type === 'notes')
 
@@ -409,8 +409,8 @@ export function App() {
     return status
   }, [sessions])
 
-  const placeOrchestrator = useCallback((sessionId: string) => {
-    setOrchestratorSessionId(sessionId)
+  const placeWorkshop = useCallback((sessionId: string) => {
+    setWorkshopSessionId(sessionId)
     setSessionAtSlot(0, sessionId)
   }, [setSessionAtSlot])
 
@@ -441,24 +441,24 @@ export function App() {
     }
   }, [addSession])
 
-  // Check orchestrator status on mount
+  // Check workshop status on mount
   useEffect(() => {
     let mounted = true
     const api = (window as any).cipherMux
-    api.orchestrator.status().then((s: { running: boolean; sessionId?: string }) => {
+    api.workshop.status().then((s: { running: boolean; sessionId?: string }) => {
       if (!mounted) return
-      if (s.running && s.sessionId) placeOrchestrator(s.sessionId)
+      if (s.running && s.sessionId) placeWorkshop(s.sessionId)
     })
-    const unsub = api.orchestrator.onStarted((data: any) => {
-      if (inFlightEntityStarts.current.has('orchestrator')) {
-        inFlightEntityStarts.current.delete('orchestrator')
+    const unsub = api.workshop.onStarted((data: any) => {
+      if (inFlightEntityStarts.current.has('workshop')) {
+        inFlightEntityStarts.current.delete('workshop')
         return
       }
       const sid = data?.sessionId ?? data?.id
-      if (sid) placeOrchestrator(sid)
+      if (sid) placeWorkshop(sid)
     })
     return () => { mounted = false; unsub() }
-  }, [placeOrchestrator])
+  }, [placeWorkshop])
 
   // Check Cyber Factory status on mount
   useEffect(() => {
@@ -1297,7 +1297,7 @@ export function App() {
           contextUsages={contextUsages}
           focusedSessionId={focusedSessionId}
           theme={theme}
-          orchestratorSessionId={orchestratorSessionId}
+          workshopSessionId={workshopSessionId}
           activeWorkspaceId={activeWorkspaceId}
           entityStatus={entityStatus}
           voiceTargetSessionId={voiceTargetSessionId}
@@ -1337,7 +1337,7 @@ export function App() {
         {!sidebarDetached && (
           <SidebarPanel
             visible={sidebarVisible}
-            orchestratorActive={!!orchestratorSessionId}
+            workshopActive={!!workshopSessionId}
             cyberFactoryActive={!!cyberFactorySessionId}
             sessions={sessions}
             gridSessionIds={gridSessionIds}

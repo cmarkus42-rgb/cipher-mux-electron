@@ -37,7 +37,7 @@ interface SessionCellProps {
   session: SessionInfo
   contextUsage?: ContextUsage
   focused: boolean
-  isOrchestrator: boolean
+  isWorkshop: boolean
   isVoiceTarget: boolean
   isVoicePinned: boolean
   voiceState: string
@@ -67,7 +67,7 @@ interface SessionCellProps {
 }
 
 export function SessionCell({
-  session, contextUsage, focused, isOrchestrator, isVoiceTarget, isVoicePinned, voiceState, isSpeaking, onToggleVoicePin, theme,
+  session, contextUsage, focused, isWorkshop, isVoiceTarget, isVoicePinned, voiceState, isSpeaking, onToggleVoicePin, theme,
   rowSpan, maxRows, slotCol, slotRow, focusModeStyle,
   onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDetach, onFocusMode, onDragStart, onDragOver, onDragLeave, onDrop, dragOver,
   topic,
@@ -134,7 +134,7 @@ export function SessionCell({
 
   // Entity color mapping — references CSS custom properties from themes.json
   const ENTITY_COLORS: Record<EntityId, string> = {
-    orchestrator: 'var(--entity-color-1, #4fc3f7)',
+    workshop: 'var(--entity-color-1, #4fc3f7)',
     'cyber-factory': 'var(--entity-color-2, #ab47bc)',
     companion: 'var(--entity-color-3, #ffb74d)',
     refinement: 'var(--entity-color-4, #ef5350)',
@@ -174,7 +174,7 @@ export function SessionCell({
   const cellClass = [
     'session-cell',
     focused && 'session-cell--focused',
-    (isOrchestrator || isEntity) && 'session-cell--orchestrator',
+    (isWorkshop || isEntity) && 'session-cell--workshop',
     dragOver && 'session-cell--drag-over',
     isFocusMode && 'session-cell--focus-mode',
   ].filter(Boolean).join(' ')

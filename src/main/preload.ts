@@ -149,15 +149,15 @@ const api = {
       ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR, opts),
   },
 
-  // ─── Orchestrator ────────────────────────────────────────
-  orchestrator: {
-    start: () => ipcRenderer.invoke(IPC.ORCHESTRATOR_START),
-    stop: () => ipcRenderer.invoke(IPC.ORCHESTRATOR_STOP),
-    status: () => ipcRenderer.invoke(IPC.ORCHESTRATOR_STATUS),
+  // ─── Workshop ────────────────────────────────────────
+  workshop: {
+    start: () => ipcRenderer.invoke(IPC.WORKSHOP_START),
+    stop: () => ipcRenderer.invoke(IPC.WORKSHOP_STOP),
+    status: () => ipcRenderer.invoke(IPC.WORKSHOP_STATUS),
     onStarted: (cb: (data: unknown) => void) => {
       const handler = (_e: unknown, data: unknown) => cb(data)
-      ipcRenderer.on(IPC.ORCHESTRATOR_STARTED, handler)
-      return () => ipcRenderer.removeListener(IPC.ORCHESTRATOR_STARTED, handler)
+      ipcRenderer.on(IPC.WORKSHOP_STARTED, handler)
+      return () => ipcRenderer.removeListener(IPC.WORKSHOP_STARTED, handler)
     },
   },
 

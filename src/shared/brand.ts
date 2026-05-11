@@ -23,8 +23,8 @@ export interface BrandConfig {
   readonly scanPaths: readonly string[]
   /** Default project directory for new sessions. */
   readonly defaultProjectDir: string
-  /** Orchestrator config/state directory. */
-  readonly orchestratorDir: string
+  /** Workshop config/state directory. */
+  readonly workshopDir: string
   /** Cyber Factory config/state directory. */
   readonly cyberFactoryDir: string
   /** Directory for statusLine context JSON files. */
@@ -41,7 +41,7 @@ const COMMUNITY_DEFAULTS: BrandConfig = {
   appName: 'cipher-mux',
   scanPaths: [],
   defaultProjectDir: '',
-  orchestratorDir: '~/.config/cipher-mux/orchestrator',
+  workshopDir: '~/.config/cipher-mux/workshop',
   cyberFactoryDir: '~/.config/cipher-mux/cyber-factory',
   statusLineDir: '/tmp/cipher-mux/context',
   projectLauncherDir: '',
@@ -109,7 +109,7 @@ export function loadProfile(filePath: string): BrandConfig {
       appName: typeof parsed.appName === 'string' ? parsed.appName : COMMUNITY_DEFAULTS.appName,
       scanPaths: Array.isArray(parsed.scanPaths) ? parsed.scanPaths : COMMUNITY_DEFAULTS.scanPaths,
       defaultProjectDir: typeof parsed.defaultProjectDir === 'string' ? parsed.defaultProjectDir : COMMUNITY_DEFAULTS.defaultProjectDir,
-      orchestratorDir: typeof parsed.orchestratorDir === 'string' ? parsed.orchestratorDir : COMMUNITY_DEFAULTS.orchestratorDir,
+      workshopDir: typeof parsed.workshopDir === 'string' ? parsed.workshopDir : COMMUNITY_DEFAULTS.workshopDir,
       cyberFactoryDir: typeof parsed.cyberFactoryDir === 'string' ? parsed.cyberFactoryDir : COMMUNITY_DEFAULTS.cyberFactoryDir,
       statusLineDir: typeof parsed.statusLineDir === 'string' ? parsed.statusLineDir : COMMUNITY_DEFAULTS.statusLineDir,
       projectLauncherDir: typeof parsed.projectLauncherDir === 'string' ? parsed.projectLauncherDir : COMMUNITY_DEFAULTS.projectLauncherDir,

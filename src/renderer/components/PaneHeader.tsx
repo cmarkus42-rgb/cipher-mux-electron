@@ -11,7 +11,7 @@ interface PaneHeaderProps {
 
 /** Entity color mapping — references CSS custom properties from themes.json. */
 const ENTITY_COLORS: Record<EntityId, string> = {
-  orchestrator: 'var(--entity-color-1, #4fc3f7)',
+  workshop: 'var(--entity-color-1, #4fc3f7)',
   'cyber-factory': 'var(--entity-color-2, #ab47bc)',
   companion: 'var(--entity-color-3, #ffb74d)',
   refinement: 'var(--entity-color-4, #ef5350)',

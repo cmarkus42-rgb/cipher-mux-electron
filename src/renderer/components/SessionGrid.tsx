@@ -17,7 +17,7 @@ interface SessionGridProps {
   contextUsages: Record<string, ContextUsage>
   focusedSessionId: string | null
   theme: ThemeName
-  orchestratorSessionId: string | null
+  workshopSessionId: string | null
   activeWorkspaceId: string | null
   entityStatus: Record<string, boolean>
   voiceTargetSessionId: string | null
@@ -59,7 +59,7 @@ interface SessionGridProps {
 
 export function SessionGrid({
   grid, sessions, contextUsages, focusedSessionId, theme,
-  orchestratorSessionId, activeWorkspaceId, entityStatus,
+  workshopSessionId, activeWorkspaceId, entityStatus,
   voiceTargetSessionId, voicePinned, voiceState, isSpeaking, onToggleVoicePin,
   workspaceLoading,
   onFocusSession, onCloseSession,
@@ -276,7 +276,7 @@ export function SessionGrid({
                 session={session}
                 contextUsage={contextUsages[session.id]}
                 focused={session.id === focusedSessionId}
-                isOrchestrator={session.id === orchestratorSessionId}
+                isWorkshop={session.id === workshopSessionId}
                 isVoiceTarget={session.id === voiceTargetSessionId}
                 isVoicePinned={voicePinned && session.id === voiceTargetSessionId}
                 voiceState={session.id === voiceTargetSessionId ? voiceState : 'idle'}

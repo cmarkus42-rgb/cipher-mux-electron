@@ -53,11 +53,11 @@ export const IPC = {
   DIALOG_OPEN_FILE: 'cipher-mux:dialog:open-file',
   DIALOG_OPEN_DIR: 'cipher-mux:dialog:open-dir',
 
-  // Orchestrator
-  ORCHESTRATOR_START: 'cipher-mux:orchestrator:start',
-  ORCHESTRATOR_STOP: 'cipher-mux:orchestrator:stop',
-  ORCHESTRATOR_STATUS: 'cipher-mux:orchestrator:status',
-  ORCHESTRATOR_STARTED: 'cipher-mux:orchestrator:started',
+  // Workshop
+  WORKSHOP_START: 'cipher-mux:workshop:start',
+  WORKSHOP_STOP: 'cipher-mux:workshop:stop',
+  WORKSHOP_STATUS: 'cipher-mux:workshop:status',
+  WORKSHOP_STARTED: 'cipher-mux:workshop:started',
 
   // Cyber Factory
   CYBER_FACTORY_START: 'cipher-mux:cyber-factory:start',

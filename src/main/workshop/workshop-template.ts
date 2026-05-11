@@ -178,7 +178,7 @@ Zusaetzlich zu den Standard-Feldern:
 
 | Quelle | Format |
 |---|---|
-| Testing-Assistant Handoff | Handoff-Note mit \`toEntity: orchestrator\` |
+| Testing-Assistant Handoff | Handoff-Note mit \`toEntity: workshop\` |
 | User direkt | Note oder Chat-Nachricht |
 | Bugreport-Outbox | Notes mit \`kind:bugreport\` |
 

@@ -18,11 +18,11 @@ export type AdapterCapabilities = Record<AdapterFeature, boolean>
 // ─── Entity Framework ─────────────────────────────────────
 
 /** Well-known entity identifiers. Extensible via string for dynamic/scanned entities. */
-export type BuiltinEntityId = 'orchestrator' | 'cyber-factory' | 'launcher' | 'companion' | 'refinement' | 'voice-relay' | 'audit' | 'ideation-partner' | 'debugger' | 'testing-assistant' | 'bugreport'
+export type BuiltinEntityId = 'workshop' | 'cyber-factory' | 'launcher' | 'companion' | 'refinement' | 'voice-relay' | 'audit' | 'ideation-partner' | 'debugger' | 'testing-assistant' | 'bugreport'
 export type EntityId = BuiltinEntityId | (string & {})
 
 /**
- * Configuration for a functional entity (Orchestrator, Cyber Factory, Companion, etc.).
+ * Configuration for a functional entity (Workshop, Cyber Factory, Companion, etc.).
  * Entities are special sessions with predefined behavior, assets, and UI styling.
  */
 export interface EntityConfig {
@@ -199,7 +199,7 @@ export interface AppConfig {
     host: string
     apiKey: string
   }
-  orchestrator: {
+  workshop: {
     dir: string
     maxRetries: number
     stallTimeout: number

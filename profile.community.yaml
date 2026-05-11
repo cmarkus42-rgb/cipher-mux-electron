@@ -4,7 +4,7 @@
 appName: cipher-mux
 scanPaths: []
 defaultProjectDir: ""
-orchestratorDir: "~/.config/cipher-mux/orchestrator"
+workshopDir: "~/.config/cipher-mux/workshop"
 statusLineDir: "/tmp/cipher-mux/context"
 projectLauncherDir: ""
 qualityBaselineDir: ""

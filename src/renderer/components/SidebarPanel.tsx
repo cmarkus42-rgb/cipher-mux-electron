@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 
 interface SidebarPanelProps {
   visible: boolean
-  orchestratorActive: boolean
+  workshopActive: boolean
   cyberFactoryActive: boolean
   sessions: Array<{ id: string; name: string; status: string; projectPath?: string }>
   gridSessionIds: string[]
@@ -40,7 +40,7 @@ function displayName(name: string, projectPath?: string | null): string {
 }
 
 export function SidebarPanel({
-  visible, orchestratorActive, cyberFactoryActive, sessions, gridSessionIds, detachedIds,
+  visible, workshopActive, cyberFactoryActive, sessions, gridSessionIds, detachedIds,
   contextUsages, onAddToGrid, onKillSession, onDetach, onReattach, activeWorkspaceId, hasNotesCell,
   onOpenNoteInGrid, voiceComState, topicMap,
 }: SidebarPanelProps) {

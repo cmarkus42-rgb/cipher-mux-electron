@@ -39,7 +39,7 @@ const DYNAMIC_COLORS = ['#26a69a', '#5c6bc0', '#ec407a', '#8d6e63', '#78909c']
 
 /**
  * Scan the entities directory and register any entity that has a CLAUDE.md.
- * Skips entities already registered (built-in ones like orchestrator, cyber-factory).
+ * Skips entities already registered (built-in ones like workshop, cyber-factory).
  *
  * @returns Array of newly registered entity configs.
  */
