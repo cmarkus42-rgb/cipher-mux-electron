@@ -236,9 +236,25 @@ export class McpServerManager {
 
     // For POST requests, collect body and route to the right session
     if (req.method === 'POST') {
+      const MAX_BODY_SIZE = 10 * 1024 * 1024 // 10 MB
       const chunks: Buffer[] = []
-      req.on('data', (chunk: Buffer) => chunks.push(chunk))
+      let totalSize = 0
+      let aborted = false
+      req.on('data', (chunk: Buffer) => {
+        totalSize += chunk.length
+        if (totalSize > MAX_BODY_SIZE) {
+          if (!aborted) {
+            aborted = true
+            res.writeHead(413, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: 'Request body too large' }))
+            req.destroy()
+          }
+          return
+        }
+        chunks.push(chunk)
+      })
       req.on('end', () => {
+        if (aborted) return
         try {
           const body = JSON.parse(Buffer.concat(chunks).toString('utf-8'))
           this.routePost(req, res, body)
