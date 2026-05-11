@@ -1,4 +1,4 @@
-# Architecture (v0.9.9)
+# Architecture (v0.9.995)
 
 This document describes the high-level architecture of cipher-mux. It is intended for contributors who want to understand the codebase before making changes.
 
@@ -8,18 +8,22 @@ If you want to build a new adapter, see [CONTRIBUTING.md](CONTRIBUTING.md#writin
 
 cipher-mux is an Electron application with a classic two-process architecture: a **main process** (Node.js) that manages tmux sessions, a SQLite database, an MCP server, and all system integrations; and a **renderer process** (Preact) that displays the terminal grid, chatroom, and cockpit UI.
 
-As of v0.9.9 the system supports **7 entity types** (Launcher, Orchestrator, Refinement, Builder, Companion, Sentinel, Auditor) that replace the old persona-based session model. The MCP server exposes **37 tools** covering session management, message bus, tasks, notes, companion memory, voice, grid navigation, UI choreography, and more. Key subsystems added since v0.9.6 include:
+As of v0.9.995 the system supports **11 entity types** (Launcher, Orchestrator, Refinement, Cyber Factory, Companion, Debugger, Testing Assistant, Audit, Ideation Partner, Voice Relay, Bugreport) that replace the old persona-based session model. The MCP server exposes **40+ tools** covering session management, message bus, tasks, notes, companion memory, voice, grid navigation, UI choreography, handoffs, and more. Key subsystems added since v0.9.6 include:
 
 - **Companion memory store** — per-entity SQLite FTS5 memory with recall/search/forget via MCP.
 - **Notes system** — full CRUD + search + Ollama auto-tagging, exposed as MCP tools (`mux_notes_*`).
 - **Voice scroll + grid navigation** — BT shutter remote triggers scroll and grid-cell focus commands.
 - **UI choreography system** — programmatic highlight overlays, sidebar toggles, and TTS narration for demos and onboarding.
+- **WindowManager detach-lifecycle** — BrowserWindow registry for pop-out/dock-in of sessions and notes with bounds persistence and focus-driven voice routing.
+- **TTS focus gate** — `mux_tts_speak` gates playback on the caller's sessionId matching the focused cell; focus source tracking distinguishes grid vs detached windows.
+- **Voice hotSwap / initPiperOnly** — runtime voice switching via queued swap (waits for active speak chain) and lazy TTS-only initialization for entities that need TTS without full voice pipeline.
+- **Testing-collaboration IPC** — dialog-target mode in VoiceInputRouter bypasses voice commands and routes raw STT text to the bugreport dialog's description field via `VOICE_DIALOG_INSERT`.
 
 Communication between main and renderer flows through typed IPC channels defined in `src/shared/ipc-channels.ts`. The renderer never accesses Node.js APIs directly - everything goes through the `contextBridge` preload API (`window.cipherMux`).
 
 ```
 +---------------------------------------------------------------------+
-|                        Electron App (v0.9.9)                         |
+|                       Electron App (v0.9.995)                        |
 |                                                                      |
 |  +---------------------------------------------------------------+  |
 |  |                    Main Process                                |  |
@@ -96,7 +100,8 @@ Communication between main and renderer flows through typed IPC channels defined
 |--------|-----------|---------------|
 | **TmuxManager** | `tmux/` | tmux Control Mode client. Spawns sessions, streams output, handles pane lifecycle. Uses a 16ms output batcher to throttle high-frequency terminal data. See [ADR-001](docs/decisions/ADR-001-tmux-streaming.md). |
 | **MessageBus** | `message-bus/` | SQLite-backed inter-session communication. Topics, messages, unread tracking. Single-writer from main process (WAL mode). 7-day retention ([ADR-007](docs/decisions/ADR-007-message-retention.md)). |
-| **MCP Server** | `mcp/` | Streamable HTTP endpoint on `127.0.0.1:3100`. Bearer token auth. Exposes 37 tools (`mux_send`, `mux_read`, `mux_create_session`, `mux_status`, `mux_context_usage`, `mux_task_*`, `mux_notes_*`, `companion_memory_*`, `mux_ui_*`, `mux_tts_speak`, `mux_grid_*`, `mux_cell_scroll`, etc.). See [ADR-002](docs/decisions/ADR-002-mcp-transport.md). |
+| **MCP Server** | `mcp/` | Streamable HTTP endpoint on `127.0.0.1:3100`. Bearer token auth. Exposes 40+ tools (`mux_send`, `mux_read`, `mux_create_session`, `mux_status`, `mux_context_usage`, `mux_task_*`, `mux_notes_*`, `companion_memory_*`, `mux_ui_*`, `mux_tts_speak`, `mux_grid_*`, `mux_cell_scroll`, `mux_cyber_factory_*`, `mux_debugger_*`, `mux_testing_*`, handoff tools, etc.). See [ADR-002](docs/decisions/ADR-002-mcp-transport.md). |
+| **WindowManager** | `window-manager.ts` | BrowserWindow registry for detached sessions/notes. Pop-out, dock-in, bounds persistence, focus callbacks for voice routing. |
 | **IPC Hub** | `ipc-hub.ts` | Central router for all renderer-main IPC. Registers handlers for ~97 typed channels. |
 | **SessionManager** | `session/` | Session registry, status tracking, crash recovery. Manages the lifecycle of tmux-backed agent sessions. |
 | **EntityRegistry** | `session/entity-registry.ts` | Entity registration and lifecycle. Registers 7 built-in entities at startup and manages their configs. |
@@ -151,21 +156,25 @@ Communication between main and renderer flows through typed IPC channels defined
 
 ## Entity Framework
 
-As of v0.9.9 cipher-mux uses an entity-based session model that replaces the earlier persona system.
+As of v0.9.995 cipher-mux uses an entity-based session model that replaces the earlier persona system.
 
 ### EntityRegistry
 
-7 built-in entities are registered at startup:
+11 built-in entities are registered at startup:
 
 | Entity | Role |
 |--------|------|
 | **Launcher** | Main process orchestration, project scaffolding, session lifecycle |
-| **Orchestrator** | Multi-session coordination, task delegation, MPO workflows |
-| **Refinement** | Iterative improvement sessions — code review, refactoring, polish |
-| **Builder** | Implementation sessions — feature building, bug fixing |
-| **Companion** | User-facing advisor, how-to guidance, bug reports, memory store |
-| **Sentinel** | Monitoring, diagnostics, health checks |
-| **Auditor** | Quality assurance, compliance, structured audits |
+| **Orchestrator** | Multi-session coordination, task delegation |
+| **Refinement** | Requirements analysis, purpose-check, REQ-ID tracking, handoff to Cyber Factory |
+| **Cyber Factory** | Multi-session build orchestrator (replaces MPO). Decomposes specs into waves, spawns parallel workers |
+| **Companion** | Persistent memory store, user-facing advisor, scope-aware recall/search/forget |
+| **Debugger** | Post-build diagnostics: findings intake, clarification, fix planning, worker dispatch, verification |
+| **Testing Assistant** | Test execution, quality audit, adversarial probing, OWASP checks, findings reporting |
+| **Audit** | Code review, security audit, ADR consistency, cognitive debt analysis, release recommendation |
+| **Ideation Partner** | Brainstorming, skill registry, Anforderungspaket generation |
+| **Voice Relay** | Background entity that polls tmux output and routes stable responses to TTS |
+| **Bugreport** | Structured bug report creation with voice dictation support |
 
 ### EntityScanner
 
@@ -284,6 +293,62 @@ Entity session (MCP client)
   -> IPC Hub emits update (if subscribed)
   -> CompanionMemoryView updates
 ```
+
+## Subsystem Deep-Dives (v0.9.10+)
+
+### WindowManager Detach-Lifecycle
+
+`WindowManager` (`src/main/window-manager.ts`) maintains a registry of detached `BrowserWindow` instances (`Map<entityId, { window, entry }>`). Sessions and notes can be popped out into their own OS window and docked back.
+
+**Lifecycle:**
+
+```
+Pop-out:  openDetachedWindow(type, entityId, bounds?)
+            → new BrowserWindow with ?view=session|note&id=<entityId>
+            → save bounds to ConfigStore (detachedWindowBounds)
+            → register onDetachedFocus callback for voice routing
+
+Dock-in:  markDockInitiated(entityId) → close window (no state-change event)
+            → DETACH_STATE_CHANGED IPC → renderer re-docks cell
+
+Startup:  restoreDetachedWindows(entries, isValid)
+            → validator skips stale sessions/notes
+            → restore saved bounds per entityId
+```
+
+**Key functions:** `openDetachedWindow()`, `closeDetachedWindow()`, `markDockInitiated()`, `getDetachedEntries()`, `restoreDetachedWindows()`, `onDetachedFocus(cb)`, `onMainWindowFocus(cb)`.
+
+**IPC channels:** `DETACH_REQUEST`, `DOCK_REQUEST`, `DETACH_STATE_CHANGED`.
+
+### TTS Focus Gate
+
+The `mux_tts_speak` MCP tool (`src/main/mcp/mcp-tools.ts`) implements focus-gating: if a `sessionId` parameter is passed, TTS only plays when that session is in the focused cell. This prevents background sessions from speaking over the user's active work.
+
+Focus source is tracked as `'grid' | 'detached'` by `VoiceInputRouter` (`src/main/voice/voice-input-router.ts`). When a detached window gains OS focus, `WindowManager.onDetachedFocus()` fires a callback that switches the TTS/STT target. When the main grid window regains focus, `onMainWindowFocus()` reverts routing.
+
+For entity sessions with voice-relay enabled, `VoiceOutputRouter` (`src/main/voice/voice-output-router.ts`) polls tmux output every 500ms, detects stable agent responses, and routes them to `ConversationEngine.speakResponse()`.
+
+### Voice hotSwap / initPiperOnly
+
+`VoiceManager` (`src/main/voice/voice-manager.ts`) supports two initialization paths:
+
+1. **`init()`** — full pipeline: STT (Whisper) + TTS (Piper) + ConversationEngine.
+2. **`initPiperOnly()`** — lazy TTS-only mode for entities that need `mux_tts_speak` but not voice input.
+
+**Runtime voice switching** via `swapVoice(newVoiceName)`:
+- Uses a `_swapQueue` (Promise chain) to serialize concurrent swap requests.
+- Waits for the active speak chain to finish.
+- Disposes old PiperTTS instance, creates new one with the target voice model.
+- Updates ConversationEngine's TTS reference after swap.
+- `isSwapping` getter exposes swap-in-progress state.
+
+### Testing-Collaboration IPC (Simplified Bugreport Dialog)
+
+When the bugreport dialog opens, `VoiceInputRouter.setDialogTarget('bugreport')` switches to dialog-target mode. In this mode, STT transcriptions bypass voice command matching (scroll, grid-nav, submit) and flow directly to the renderer via `VOICE_DIALOG_INSERT` IPC. The renderer inserts the text into the dialog's description field, enabling hands-free dictation.
+
+**IPC channels:** `BUGREPORT_DIALOG_OPEN` (triggers `setDialogTarget`), `BUGREPORT_DIALOG_CLOSE` (triggers `clearDialogTarget`), `VOICE_DIALOG_INSERT` (raw STT text → renderer input field).
+
+**Key functions:** `VoiceInputRouter.setDialogTarget(target)`, `clearDialogTarget()`, `routeTranscription(text)` (checks dialogTarget as priority 1).
 
 ## Key Design Decisions
 
