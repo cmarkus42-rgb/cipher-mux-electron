@@ -1949,8 +1949,22 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
     async (args: { skillId: string; skillsDir?: string }) => {
       try {
+        // Validate skillId: only alphanumeric, hyphens, underscores (no path traversal)
+        if (!/^[a-zA-Z0-9_-]+$/.test(args.skillId)) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: `Invalid skillId: ${args.skillId}` }) }],
+            isError: true,
+          }
+        }
         const skillsDir = args.skillsDir || `${require('os').homedir()}/.config/cipher-mux/skills/ideation`
-        const skillPath = require('path').join(skillsDir, `${args.skillId}.md`)
+        const skillPath = require('path').resolve(skillsDir, `${args.skillId}.md`)
+        // Defense-in-depth: ensure resolved path stays within skillsDir
+        if (!skillPath.startsWith(require('path').resolve(skillsDir))) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'Path traversal blocked' }) }],
+            isError: true,
+          }
+        }
         let skillContent: string
 
         try {
