@@ -27,6 +27,23 @@ import { useSetupWizard } from './hooks/useSetupWizard'
 import { SetupWizard } from './components/SetupWizard'
 import { UpdateDialog } from './components/UpdateDialog'
 
+/** Entities with custom start APIs (different from api.entity.start()) */
+const CUSTOM_START: Partial<Record<string, {
+  start: (api: any) => Promise<any>
+  extractId: (s: any) => string | undefined
+}>> = {
+  'orchestrator': { start: (api) => api.orchestrator.start(), extractId: (s) => s?.sessionId ?? s?.id },
+  'cyber-factory': { start: (api) => api.cyberFactory.start(), extractId: (s) => s?.sessionId ?? s?.id },
+}
+
+/** Entities that auto-register when started externally (via IPC events, not renderer) */
+const AUTO_REGISTER_ENTITIES: ReadonlyArray<{ id: EntityId; background?: boolean }> = [
+  { id: 'companion' },
+  { id: 'refinement' },
+  { id: 'voice-relay', background: true },
+  { id: 'audit' },
+]
+
 export function App() {
   const { t } = useTranslation()
   const setupWizard = useSetupWizard()
@@ -299,6 +316,27 @@ export function App() {
   const [voiceRelaySessionId, setVoiceRelaySessionId] = useState<string | null>(null)
   const [auditSessionId, setAuditSessionId] = useState<string | null>(null)
 
+  // Entity session dispatch maps — eliminate repeated entityId→setter conditionals.
+  // useState setters are referentially stable, so empty deps is correct.
+  const entitySetters = useMemo<Record<string, (sid: string | null) => void>>(() => ({
+    'orchestrator': setOrchestratorSessionId,
+    'cyber-factory': setCyberFactorySessionId,
+    'companion': setCompanionSessionId,
+    'refinement': setRefinementSessionId,
+    'voice-relay': setVoiceRelaySessionId,
+    'audit': setAuditSessionId,
+  }), [])
+
+  // Current entity→sessionId map (reactive, updates when any entity session changes)
+  const entitySessionMap = useMemo<Record<string, string | null>>(() => ({
+    'orchestrator': orchestratorSessionId,
+    'cyber-factory': cyberFactorySessionId,
+    'companion': companionSessionId,
+    'refinement': refinementSessionId,
+    'voice-relay': voiceRelaySessionId,
+    'audit': auditSessionId,
+  }), [orchestratorSessionId, cyberFactorySessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
+
   // RT-X1 fix: after initial session list load, clean up grid slots referencing dead sessions.
   // Runs once after a short delay to let recovery/restore complete first.
   const sessionsRef = useRef(sessions)
@@ -355,13 +393,10 @@ export function App() {
   useEffect(() => {
     if (!initialCleanupDone.current) return
     const activeIds = new Set(sessions.map(s => s.id))
-    if (orchestratorSessionId && !activeIds.has(orchestratorSessionId)) setOrchestratorSessionId(null)
-    if (cyberFactorySessionId && !activeIds.has(cyberFactorySessionId)) setCyberFactorySessionId(null)
-    if (companionSessionId && !activeIds.has(companionSessionId)) setCompanionSessionId(null)
-    if (refinementSessionId && !activeIds.has(refinementSessionId)) setRefinementSessionId(null)
-    if (voiceRelaySessionId && !activeIds.has(voiceRelaySessionId)) setVoiceRelaySessionId(null)
-    if (auditSessionId && !activeIds.has(auditSessionId)) setAuditSessionId(null)
-  }, [sessions, orchestratorSessionId, cyberFactorySessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
+    for (const [eid, currentSid] of Object.entries(entitySessionMap)) {
+      if (currentSid && !activeIds.has(currentSid)) entitySetters[eid]?.(null)
+    }
+  }, [sessions, entitySessionMap, entitySetters])
 
   // Entity status map for unified dialog — computed dynamically from active sessions
   // so that ANY entity (including dynamic ones like watchdog, projectlauncher, etc.)
@@ -734,12 +769,7 @@ export function App() {
       }
     }
     for (const session of result.recovered) {
-      if (session.entityId === 'orchestrator') setOrchestratorSessionId(session.id)
-      if (session.entityId === 'cyber-factory') setCyberFactorySessionId(session.id)
-      if (session.entityId === 'companion') setCompanionSessionId(session.id)
-      if (session.entityId === 'refinement') setRefinementSessionId(session.id)
-      if (session.entityId === 'voice-relay') setVoiceRelaySessionId(session.id)
-      if (session.entityId === 'audit') setAuditSessionId(session.id)
+      entitySetters[session.entityId]?.(session.id)
     }
     if (result.recovered.length > 0) {
       setFocusedSessionId(result.recovered[0].id)
@@ -950,16 +980,8 @@ export function App() {
   // ─── Unified Dialog: Entity Start/Focus ───���─────────────
 
   const getEntitySessionId = useCallback((entityId: EntityId): string | null => {
-    switch (entityId) {
-      case 'orchestrator': return orchestratorSessionId
-      case 'cyber-factory': return cyberFactorySessionId
-      case 'companion': return companionSessionId
-      case 'refinement': return refinementSessionId
-      case 'voice-relay': return voiceRelaySessionId
-      case 'audit': return auditSessionId
-      default: return null
-    }
-  }, [orchestratorSessionId, cyberFactorySessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
+    return entitySessionMap[entityId] ?? null
+  }, [entitySessionMap])
 
   const handleStartEntity = useCallback(async (entityId: EntityId, slotIndex: number) => {
     const api = (window as any).cipherMux
@@ -967,35 +989,13 @@ export function App() {
     // the onStarted IPC event arrives before the await resolves (RT-X2 fix).
     inFlightEntityStarts.current.add(entityId)
     try {
-      if (entityId === 'orchestrator') {
-        const session = await api.orchestrator.start()
-        const sid = session?.sessionId ?? session?.id
-        if (sid) {
-          setOrchestratorSessionId(sid)
-          setSessionAtSlot(slotIndex, sid)
-          setFocusedSessionId(sid)
-        }
-        return
-      }
-      if (entityId === 'cyber-factory') {
-        const session = await api.cyberFactory.start()
-        const sid = session?.sessionId ?? session?.id
-        if (sid) {
-          setCyberFactorySessionId(sid)
-          setSessionAtSlot(slotIndex, sid)
-          setFocusedSessionId(sid)
-        }
-        return
-      }
-      const session = await api.entity.start(entityId)
-      const sid = session?.id
+      const custom = CUSTOM_START[entityId]
+      const session = custom
+        ? await custom.start(api)
+        : await api.entity.start(entityId)
+      const sid = custom ? custom.extractId(session) : session?.id
       if (sid) {
-        switch (entityId) {
-          case 'companion': setCompanionSessionId(sid); break
-          case 'refinement': setRefinementSessionId(sid); break
-          case 'voice-relay': setVoiceRelaySessionId(sid); break
-          case 'audit': setAuditSessionId(sid); break
-        }
+        entitySetters[entityId]?.(sid)
         setSessionAtSlot(slotIndex, sid)
         setFocusedSessionId(sid)
       }
@@ -1004,7 +1004,7 @@ export function App() {
       // already deleted it, but Set.delete is idempotent.
       inFlightEntityStarts.current.delete(entityId)
     }
-  }, [setSessionAtSlot])
+  }, [setSessionAtSlot, entitySetters])
 
   const handleResumeEntity = useCallback(async (entityId: EntityId, slotIndex: number) => {
     const api = (window as any).cipherMux
@@ -1013,21 +1013,14 @@ export function App() {
       const session = await api.entity.resume(entityId)
       const sid = session?.id
       if (sid) {
-        switch (entityId) {
-          case 'orchestrator': setOrchestratorSessionId(sid); break
-          case 'cyber-factory': setCyberFactorySessionId(sid); break
-          case 'companion': setCompanionSessionId(sid); break
-          case 'refinement': setRefinementSessionId(sid); break
-          case 'voice-relay': setVoiceRelaySessionId(sid); break
-          case 'audit': setAuditSessionId(sid); break
-        }
+        entitySetters[entityId]?.(sid)
         setSessionAtSlot(slotIndex, sid)
         setFocusedSessionId(sid)
       }
     } finally {
       inFlightEntityStarts.current.delete(entityId)
     }
-  }, [setSessionAtSlot])
+  }, [setSessionAtSlot, entitySetters])
 
   const handleFocusEntity = useCallback((entityId: EntityId) => {
     const sid = getEntitySessionId(entityId)
@@ -1165,19 +1158,16 @@ export function App() {
       // Skip if session is already placed in the grid
       const alreadyPlaced = grid.slots.some(s => s.sessionId === sid)
       if (alreadyPlaced) return
-      if (data.entityId === 'companion' && !companionSessionId) {
-        setCompanionSessionId(sid); placeEntity(sid)
-      } else if (data.entityId === 'refinement' && !refinementSessionId) {
-        setRefinementSessionId(sid); placeEntity(sid)
-      } else if (data.entityId === 'voice-relay' && !voiceRelaySessionId) {
-        // Voice-relay runs as background session only (no grid placement)
-        setVoiceRelaySessionId(sid)
-      } else if (data.entityId === 'audit' && !auditSessionId) {
-        setAuditSessionId(sid); placeEntity(sid)
+      for (const { id, background } of AUTO_REGISTER_ENTITIES) {
+        if (data.entityId === id && !entitySessionMap[id]) {
+          entitySetters[id](sid)
+          if (!background) placeEntity(sid)
+          break
+        }
       }
     })
     return () => unsub()
-  }, [companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId, placeEntity])
+  }, [entitySessionMap, entitySetters, placeEntity])
 
   // Check entity status on mount
   useEffect(() => {
