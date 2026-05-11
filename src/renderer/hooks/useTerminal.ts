@@ -12,15 +12,19 @@ import { getTerminalFontSize } from '../a11y/terminal-font-size'
 const api = () => (window as any).cipherMux
 
 /**
- * Reads terminal color CSS variables from :root and returns an xterm.js theme object.
+ * Reads terminal color CSS variables from body and returns an xterm.js theme object.
+ * Variables are defined on body[data-theme="..."], so we must read from body, not :root.
  * Falls back to the generated theme map if CSS variables are not yet defined.
  */
-function getCssTerminalTheme(fallbackTheme: ThemeName): Record<string, string | undefined> {
-  const style = getComputedStyle(document.documentElement)
+function getCssTerminalTheme(fallbackTheme?: ThemeName): Record<string, string | undefined> {
+  const style = getComputedStyle(document.body)
   const get = (name: string) => style.getPropertyValue(name).trim() || undefined
   const bg = get('--terminal-bg')
   // If no CSS variable defined, fall back to generated theme
-  if (!bg) return getGeneratedTerminalTheme(fallbackTheme)
+  if (!bg) {
+    const current = (document.body.dataset.theme as ThemeName) || fallbackTheme || 'cipher-ivory'
+    return getGeneratedTerminalTheme(current)
+  }
   return {
     background: bg,
     foreground: get('--terminal-foreground'),
@@ -265,7 +269,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
     // Listen for theme-editor live preview: CSS variable changes on body
     const themeObserver = new MutationObserver(() => {
       if (term) {
-        term.options.theme = getCssTerminalTheme(theme)
+        term.options.theme = getCssTerminalTheme()
       }
     })
     themeObserver.observe(document.body, { attributes: true, attributeFilter: ['style'] })
