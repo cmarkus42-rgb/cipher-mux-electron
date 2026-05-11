@@ -4,12 +4,46 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { CanvasAddon } from '@xterm/addon-canvas'
 import '@xterm/xterm/css/xterm.css'
-import { getTerminalTheme } from './useTheme'
+import { getTerminalTheme as getGeneratedTerminalTheme } from './useTheme'
 import type { ThemeName } from '../../shared/grid-types'
 import { registerTerminal, unregisterTerminal, setMarker } from '../terminal-registry'
 import { getTerminalFontSize } from '../a11y/terminal-font-size'
 
 const api = () => (window as any).cipherMux
+
+/**
+ * Reads terminal color CSS variables from :root and returns an xterm.js theme object.
+ * Falls back to the generated theme map if CSS variables are not yet defined.
+ */
+function getCssTerminalTheme(fallbackTheme: ThemeName): Record<string, string | undefined> {
+  const style = getComputedStyle(document.documentElement)
+  const get = (name: string) => style.getPropertyValue(name).trim() || undefined
+  const bg = get('--terminal-bg')
+  // If no CSS variable defined, fall back to generated theme
+  if (!bg) return getGeneratedTerminalTheme(fallbackTheme)
+  return {
+    background: bg,
+    foreground: get('--terminal-foreground'),
+    cursor: get('--terminal-cursor'),
+    selectionBackground: get('--terminal-selection'),
+    black: get('--terminal-ansi-black'),
+    red: get('--terminal-ansi-red'),
+    green: get('--terminal-ansi-green'),
+    yellow: get('--terminal-ansi-yellow'),
+    blue: get('--terminal-ansi-blue'),
+    magenta: get('--terminal-ansi-magenta'),
+    cyan: get('--terminal-ansi-cyan'),
+    white: get('--terminal-ansi-white'),
+    brightBlack: get('--terminal-ansi-bright-black'),
+    brightRed: get('--terminal-ansi-bright-red'),
+    brightGreen: get('--terminal-ansi-bright-green'),
+    brightYellow: get('--terminal-ansi-bright-yellow'),
+    brightBlue: get('--terminal-ansi-bright-blue'),
+    brightMagenta: get('--terminal-ansi-bright-magenta'),
+    brightCyan: get('--terminal-ansi-bright-cyan'),
+    brightWhite: get('--terminal-ansi-bright-white'),
+  }
+}
 
 /**
  * Tracks sessionIds that have already been capture-restored in this renderer
@@ -168,7 +202,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       lineHeight: 1.3,
       cursorBlink: true,
       cursorStyle: 'block',
-      theme: getTerminalTheme(theme),
+      theme: getCssTerminalTheme(theme),
       allowProposedApi: true,
     })
 
@@ -227,6 +261,16 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
     termRef.current = term
     fitAddonRef.current = fitAddon
     registerTerminal(sessionId, term)
+
+    // Listen for theme-editor live preview: CSS variable changes on body
+    const themeObserver = new MutationObserver(() => {
+      if (term) {
+        term.options.theme = getCssTerminalTheme(theme)
+      }
+    })
+    themeObserver.observe(document.body, { attributes: true, attributeFilter: ['style'] })
+    // Also listen for data-theme attribute changes (theme switch)
+    themeObserver.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] })
 
     // Listen for terminal font size changes from a11y settings
     const onTermFontSize = ((e: CustomEvent<number>) => {
@@ -395,6 +439,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       inputDisposable.dispose()
       unsubscribe()
       window.removeEventListener('a11y:terminal-font-size', onTermFontSize)
+      themeObserver.disconnect()
       unregisterTerminal(sessionId)
       term.dispose()
       termRef.current = null

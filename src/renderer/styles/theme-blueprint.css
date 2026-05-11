@@ -57,7 +57,6 @@ body[data-theme="blueprint"] {
   --shadow-sm:              0 1px 2px rgba(0,0,0,0.20), 0 2px 6px rgba(0,0,0,0.16);
   --shadow-md:              0 2px 4px rgba(0,0,0,0.24), 0 4px 16px rgba(0,0,0,0.20);
   --shadow-lg:              0 4px 8px rgba(0,0,0,0.28), 0 8px 32px rgba(0,0,0,0.24);
-  --shadow-inset:           inset 0 1px 4px rgba(0,0,0,0.16);
 
   /* session action buttons */
   --session-action-btn-text:       #8EE3B0;
@@ -65,6 +64,28 @@ body[data-theme="blueprint"] {
   --session-action-btn-border:     #2E6FA0;
   --session-action-btn-text-hover: #AEF3C8;
   --session-action-btn-bg-hover:   rgba(142, 227, 176, 0.14);
+
+  /* terminal colors (xterm.js) */
+  --terminal-bg:                    #0A2138;
+  --terminal-foreground:            #DCEEFF;
+  --terminal-cursor:                #7FD3FF;
+  --terminal-selection:             rgba(127, 211, 255, 0.25);
+  --terminal-ansi-black:            #081C30;
+  --terminal-ansi-red:              #FF8FA0;
+  --terminal-ansi-green:            #8EE3B0;
+  --terminal-ansi-yellow:           #FFC170;
+  --terminal-ansi-blue:             #7FD3FF;
+  --terminal-ansi-magenta:          #C8A8F0;
+  --terminal-ansi-cyan:             #9FE5FF;
+  --terminal-ansi-white:            #A8CCEC;
+  --terminal-ansi-bright-black:     #4A8AC0;
+  --terminal-ansi-bright-red:       #FFAFC0;
+  --terminal-ansi-bright-green:     #AEEFC8;
+  --terminal-ansi-bright-yellow:    #FFD690;
+  --terminal-ansi-bright-blue:      #A8E0FF;
+  --terminal-ansi-bright-magenta:   #DCC0FF;
+  --terminal-ansi-bright-cyan:      #C0F0FF;
+  --terminal-ansi-bright-white:     #DCEEFF;
 
   /* ANSI terminal palette 0-15 */
   --ansi-0:                 #081C30;

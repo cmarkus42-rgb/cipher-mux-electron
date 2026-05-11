@@ -457,6 +457,7 @@
   "themeEditor.custom": "custom",
   "themeEditor.deleteTheme": "delete theme",
   "themeEditor.groupSession": "session & header",
+  "themeEditor.groupTerminalColors": "terminal colors",
   "themeEditor.groupEntity": "entity colors",
   "themeEditor.groupTerminal": "terminal",
   "themeEditor.terminalFont": "font family",
