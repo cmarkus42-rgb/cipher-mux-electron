@@ -164,7 +164,9 @@ function clearCustomTokens(): void {
   const style = document.body.style
   for (let i = style.length - 1; i >= 0; i--) {
     const prop = style[i]
-    if (prop.startsWith('--color-')) {
+    if (prop.startsWith('--color-') || prop.startsWith('--session-') ||
+        prop.startsWith('--terminal-') || prop.startsWith('--entity-') ||
+        prop.startsWith('--shadow-')) {
       style.removeProperty(prop)
     }
   }

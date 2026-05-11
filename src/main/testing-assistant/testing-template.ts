@@ -67,6 +67,12 @@ Die Testcase-Note ist ein **bidirektionales Arbeitsdokument** zwischen dir und d
 - User-Kommentare in Fail-Cases sind Findings — muessen in den Findings-Report uebernommen werden
 - User-Abhakungen haben Vorrang vor eigenen Einschaetzungen
 
+### 5. Testcase-Note sauber halten
+- In der Testcase-Note stehen **nur echte, nummerierte Testcases** (T-PREFIX.N)
+- Durchlauf-Ergebnisse, Retest-Notizen, Beobachtungen und Kommentare gehoeren in eine **separate Note** (tag: \`kind:findings-report\` oder \`kind:testing-run\`)
+- Wenn ein Retest einen bestehenden Case verifiziert → **Status + Kommentar am Originalcase updaten** via \`set_status\` + \`set_comment\`, keinen neuen T-RT*.* Case anlegen
+- Keine Durchlauf-Sektionen (z.B. "Retest Run 2", "Workshop-Run 3") in der Testcase-Note — diese blaehen die Testcase-Zaehlung auf und verwirren den TestcaseView
+
 ## Boundaries
 
 - You do not write production code or fixes. You find and report.

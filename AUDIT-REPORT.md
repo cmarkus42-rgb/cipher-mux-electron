@@ -1,156 +1,198 @@
 # Audit Report — cipher-mux-electron
 
-**Datum:** 2026-05-03
-**Version:** 0.9.99 (commit `5e506b5`)
-**Auditor:** Relay (cipher-mux Audit Entity)
-**Scope:** Pre-Release OSS Audit — Security, Code Quality, Dokumentation
+**Datum:** 2026-05-11
+**Version:** 0.9.995 (commit `a65488e`, HEAD)
+**Vorheriger Audit:** 2026-05-03 (commit `5e506b5`, v0.9.99)
+**Auditor:** Cipher (cipher-mux Audit Entity)
+**Scope:** Welle-Audit — 30 Commits seit letztem Audit, Fokus auf neue Features und Security
 
 ---
 
 ## Zusammenfassung
 
-cipher-mux ist ein substantielles Electron-Projekt (~42.800 LOC, 202 Source-Dateien) mit einer durchdachten Architektur: typisierte IPC-Kanäle, contextBridge-Isolation, Profile-System für OSS vs. Private, Zod-Validierung auf der MCP-Ebene, und ein Credential-Filter im Memory-Store. Die Testsuite ist mit **1207 Tests / 0 Failures** für ein Projekt dieser Größe beeindruckend.
+cipher-mux ist auf ~48.300 LOC (226 Source-Dateien) gewachsen. Seit dem letzten Audit kamen **Detachable Windows**, **Grid Focus Mode**, **Session Tokens**, **Testing Collaboration**, umfangreiche **Voice/STT-Fixes** und eine **i18n-Vervollstaendigung** hinzu. Die Testsuite ist auf **1497 Tests / 0 Failures** gewachsen (+290 Tests). Die drei kritischsten Security-Findings (Timing Attack, Path Traversal, Body Size Limit) wurden noch waehrend des Audits vom Debugger gefixt und committed.
 
-Für eine OSS-Veröffentlichung ist das Projekt in gutem Zustand. Die gefundenen Issues sind überwiegend Hygiene- und Härtungs-Themen, keine architektonischen Schwächen.
+Das Projekt ist in gutem Zustand. Die architektonischen Grundlagen halten der Feature-Last stand. Die Hauptbaustelle ist die ipc-hub God-File-Tendenz (jetzt 2979 LOC) und die veraltete ARCHITECTURE.md.
 
 ---
 
 ## Bewertungstabelle
 
-| Bereich | Note | Kommentar |
-|---------|------|-----------|
-| Security | **B+** | Solide Grundlagen (Bearer Auth, contextIsolation, CSP, kein nodeIntegration). Einige Härtungslücken. |
-| Code Quality | **B+** | Klare Modulgrenzen, gute Tests, einige God-File-Tendenzen (ipc-hub 2389 LOC). |
-| Dokumentation | **A-** | README, ARCHITECTURE, CONTRIBUTING, SECURITY, HOWTO, ADRs — alles vorhanden und konsistent. |
-| Testing | **A** | 1207 Tests, 0 Failures, ~90s Laufzeit. Starke Abdeckung für Main-Process-Logic. |
+| Bereich | Note | Trend | Kommentar |
+|---------|------|-------|-----------|
+| Security | **B+** | = | 3 Findings waehrend Audit gefixt. Sandbox-Frage bleibt offen. |
+| Code Quality | **B** | -0.5 | ipc-hub +25%, DetachedNoteView Save-Path hat Silent Failures. |
+| Testing | **A** | = | 1497 Tests, 0 Failures, +290 neue Tests. Gute Edge-Case-Abdeckung. |
+| Dokumentation | **B+** | -0.5 | ARCHITECTURE.md veraltet (v0.9.9). README fehlt Detach-Feature. |
 
 ---
 
 ## Security Findings
 
-### S-001 — `sandbox: false` in allen BrowserWindows
+### S-001 — Timing Attack in Bearer Auth
+**Schweregrad:** HIGH → **FIXED** (commit `a65488e`)
+**Datei:** `src/main/mcp/mcp-auth.ts:18`
+**Beschreibung:** `parts[1] === apiKey` war anfaellig fuer Timing-Side-Channel-Attacks.
+**Fix:** `crypto.timingSafeEqual()` mit Laengenvergleich davor. Korrekt implementiert.
+
+### S-002 — Path Traversal in mux_ideation_skill_run
+**Schweregrad:** HIGH → **FIXED** (commit `a65488e`)
+**Datei:** `src/main/mcp/mcp-tools.ts:1946-1957`
+**Beschreibung:** `args.skillId` wurde unvalidiert in `path.join()` verwendet. MCP-Client konnte beliebige Dateien lesen.
+**Fix:** Regex-Validierung (`/^[a-zA-Z0-9_-]+$/`) + Pfad-Containment-Check. Korrekt implementiert.
+
+### S-003 — No Request Body Size Limit
+**Schweregrad:** MEDIUM → **FIXED** (commit `a65488e`)
+**Datei:** `src/main/mcp/mcp-server.ts:239-240`
+**Beschreibung:** POST-Body wurde ohne Groessenlimit akkumuliert.
+**Fix:** 10MB Limit mit `req.destroy()` bei Ueberschreitung. `aborted`-Flag verhindert Doppel-Response. Sauber.
+
+### S-004 — `sandbox: false` auf allen BrowserWindows (Carry-Over)
 **Schweregrad:** MEDIUM
-**Datei:** `src/main/window-manager.ts:56, 129, 174`
-**Beschreibung:** Alle drei BrowserWindows (main, workspaces, sidebar) setzen `sandbox: false`. Das deaktiviert die Chromium-Sandbox für den Renderer-Process. Obwohl `contextIsolation: true` und `nodeIntegration: false` aktiv sind, reduziert `sandbox: false` die Defense-in-Depth.
-**Warum ist es so:** Vermutlich wegen `better-sqlite3` native module im Preload oder weil die Preload-Scripts nicht sandbox-kompatibel sind.
-**Empfehlung:** Prüfen ob `sandbox: true` mit dem aktuellen Preload-Setup funktioniert. Falls nicht möglich: im SECURITY.md dokumentieren warum.
+**Datei:** `src/main/window-manager.ts:57, 150, 195, 299`
+**Beschreibung:** Vier BrowserWindows (main, workspaces, sidebar, NEU: detached) setzen `sandbox: false`. Betrifft jetzt auch Pop-Out-Fenster. `contextIsolation: true` und `nodeIntegration: false` sind aktiv.
+**Kontext:** Vermutlich wegen better-sqlite3 im Preload. SECURITY.md dokumentiert die Entscheidung bereits.
+**Empfehlung:** Weiterhin pruefen ob sandbox: true moeglich ist. Kein Blocker.
 
-### S-002 — CORS `Access-Control-Allow-Origin: *`
+### S-005 — Keine Integritaetspruefung bei Voice-Model-Downloads
+**Schweregrad:** MEDIUM
+**Datei:** `src/main/voice/voice-downloader.ts:73-85`
+**Beschreibung:** .onnx-Modelle von HuggingFace werden per HTTPS heruntergeladen, aber ohne SHA256-Validierung geladen.
+**Kontext:** HTTPS schuetzt die Verbindung. Fuer ein Desktop-Tool akzeptables Risiko. Checksum waere Defense-in-Depth.
+**Empfehlung:** SHA256-Hashes fuer bekannte Modelle hardcoden oder aus HuggingFace-Metadata abrufen.
+
+### S-006 — Health-Endpoint ohne Auth (Carry-Over)
 **Schweregrad:** LOW
-**Datei:** `src/main/mcp/mcp-server.ts:197`
-**Beschreibung:** Der MCP-Server erlaubt CORS von allen Origins. Da der Server nur auf `127.0.0.1` bindet UND Bearer-Auth erfordert, ist das Risiko gering — aber eine bösartige Website könnte theoretisch Requests an localhost:3100 schicken (der Bearer müsste erraten werden).
-**Empfehlung:** CORS auf `null` oder einen festen lokalen Origin einschränken (z.B. nur die Electron-App selbst). Alternativ: explizit im Security-Doc begründen.
+**Datei:** `src/main/mcp/mcp-server.ts:212-219`
+**Beschreibung:** `/health` leakt Session-Count und Uptime ohne Auth. Nur auf localhost erreichbar.
+**Status:** Bewusste Design-Entscheidung. In SECURITY.md dokumentiert.
 
-### S-003 — npm audit: 15 Vulnerabilities (11 high) in Dev-Dependencies
-**Schweregrad:** LOW (DevDeps, nicht in Runtime)
-**Beschreibung:** Alle 15 Findings stecken in `electron-builder` -> `tar` -> `cacache` Dependency-Chain. Betrifft nur den Build-Prozess, nicht die ausgelieferte App.
-**Empfehlung:** `npm audit fix --force` oder auf electron-builder 26.x upgraden (breaking change). Vor Release einmal durchführen — für CI-Badge-Optik relevant.
+### S-007 — TTS Temp-File mit vorhersagbarem Namen
+**Schweregrad:** LOW
+**Datei:** `src/main/voice/voice-manager.ts:477`
+**Beschreibung:** `cipher-mux-tts-${Date.now()}.wav` im tmpdir. Vorhersagbar, aber nur lokal relevant.
+**Empfehlung:** `fs.mkdtempSync()` waere sauberer. Kein Blocker.
 
-### S-004 — Health-Endpoint `/health` ohne Auth
-**Schweregrad:** INFO
-**Datei:** `src/main/mcp/mcp-server.ts:210-218`
-**Beschreibung:** `/health` antwortet ohne Bearer-Token mit Session-Count und Uptime. Kein Credential-Leak, aber gibt einem lokalen Angreifer Metadaten.
-**Empfehlung:** Bewusste Design-Entscheidung, aber im Security-Doc erwähnen.
+### S-008 — npm audit: 18 Vulnerabilities in DevDeps
+**Schweregrad:** LOW
+**Beschreibung:** Alle in electron-builder → tar → cacache Chain. Kein Runtime-Impact. Upgrade auf electron-builder 26.x wuerde sie beheben (Breaking Change).
 
-### S-005 — `task-hooks.ts` verwendet Shell-Interpretation
-**Schweregrad:** LOW (admin-configured, kein User-Input)
-**Datei:** `src/main/task/task-hooks.ts:43`
-**Beschreibung:** Task-Hooks verwenden Shell-Interpretation für Hook-Commands. Das ist dokumentiert ("hook commands are admin-configured shell pipelines") und der Input kommt aus der Config, nicht von externen Quellen. Shell-Interpretation ist hier bewusst gewählt damit Pipes und Redirects funktionieren.
-**Empfehlung:** OK so — der Kommentar ist bereits vorhanden. Im Contributor-Guide erwähnen dass Hook-Commands niemals aus User-Input stammen dürfen.
+### S-009 — CORS: Verbessert seit letztem Audit
+**Schweregrad:** INFO (FIXED)
+**Beschreibung:** Von `Access-Control-Allow-Origin: *` auf localhost-only Regex. Korrekt implementiert.
 
-### S-006 — API-Key-Persistenz im Config-Store
-**Schweregrad:** INFO
-**Datei:** `src/main/ipc-hub.ts:286`
-**Beschreibung:** Der MCP Bearer-Token wird in `config.json` im App-Data-Verzeichnis persistiert (kein tmp, sondern `~/.config/cipher-mux/config.json`). Das ist korrekt für Session-Reconnect, aber die Datei sollte `0600` Permissions haben.
-**Empfehlung:** Bei Erstellung von `config.json` explizit `fs.chmod(path, 0o600)` setzen.
+### S-010 — config.json Permissions
+**Schweregrad:** INFO (FIXED)
+**Beschreibung:** `0o600` Permissions werden beim Schreiben gesetzt. Fix aus letztem Audit verifiziert.
+
+### S-011 — Credential Filter funktional
+**Schweregrad:** INFO (OK)
+**Beschreibung:** `CREDENTIAL_PATTERNS` in memory-store.ts fangen Secrets ab. Kein Bypass gefunden.
 
 ---
 
 ## Code Quality Findings
 
-### Q-001 — `ipc-hub.ts` ist ein God-File (2389 LOC)
+### Q-001 — ipc-hub.ts God-File (2979 LOC, +25%)
 **Schweregrad:** MEDIUM
-**Beschreibung:** Die Datei ist der zentrale Router für ~97 IPC-Kanäle. Sie importiert 46 Module und ist das Herz der Anwendung. Das funktioniert, aber die Datei wächst mit jedem Feature.
-**Empfehlung:** Kein Blocker für die Veröffentlichung — aber ein natürlicher Refactoring-Kandidat. Handler-Gruppen (notes, tasks, voice, audit) könnten in separate Dateien extrahiert werden (ähnlich wie `handoff-kernel.ts` das für Handoffs bereits macht).
+**Beschreibung:** Von 2389 auf 2979 LOC gewachsen. Importiert ~60 Module. Feature-getrieben (Detach, Voice Relay, Grid Focus), nicht Spaghetti — aber das Limit ist erreicht.
+**Extraktions-Kandidaten:**
+- `WorkspaceResolver` — Workspace-Lookup mit identischem `(workspaces as any[]).find()` Pattern taucht 6x auf
+- `GridSnapshotManager` — Keep-Working-Snapshot-Logik (destroy + restore)
+- Handler-Gruppen (Notes, Voice, Grid) in separate Dateien
+**Empfehlung:** WorkspaceResolver-Extraktion als Quick Win (eliminiert 6x `as any`). Rest nach Bedarf.
 
-### Q-002 — 227x `as any` im Source (58x davon in `mcp-tools.ts`)
+### Q-002 — DetachedNoteView: Silent Save Failures
+**Schweregrad:** MEDIUM
+**Datei:** `src/renderer/components/DetachedNoteView.tsx:83-95`
+**Beschreibung:** `handleSave()` hat kein Error-Handling — wenn der Save fehlschlaegt, bekommt der User kein Feedback. `beforeunload`-Flush ist unwaited (Save kann vor Window-Close nicht fertig werden).
+**Empfehlung:** try/catch mit Error-State in handleSave. beforeunload kann nicht awaited werden (Browser-Limitation), aber ein Dirty-Flag mit Warnung waere moeglich.
+
+### Q-003 — 101x `as any` in src/main/
 **Schweregrad:** LOW
-**Beschreibung:** Die `mcp-tools.ts` Casts sind dokumentiert als Workaround für TS2589 (deep type instantiation mit Zod + MCP SDK). Das ist ein bekanntes Library-Problem. Die restlichen Renderer-Casts sind typisch für Preact/React IPC-Bridging wo `window.cipherMux` untyped ist.
-**Empfehlung:** Für die Veröffentlichung akzeptabel. Langfristig: ein `declare global { interface Window { cipherMux: CipherMuxApi } }` Type-Declaration File würde die Renderer-Casts eliminieren.
+**Aufschluesselung:**
+- 58x in mcp-tools.ts (MCP SDK TS2589 Workaround, dokumentiert)
+- 20x in ipc-hub.ts (Workspace/Grid Casts, extrahierbar)
+- 23x Rest (verteilt, ueberwiegend akzeptabel)
+**Trend:** Stabil. Kein Anstieg der "echten" Any-Casts.
 
-### Q-003 — `mcp-tools.ts` Tool-Registrierung: Inline-Lambdas mit Error-Wrapping
-**Schweregrad:** LOW
-**Beschreibung:** Jede Tool-Registration ist ein One-Liner mit identischem try/catch Pattern. Das ist funktional, aber repetitiv (DRY-Verletzung über ~40 Tools).
-**Empfehlung:** Ein `registerSafe(server, name, schema, handler)` Helper würde den Boilerplate eliminieren. Kein Blocker.
-
-### Q-004 — `app.tsx` Root-Component mit 37 State-Variablen
-**Schweregrad:** LOW
-**Datei:** `src/renderer/app.tsx`
-**Beschreibung:** Die App-Komponente hat viele State-Variables auf Top-Level. Das ist bei Electron-Apps mit wenig Routing üblich — aber bei weiterem Wachstum wird es unübersichtlich.
-**Empfehlung:** Für v1.0 akzeptabel. Bei nächster größerer Feature-Welle: Context/Reducer-Pattern für zusammengehörige State-Gruppen (voice, grid, dialogs).
-
-### Q-005 — Kein `strict: true` in tsconfig
+### Q-004 — mcp-tools.ts: Gut organisiert (2085 LOC)
 **Schweregrad:** INFO
-**Dateien:** `tsconfig.json`, `tsconfig.main.json`, `tsconfig.renderer.json`
-**Beschreibung:** TypeScript-Strict-Mode ist nicht aktiv. Das erklärt die ~227 `as any` Casts teilweise.
-**Empfehlung:** Nicht vor Release umstellen (zu viele Änderungen). Als Post-1.0 Roadmap-Item aufnehmen.
+**Beschreibung:** 58 Tools in logischen Gruppen. Zod-Validierung konsistent. Die Datei ist gross, aber gut strukturiert. Kein unmittelbarer Handlungsbedarf.
+
+### Q-005 — Voice Pipeline: Sauber (583 LOC)
+**Schweregrad:** INFO
+**Beschreibung:** Graceful Degradation (Piper → Re-Init → macOS Say). Process-Cleanup robust. Voice-Swap-Queue hat einen theoretischen Edge Case (release! non-null assertion), aber praktisch sicher.
+
+---
+
+## Testing Findings
+
+### T-001 — 1497 Tests, 0 Failures
+**Rating:** A
+**Beschreibung:** +290 Tests seit letztem Audit. 142 Test-Dateien, 302 Suites. Laufzeit ~91s.
+
+### T-002 — Neue Tests fuer neue Features
+- Detachable Windows: 6 Tests (grid-slot-state, ipc-routing, keep-working-persistence, view-routing, window-registry, workspace-block)
+- Entity Registry: 14 Tests
+- Grid Focus Mode: Abgedeckt in grid-slot-state
+- Voice Downloader: 10 Tests (URL-Building, Deletion, Name-Parsing)
+
+### T-003 — Luecken bei Security-kritischem Code
+**Schweregrad:** MEDIUM
+- `mcp-auth.ts` (validateBearer, generateApiKey) hat **keine Unit-Tests**. Wird indirekt durch MCP-Lifecycle-Tests abgedeckt, aber Security-kritische Funktionen verdienen eigene Tests.
+- `window-manager.ts` hat keine Unit-Tests fuer Grid-Sizing und Detach-Lifecycle.
+**Empfehlung:** 5 min fuer mcp-auth Tests, 30 min fuer window-manager Tests.
 
 ---
 
 ## Dokumentation Findings
 
-### D-001 — SECURITY.md: Version-Tabelle veraltet
+### D-001 — ARCHITECTURE.md veraltet (v0.9.9)
+**Schweregrad:** MEDIUM
+**Beschreibung:** Kein WindowManager-Subsystem, kein Detach, keine Voice-Methoden, kein TTS Focus Gate dokumentiert.
+**Empfehlung:** Update auf v1.0.0 mit neuen Subsystemen.
+
+### D-002 — README fehlt Detachable Windows
 **Schweregrad:** LOW
-**Datei:** `SECURITY.md:9`
-**Beschreibung:** Supported Versions zeigt `0.8.x` — das Projekt ist bei `0.9.99`.
-**Empfehlung:** Auf `0.9.x` aktualisieren.
+**Beschreibung:** Key Feature nicht in Feature-Liste erwaehnt. Ein Einzeiler unter "Focus Mode" wuerde reichen.
 
-### D-002 — README Version-Badge zeigt `0.9.9` statt `0.9.99`
-**Schweregrad:** INFO
-**Datei:** `README.md:12`
-**Beschreibung:** Der Badge ist statisch und zeigt die alte Version.
-**Empfehlung:** Dynamischen Badge verwenden oder vor Release aktualisieren.
-
-### D-003 — Screenshot-Block im README noch auskommentiert
+### D-003 — JSDoc-Luecken bei neuen Public APIs
 **Schweregrad:** LOW
-**Datei:** `README.md:20-32`
-**Beschreibung:** Für eine Veröffentlichung ist ein Screenshot wichtig — es ist der erste visuelle Eindruck.
-**Empfehlung:** Mindestens einen Screenshot in `assets/screenshots/` bereitstellen und Block aktivieren.
+**Dateien:** `window-manager.ts` (openDetachedWindow, closeDetachedWindow), `voice-manager.ts` (hotSwapVoice, initPiperOnly)
+**Beschreibung:** Public Methoden ohne JSDoc.
 
-### D-004 — `profile.cipher.yaml` ist im Repo-Worktree vorhanden
+### D-004 — docs/retest-2026-05-09.md ist stale
 **Schweregrad:** INFO
-**Beschreibung:** Die Datei ist korrekt gitignored und NICHT in git tracked. Keine Aktion nötig — nur Bestätigung dass das Profil-System sauber getrennt ist.
+**Beschreibung:** Internes QA-Dokument, referenziert entfernte Features. Aufraeum-Kandidat.
 
 ---
 
-## Top-5 Empfehlungen (Release-Blockend -> Nice-to-Have)
+## Top-5 Empfehlungen
 
-| # | Priorität | Finding | Aufwand | Empfehlung |
-|---|-----------|---------|---------|------------|
-| 1 | **Hoch** | D-001 + D-002 | 5 min | SECURITY.md + README Badge aktualisieren |
-| 2 | **Hoch** | D-003 | 30 min | Screenshot erstellen und README aktivieren |
-| 3 | **Mittel** | S-001 | 1-2h | `sandbox: true` testen oder in SECURITY.md begründen |
-| 4 | **Mittel** | S-003 | 10 min | `npm audit fix --force` (electron-builder Upgrade) |
-| 5 | **Niedrig** | S-006 | 5 min | `config.json` mit 0600 Permissions erstellen |
+| # | Prioritaet | Finding | Aufwand | Status |
+|---|-----------|---------|---------|--------|
+| 1 | **Erledigt** | S-001/S-002/S-003: Timing Attack, Path Traversal, Body Limit | — | Fixed in `a65488e` |
+| 2 | **Hoch** | Q-002: DetachedNoteView Save Error-Handling | 30 min | Offen |
+| 3 | **Hoch** | D-001: ARCHITECTURE.md auf v1.0 updaten | 1-2h | Offen |
+| 4 | **Mittel** | T-003: Unit-Tests fuer mcp-auth.ts | 5 min | Offen |
+| 5 | **Mittel** | Q-001: WorkspaceResolver extrahieren | 1h | Offen |
 
 ---
 
-## Positiv-Findings (was gut ist)
+## Positiv-Findings
 
-- **Credential-Filter im Memory-Store** (`CREDENTIAL_PATTERNS`) — verhindert dass Secrets in die Companion-DB geschrieben werden.
-- **`execFile` statt Shell-Interpretation** überall außer dem dokumentierten Hooks-Ausnahmefall.
-- **`shellEscapePath`** korrekt implementiert (POSIX single-quote idiom).
-- **`contextIsolation: true` + `nodeIntegration: false`** auf allen Windows.
-- **CSP-Header** via `onHeadersReceived` — robuster als Meta-Tag.
-- **Profile-System** sauber: cipher-spezifische Pfade in gitignored YAML, Community-Profile neutral.
-- **ESLint-Rule gegen Hardcoded-Pfade** (`no-restricted-syntax` für `/Users/Shared/Nextcloud`).
-- **Single-Instance-Lock** verhindert Doppelstart.
-- **1207 Tests** — für ein Pre-1.0 Projekt exzellent. Tests decken Security-relevante Module (credential-filter, shell-escape, MCP lifecycle) explizit ab.
-- **ARCHITECTURE.md** mit ASCII-Diagramm und Module-Map — selten bei Projekten dieser Phase.
-- **ADR-Dokumentation** vorhanden (decisions/).
-- **Keine unsicheren DOM-Manipulationen** im Produktivcode.
-- **MCP-Auth korrekt:** Bearer-Token wird per `crypto.randomBytes(16)` erzeugt, validiert mit Split+Compare.
-- **Kein einziger Hardcoded Secret** im Source.
+- **Security-Fixes waehrend Audit**: 3 HIGH/MEDIUM Findings vom Debugger verifiziert und gefixt bevor der Report fertig war. Audit-Debugger-Pipeline funktioniert.
+- **CORS verbessert** seit letztem Audit (von `*` auf localhost-only).
+- **config.json 0o600** seit letztem Audit gefixt.
+- **Credential Filter** weiterhin robust, kein Bypass gefunden.
+- **sendKeys Hex-Encoding** (`send-keys -H`) neutralisiert Command Injection komplett.
+- **execFile statt Shell** durchgehend (ausser dokumentierte Hooks-Ausnahme).
+- **1497 Tests** — beeindruckend fuer ein Projekt dieser Groesse. Edge-Case-Abdeckung gut.
+- **Detach-Windows** architektonisch sauber (contextIsolation, encodeURIComponent, Bounds-Persistence).
+- **Voice Graceful Degradation** (Piper → Re-Init → macOS Say) robust implementiert.
+- **i18n-Vervollstaendigung** (de/en) reduziert hardcoded Strings im Renderer.
+- **Profile-System** weiterhin sauber getrennt (cipher vs. community).
 
 ---
 
@@ -158,30 +200,43 @@ Für eine OSS-Veröffentlichung ist das Projekt in gutem Zustand. Die gefundenen
 
 ### Projekt-Steckbrief
 
-| Eigenschaft | Wert |
-|-------------|------|
-| Sprache | TypeScript (100%) |
-| Framework | Electron 34 + Preact 10 |
-| Build | Vite (Renderer) + tsc (Main) |
-| Paketierung | electron-builder |
-| DB | better-sqlite3 (WAL mode) |
-| MCP | @modelcontextprotocol/sdk (Streamable HTTP) |
-| Lizenz | MIT |
-| LOC (src/) | ~42.800 |
-| Tests | 1207 (node:test + tsx) |
-| Dependencies (prod) | 12 |
-| Dependencies (dev) | 15 |
+| Eigenschaft | Wert | Delta |
+|-------------|------|-------|
+| Sprache | TypeScript (100%) | — |
+| Framework | Electron 34 + Preact 10 | — |
+| Build | Vite (Renderer) + tsc (Main) | — |
+| Paketierung | electron-builder | — |
+| DB | better-sqlite3 (WAL mode) | — |
+| MCP | @modelcontextprotocol/sdk (Streamable HTTP) | — |
+| Lizenz | MIT | — |
+| LOC (src/) | ~48.300 | +5.500 |
+| Source-Dateien | 226 | +24 |
+| Tests | 1497 (node:test + tsx) | +290 |
+| Dependencies (prod) | 12 | — |
+| Dependencies (dev) | 15 | — |
 
 ### Audit-Methodik
 
-- Source-Code-Review der sicherheitskritischen Module (MCP Server, Session Manager, Preload, Window Manager)
-- `npm audit` für Dependency-Vulnerabilities
-- Pattern-Suche nach Secrets, Code-Injection-Vektoren, unsicherer DOM-Nutzung, Shell-Injection
-- Electron Security Checklist (nodeIntegration, contextIsolation, sandbox, CSP, webSecurity)
-- TypeScript-Kompilierung (noEmit Check)
-- Vollständiger Test-Lauf
-- Dokumentations-Vollständigkeitsprüfung
+- Welle-Audit: 30 Commits seit 5e506b5 (2026-05-03 bis 2026-05-11)
+- Parallele Sub-Agent-Exploration fuer MCP, Voice, Dependencies, Code Quality, Tests, Docs
+- Manuelle Verifikation aller HIGH/MEDIUM Findings mit File:Line-Referenzen
+- npm audit, vollstaendiger Test-Lauf (1497/1497 pass)
+- Debugger-Handoff fuer Fix-Verifikation und Implementation
+- False-Positive-Pruefung (macOS Voice Injection, sendKeys Injection, noteId Traversal — alle drei als FP bestaetigt)
+
+### Vergleich zum Vor-Audit
+
+| Finding | Letzter Audit | Dieser Audit |
+|---------|--------------|-------------|
+| S-001 Sandbox | MEDIUM (offen) | MEDIUM (offen, +1 Window) |
+| S-002 CORS | LOW | INFO (fixed) |
+| S-003 npm audit | LOW (15 vulns) | LOW (18 vulns, gleiche Chain) |
+| S-004 Health | INFO | LOW (unveraendert) |
+| S-006 config.json | INFO | INFO (fixed) |
+| Q-001 ipc-hub | MEDIUM (2389 LOC) | MEDIUM (2979 LOC) |
+| Tests | 1207 | 1497 |
+| LOC | ~42.800 | ~48.300 |
 
 ---
 
-*Report generiert am 2026-05-03 von der cipher-mux Audit Entity.*
+*Report generiert am 2026-05-11 von der cipher-mux Audit Entity (Run arun-01KR9T2R7M10WSFN1GNT8TC4DC).*
