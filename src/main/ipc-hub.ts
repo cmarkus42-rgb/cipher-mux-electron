@@ -777,7 +777,7 @@ export class IpcHub {
         // Send filename to the session via tmux (full path is in clipboard)
         if (session?.tmuxSession) {
           const fileName = pathNode.basename(filePath)
-          await this.sessionManager.sendKeys(sessionId, `# Screenshot: ${fileName} (Pfad im Clipboard)\r`)
+          await this.sessionManager.sendKeys(sessionId, `# Screenshot: ${fileName} (Pfad im Clipboard)`)
         }
         return { path: filePath }
       } catch {

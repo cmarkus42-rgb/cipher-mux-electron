@@ -64,6 +64,31 @@ Check points:
 - Testing (present, coverage of critical paths, test quality, run tests)
 - Typing & linting (strict mode, any-frequency, linter configured)
 
+### Phase 2b — AI-Code Anti-Pattern Check
+
+AI-generierter Code driftet in vorhersagbare Richtungen. Diese Phase prueft gezielt dagegen.
+
+**Check points (9 Kriterien):**
+
+| # | Pattern | Pruefung | Red Flag |
+|---|---------|----------|----------|
+| 1 | **God Object** | Klassen/Structs mit >20 Fields zaehlen. Mischen die Daten UND Referenzen UND Cache? | Eine Klasse haelt >30% des Gesamtstate |
+| 2 | **Feature-Local Blindness** | State-Cleanup zwischen Views/Modes pruefen. Ghost Data? | Daten einer View bluten in andere |
+| 3 | **Conditional Dispatch Sprawl** | if/switch-Ketten auf Entity-/View-Typen zaehlen. >5x gleiches Pattern? | Copy-Paste statt Map/Registry/Polymorphism |
+| 4 | **Positional Array Magic Numbers** | Array-Index-Zugriffe auf Daten (nicht Loop-Variablen). Semantische Indizes? | \`data[3]\` statt \`data.allocatedGpu\` |
+| 5 | **Scope Creep** | Feature-Bereiche zaehlen vs. urspruenglichem Scope. Bewusst oder schleichend? | Feature-Count verdoppelt ohne Scope-Review |
+| 6 | **Concurrent State Mutation** | Async Ops die shared State mutieren. Mutex/Serialisierung vorhanden? | Promise-Ketten ohne Race-Protection |
+| 7 | **View-State Wrong Place** | State-Variablen am Root die nur in einem Child gebraucht werden | >30% der Root-States sind Dialog-/Modal-spezifisch |
+| 8 | **Missing Architecture Before Code** | ADRs, typed Interfaces, Module-Contracts vorhanden? | Substanzielle Features ohne Design-Dokument |
+| 9 | **Flat Keymap** | Shortcut-/Command-Registry: context-aware oder flat? Key-Konflikte? | Gleicher Key, verschiedene Bedeutung je nach Modus |
+
+**Output:** Tabelle mit Pattern, Gefunden (ja/nein/teilweise), Severity, Trend (besser/gleich/schlechter seit letztem Audit).
+
+**Wichtig:** Nicht alle Patterns sind immer schlecht. Kontext beachten:
+- God Object als bewusster Router ≠ God Object als Zustandsblob
+- Scope Creep mit Changelog/ADRs ≠ unkontrolliertes Wachstum
+- 17 useState ≠ 40 Fields in einem Struct
+
 ### Phase 3 — Documentation
 
 Check points:
