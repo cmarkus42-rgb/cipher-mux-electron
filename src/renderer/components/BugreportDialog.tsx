@@ -3,16 +3,6 @@ import { useTranslation } from 'react-i18next'
 
 const api = () => (window as any).cipherMux
 
-interface EnrichedBugreport {
-  title: string
-  severity: string
-  tags: string[]
-  steps_to_reproduce: string[]
-  expected_behavior: string
-  actual_behavior: string
-  summary: string
-}
-
 interface BugreportDialogProps {
   visible: boolean
   onClose: () => void
@@ -20,43 +10,12 @@ interface BugreportDialogProps {
 
 export type ReportType = 'bug' | 'feature-request'
 
-/** Format an enriched bugreport as a Markdown document. */
-function formatEnriched(e: EnrichedBugreport): string {
-  const lines: string[] = [
-    `# ${e.title}`,
-    '',
-    `**Severity:** ${e.severity}`,
-  ]
-  if (e.tags.length) lines.push(`**Tags:** ${e.tags.join(', ')}`)
-  lines.push('')
-
-  if (e.summary) {
-    lines.push('## Summary', e.summary, '')
-  }
-  if (e.steps_to_reproduce.length) {
-    lines.push('## Steps to Reproduce')
-    e.steps_to_reproduce.forEach((s, i) => lines.push(`${i + 1}. ${s}`))
-    lines.push('')
-  }
-  if (e.expected_behavior) {
-    lines.push('## Expected Behavior', e.expected_behavior, '')
-  }
-  if (e.actual_behavior) {
-    lines.push('## Actual Behavior', e.actual_behavior)
-  }
-  return lines.join('\n').trim()
-}
-
 export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   const { t } = useTranslation()
   const [reportType, setReportType] = useState<ReportType>('bug')
   const [description, setDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [processing, setProcessing] = useState(false)
-  const [enriched, setEnriched] = useState<EnrichedBugreport | null>(null)
-  const [enrichFailed, setEnrichFailed] = useState(false)
-  const [preview, setPreview] = useState('')
-  const [result, setResult] = useState<string | null>(null)
+  const [result, setResult] = useState<{ id: string; issueUrl?: string } | null>(null)
   const [screenshots, setScreenshots] = useState<string[]>([])
 
   // Notify main process when dialog opens/closes (for STT routing)
@@ -84,52 +43,26 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
   const resetForm = useCallback(() => {
     setReportType('bug')
     setDescription('')
-    setEnriched(null)
-    setPreview('')
-    setEnrichFailed(false)
     setScreenshots([])
   }, [])
 
-  const handleProcess = useCallback(async () => {
-    if (!description.trim()) return
-    setProcessing(true)
-    setEnrichFailed(false)
-    setEnriched(null)
-    try {
-      const res = await api().bugreport.process(description)
-      if (res.ok && res.result) {
-        setEnriched(res.result)
-        setPreview(formatEnriched(res.result))
-      } else {
-        setEnrichFailed(true)
-      }
-    } catch (err) {
-      console.error('[BugreportDialog] process failed:', err)
-      setEnrichFailed(true)
-    } finally {
-      setProcessing(false)
-    }
-  }, [description])
-
   const handleSubmit = useCallback(async () => {
-    const finalDescription = enriched ? preview : description
-    if (!finalDescription.trim()) return
+    if (!description.trim()) return
     setSubmitting(true)
     try {
       const res = await api().bugreport.submit(
-        finalDescription, undefined,
+        description, undefined,
         screenshots.length > 0 ? screenshots : undefined,
         reportType,
-        enriched ?? undefined,
       )
-      setResult(res.id)
+      setResult({ id: res.id, issueUrl: res.issueUrl })
       resetForm()
     } catch (err) {
       console.error('[BugreportDialog] submit failed:', err)
     } finally {
       setSubmitting(false)
     }
-  }, [description, enriched, preview, screenshots, resetForm, reportType])
+  }, [description, screenshots, resetForm, reportType])
 
   const handleClose = useCallback(() => {
     setResult(null)
@@ -159,7 +92,15 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
         <div class="bugreport-body">
           {result ? (
             <>
-              <p class="bugreport-body__text">{t('bugreport.resultText', { id: result })}</p>
+              <p class="bugreport-body__text">{t('bugreport.resultText', { id: result.id })}</p>
+              {result.issueUrl && (
+                <p class="bugreport-body__text">
+                  <a href="#" onClick={(e) => { e.preventDefault(); api()?.openExternal?.(result.issueUrl) }}
+                    style={{ color: 'var(--color-accent)', textDecoration: 'underline', cursor: 'pointer' }}>
+                    GitHub Issue öffnen
+                  </a>
+                </p>
+              )}
               <div class="bugreport-footer">
                 <button class="btn btn--sm btn--primary" onClick={handleClose}>OK</button>
               </div>
@@ -183,19 +124,12 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
 
               <textarea
                 class="bugreport-textarea"
-                rows={3}
+                rows={5}
                 value={description}
-                onInput={(e) => {
-                  setDescription((e.target as HTMLTextAreaElement).value)
-                  if (enriched) {
-                    setEnriched(null)
-                    setPreview('')
-                    setEnrichFailed(false)
-                  }
-                }}
+                onInput={(e) => setDescription((e.target as HTMLTextAreaElement).value)}
                 placeholder={reportType === 'bug' ? t('bugreport.placeholder') : t('bugreport.placeholderFeature')}
                 autoFocus
-                style={{ resize: 'vertical', minHeight: '60px' }}
+                style={{ resize: 'vertical', minHeight: '80px' }}
               />
 
               <div class="bugreport-actions">
@@ -215,24 +149,10 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
                 </div>
               )}
 
-              {enrichFailed && <p class="bugreport-body__notice">{t('bugreport.enrichFailed')}</p>}
-              {enriched && (
-                <>
-                  <p class="bugreport-body__label">{t('bugreport.previewLabel')}</p>
-                  <textarea class="bugreport-textarea bugreport-textarea--preview" rows={10} value={preview}
-                    onInput={(e) => setPreview((e.target as HTMLTextAreaElement).value)} />
-                </>
-              )}
-
               <div class="bugreport-footer">
                 <button class="btn btn--sm" onClick={handleClose}>{t('bugreport.cancel')}</button>
-                {!enriched && (
-                  <button class="btn btn--sm" onClick={handleProcess} disabled={processing || !description.trim()}>
-                    {processing ? t('bugreport.processing') : t('bugreport.preview')}
-                  </button>
-                )}
                 <button class="btn btn--sm btn--primary" onClick={handleSubmit}
-                  disabled={submitting || (!description.trim() && !preview.trim())}>
+                  disabled={submitting || !description.trim()}>
                   {submitting ? t('bugreport.sending') : t('bugreport.submit')}
                 </button>
               </div>
