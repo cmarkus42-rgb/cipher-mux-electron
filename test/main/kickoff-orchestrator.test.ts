@@ -4,7 +4,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import { EventEmitter } from 'events'
-import { KickoffOrchestrator } from '../../src/main/project/kickoff-orchestrator'
+import { KickoffWorkshop as KickoffOrchestrator } from '../../src/main/project/kickoff-orchestrator'
 import { AdapterRegistry } from '../../src/main/agent/registry'
 import type { SessionInfo, StartSessionOpts } from '../../src/shared/types'
 

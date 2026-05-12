@@ -474,7 +474,7 @@ export class VoiceManager extends EventEmitter {
     return new Promise((resolve, reject) => {
       const os = require('os')
       const fs = require('fs')
-      const tmpFile = path.join(os.tmpdir(), `cipher-mux-tts-${Date.now()}.wav`)
+      const tmpFile = path.join(os.tmpdir(), `cipher-mux-tts-${require('crypto').randomUUID()}.wav`)
       fs.writeFileSync(tmpFile, wavBuffer)
       const { execFile } = require('child_process')
       this.afplayProcess = execFile('afplay', [tmpFile], (err: Error | null) => {

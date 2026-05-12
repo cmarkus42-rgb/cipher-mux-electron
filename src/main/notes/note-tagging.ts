@@ -2,6 +2,7 @@ import * as http from 'node:http'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { TagRepository, TagEntry } from '../../shared/types'
+import type { TagClassRepo } from './tag-repository'
 
 const TIMEOUT_MS = 60_000
 
@@ -189,11 +190,21 @@ function ollamaPost(body: string): Promise<string> {
 export class NoteTagging {
   private notesDir: string
   private repo: TagRepository
+  private tagClassRepo: TagClassRepo | null = null
 
   constructor(notesDir: string) {
     this.notesDir = notesDir
     this.repo = { tags: {} }
     this.loadRepository()
+  }
+
+  /**
+   * Wire up the single-writer. Call this after both NoteTagging and TagClassRepo
+   * are constructed with the same notesDir. Once set, all .tags.json writes are
+   * routed through TagClassRepo.saveWithTags() so there is only one writer.
+   */
+  setTagClassRepo(repo: TagClassRepo): void {
+    this.tagClassRepo = repo
   }
 
   private get tagsFilePath(): string {
@@ -224,6 +235,12 @@ export class NoteTagging {
   }
 
   private saveRepository(): void {
+    if (this.tagClassRepo) {
+      // Single-writer path: TagClassRepo owns the file, merges all fields in one write
+      this.tagClassRepo.saveWithTags(this.repo.tags as Record<string, unknown>, TAG_CLASSES)
+      return
+    }
+    // Fallback (no TagClassRepo wired — standalone/test usage): write directly
     try {
       fs.mkdirSync(this.notesDir, { recursive: true })
       // Merge with existing file to avoid clobbering TagClassRepo's 'classes'/'synonyms' fields
@@ -357,6 +374,14 @@ export class NoteTagging {
 
   /** Write synonym entries into .tags.json (shared with TagClassRepo). */
   private registerSynonyms(sources: string[], target: string): void {
+    if (this.tagClassRepo) {
+      // Single-writer path: use TagClassRepo's synonym API — one write per source
+      for (const src of sources) {
+        this.tagClassRepo.addSynonym(src, target)
+      }
+      return
+    }
+    // Fallback (no TagClassRepo wired — standalone/test usage): write directly
     try {
       let existing: Record<string, unknown> = {}
       try {

@@ -80,15 +80,36 @@ export class TagClassRepo {
   }
 
   private save(): void {
+    this.saveWithTags(undefined, undefined)
+  }
+
+  /**
+   * Single-writer entry point for all .tags.json writes.
+   * NoteTagging delegates here so both sets of fields are written atomically
+   * in one read-merge-write cycle, eliminating the last-writer-wins race.
+   *
+   * @param tags       The `tags` map from NoteTagging (pass undefined to preserve existing)
+   * @param tagClasses The `_tagClasses` constant from NoteTagging (pass undefined to preserve existing)
+   */
+  saveWithTags(
+    tags: Record<string, unknown> | undefined,
+    tagClasses: Record<string, unknown> | undefined,
+  ): void {
     try {
       const dir = path.dirname(this.filePath)
       fs.mkdirSync(dir, { recursive: true })
-      // Merge with existing file to avoid clobbering NoteTagging's 'tags' field
+      // Read existing file once — single read-merge-write cycle
       let existing: Record<string, unknown> = {}
       try {
         existing = JSON.parse(fs.readFileSync(this.filePath, 'utf-8'))
       } catch { /* file missing or invalid — start fresh */ }
-      const merged = { ...existing, classes: this.data.classes, synonyms: this.data.synonyms }
+      const merged: Record<string, unknown> = {
+        ...existing,
+        classes: this.data.classes,
+        synonyms: this.data.synonyms,
+      }
+      if (tags !== undefined) merged.tags = tags
+      if (tagClasses !== undefined) merged._tagClasses = tagClasses
       fs.writeFileSync(this.filePath, JSON.stringify(merged, null, 2), 'utf-8')
     } catch {
       // Non-fatal

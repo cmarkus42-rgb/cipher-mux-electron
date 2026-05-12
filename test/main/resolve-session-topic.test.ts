@@ -52,9 +52,9 @@ describe('resolveSessionTopic', () => {
   })
 
   it('uses separator dot for entity fallback without task', () => {
-    const session = { ...baseSession, entityId: 'orchestrator' }
+    const session = { ...baseSession, entityId: 'workshop' }
     const result = resolveSessionTopic(session, [], undefined)
-    assert.equal(result, 'Orchestrator · my-project')
+    assert.equal(result, 'Workshop · my-project')
   })
 })
 

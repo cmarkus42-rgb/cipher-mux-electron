@@ -142,7 +142,7 @@ Communication between main and renderer flows through typed IPC channels defined
 | **UnifiedSessionDialog** | `components/` | Unified dialog for session creation, replacing older scattered launch flows |
 | **WorkspacesWindow** | `components/` | Standalone editor window for personas and workspaces (960x720, separate BrowserWindow) |
 | **WorkspacePopup** | `components/` | Quick-access popup above statusbar for loading workspaces |
-| **Hooks** | `hooks/` | `useTerminal`, `useSessions`, `useMessages`, `useGrid`, `useContextUsage`, `useTheme`, `useShortcuts`, `useInputRequests`, `useProjects`, `useVoiceSession`, `useEntityPresets`, `useScrollHandler`, `useGlobalTtsPlayback` - all wrap IPC calls |
+| **Hooks** | `hooks/` | `useTerminal`, `useSessions`, `useMessages`, `useGrid`, `useContextUsage`, `useTheme`, `useShortcuts`, `useProjects`, `useVoiceSession`, `useEntityPresets`, `useScrollHandler`, `useGlobalTtsPlayback` - all wrap IPC calls |
 
 ### Shared (`src/shared/`)
 
