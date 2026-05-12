@@ -266,15 +266,15 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
     fitAddonRef.current = fitAddon
     registerTerminal(sessionId, term)
 
-    // Listen for theme-editor live preview: CSS variable changes on body
+    // Listen for theme-editor live preview (style changes) and theme switch (data-theme).
+    // IMPORTANT: MutationObserver.observe() replaces previous observations on the same
+    // target, so both filters must be in a single observe() call.
     const themeObserver = new MutationObserver(() => {
       if (term) {
         term.options.theme = getCssTerminalTheme()
       }
     })
-    themeObserver.observe(document.body, { attributes: true, attributeFilter: ['style'] })
-    // Also listen for data-theme attribute changes (theme switch)
-    themeObserver.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] })
+    themeObserver.observe(document.body, { attributes: true, attributeFilter: ['style', 'data-theme'] })
 
     // Listen for terminal font size changes from a11y settings
     const onTermFontSize = ((e: CustomEvent<number>) => {

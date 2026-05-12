@@ -108,12 +108,22 @@ export class IpcHub {
     // Migrate orchestrator → workshop directory
     const oldDir = path.join(os.homedir(), '.config/cipher-mux/entities/orchestrator')
     const newDir = path.join(os.homedir(), '.config/cipher-mux/entities/workshop')
-    if (fs.existsSync(oldDir) && !fs.existsSync(newDir)) {
-      try {
-        fs.renameSync(oldDir, newDir)
-        console.log('[IpcHub] Migrated orchestrator → workshop entity directory')
-      } catch (err) {
-        console.error('[IpcHub] Failed to migrate orchestrator directory:', err)
+    if (fs.existsSync(oldDir)) {
+      if (!fs.existsSync(newDir)) {
+        try {
+          fs.renameSync(oldDir, newDir)
+          console.log('[IpcHub] Migrated orchestrator → workshop entity directory')
+        } catch (err) {
+          console.error('[IpcHub] Failed to migrate orchestrator directory:', err)
+        }
+      } else {
+        // Workshop already exists — remove stale orchestrator remnant
+        try {
+          fs.rmSync(oldDir, { recursive: true, force: true })
+          console.log('[IpcHub] Removed stale orchestrator entity directory (workshop already exists)')
+        } catch (err) {
+          console.error('[IpcHub] Failed to remove stale orchestrator directory:', err)
+        }
       }
     }
     // Migrate config key
