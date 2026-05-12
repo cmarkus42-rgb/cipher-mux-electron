@@ -31,7 +31,7 @@ describe('BugreportManager', () => {
 
   it('submit writes projectPath into frontmatter', async () => {
     const projectPath = '/test/project'
-    const id = await mgr.submit('test bug', [], 'test-project', projectPath)
+    const { id } = await mgr.submit('test bug', [], 'test-project', projectPath)
     const file = fs.readFileSync(path.join(outboxDir, `${id}.md`), 'utf-8')
     assert.ok(file.includes(`projectPath: ${projectPath}`))
   })
@@ -49,7 +49,7 @@ describe('BugreportManager', () => {
 
   it('submit works without messageBus (graceful)', async () => {
     const mgrNoBus = new BugreportManager({ outboxDir })
-    const id = await mgrNoBus.submit('test bug', [])
+    const { id } = await mgrNoBus.submit('test bug', [])
     assert.ok(id.startsWith('BUG-'))
   })
 })

@@ -89,9 +89,9 @@ describe('ClaudeCodeAdapter', () => {
     assert.ok(markers.includes('.claude'))
   })
 
-  it('buildOrchestratorPromptFragment returns non-empty for de and en', () => {
-    const de = adapter.buildOrchestratorPromptFragment('de')
-    const en = adapter.buildOrchestratorPromptFragment('en')
+  it('buildWorkshopPromptFragment returns non-empty for de and en', () => {
+    const de = adapter.buildWorkshopPromptFragment('de')
+    const en = adapter.buildWorkshopPromptFragment('en')
     assert.ok(de.length > 0)
     assert.ok(en.length > 0)
     assert.ok(de.includes('claude'))
@@ -154,8 +154,8 @@ describe('ReferenceStubAdapter', () => {
   })
 
   it('prompt fragments return empty strings', () => {
-    assert.equal(stub.buildOrchestratorPromptFragment('de'), '')
-    assert.equal(stub.buildOrchestratorPromptFragment('en'), '')
+    assert.equal(stub.buildWorkshopPromptFragment('de'), '')
+    assert.equal(stub.buildWorkshopPromptFragment('en'), '')
     assert.equal(stub.buildLauncherPromptFragment('de'), '')
     assert.equal(stub.buildLauncherPromptFragment('en'), '')
   })

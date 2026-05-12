@@ -28,7 +28,7 @@ export interface ParsedVoiceName {
 export function parseVoiceName(name: string): ParsedVoiceName | null {
   // Format: <locale>-<dataset>-<quality>
   // locale is xx_XX, quality is the last segment, dataset is everything in between
-  const match = name.match(/^([a-z]{2}_[A-Z]{2})-(.+)-(low|medium|high|x_low|x_high)$/)
+  const match = name.match(/^([a-z]{2}_[A-Z]{2})-([a-zA-Z0-9_]+)-(low|medium|high|x_low|x_high)$/)
   if (!match) return null
 
   const [, locale, dataset, quality] = match

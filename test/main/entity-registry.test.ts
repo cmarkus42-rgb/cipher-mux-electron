@@ -98,8 +98,8 @@ describe('registerBuiltinEntities()', () => {
     const ids = entities.map((e: any) => e.id).sort()
     assert.deepStrictEqual(ids, [
       'audit', 'companion', 'cyber-factory', 'debugger',
-      'ideation-partner', 'launcher', 'orchestrator',
-      'refinement', 'testing-assistant', 'voice-relay',
+      'ideation-partner', 'launcher', 'refinement',
+      'testing-assistant', 'voice-relay', 'workshop',
     ])
   })
 
@@ -122,11 +122,11 @@ describe('registerBuiltinEntities()', () => {
     assert.strictEqual(refinement?.color, '#ef5350')
   })
 
-  it('orchestrator gets correct projectPath from entitiesBase', () => {
+  it('workshop gets correct projectPath from entitiesBase', () => {
     const registry = new EntityRegistry()
     registerBuiltinEntities(registry)
-    const orch = registry.get('orchestrator')
-    assert.ok(orch?.projectPath.endsWith('/entities/orchestrator'))
+    const workshop = registry.get('workshop')
+    assert.ok(workshop?.projectPath.endsWith('/entities/workshop'))
     const cf = registry.get('cyber-factory')
     assert.ok(cf?.projectPath.endsWith('/entities/cyber-factory'))
   })

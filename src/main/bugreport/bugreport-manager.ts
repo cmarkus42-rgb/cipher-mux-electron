@@ -6,7 +6,6 @@ import { ulid } from 'ulidx'
 import type { BugreportData, SessionInfo } from '../../shared/types'
 import { APP_VERSION } from '../../shared/constants'
 import { runCommand } from '../util/exec-util'
-import { parseEnrichedOutput, type EnrichedBugreport } from './ollama-client'
 import { deliverToGitHub } from './github-delivery'
 import type { MessageBus } from '../message-bus/message-bus'
 import { BRAND } from '../../shared/brand'
@@ -82,8 +81,7 @@ export class BugreportManager {
     projectPath?: string,
     screenshots?: string[],
     reportType?: string,
-    enriched?: EnrichedBugreport | null,
-  ): Promise<string> {
+  ): Promise<{ id: string; issueUrl?: string }> {
     ensureDirs(this.outboxDir)
     const diagnostics = await this.collectDiagnostics(sessions)
     const now = new Date()
@@ -115,6 +113,20 @@ export class BugreportManager {
       ? `\n## Screenshots\n\n${copiedScreenshots.map((f) => `![${f}](${id}-screenshots/${f})`).join('\n')}\n`
       : ''
 
+    // GitHub delivery first — result determines frontmatter content
+    const issueBody = `${description}\n\n---\n*Filed via cipher-mux bugreport (${id})*`
+    let issueUrl: string | undefined
+    try {
+      const ghResult = await deliverToGitHub(id, issueBody)
+      issueUrl = ghResult.issueUrl
+    } catch (err) {
+      console.error('[BugreportManager] GitHub delivery failed:', err)
+    }
+
+    const githubFrontmatterLine = issueUrl
+      ? `githubIssue: ${issueUrl}`
+      : `deliveryStatus: failed`
+
     const content = `---
 id: ${id}
 type: ${type}
@@ -122,6 +134,7 @@ status: open
 project: ${project ?? 'cipher-mux-electron'}
 projectPath: ${resolvedProjectPath}
 created: ${now.toISOString()}
+${githubFrontmatterLine}
 ---
 
 ## Beschreibung
@@ -162,78 +175,6 @@ ${diagnostics.logs.slice(-50).join('\n')}
       }
     }
 
-    // GitHub delivery — fire-and-forget, local outbox is the source of truth
-    if (type === 'bug') {
-      const issueTitle = enriched?.title ?? id
-      const issueBody = enriched
-        ? `## Summary\n\n${enriched.summary}\n\n## Steps to Reproduce\n\n${enriched.steps_to_reproduce.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n## Expected Behavior\n\n${enriched.expected_behavior}\n\n## Actual Behavior\n\n${enriched.actual_behavior}\n\n---\n*Filed via cipher-mux bugreport (${id})*`
-        : `${description}\n\n---\n*Filed via cipher-mux bugreport (${id})*`
-      deliverToGitHub(issueTitle, issueBody, enriched?.severity, enriched?.tags).then((result) => {
-        if (result.issueUrl) {
-          // Write issue URL back into the local outbox file
-          try {
-            const filePath = path.join(this.outboxDir, filename)
-            const existing = fs.readFileSync(filePath, 'utf-8')
-            fs.writeFileSync(filePath, existing.replace(/^---$/m, `githubIssue: ${result.issueUrl}\n---`), 'utf-8')
-          } catch { /* non-critical */ }
-        }
-      }).catch((err) => {
-        console.error('[BugreportManager] GitHub delivery failed:', err)
-      })
-    }
-
-    return id
-  }
-
-  async processBugreport(
-    description: string,
-    sessionManager: any,
-  ): Promise<EnrichedBugreport | null> {
-    const TIMEOUT_MS = 120_000
-    const POLL_INTERVAL_MS = 3_000
-    const MARKER_START = '```yaml'
-    const MARKER_END = '```'
-
-    const session = await sessionManager.startEntity('bugreport')
-    const tmuxSession = session.tmuxSession
-
-    try {
-      // Wait for Claude to be ready
-      await new Promise(resolve => setTimeout(resolve, 10_000))
-
-      // Send the description as prompt
-      const escaped = description.replace(/'/g, "'\\''")
-      await runCommand('tmux', [
-        'send-keys', '-t', tmuxSession,
-        `Verarbeite diesen Bugreport und gib das Ergebnis als YAML-Block aus:\n\n${escaped}`,
-        'Enter',
-      ], { timeout: 5000 })
-
-      // Poll for structured output
-      const startTime = Date.now()
-      while (Date.now() - startTime < TIMEOUT_MS) {
-        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
-        try {
-          const capture = await runCommand('tmux', [
-            'capture-pane', '-t', tmuxSession, '-p',
-          ], { timeout: 5000 })
-          const yamlStart = capture.lastIndexOf(MARKER_START)
-          if (yamlStart !== -1) {
-            const afterStart = capture.slice(yamlStart + MARKER_START.length)
-            const yamlEnd = afterStart.indexOf(MARKER_END)
-            if (yamlEnd !== -1) {
-              const yamlText = afterStart.slice(0, yamlEnd).trim()
-              const result = parseEnrichedOutput(yamlText)
-              if (result) return result
-            }
-          }
-        } catch { /* capture failed, retry */ }
-      }
-      return null
-    } finally {
-      try {
-        await sessionManager.stop(session.id)
-      } catch { /* session may already be gone */ }
-    }
+    return { id, issueUrl }
   }
 }

@@ -160,6 +160,8 @@ export class IpcHub {
     this.noteTagging = new NoteTagging(notesDir)
     this.noteSearchIndex = new NoteSearchIndex()
     this.tagClassRepo = new TagClassRepo(notesDir)
+    // Single-writer wiring: all .tags.json writes go through TagClassRepo
+    this.noteTagging.setTagClassRepo(this.tagClassRepo)
     this.tagIndex = new TagIndex(notesDir, this.tagClassRepo)
     this.tagIndex.rebuild()
     this.noteWatcher = new NoteWatcher(notesDir, (noteId) => {
@@ -1121,25 +1123,13 @@ export class IpcHub {
       return this.bugreportManager.collectDiagnostics(this.sessionManager.list())
     })
 
-    ipcMain.handle(IPC.BUGREPORT_SUBMIT, async (_e, { description, project, screenshots, reportType, enriched }: {
+    ipcMain.handle(IPC.BUGREPORT_SUBMIT, async (_e, { description, project, screenshots, reportType }: {
       description: string
       project?: string
       screenshots?: string[]
       reportType?: string
-      enriched?: import('./bugreport/ollama-client').EnrichedBugreport
     }) => {
-      const id = await this.bugreportManager.submit(description, this.sessionManager.list(), project, undefined, screenshots, reportType, enriched)
-      return { id }
-    })
-
-    ipcMain.handle(IPC.BUGREPORT_PROCESS, async (_e, { description }: { description: string }) => {
-      try {
-        const result = await this.bugreportManager.processBugreport(description, this.sessionManager)
-        return { ok: true, result }
-      } catch (err: any) {
-        console.error('[IpcHub] bugreport process failed:', err)
-        return { ok: false, error: err.message }
-      }
+      return this.bugreportManager.submit(description, this.sessionManager.list(), project, undefined, screenshots, reportType)
     })
 
     ipcMain.handle(IPC.BUGREPORT_PICK_SCREENSHOT, async () => {
