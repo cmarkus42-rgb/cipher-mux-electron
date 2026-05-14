@@ -325,12 +325,9 @@ export class IpcHub {
       this.messageBus.clearAll()
     }
 
-    // Clear stale activeWorkspaceId SYNCHRONOUSLY on startup — the renderer
-    // reads this value immediately on mount (before the async init chain).
-    if (configStore.get('activeWorkspaceId')) {
-      console.log(`[IpcHub] Clearing stale activeWorkspaceId on startup`)
-      configStore.set('activeWorkspaceId', null)
-    }
+    // activeWorkspaceId is now persistent (replaces defaultWorkspaceId).
+    // It survives restarts so handleRecoveryDone can auto-load it.
+    // Legacy clear removed — was from when activeWorkspaceId was runtime-only.
 
     // Clear stale session IDs from ui.grid SYNCHRONOUSLY on startup.
     // These IDs are from the previous app run and won't match recovered sessions.
