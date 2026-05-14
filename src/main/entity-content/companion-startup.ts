@@ -21,64 +21,6 @@ Du fuehrst einen neuen User durch cipher-mux. Folge den Phasen der Reihe nach, a
 
 **WICHTIG:** Lies deine eigene CLAUDE.md fuer Name und Rolle. Hardcode NICHTS.
 
-## Phase 0: Bootsequenz (~6 Sekunden)
-
-Die gesamte visuelle Sequenz laeuft als EIN \`mux_ui_choreography\`-Call. Starte KEINEN neuen TTS waehrend die Choreography laeuft — der Opening-TTS darf natuerlich noch ausschwingen.
-
-**Schritt A — Opening-TTS + Choreography parallel starten:**
-1. \`mux_tts_speak\`: "Sekunde — ich fahr alles hoch."
-2. Sofort (parallel) die Choreography starten — der TTS-Satz laeuft noch ~2.5s weiter waehrend die ersten visuellen Beats beginnen. Das ist gewollt: Voice als Setup, Visual liefert.
-
-**Schritt B — Choreography starten:**
-
-\`\`\`json
-mux_ui_choreography({
-  "timeline": [
-    { "at": 400,  "action": "grid_resize", "cols": 1, "rows": 1 },
-    { "at": 600,  "action": "grid_resize", "cols": 3, "rows": 1 },
-    { "at": 900,  "action": "grid_resize", "cols": 1, "rows": 2 },
-    { "at": 1700, "action": "grid_resize", "cols": 2, "rows": 2 },
-
-    { "at": 1900, "action": "theme", "value": "matrix" },
-    { "at": 2000, "action": "theme", "value": "synthwave" },
-    { "at": 2160, "action": "theme", "value": "blueprint" },
-    { "at": 2400, "action": "theme", "value": "gruvbox-dark" },
-    { "at": 2720, "action": "theme", "value": "nord" },
-    { "at": 3120, "action": "theme", "value": "warm-paper" },
-    { "at": 3620, "action": "theme", "value": "cipher-dark" },
-
-    { "at": 3620, "action": "highlight", "target": "sb-voice",      "duration": 400, "style": "glow" },
-    { "at": 3900, "action": "highlight", "target": "sb-grid",       "duration": 400, "style": "glow" },
-    { "at": 4120, "action": "highlight", "target": "sb-workspaces", "duration": 400, "style": "glow" },
-    { "at": 4285, "action": "highlight", "target": "sb-sidebar",    "duration": 400, "style": "glow" },
-    { "at": 4400, "action": "highlight", "target": "sb-theme",      "duration": 400, "style": "glow" },
-    { "at": 4470, "action": "highlight", "target": "sb-info",       "duration": 400, "style": "glow" },
-
-    { "at": 4470, "action": "sidebar", "visible": true },
-
-    { "at": 4770, "action": "highlight", "target": "side-messages",   "duration": 500, "style": "glow" },
-    { "at": 4770, "action": "highlight", "target": "side-background", "duration": 500, "style": "glow" },
-    { "at": 4770, "action": "highlight", "target": "side-notes",      "duration": 500, "style": "glow" },
-    { "at": 4770, "action": "highlight", "target": "side-requests",   "duration": 500, "style": "glow" },
-    { "at": 4770, "action": "highlight", "target": "side-memory",     "duration": 500, "style": "glow" },
-
-    { "at": 5270, "action": "highlight", "target": "cell-0-0", "duration": 5000, "style": "outline" }
-  ]
-})
-\`\`\`
-
-**Schritt C — Closing-TTS (nach ~5.5s Pause):**
-Warte bis die Choreography den cell-0-0-Anker erreicht hat (~5.5s nach Start), dann:
-\`mux_tts_speak\`: "Steht. Bus laeuft."
-
-Danach sofort weiter zu Phase 1 — cell-0-0 outline laeuft im Hintergrund noch ~3.5s weiter.
-
-**REGELN fuer Phase 0:**
-- Die gesamte Sequenz ist EIN \`mux_ui_choreography\`-Call. Keine einzelnen highlight/theme-Calls.
-- TTS-Calls NIEMALS ueberlappen. Immer: TTS fertig → Pause → naechster TTS.
-- Zwischen den Theme-Wechseln KEINEN Text-Output schreiben — das verlangsamt.
-- Zwischen den visuellen Beats NICHT auf User-Antwort warten.
-
 ## Phase 1: Vorstellung (~8 Sekunden)
 
 Drei Beats: Identitaet, Funktion, Uebergabe. Keine Fragen — die kommen in Phase 2.
