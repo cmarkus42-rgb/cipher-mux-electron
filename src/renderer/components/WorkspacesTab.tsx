@@ -36,7 +36,6 @@ export function WorkspacesTab() {
   const [activeWsId, setActiveWsId] = useState('')
   const [selectedCell, setSelectedCell] = useState(0)
   const [dirty, setDirty] = useState(false)
-  const [knownProjects, setKnownProjects] = useState<Array<{ path: string; name: string }>>([])
   const [activeWsForDefault, setActiveWsForDefault] = useState<string | null>(null)
   const entityPresets = useEntityPresets()
   const [allTags, setAllTags] = useState<string[]>([])
@@ -51,14 +50,6 @@ export function WorkspacesTab() {
     if (wsList.length > 0 && !activeWsId) {
       setActiveWsId(wsList[0].id)
     }
-    // Load known projects for the project picker — try cache first, scan if empty
-    try {
-      let projects = await api.projects.list()
-      if (!projects || projects.length === 0) {
-        projects = await api.projects.scan()
-      }
-      setKnownProjects(projects ?? [])
-    } catch { /* ignore */ }
     // Load default workspace id
     try {
       const defId = await api.config.get('activeWorkspaceId')

@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import type { RecoveryResult, EntityId } from '../shared/types'
 import { useSessions } from './hooks/useSessions'
 import { useContextUsage } from './hooks/useContextUsage'
-import { useProjects } from './hooks/useProjects'
 import { useGrid } from './hooks/useGrid'
 import { useTheme } from './hooks/useTheme'
 import { useShortcuts } from './hooks/useShortcuts'
@@ -61,7 +60,6 @@ export function App() {
 
   const { sessions, startSession, stopSession, refresh: refreshSessions } = useSessions()
   const contextUsages = useContextUsage()
-  const { rescan } = useProjects()
   const panelWidthRef = useRef(0)
   // Track entityIds being started by handleStartEntity to prevent race with onStarted events.
   // Uses entityId (known BEFORE the await) instead of sessionId (known only AFTER) — this
@@ -485,7 +483,6 @@ export function App() {
       if (data?.status === 'complete' && data.event?.followupSessionId) {
         addSession(data.event.followupSessionId)
         setFocusedSessionId(data.event.followupSessionId)
-        rescan().catch(() => {})
       } else if (data?.status === 'timeout') {
         console.warn('[App] Kickoff timed out for project:', data.handle?.projectName)
       } else if (data?.status === 'error') {
@@ -493,7 +490,7 @@ export function App() {
       }
     })
     return () => unsub()
-  }, [addSession, rescan])
+  }, [addSession])
 
   useEffect(() => {
     const api = (window as any).cipherMux
