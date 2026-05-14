@@ -10,8 +10,8 @@ import * as path from 'path';
 
 export function deployCompanionStartup(projectPath: string): void {
   const filePath = path.join(projectPath, '.claude', 'commands', 'startup.md');
-  if (fs.existsSync(filePath)) return;
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  // Always overwrite — content is managed by this deployer, not user-editable
   fs.writeFileSync(filePath, CONTENT, 'utf-8');
 }
 
