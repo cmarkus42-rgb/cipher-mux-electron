@@ -248,6 +248,8 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
         merges: {},
         promptOverrides: {},
         ...(saveTags.length > 0 ? { defaultTags: saveTags } : {}),
+        ...(savePrompt.trim() ? { workspacePrompt: savePrompt.trim() } : {}),
+        ...(saveContextPaths.length > 0 ? { contextPaths: saveContextPaths } : {}),
       }
 
       await api.workspaces.save(ws)
@@ -260,7 +262,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     } finally {
       setSaving(false)
     }
-  }, [currentGrid, currentSessions, saveName])
+  }, [currentGrid, currentSessions, saveName, saveTags, savePrompt, saveContextPaths])
 
   if (!visible) return null
 
