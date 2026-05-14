@@ -514,6 +514,12 @@
   "voice.downloadFailed": "Download fehlgeschlagen: {{error}}",
   "voice.deleteFailed": "Loeschen fehlgeschlagen: {{error}}",
   "voice.size": "{{size}} MB",
+  "hub.setupTitle": "Hub einrichten",
+  "hub.setupDescription": "cipher-mux braucht einen Ordner fuer deine Projekte.",
+  "hub.defaultPath": "~/cipher-mux/",
+  "hub.createButton": "Anlegen",
+  "hub.browseButton": "Durchsuchen...",
+
   "voice.keepWorking": "Keep Working",
   "voice.keepWorkingHint": "Beim Beenden alle Sessions speichern und beim naechsten Start mit Resume wieder hochfahren.",
   "voice.keepWorkingLabel": "Keep Working — Sessions bei App-Neustart mit Resume fortsetzen"

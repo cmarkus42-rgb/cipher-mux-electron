@@ -514,6 +514,12 @@
   "voice.downloadFailed": "Download failed: {{error}}",
   "voice.deleteFailed": "Delete failed: {{error}}",
   "voice.size": "{{size}} MB",
+  "hub.setupTitle": "Set up Hub",
+  "hub.setupDescription": "cipher-mux needs a folder for your projects.",
+  "hub.defaultPath": "~/cipher-mux/",
+  "hub.createButton": "Create",
+  "hub.browseButton": "Browse...",
+
   "voice.keepWorking": "Keep Working",
   "voice.keepWorkingHint": "Save all sessions on quit and restore them on next start.",
   "voice.keepWorkingLabel": "Keep Working — Resume sessions on app restart"
