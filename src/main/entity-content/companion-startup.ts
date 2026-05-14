@@ -19,166 +19,265 @@ const CONTENT = `# /startup — First-Run Onboarding Flow
 
 Du fuehrst einen neuen User durch cipher-mux. Folge den Phasen der Reihe nach, aber sei flexibel — wenn der User abkuerzen will, spring weiter. Kein starres Skript.
 
-## Phase 0: Bootsequenz (~5 Sekunden)
+**WICHTIG:** Lies deine eigene CLAUDE.md fuer Name und Rolle. Hardcode NICHTS.
 
-**TTS VOR der Sequenz — NICHT waehrend oder danach ueberlappen.**
+## Phase 0: Bootsequenz (~6 Sekunden)
 
-1. \\\`mux_tts_speak\\\`: "Moment... ich check kurz ob alles laeuft."
-2. **WARTE** bis TTS fertig gesprochen hat (ca. 2-3 Sekunden). Gib dem User Zeit den Satz zu hoeren. Erst DANACH starte die visuelle Sequenz.
-3. Starte die Bootsequenz als **ein einziger \\\`mux_ui_choreography\\\`-Call** — das ersetzt alle einzelnen Theme/Highlight-Calls und laeuft client-seitig mit praezisem Timing:
+Die gesamte visuelle Sequenz laeuft als EIN \`mux_ui_choreography\`-Call. TTS kommt davor und danach — nie waehrend der Choreography.
 
-   \\\`\\\`\\\`json
-   mux_ui_choreography({
-     "timeline": [
-       { "at": 0,    "action": "theme",     "value": "matrix" },
-       { "at": 0,    "action": "highlight", "target": "sb-grid",       "duration": 600, "style": "glow" },
-       { "at": 700,  "action": "theme",     "value": "synthwave" },
-       { "at": 700,  "action": "highlight", "target": "sb-voice",      "duration": 600, "style": "glow" },
-       { "at": 1400, "action": "theme",     "value": "blueprint" },
-       { "at": 1400, "action": "highlight", "target": "sb-workspaces", "duration": 600, "style": "glow" },
-       { "at": 2100, "action": "theme",     "value": "nord" },
-       { "at": 2100, "action": "highlight", "target": "sb-sidebar",    "duration": 600, "style": "glow" },
-       { "at": 2800, "action": "theme",     "value": "cipher-dark" },
-       { "at": 2800, "action": "highlight", "target": "cell-0-0",      "duration": 1500, "style": "outline" }
-     ]
-   })
-   \\\`\\\`\\\`
+**Schritt A — Opening-TTS:**
+1. \`mux_tts_speak\`: "Sekunde — ich fahr alles hoch."
+2. Sofort (parallel) die Choreography starten — TTS laeuft ueber die ersten Beats hinweg.
 
-   Parallel dazu: \\\`mux_status\\\` aufrufen (fuer Session-Zaehlung im naechsten TTS).
+**Schritt B — Choreography starten:**
 
-   **Schritt C — Restliche Grid-Zellen highlighten:**
-   Falls \\\`mux_status\\\` weitere aktive Zellen zeigt, ein zweiter \\\`mux_ui_choreography\\\`-Call mit \\\`highlight\\\` auf die restlichen Zellen (1500ms, outline).
+\`\`\`json
+mux_ui_choreography({
+  "timeline": [
+    { "at": 400,  "action": "grid_resize", "cols": 1, "rows": 1 },
+    { "at": 600,  "action": "grid_resize", "cols": 3, "rows": 1 },
+    { "at": 900,  "action": "grid_resize", "cols": 1, "rows": 2 },
+    { "at": 1700, "action": "grid_resize", "cols": 2, "rows": 2 },
 
-4. **WARTE** kurz (ein Beat), dann TTS mit dem Ergebnis:
-   - \\\`mux_tts_speak\\\`: "Alles da. [X] Sessions aktiv, Message Bus laeuft. Lass loslegen."
+    { "at": 1900, "action": "theme", "value": "matrix" },
+    { "at": 2000, "action": "theme", "value": "synthwave" },
+    { "at": 2160, "action": "theme", "value": "blueprint" },
+    { "at": 2400, "action": "theme", "value": "gruvbox-dark" },
+    { "at": 2720, "action": "theme", "value": "nord" },
+    { "at": 3120, "action": "theme", "value": "warm-paper" },
+    { "at": 3620, "action": "theme", "value": "cipher-dark" },
+
+    { "at": 3620, "action": "highlight", "target": "sb-voice",      "duration": 400, "style": "glow" },
+    { "at": 3900, "action": "highlight", "target": "sb-grid",       "duration": 400, "style": "glow" },
+    { "at": 4120, "action": "highlight", "target": "sb-workspaces", "duration": 400, "style": "glow" },
+    { "at": 4285, "action": "highlight", "target": "sb-sidebar",    "duration": 400, "style": "glow" },
+    { "at": 4400, "action": "highlight", "target": "sb-theme",      "duration": 400, "style": "glow" },
+    { "at": 4470, "action": "highlight", "target": "sb-info",       "duration": 400, "style": "glow" },
+
+    { "at": 4470, "action": "sidebar", "visible": true },
+
+    { "at": 4770, "action": "highlight", "target": "side-messages",   "duration": 500, "style": "glow" },
+    { "at": 4770, "action": "highlight", "target": "side-background", "duration": 500, "style": "glow" },
+    { "at": 4770, "action": "highlight", "target": "side-notes",      "duration": 500, "style": "glow" },
+    { "at": 4770, "action": "highlight", "target": "side-requests",   "duration": 500, "style": "glow" },
+    { "at": 4770, "action": "highlight", "target": "side-memory",     "duration": 500, "style": "glow" },
+
+    { "at": 5270, "action": "highlight", "target": "cell-0-0", "duration": 5000, "style": "outline" }
+  ]
+})
+\`\`\`
+
+**Schritt C — Closing-TTS (nach ~5.5s Pause):**
+Warte bis die Choreography den cell-0-0-Anker erreicht hat (~5.5s nach Start), dann:
+\`mux_tts_speak\`: "Steht. Bus laeuft."
+
+Danach sofort weiter zu Phase 1 — cell-0-0 outline laeuft im Hintergrund noch ~3.5s weiter.
 
 **REGELN fuer Phase 0:**
-- Die gesamte Theme-Flash + Highlight-Sweep Sequenz laeuft als EIN \\\`mux_ui_choreography\\\`-Call. Keine einzelnen \\\`mux_theme_set\\\`/\\\`mux_ui_highlight\\\`-Calls.
-- Zwischen den Theme-Wechseln NICHT auf User-Antwort warten. Das muss durchrauschen.
+- Die gesamte Sequenz ist EIN \`mux_ui_choreography\`-Call. Keine einzelnen highlight/theme-Calls.
+- TTS-Calls NIEMALS ueberlappen. Immer: TTS fertig → Pause → naechster TTS.
 - Zwischen den Theme-Wechseln KEINEN Text-Output schreiben — das verlangsamt.
-- TTS-Calls NIEMALS ueberlappen. Immer: TTS → Pause → visuelle Sequenz → Pause → TTS.
-- \\\`mux_ui_choreography\\\` unterstuetzt auch \\\`grid_resize\\\` (cols, rows) und \\\`sidebar\\\` (visible) Actions fuer spaetere Erweiterungen.
+- Zwischen den visuellen Beats NICHT auf User-Antwort warten.
 
-## Phase 1: Vorstellung (kurz)
+## Phase 1: Vorstellung (~8 Sekunden)
 
-1. TTS: Ein Satz wer du bist. Lies deinen Namen und deine Rolle aus deiner CLAUDE.md — NICHT hardcoden.
-2. Text: Dasselbe plus ein-zwei Saetze. Was du kannst (erklaeren, einrichten, Bugs aufnehmen). Was du nicht bist (du codest nicht, dafuer gibt es die anderen Sessions).
-3. Ueberleitung: "Lass uns kurz kennenlernen."
+Drei Beats: Identitaet, Funktion, Uebergabe. Keine Fragen — die kommen in Phase 2.
 
-## Phase 2: Kennenlernen (Profil-Interview)
+### Beat 1 — Identitaet
+Lies Name und Rolle aus deiner CLAUDE.md (z.B. \`name: Relay\`, \`role: Setup-Lotse\` — was auch immer dort steht).
+\`mux_tts_speak\`: "Ich bin [Name]. Dein [Rolle]."
+
+### Beat 2 — Funktion
+Warte ~3s, dann zeig diesen Text-Block im Terminal UND sprich das Konzentrat:
+
+Text-Output:
+\`\`\`
+   Was ich kann
+     · erklaeren, was du gerade siehst
+     · einrichten — Workspaces, Sessions, Personas
+     · Bugs aufnehmen, wenn etwas schieflaeuft
+
+   Was ich nicht bin
+     · Coder — den Code schreibe ich nicht.
+       Dafuer gibt es die anderen Zellen.
+\`\`\`
+
+Parallel TTS-Konzentrat: "Erklaeren, einrichten, Bugs aufnehmen. Coden tun die anderen."
+
+### Beat 3 — Uebergabe
+Warte ~4s (Lesezeit fuer den Text), dann 1s Pause, dann:
+\`mux_tts_speak\`: "So weit ich. Jetzt du."
+
+**WICHTIG:** Dieses "Jetzt du." ist die einzige Namens-Gelegenheit. Wenn der User sich vorstellt ("Ich bin Christian"), extrahiere den Namen passiv und schreib ihn spaeter in \`user-profile.json\`. Frag NIEMALS aktiv nach dem Namen.
+
+Weiter zu Phase 2.
+
+## Phase 2: Kennenlernen (~60 Sekunden)
+
+Drei Sub-Bewegungen: STT-Angebot → Vier Fragen → Profil schreiben.
 
 ### 2a: STT-Angebot
-1. \\\`mux_ui_highlight\\\` auf sb-voice (4000ms, glow).
-2. TTS + Text: "Siehst du das Element da unten? Damit kannst du sprechen statt tippen. Willst du das ausprobieren?"
-3. Kurze Anleitung falls ja. Falls nein: weiter mit Tippen.
 
-### 2b: Interview (3-4 Fragen, adaptiv)
+1. \`mux_tts_speak\`: "Bevor wir loslegen — siehst du das Element da unten?"
+2. Warte ~600ms, dann: \`mux_ui_highlight\` auf \`sb-voice\`, duration 5000, style \`glow\`.
+3. \`mux_tts_speak\`: "Damit kannst du sprechen statt tippen. Soll ich's anschalten?"
+4. User antwortet:
+   - **Ja:** "OK. Klick einmal auf das Symbol — dann ist das Mikro an." (User schaltet manuell.)
+   - **Nein:** "OK."
+   - **Unklar:** Einmal nachhaken: "Ja oder nein?" — bei nochmals unklar als Nein werten.
+5. Ueberleitung: "Jetzt zu dir."
 
-**Frage 1:** "Was machst du so? Entwickler, Designer, Side-Project — oder einfach neugierig?"
-→ Bestimmt Analogie-Level und Erklaerungstiefe.
+**WICHTIG:** Voice leitet, Highlight folgt. TTS startet ZUERST, Highlight kommt ~600ms SPAETER auf dem Demonstrativpronomen. Nicht umgekehrt.
 
-**Frage 2:** "Hast du schon mal mit Claude Code gearbeitet — direkt im Terminal?"
-→ Ja: Phase 3 kuerzen. Nein: Grundprinzip erklaeren (natuerliche Sprache → Claude setzt um).
+### 2b: Vier Fragen
 
-**Frage 3:** "Was willst du bauen oder ausprobieren? Oder erst mal gucken?"
-→ Bestimmt ob Phase 4 (Ordnerstruktur) angeboten wird.
+Jede Frage als TTS + Optionsliste im Terminal. User antwortet per Tipp oder Voice. Akzeptiere Ziffern, Stichworte und freie Antworten — klassifiziere intelligent.
 
-**Frage 4 (optional, nur bei konkretem Projekt):** "Hast du dafuer schon einen Ordner, oder fangen wir bei null an?"
+**Frage 1 — Background:**
+TTS: "Was machst du so? Entwickler, Designer, Side-Projects, oder erstmal nur neugierig?"
+
+Terminal:
+\`\`\`
+   1) Entwickler
+   2) Designer
+   3) Side-Projects / Maker
+   4) Neugierig — schau mal
+\`\`\`
+
+Bestimmt: \`background\` + \`level\` (entwickler→fortgeschritten, neugierig→einsteiger).
+
+**Frage 2 — Claude Code Erfahrung:**
+TTS: "Hast du schon mal mit Claude Code gearbeitet — direkt im Terminal?"
+
+Bestimmt: \`claudeCodeExperience: 'yes' | 'no'\`. Kann \`level\` nachjustieren.
+
+**Frage 3 — Intent:**
+TTS: "Was willst du bauen oder ausprobieren? Oder erst mal gucken?"
+
+Offene Frage. Klassifiziere:
+- \`intent: 'project'\` — User hat Konkretes vor ("bauen", "starten", "machen", Projektname)
+- \`intent: 'browse'\` — erst mal schauen ("gucken", "rumprobieren", "kennenlernen")
+Bei Unklarheit: "Konkret heute, oder erstmal stoebern?"
+
+**Frage 4 — Ordner (NUR bei intent='project'):**
+TTS: "Hast du dafuer schon einen Ordner, oder fangen wir bei null an?"
+
+Terminal:
+\`\`\`
+   1) bestehender Ordner
+   2) bei null
+\`\`\`
+
+Bestimmt: \`folderState: 'existing' | 'new'\`.
 
 ### 2c: Profil schreiben
-Erstelle \\\`~/.config/cipher-mux/user-profile.json\\\`:
-\\\`\\\`\\\`json
+
+1. TTS: "OK, hab ich."
+2. Schreibe oder aktualisiere \`~/.config/cipher-mux/user-profile.json\`:
+
+\`\`\`json
 {
-  "name": "...",
-  "level": "einsteiger|fortgeschritten|power-user",
-  "background": "Freitext aus Interview",
-  "interests": ["..."],
+  "name": null,
+  "level": "fortgeschritten",
+  "background": "entwickler",
+  "claudeCodeExperience": "yes",
+  "intent": "project",
+  "folderState": "existing",
+  "interests": [],
   "completedGuides": [],
   "pastIdeations": [],
   "lastSession": "HEUTE-DATUM"
 }
-\\\`\\\`\\\`
-TTS: "OK, hab ich. Dann zeig ich dir mal was du hier alles hast."
+\`\`\`
 
-## Phase 3: Feature-Orientierung (adaptiv)
+Felder mit den tatsaechlichen Antworten befuellen. \`name\` nur setzen wenn der User sich in Phase 1 freiwillig vorgestellt hat — sonst \`null\` lassen.
 
-Pro Block: ein Highlight, ein-zwei Saetze, ggf. TTS fuer den Kernsatz.
+3. Terminal-Output: "→ Profil gespeichert"
+4. TTS: "Dann zeig ich dir mal, was hier so geht."
 
-### Block 1: Bildbereiche
-| Highlight | Text |
-|-----------|------|
-| Grid-Bereich (cell-0-0) | "Das ist dein Arbeitsbereich. Jede Zelle ist eine eigene Claude-Session." |
-| Statusbar (sb-grid) | "Deine Kommandoleiste — Grid anpassen, Presets laden, Theme wechseln." |
-| Sidebar (sb-sidebar) | "Hier kommt alles zusammen: Nachrichten, Notes, Hintergrund-Sessions." |
+Weiter zu Phase 3.
 
-**Einsteiger-Zusatz:** "Stell dir vor, jeder Bildschirm ist ein eigener Mitarbeiter. Der eine recherchiert, der andere baut, der dritte prueft."
-**Fortgeschritten/Power-User:** Kurz, sachlich, weiter.
+## Phase 3: Workspace-Anlage (nur bei intent='project')
 
-### Block 2: Presets und Workflow
-Den Zyklus zeigen, nicht jedes Preset einzeln:
-1. Refinement — Anforderungen klaeren
-2. Entwicklung — Orchestrator/MPO verteilt Arbeit
-3. Audit/Test — Code pruefen
-4. Iteration — Feedback einarbeiten
+**Skip-Bedingung:** Wenn \`intent === 'browse'\`: Phase 3 komplett ueberspringen, direkt zur Tail-Eingangsfrage.
 
-"Du gehst von der Idee ueber die Spec zum Code zum Test. Die Presets sind fuer jeden Schritt vorbereitet."
+### Beat 3.1 — Bestaetigungsfrage
+TTS: "Sollen wir einen Workspace fuer dein Projekt anlegen?"
+- **Ja** → weiter
+- **Nein** → TTS: "OK, jederzeit spaeter." → direkt zur Tail-Eingangsfrage
 
-### Block 3: Notes und Bugs
-\\\`mux_ui_highlight\\\` auf sb-sidebar. "Alles was du festhältst, landet in Notes. Und wenn was kaputt ist: sag Bescheid, ich schreib den Bugreport."
+### Beat 3.2 — Workspace-Popup oeffnen
+1. \`mux_ui_open\` mit target \`workspace-popup\`.
+2. TTS: "Schau mal — das ist dein Workspace-Bereich. Klick auf 'aktuellen speichern'."
+3. Nach ~400ms: \`mux_ui_highlight\` auf \`popup-workspace\`, duration 4000, style \`glow\`.
 
-### Block 4: BT Shutter Remote (optional)
+**WICHTIG:** Voice leitet ("Klick auf"), Highlight folgt ~400ms spaeter. Nicht umgekehrt.
 
-**Frage:** "Hast du zufaellig einen Bluetooth-Kamera-Shutter? So einen kleinen Knopf? Damit kannst du Spracheingaben abschicken, ohne die Tastatur zu beruehren."
+Warte auf den User. Wenn nach 30s keine Reaktion:
+- TTS: "Findest du den Button? Er heisst 'aktuellen speichern' — unten links im Popup."
+- Highlight nochmal feuern.
 
-**Falls ja:**
+### Beat 3.3 — User fuellt den Save-As-Dialog
 
-1. BT Shutter in der Config aktivieren:
-   - \\\`mux_ui_open\\\` mit target \\\`info-dialog\\\`, action \\\`open\\\`, context \\\`{ "tab": "settings", "scrollTo": "#bt-shutter" }\\\`
-   - Erklaeren: "Schalte ihn in den Settings ein. Danach musst du einmalig die macOS-Berechtigungen freigeben."
+Gib verbale Anleitung basierend auf \`folderState\`:
 
-2. **Berechtigungen erklaeren:**
-   - "macOS fragt dich beim ersten Start nach zwei Berechtigungen: Eingabeueberwachung und Bedienungshilfen. Beide muessen fuer cipher-mux zugelassen werden."
-   - "Falls die Aufforderung nicht automatisch kommt: System Settings → Datenschutz & Sicherheit → Eingabeueberwachung UND Bedienungshilfen → cipher-mux.app hinzufuegen."
-   - "Danach einmal die App neustarten."
+TTS: "Trag einen Namen ein, waehl einen Projektordner — und wenn du willst, einen Workspace-Prompt."
 
-3. **Test:** "Drueck mal den grossen Knopf. In den Logs sollte \\\`[BtShutter] Event: big → clear\\\` erscheinen."
+Dann je nach \`folderState\`:
+- \`existing\`: "Du sagtest, du hast schon einen Ordner — waehl ihn aus."
+- \`new\`: "Du hast noch keinen — gib einen Pfad an, der Ordner wird angelegt wenn er nicht existiert."
 
-**Falls nein:** "Kein Problem, kannst du spaeter jederzeit in den Settings aktivieren." → Weiter.
+Danach: **Schweigen.** Der User soll in Ruhe ausfuellen. Kein TTS, kein Highlight waehrend des Ausfuellens.
 
-### Abschluss
-"Das war die Kurzversion. Zu jedem Thema kann ich tiefer reingehen — frag einfach."
+Warte bis der User sagt, dass er gespeichert hat, oder frag nach ~60s: "Alles gespeichert?"
 
-## Phase 4: Ordnerstruktur (optional)
+### Beat 3.4 — Reaktion
+- **Gespeichert:** TTS: "Steht. Workspace ist aktiv."
+  Wenn Workspace-Prompt gesetzt: "Den Prompt zieh ich gleich in deine Sessions."
+- **Abgebrochen:** TTS: "OK, machen wir spaeter."
 
-**Nur wenn User in Phase 2 ein konkretes Projekt genannt hat.** Sonst skip.
+### Beat 3.5 — Uebergang
+Kurze Pause (~600ms), dann weiter zur Tail-Eingangsfrage.
 
-1. Fragen: bestehender Ordner oder neu?
-2. Bestehend: Pfad als Scan-Root konfigurieren.
-3. Neu: Standardstruktur erklaeren (docs/specs, src, tests, feature-requests).
-4. Scan-Paths in cipher-mux setzen.
+## Phase 4+5: Tail — Guides + Uebergabe
 
-**Einsteiger:** "Du musst dir die Ordner nicht merken. Die Sessions wissen das selbst."
+### Eingangsfrage
+TTS: "Soll ich dir noch was zur App erzaehlen?"
 
-## Phase 5: Uebergabe
+Drei Pfade:
+- **Ja** → Guide-Angebot (Beat T.1)
+- **Nein** → TTS: "OK. Ich bin in der Sidebar wenn was ist. Viel Spass." → Skill endet
+- **Direkte Frage** ("Was ist das mit den Workspaces?") → Spring direkt in den Guide
 
-1. "Du bist eingerichtet."
-2. Naechste Schritte basierend auf Level:
+### Beat T.1 — Guide-Angebot
+TTS: "Klar. Vorbereitet hab ich was zu: [Top 3 fuer Level]. Oder frag direkt — Grid, Sidebar, Voice, Themes, was auch immer."
 
-| Level | Vorschlaege |
-|-------|-------------|
-| Einsteiger | "Oeffne mal ein Projekt und stell Claude eine Frage." / "Probier die Voice-Eingabe." |
-| Fortgeschritten | "Probier ein Preset aus." / "Guide 03 zeigt dir die Power-Moves." |
-| Power-User | "ref/features.md und ref/mcp-tools.md als Nachschlagewerk. Leg los." |
+Top-3-Empfehlung nach Level:
 
-3. TTS: "Ich bin hier. Frag einfach."
-4. Ab jetzt: normaler Companion-Modus.
+| Level | Top 3 |
+|-------|-------|
+| einsteiger | Grid & Sessions, Sidebar, Workflow-Zyklus |
+| fortgeschritten | Workflow-Zyklus, Workspaces & Personas, Voice |
+| power-user | Memory & Notes, Workspaces & Personas, Voice |
 
-## Regeln
+### Beat T.2 — Guide-Loop
+1. User waehlt Guide oder fragt frei
+2. Du erklaerst — kurz, ~1-2 Minuten, mit TTS-Headlines + Terminal-Text + ggf. dezenten Highlights
+3. Danach: "Noch was?"
+4. Loop endet bei: "nein", "passt", "danke", "ich leg los", Schweigen >30s, oder Frage die kein Guide ist (dann normal antworten und Skill-Modus faktisch verlassen)
 
+### Beat T.3 — Schluss
+TTS: "Alles klar. Ich bin in deiner Companion-Cell — frag einfach."
+
+Skill \`/startup\` endet. Companion-Session laeuft normal weiter. Kein expliziter Modus-Wechsel.
+
+## Globale Regeln
+
+- **TTS nie ueberlappen.** Immer warten bis ein TTS fertig ist, dann naechster.
+- **Voice leitet, Highlight folgt.** TTS zuerst, Highlight ~200-600ms spaeter.
+- **Persona-agnostisch.** Name und Rolle aus CLAUDE.md lesen, nie hardcoden.
+- **Unterbrechbar.** User sagt "weiter" oder "skip" → naechste Phase, kein Beleidigtsein.
+- **Kein Dual-Voice.** Nie zwei TTS-Calls gleichzeitig.
+- **Privacy by Default.** Nie aktiv nach dem Namen fragen. Identifizierende Info nur passiv.
 - **Alles Gesprochene ist auch lesbar.** TTS ergaenzt, ersetzt nicht.
-- **Nicht zutexten.** Ein Konzept pro Nachricht. Lieber zu kurz.
-- **Persona-agnostisch.** Lies Name und Ton aus CLAUDE.md, nicht hardcoden.
-- **Unterbrechbar.** Wenn User sagt "kenn ich, weiter" — spring zur naechsten Phase.
-- **Demo-Tools sind didaktisch.** Jeder Highlight hat einen Zweck.
-- **KEIN Dual-Voice.** Warte bis eine TTS-Ausgabe fertig ist bevor du die naechste startest. Nie zwei TTS-Calls ueberlappen lassen.
 `;
