@@ -24,6 +24,8 @@ import { useFocusTrap } from './a11y/useFocusTrap'
 import { getMultiFocusOverlappedSlots, canAddFocusSlot, getCoveredSlots, findNavigationTarget } from '../shared/grid-types'
 import { useSetupWizard } from './hooks/useSetupWizard'
 import { SetupWizard } from './components/SetupWizard'
+import { useHubSetup } from './hooks/useHubSetup'
+import { HubSetupDialog } from './components/HubSetupDialog'
 import { UpdateDialog } from './components/UpdateDialog'
 
 /** Entities with custom start APIs (different from api.entity.start()) */
@@ -45,6 +47,7 @@ const AUTO_REGISTER_ENTITIES: ReadonlyArray<{ id: EntityId; background?: boolean
 
 export function App() {
   const { t } = useTranslation()
+  const hubSetup = useHubSetup()
   const setupWizard = useSetupWizard()
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [sidebarDetached, setSidebarDetached] = useState(false)
@@ -1275,6 +1278,9 @@ export function App() {
   return (
     <div class="app-shell">
       <HighlightOverlay />
+      {hubSetup.needsSetup && !hubSetup.loading && (
+        <HubSetupDialog onComplete={hubSetup.completeSetup} />
+      )}
       {setupWizard.visible && (
         <SetupWizard
           dependencies={setupWizard.dependencies}
