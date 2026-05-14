@@ -2,6 +2,10 @@
 
 Electron-basierte Kommandozentrale für Claude Code Projekte. Ein Fenster mit eingebetteten Terminals (tmux + xterm.js), Message Bus für Inter-Session-Kommunikation, MCP-Server, Orchestrator-Session und komfortablem Projekt-Kick-off.
 
+## Hub
+
+cipher-mux uses a Hub directory as the organizational home for all projects. The Hub path is stored in config (`hubPath`). On first launch, users are prompted to choose or create a Hub directory via `HubSetupDialog`. The Launcher folder picker defaults to `hubPath/projects/`. Hub path resolution is centralized in `src/main/project/hub-paths.ts`.
+
 ## Aktueller Status
 
 **Phase: Komplett — Polish & Erweiterung**
@@ -101,7 +105,7 @@ cipher-mux-electron/
 │   │   ├── message-bus/   ← SQLite CRUD, Schema
 │   │   ├── mcp/           ← Streamable HTTP Server, Tools, Auth
 │   │   ├── session/       ← SessionManager, OrchestratorTemplate, PersonaResolver
-│   │   ├── project/       ← ProjectScanner, KickoffOrchestrator, LauncherPrompt, KickoffWatcher
+│   │   ├── project/       ← HubPaths, KickoffOrchestrator, LauncherPrompt, KickoffWatcher
 │   │   ├── config/        ← ConfigStore (JSON-File Store), GlobalRules
 │   │   ├── monitoring/    ← StatusLineMonitor, StatusLineHook
 │   │   ├── bugreport/     ← BugreportManager, BugreportResolve, OllamaClient
@@ -149,7 +153,7 @@ cipher-mux-electron/
 ## Referenz-Projekte
 
 - `/Users/Shared/Nextcloud/Claude/ClaudeCode01/cipher-desktop-electron` — Electron-Patterns, Build-Setup, IPC-Bridge
-- `/Users/Shared/Nextcloud/Claude/ClaudeCode01/cipher-mux` — v1 (Node.js HTTP-Server), Module zur Migration: ProjectScanner, ConfigStore, WorkspaceLoader
+- `/Users/Shared/Nextcloud/Claude/ClaudeCode01/cipher-mux` — v1 (Node.js HTTP-Server), Module zur Migration: ConfigStore, WorkspaceLoader
 
 ## Infrastruktur
 
