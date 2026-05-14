@@ -29,6 +29,7 @@ const defaults: AppConfig = {
   workspaces: [...SEED_WORKSPACES] as AppConfig['workspaces'],
   activeWorkspaceId: null,
   defaultWorkspaceId: null,
+  hubPath: '',
   activeCharacterId: DEFAULT_CHARACTER_ID,
   globalActivePersonaId: null,
   characters: [...SEED_CHARACTERS],

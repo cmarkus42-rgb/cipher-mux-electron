@@ -165,6 +165,8 @@ export interface AppConfig {
   activeWorkspaceId: string | null
   /** Workspace ID to auto-load on fresh app start (set via star toggle in WorkspacePopup). */
   defaultWorkspaceId: string | null
+  /** Absolute path to the cipher-mux hub root directory. Empty string = not configured. */
+  hubPath: string
   /** Active companion character ID. */
   activeCharacterId: string
   /** Global persona override — when set, this persona applies to ALL presets. */

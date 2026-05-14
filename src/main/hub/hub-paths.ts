@@ -1,41 +1,13 @@
 import * as path from 'path'
-import * as fs from 'fs'
+import { configStore } from '../config/config-store'
 
 /**
- * Resolve the hub root by walking up from this file until we find ARCHIV-VERWEIS.md.
- * Works in both dev (tsx, src/) and production (dist/) layouts.
- * Can be overridden via HUB_ROOT_OVERRIDE for testing.
+ * Hub root directory from ConfigStore.
+ * Returns empty string if hubPath is not configured.
  */
-let _hubRoot: string | null = null
-
-function resolveHubRoot(): string {
-  if (process.env.HUB_ROOT_OVERRIDE) return process.env.HUB_ROOT_OVERRIDE
-
-  if (_hubRoot) return _hubRoot
-
-  let dir = __dirname
-  for (let i = 0; i < 10; i++) {
-    if (fs.existsSync(path.join(dir, 'ARCHIV-VERWEIS.md'))) {
-      _hubRoot = dir
-      return dir
-    }
-    const parent = path.dirname(dir)
-    if (parent === dir) break
-    dir = parent
-  }
-  // Fallback: assume standard layout (hub is grandparent of project root)
-  _hubRoot = path.resolve(__dirname, '..', '..', '..', '..', '..')
-  return _hubRoot
-}
-
-/** Hub root directory. All hub operations resolve paths relative to this. */
 export function hubRoot(): string {
-  return resolveHubRoot()
-}
-
-/** Reset cached hub root (for testing). */
-export function _resetHubRoot(): void {
-  _hubRoot = null
+  if (process.env.HUB_ROOT_OVERRIDE) return process.env.HUB_ROOT_OVERRIDE
+  return configStore.get('hubPath') ?? ''
 }
 
 /** Projects directory inside the hub. */
