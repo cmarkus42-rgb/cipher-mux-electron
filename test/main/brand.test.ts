@@ -15,9 +15,6 @@ describe('brand module', () => {
       communityYaml,
       [
         'appName: cipher-mux',
-        'scanPaths: []',
-        'defaultProjectDir: ""',
-        'orchestratorDir: "~/.config/cipher-mux/orchestrator"',
         'statusLineDir: /tmp/cipher-mux/context',
         'projectLauncherDir: ""',
         'qualityBaselineDir: ""',
@@ -28,10 +25,6 @@ describe('brand module', () => {
       cipherYaml,
       [
         'appName: cipher-mux',
-        'scanPaths:',
-        '  - ~/projects',
-        'defaultProjectDir: ~/projects',
-        'orchestratorDir: "~/.config/cipher-mux/orchestrator"',
         'statusLineDir: /tmp/cipher-mux/context',
         'projectLauncherDir: ~/projects/projectlauncher',
         'qualityBaselineDir: ~/projects/projekt-d',
@@ -45,8 +38,6 @@ describe('brand module', () => {
     const { loadProfile } = require('../../src/shared/brand') as typeof import('../../src/shared/brand')
     const brand = loadProfile(communityYaml)
     assert.strictEqual(brand.appName, 'cipher-mux')
-    assert.deepStrictEqual(brand.scanPaths, [])
-    assert.strictEqual(brand.defaultProjectDir, '')
     assert.strictEqual(brand.projectLauncherDir, '')
     assert.strictEqual(brand.qualityBaselineDir, '')
     assert.strictEqual(brand.ipcPrefix, 'cipher-mux')
@@ -55,7 +46,6 @@ describe('brand module', () => {
   it('loads cipher profile with populated paths', () => {
     const { loadProfile } = require('../../src/shared/brand') as typeof import('../../src/shared/brand')
     const brand = loadProfile(cipherYaml)
-    assert.deepStrictEqual(brand.scanPaths, ['~/projects'])
     assert.strictEqual(brand.projectLauncherDir, '~/projects/projectlauncher')
     assert.strictEqual(brand.qualityBaselineDir, '~/projects/projekt-d')
   })
@@ -64,7 +54,6 @@ describe('brand module', () => {
     const { loadProfile } = require('../../src/shared/brand') as typeof import('../../src/shared/brand')
     const brand = loadProfile(path.join(tmpDir, 'nonexistent.yaml'))
     assert.strictEqual(brand.appName, 'cipher-mux')
-    assert.deepStrictEqual(brand.scanPaths, [])
   })
 
   it('exposes BRAND singleton from resolved profile', () => {

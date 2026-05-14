@@ -33,8 +33,6 @@ export const IPC = {
   MESSAGE_RECEIVED: 'cipher-mux:message-received',
 
   // Projects
-  PROJECTS_LIST: 'cipher-mux:projects:list',
-  PROJECTS_SCAN: 'cipher-mux:projects:scan',
   PROJECTS_KICKOFF: 'cipher-mux:projects:kickoff',
   PROJECT_KICKOFF_COMPLETED: 'cipher-mux:projects:kickoff-completed',
 

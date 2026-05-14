@@ -19,10 +19,6 @@ import * as path from 'path'
 export interface BrandConfig {
   /** Application name — always "cipher-mux" across all profiles. */
   readonly appName: string
-  /** Directories to scan for Claude Code projects. Empty = ask user on first run. */
-  readonly scanPaths: readonly string[]
-  /** Default project directory for new sessions. */
-  readonly defaultProjectDir: string
   /** Workshop config/state directory. */
   readonly workshopDir: string
   /** Cyber Factory config/state directory. */
@@ -39,8 +35,6 @@ export interface BrandConfig {
 
 const COMMUNITY_DEFAULTS: BrandConfig = {
   appName: 'cipher-mux',
-  scanPaths: [],
-  defaultProjectDir: '',
   workshopDir: '~/.config/cipher-mux/workshop',
   cyberFactoryDir: '~/.config/cipher-mux/cyber-factory',
   statusLineDir: '/tmp/cipher-mux/context',
@@ -107,8 +101,6 @@ export function loadProfile(filePath: string): BrandConfig {
 
     return {
       appName: typeof parsed.appName === 'string' ? parsed.appName : COMMUNITY_DEFAULTS.appName,
-      scanPaths: Array.isArray(parsed.scanPaths) ? parsed.scanPaths : COMMUNITY_DEFAULTS.scanPaths,
-      defaultProjectDir: typeof parsed.defaultProjectDir === 'string' ? parsed.defaultProjectDir : COMMUNITY_DEFAULTS.defaultProjectDir,
       workshopDir: typeof parsed.workshopDir === 'string' ? parsed.workshopDir : COMMUNITY_DEFAULTS.workshopDir,
       cyberFactoryDir: typeof parsed.cyberFactoryDir === 'string' ? parsed.cyberFactoryDir : COMMUNITY_DEFAULTS.cyberFactoryDir,
       statusLineDir: typeof parsed.statusLineDir === 'string' ? parsed.statusLineDir : COMMUNITY_DEFAULTS.statusLineDir,

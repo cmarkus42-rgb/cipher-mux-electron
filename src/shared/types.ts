@@ -123,17 +123,6 @@ export interface SendMessage {
   payload: Record<string, unknown>
 }
 
-// ─── Projects ──────────────────────────────────────────────
-
-export interface ProjectInfo {
-  path: string
-  name: string
-  sddPhase: string | null
-  gitBranch: string | null
-  gitDirty: boolean
-  hasClaudeMd: boolean
-}
-
 // ─── Context Usage ─────────────────────────────────────────
 
 export interface ContextUsage {
@@ -185,10 +174,6 @@ export interface AppConfig {
   /** Global base rules injected into every entity session. */
   globalRules: string
   app: {
-    scanPaths: string[]
-    /** Directory levels below each scanPath that are inspected (1 = children only). */
-    scanDepth: number
-    defaultProjectDir: string
     maxSessions: number
     messageRetentionDays: number
     /** Path to the projectlauncher working directory. */
