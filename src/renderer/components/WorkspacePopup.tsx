@@ -257,12 +257,14 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
       setWorkspaces(wsList ?? [])
       setSelectedId(ws.id)
       setShowSaveDialog(false)
+      // Auto-apply: neuer Workspace wird sofort aktiv
+      onApply(ws.id)
     } catch (err) {
       console.error('[WorkspacePopup] save failed:', err)
     } finally {
       setSaving(false)
     }
-  }, [currentGrid, currentSessions, saveName, saveTags, savePrompt, saveContextPaths])
+  }, [currentGrid, currentSessions, saveName, saveTags, savePrompt, saveContextPaths, onApply])
 
   if (!visible) return null
 
