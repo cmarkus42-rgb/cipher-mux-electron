@@ -1803,6 +1803,13 @@ export class IpcHub {
 
   // ─── Workspaces ───────────────────────────────────────
   private registerWorkspaceChannels(): void {
+    // Migration: defaultWorkspaceId → activeWorkspaceId (one-time)
+    const defaultWsId = configStore.get('defaultWorkspaceId')
+    if (defaultWsId && !configStore.get('activeWorkspaceId')) {
+      console.log(`[IpcHub] Migrating defaultWorkspaceId → activeWorkspaceId: "${defaultWsId}"`)
+      configStore.set('activeWorkspaceId', defaultWsId)
+    }
+
     ipcMain.handle(IPC.WORKSPACES_LIST, () => {
       const workspaces = configStore.get('workspaces') ?? []
       const defaultId = configStore.get('defaultWorkspaceId')
@@ -1839,10 +1846,31 @@ export class IpcHub {
       const ws = workspaces.find(w => w.id === workspaceId)
       if (!ws) return { applied: false, sessionsStarted: 0, warnings: ['Workspace not found'] }
 
+      // Teardown: gracefully stop all existing sessions before applying
+      const existing = this.sessionManager.list()
+      if (existing.length > 0) {
+        console.log(`[IpcHub] WORKSPACES_APPLY: tearing down ${existing.length} existing session(s)`)
+        await Promise.allSettled(
+          existing.map(s => this.sessionManager.gracefulStop(s.id, 30_000))
+        )
+      }
+
       const personas = configStore.get('personas')
       const result = await applyWorkspace(ws, personas, this.sessionManager, (cols, rows) => {
         this.windowManager.sendToMainWindow(IPC.SESSION_CHANGED, { gridResize: { cols, rows } })
       })
+
+      // Entity-launch: queue Claude + startup greeting for entity sessions
+      for (const s of result.sessions) {
+        if (s.entityId) {
+          try {
+            this.sessionManager.queueEntityClaude(s.entityId as EntityId, s.sessionId)
+            this.sessionManager.scheduleStartupGreeting(s.entityId as EntityId)
+          } catch (err) {
+            console.error(`[IpcHub] Failed to queue entity "${s.entityId}" claude:`, err)
+          }
+        }
+      }
 
       configStore.set('activeWorkspaceId', workspaceId)
       return result
