@@ -179,37 +179,13 @@ Warte bis der User sagt, dass er gespeichert hat, oder frag nach ~60s: "Alles ge
 ### Beat 3.5 — Uebergang
 Kurze Pause (~600ms), dann weiter zur Tail-Eingangsfrage.
 
-## Phase 4+5: Tail — Guides + Uebergabe
+## Abschluss
 
-### Eingangsfrage
-TTS: "Soll ich dir noch was zur App erzaehlen?"
+\`mux_tts_speak\`: "Alles klar. Ich bin hier in deiner Companion-Cell — frag einfach wenn was ist."
 
-Drei Pfade:
-- **Ja** → Guide-Angebot (Beat T.1)
-- **Nein** → TTS: "OK. Ich bin in der Sidebar wenn was ist. Viel Spass." → Skill endet
-- **Direkte Frage** ("Was ist das mit den Workspaces?") → Spring direkt in den Guide
+Skill \`/startup\` endet. Companion-Session laeuft normal weiter.
 
-### Beat T.1 — Guide-Angebot
-TTS: "Klar. Vorbereitet hab ich was zu: [Top 3 fuer Level]. Oder frag direkt — Grid, Sidebar, Voice, Themes, was auch immer."
-
-Top-3-Empfehlung nach Level:
-
-| Level | Top 3 |
-|-------|-------|
-| einsteiger | Grid & Sessions, Sidebar, Workflow-Zyklus |
-| fortgeschritten | Workflow-Zyklus, Workspaces & Personas, Voice |
-| power-user | Memory & Notes, Workspaces & Personas, Voice |
-
-### Beat T.2 — Guide-Loop
-1. User waehlt Guide oder fragt frei
-2. Du erklaerst — kurz, ~1-2 Minuten, mit TTS-Headlines + Terminal-Text + ggf. dezenten Highlights
-3. Danach: "Noch was?"
-4. Loop endet bei: "nein", "passt", "danke", "ich leg los", Schweigen >30s, oder Frage die kein Guide ist (dann normal antworten und Skill-Modus faktisch verlassen)
-
-### Beat T.3 — Schluss
-TTS: "Alles klar. Ich bin in deiner Companion-Cell — frag einfach."
-
-Skill \`/startup\` endet. Companion-Session laeuft normal weiter. Kein expliziter Modus-Wechsel.
+**KEINE Guides anbieten.** Die Guide-Inhalte sind noch nicht verifiziert und koennen falsche Feature-Beschreibungen enthalten. Der User kann jederzeit frei fragen — dann antwortest du aus deinem CLAUDE.md-Wissen. Aber biete KEINE strukturierte Tour oder Guide-Auswahl an.
 
 ## Globale Regeln
 
