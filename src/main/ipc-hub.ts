@@ -607,17 +607,6 @@ export class IpcHub {
     })
 
     this.kickoffWorkshop.on('kickoff-complete', (event) => {
-      // Persist the project's parent directory as a scan path, so that the
-      // renderer's post-completion rescan (and any future manual rescan) finds
-      // the new project even if it lives outside the default scan paths.
-      const projectPath = event.handle.projectDir
-      const parentDir = path.dirname(projectPath)
-      const appCfg = configStore.get('app')
-      const scanPaths = appCfg?.scanPaths ?? []
-      if (!scanPaths.includes(parentDir)) {
-        configStore.set('app', { ...appCfg, scanPaths: [...scanPaths, parentDir] })
-      }
-
       this.windowManager.sendToMainWindow(
         IPC.PROJECT_KICKOFF_COMPLETED,
         { status: 'complete', event },

@@ -57,7 +57,6 @@ export class ReferenceStubAdapter implements AgentAdapter {
   /**
    * TODO: Return the filenames your agent uses as project markers.
    *
-   * These are used by ProjectScanner to detect projects on disk.
    * Example: ['CODEX.md', '.codex']
    */
   getProjectMarkers(): string[] {
