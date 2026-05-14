@@ -892,6 +892,9 @@ export function App() {
   const [workspaceLoading, setWorkspaceLoading] = useState(true)
 
   const handleWorkspaceApply = useCallback(async (workspaceId: string) => {
+    if (sessions.length > 0) {
+      if (!confirm(t('workspacePopup.switchConfirmBody'))) return
+    }
     setWorkspaceLoading(true)
     try {
       const api = (window as any).cipherMux
@@ -928,9 +931,9 @@ export function App() {
       setWorkspaceLoading(false)
     }
     setWorkspacesPopupVisible(false)
-  }, [resize, applyMerges, setSessionAtSlot])
+  }, [resize, applyMerges, setSessionAtSlot, sessions, t])
 
-  // Called when RecoveryDialog finishes — auto-load default workspace only if no sessions exist yet
+  // Called when RecoveryDialog finishes — auto-load active workspace only if no sessions exist yet
   const handleRecoveryDone = useCallback(async () => {
     try {
       // Keep Working already restored sessions — skip default workspace loading
@@ -958,15 +961,15 @@ export function App() {
         return
       }
 
-      const defaultWsId: string | null = await api.config.get('defaultWorkspaceId')
-      if (defaultWsId) {
-        console.log(`[App] Auto-loading default workspace: ${defaultWsId}`)
-        handleWorkspaceApply(defaultWsId)
+      const activeWsId: string | null = await api.config.get('activeWorkspaceId')
+      if (activeWsId) {
+        console.log(`[App] Auto-loading active workspace: ${activeWsId}`)
+        handleWorkspaceApply(activeWsId)
       } else {
         setWorkspaceLoading(false)
       }
     } catch (err) {
-      console.warn('[App] Failed to auto-load default workspace:', err)
+      console.warn('[App] Failed to auto-load active workspace:', err)
       setWorkspaceLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

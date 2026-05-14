@@ -61,7 +61,7 @@ export function WorkspacesTab() {
     } catch { /* ignore */ }
     // Load default workspace id
     try {
-      const defId = await api.config.get('defaultWorkspaceId')
+      const defId = await api.config.get('activeWorkspaceId')
       setActiveWsForDefault(defId ?? null)
     } catch { /* ignore */ }
     // Load available tags for autocomplete
@@ -249,7 +249,7 @@ export function WorkspacesTab() {
 
   const handleActivate = async (wsId: string) => {
     const nextId = activeWsForDefault === wsId ? null : wsId
-    await api.config.set('defaultWorkspaceId', nextId)
+    await api.config.set('activeWorkspaceId', nextId)
     setActiveWsForDefault(nextId)
   }
 
