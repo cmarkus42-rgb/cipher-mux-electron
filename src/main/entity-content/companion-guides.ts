@@ -22,7 +22,6 @@ export function deployCompanionGuides(projectPath: string): void {
 
   for (const file of files) {
     const filePath = path.join(guidesDir, file.name);
-    if (fs.existsSync(filePath)) continue;
     fs.mkdirSync(guidesDir, { recursive: true });
     fs.writeFileSync(filePath, file.content, 'utf-8');
   }
