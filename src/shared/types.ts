@@ -90,6 +90,8 @@ export interface StartSessionOpts {
   workspacePrompt?: string
   /** Context directory paths — injected as ## Context Directories in project CLAUDE.md. */
   contextPaths?: string[]
+  /** Model override — passed as --model <id> to the agent CLI. */
+  model?: string
   /** Internal flag: global rules already injected by startEntity(). */
   _entityInjected?: boolean
 }

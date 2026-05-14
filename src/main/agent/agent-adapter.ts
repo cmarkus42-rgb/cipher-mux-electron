@@ -42,6 +42,8 @@ export interface LaunchOpts {
   forkFromClaudeSessionId?: string
   /** Resume the most recent conversation (--resume) */
   resume?: boolean
+  /** Model override (e.g. 'haiku', 'sonnet', 'opus') — passed as --model <id> */
+  model?: string
 }
 
 export interface AdapterContext {

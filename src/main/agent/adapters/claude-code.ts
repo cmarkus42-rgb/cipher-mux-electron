@@ -59,6 +59,9 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     if (opts.forkFromClaudeSessionId) {
       args.push('--fork-session', opts.forkFromClaudeSessionId)
     }
+    if (opts.model) {
+      args.push('--model', opts.model)
+    }
     return { cmd: 'claude', args }
   }
 

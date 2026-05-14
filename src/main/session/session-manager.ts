@@ -347,6 +347,7 @@ export class SessionManager extends EventEmitter {
         projectPath: opts.projectPath || os.homedir(),
         sessionName: opts.name,
         forkFromClaudeSessionId: opts.forkFromClaudeSessionId,
+        model: opts.model,
       })
       const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
       this.setPendingLaunch(id, `clear; ${cmdStr}\n`)
