@@ -15,9 +15,6 @@ describe('brand module', () => {
       communityYaml,
       [
         'appName: cipher-mux',
-        'scanPaths: []',
-        'defaultProjectDir: ""',
-        'orchestratorDir: "~/.config/cipher-mux/orchestrator"',
         'statusLineDir: /tmp/cipher-mux/context',
         'projectLauncherDir: ""',
         'qualityBaselineDir: ""',
@@ -28,10 +25,6 @@ describe('brand module', () => {
       cipherYaml,
       [
         'appName: cipher-mux',
-        'scanPaths:',
-        '  - /Users/Shared/Nextcloud/Claude/ClaudeCode01',
-        'defaultProjectDir: /Users/Shared/Nextcloud/Claude/ClaudeCode01',
-        'orchestratorDir: "~/.config/cipher-mux/orchestrator"',
         'statusLineDir: /tmp/cipher-mux/context',
         'projectLauncherDir: /Users/Shared/Nextcloud/Claude/ClaudeCode01/projectlauncher',
         'qualityBaselineDir: /Users/Shared/Nextcloud/Claude/ClaudeCode01/cipher-boox',
@@ -45,8 +38,6 @@ describe('brand module', () => {
     const { loadProfile } = require('../../src/shared/brand') as typeof import('../../src/shared/brand')
     const brand = loadProfile(communityYaml)
     assert.strictEqual(brand.appName, 'cipher-mux')
-    assert.deepStrictEqual(brand.scanPaths, [])
-    assert.strictEqual(brand.defaultProjectDir, '')
     assert.strictEqual(brand.projectLauncherDir, '')
     assert.strictEqual(brand.qualityBaselineDir, '')
     assert.strictEqual(brand.ipcPrefix, 'cipher-mux')
@@ -55,7 +46,6 @@ describe('brand module', () => {
   it('loads cipher profile with populated paths', () => {
     const { loadProfile } = require('../../src/shared/brand') as typeof import('../../src/shared/brand')
     const brand = loadProfile(cipherYaml)
-    assert.deepStrictEqual(brand.scanPaths, ['/Users/Shared/Nextcloud/Claude/ClaudeCode01'])
     assert.strictEqual(brand.projectLauncherDir, '/Users/Shared/Nextcloud/Claude/ClaudeCode01/projectlauncher')
     assert.strictEqual(brand.qualityBaselineDir, '/Users/Shared/Nextcloud/Claude/ClaudeCode01/cipher-boox')
   })
@@ -64,7 +54,6 @@ describe('brand module', () => {
     const { loadProfile } = require('../../src/shared/brand') as typeof import('../../src/shared/brand')
     const brand = loadProfile(path.join(tmpDir, 'nonexistent.yaml'))
     assert.strictEqual(brand.appName, 'cipher-mux')
-    assert.deepStrictEqual(brand.scanPaths, [])
   })
 
   it('exposes BRAND singleton from resolved profile', () => {

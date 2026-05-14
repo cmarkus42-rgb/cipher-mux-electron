@@ -42,11 +42,6 @@ export const WORKSHOP_MAX_RETRIES = 2
 /** Cyber Factory max retries per sub-project session */
 export const CF_MAX_RETRIES = 2
 
-/** Default scan depth (directory levels below each scanPath that are inspected). */
-export const DEFAULT_SCAN_DEPTH = 1
-/** Max allowed scan depth (guardrail against runaway recursion). */
-export const MAX_SCAN_DEPTH = 5
-
 /** Window defaults */
 export const DEFAULT_WINDOW_WIDTH = 1400
 export const DEFAULT_WINDOW_HEIGHT = 900

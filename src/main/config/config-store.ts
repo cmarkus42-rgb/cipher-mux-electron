@@ -12,7 +12,6 @@ import { SEED_CHARACTERS, DEFAULT_CHARACTER_ID, assignCharacterColor } from '../
 import { DEBUGGER_DEFAULTS } from '../debugger/types'
 import { TESTING_ASSISTANT_DEFAULTS } from '../testing-assistant/types'
 import {
-  DEFAULT_SCAN_DEPTH,
   MAX_SESSIONS,
   MESSAGE_RETENTION_DAYS,
   KICKOFF_TIMEOUT_MIN_DEFAULT,
@@ -35,9 +34,6 @@ const defaults: AppConfig = {
   characters: [...SEED_CHARACTERS],
   globalRules: '',
   app: {
-    scanPaths: [...BRAND.scanPaths],
-    scanDepth: DEFAULT_SCAN_DEPTH,
-    defaultProjectDir: BRAND.defaultProjectDir,
     maxSessions: MAX_SESSIONS,
     messageRetentionDays: MESSAGE_RETENTION_DAYS,
     projectlauncherPath: BRAND.projectLauncherDir,
