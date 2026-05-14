@@ -570,6 +570,39 @@ export function registerAllHandoffTools(server: McpServer, ctx: ToolContext): vo
     buildSessionName: () => 'Audit',
   })
 
+  // ─── REQ-TOOLS-011: mux_audit_handoff_cyber_factory ────────
+  registerHandoffTool(server, ctx, {
+    toolName: 'mux_audit_handoff_cyber_factory',
+    description:
+      'Hand off audit results from Audit back to the Cyber Factory. '
+      + 'Delivers the verdict (release / release-after-fix / blocked) and findings summary '
+      + 'so CF can act on the audit outcome.',
+    targetEntityId: 'cyber-factory',
+    senderEntityId: 'audit',
+    inputSchema: {
+      run_id: z.string().describe('Audit run ID'),
+      verdict: z.string().describe('Audit verdict: "release", "release-after-fix", or "blocked"'),
+      findings_summary: z.string().describe('Structured findings summary (markdown)'),
+      high_count: z.number().describe('Number of high-severity findings'),
+      medium_count: z.number().describe('Number of medium-severity findings'),
+    },
+    buildPayload: (args) => ({
+      run_id: args.run_id,
+      verdict: args.verdict,
+      findings_summary: args.findings_summary,
+      high_count: args.high_count,
+      medium_count: args.medium_count,
+    }),
+    buildSessionName: () => 'Cyber Factory',
+    sideEffects: {
+      createNote: (args) => ({
+        title: `Audit Verdict — ${args.verdict} (${args.high_count}H/${args.medium_count}M)`,
+        body: `# Audit Verdict — ${args.verdict}\n\nHigh: ${args.high_count} | Medium: ${args.medium_count}\n\n${args.findings_summary}`,
+        tags: ['kind:handoff', 'scope:audit', `verdict:${args.verdict}`],
+      }),
+    },
+  })
+
   // ─── REQ-TOOLS-008: mux_testing_handoff_cyber_factory ─────
   registerHandoffTool(server, ctx, {
     toolName: 'mux_testing_handoff_cyber_factory',

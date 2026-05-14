@@ -384,6 +384,82 @@ describe('REQ-TOOLS-005: mux_cyber_factory_handoff_debugger', () => {
   })
 })
 
+// ─── REQ-TOOLS-011: mux_audit_handoff_cyber_factory ────────
+
+describe('REQ-TOOLS-011: mux_audit_handoff_cyber_factory', () => {
+  it('is registered with correct name', () => {
+    const { ctx } = makeCtx()
+    const handlers = registerAndCollect(ctx)
+    assert.ok(handlers.has('mux_audit_handoff_cyber_factory'))
+  })
+
+  it('targets cyber-factory from audit with verdict and findings', async () => {
+    const session = makeSession({ entityId: 'cyber-factory' as EntityId })
+    const { ctx, sendKeysCalls } = makeCtx({ sessions: [session] })
+    const handlers = registerAndCollect(ctx)
+    const handler = handlers.get('mux_audit_handoff_cyber_factory')!
+
+    const result = await handler({
+      run_id: 'audit-001',
+      verdict: 'release-after-fix',
+      findings_summary: '## Findings\n\n2 medium issues',
+      high_count: 0,
+      medium_count: 2,
+    })
+    const parsed = parseResult(result)
+
+    assert.equal(parsed.ok, true)
+    assert.equal(parsed.targetSessionId, session.id)
+
+    // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
+    const message = sendKeysCalls[1][1]
+    assert.ok(message.includes('[HANDOFF from audit]'))
+    assert.ok(message.includes('verdict'))
+    assert.ok(message.includes('release-after-fix'))
+    assert.ok(message.includes('findings_summary'))
+  })
+
+  it('creates a note with audit scope and verdict tag', async () => {
+    const session = makeSession({ entityId: 'cyber-factory' as EntityId })
+    const { ctx, noteCreateCalls } = makeCtx({ sessions: [session] })
+    const handlers = registerAndCollect(ctx)
+    const handler = handlers.get('mux_audit_handoff_cyber_factory')!
+
+    await handler({
+      run_id: 'audit-002',
+      verdict: 'blocked',
+      findings_summary: '1 critical issue',
+      high_count: 1,
+      medium_count: 3,
+    })
+
+    assert.equal(noteCreateCalls.length, 1)
+    assert.ok(noteCreateCalls[0].title.includes('blocked'))
+    assert.ok(noteCreateCalls[0].title.includes('1H/3M'))
+    assert.ok(noteCreateCalls[0].tags.includes('kind:handoff'))
+    assert.ok(noteCreateCalls[0].tags.includes('scope:audit'))
+    assert.ok(noteCreateCalls[0].tags.includes('verdict:blocked'))
+  })
+
+  it('starts CF session when none exists', async () => {
+    const { ctx } = makeCtx({ sessions: [], paneCommand: 'claude' })
+    const handlers = registerAndCollect(ctx)
+    const handler = handlers.get('mux_audit_handoff_cyber_factory')!
+
+    const result = await handler({
+      run_id: 'audit-003',
+      verdict: 'release',
+      findings_summary: 'Clean',
+      high_count: 0,
+      medium_count: 0,
+    })
+    const parsed = parseResult(result)
+
+    assert.equal(parsed.ok, true)
+    assert.equal(parsed.wasExisting, false)
+  })
+})
+
 // ─── REQ-TOOLS-006: mux_testing_findings_handoff_debugger ──
 
 describe('REQ-TOOLS-006: mux_testing_findings_handoff_debugger', () => {
