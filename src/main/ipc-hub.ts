@@ -6,7 +6,6 @@ import { WindowManager } from './window-manager'
 import { SessionManager } from './session/session-manager'
 import { TmuxManager } from './tmux/tmux-manager'
 import { MessageBus } from './message-bus/message-bus'
-import { ProjectScanner } from './project/project-scanner'
 import { configStore } from './config/config-store'
 import { getActiveWorkspace } from './workspace/workspace-utils'
 import { projectsDir } from './hub/hub-paths'
@@ -68,7 +67,6 @@ export class IpcHub {
   private tmux: TmuxManager
   private sessionManager: SessionManager
   private messageBus: MessageBus
-  private projectScanner: ProjectScanner
   private statusLineMonitor: StatusLineMonitor
   private mcpServer: McpServerManager
   private kickoffWorkshop: KickoffWorkshop
@@ -89,7 +87,6 @@ export class IpcHub {
   private cyberFactoryManager: CyberFactoryManager | null = null
   private testingAssistantManager: TestingAssistantManager | null = null
   private auditManager: AuditManager | null = null
-  private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
   private cachedRecoveryResult: RecoveryResult | null = null
   private cachedKeepWorkingRestore: {
     gridConfig: { cols: number; rows: number }
@@ -154,7 +151,6 @@ export class IpcHub {
       console.error('[IpcHub] MessageBus init failed (native module mismatch?):', err)
       this.messageBus = null as any
     }
-    this.projectScanner = new ProjectScanner()
     this.statusLineMonitor = new StatusLineMonitor()
     this.mcpServer = new McpServerManager()
     const appConfig = configStore.get('app')
@@ -252,7 +248,7 @@ export class IpcHub {
     this.registerScreenshotChannel()
     this.registerTerminalChannels()
     this.registerMessageChannels()
-    this.registerProjectChannels()
+    this.registerKickoffChannel()
     this.registerContextChannels()
     this.registerConfigChannels()
     this.registerWindowChannels()
@@ -622,18 +618,6 @@ export class IpcHub {
         configStore.set('app', { ...appCfg, scanPaths: [...scanPaths, parentDir] })
       }
 
-      // Pre-populate cachedProjects so the new project shows up immediately
-      // without waiting for the renderer's rescan round-trip.
-      this.projectScanner.inspectProject(projectPath).then((projectInfo) => {
-        if (projectInfo) {
-          this.cachedProjects = this.cachedProjects.filter((p) => p.path !== projectInfo.path)
-          this.cachedProjects.push(projectInfo)
-          this.cachedProjects.sort((a, b) => a.name.localeCompare(b.name))
-        }
-      }).catch((err) => {
-        console.warn('[IpcHub] kickoff-complete: inspectProject failed:', err)
-      })
-
       this.windowManager.sendToMainWindow(
         IPC.PROJECT_KICKOFF_COMPLETED,
         { status: 'complete', event },
@@ -890,20 +874,8 @@ export class IpcHub {
     })
   }
 
-  // ─── Projects ──────────────────────────────────────────
-  private registerProjectChannels(): void {
-    ipcMain.handle(IPC.PROJECTS_LIST, async () => {
-      return this.cachedProjects
-    })
-
-    ipcMain.handle(IPC.PROJECTS_SCAN, async () => {
-      const appConfig = configStore.get('app')
-      const scanPaths = appConfig?.scanPaths ?? []
-      const scanDepth = appConfig?.scanDepth ?? 1
-      this.cachedProjects = await this.projectScanner.scan(scanPaths, scanDepth)
-      return this.cachedProjects
-    })
-
+  // ─── Kickoff ──────────────────────────────────────────
+  private registerKickoffChannel(): void {
     ipcMain.handle(IPC.PROJECTS_KICKOFF, async (_e, req: KickoffRequest) => {
       const handle = await this.kickoffWorkshop.start(req)
       return handle
@@ -3043,7 +3015,6 @@ ist dieses Entity fokussiert?
     this.voiceManager?.shutdown()
     await this.mcpServer.stop().catch(() => {})
     this.statusLineMonitor.stop()
-    this.projectScanner.stopWatch()
     this.kickoffWorkshop.destroy()
     if (this.messageBus) this.messageBus.destroy()
     await this.sessionManager.destroy()
