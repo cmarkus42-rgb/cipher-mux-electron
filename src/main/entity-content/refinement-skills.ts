@@ -341,7 +341,6 @@ export function deployRefinementSkills(projectPath: string): void {
   for (const [name, content] of Object.entries(SKILLS_MAP)) {
     const skillDir = path.join(projectPath, 'skills', name);
     const filePath = path.join(skillDir, 'SKILL.md');
-    if (fs.existsSync(filePath)) return;
     fs.mkdirSync(skillDir, { recursive: true });
     fs.writeFileSync(filePath, content, 'utf-8');
   }

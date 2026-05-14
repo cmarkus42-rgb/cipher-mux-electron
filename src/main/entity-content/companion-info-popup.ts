@@ -10,7 +10,6 @@ import * as path from 'path';
 
 export function deployCompanionInfoPopup(projectPath: string): void {
   const filePath = path.join(projectPath, 'how-to-info-popup.md');
-  if (fs.existsSync(filePath)) return;
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, CONTENT, 'utf-8');
 }

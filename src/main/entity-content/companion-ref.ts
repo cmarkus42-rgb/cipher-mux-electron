@@ -20,7 +20,6 @@ export function deployCompanionRef(projectPath: string): void {
 
   for (const file of files) {
     const filePath = path.join(refDir, file.name);
-    if (fs.existsSync(filePath)) continue;
     fs.mkdirSync(refDir, { recursive: true });
     fs.writeFileSync(filePath, file.content, 'utf-8');
   }
