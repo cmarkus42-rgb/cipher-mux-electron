@@ -507,12 +507,12 @@ export class IpcHub {
    * started manually via the StatusBar button.
    */
   private autoStartDefault(): void {
-    const defaultWorkspaceId = configStore.get('defaultWorkspaceId')
+    const activeWsId = configStore.get('activeWorkspaceId')
 
-    if (defaultWorkspaceId) {
-      // Default workspace configured — renderer will load it via handleRecoveryDone.
+    if (activeWsId) {
+      // Active workspace configured — renderer will load it via handleRecoveryDone.
       // Don't auto-start Companion here; the workspace apply flow handles session creation.
-      console.log(`[IpcHub] Default workspace "${defaultWorkspaceId}" set — renderer will apply it after recovery`)
+      console.log(`[IpcHub] Active workspace "${activeWsId}" set — renderer will apply it after recovery`)
       return
     }
 
@@ -1809,11 +1809,11 @@ export class IpcHub {
 
     ipcMain.handle(IPC.WORKSPACES_LIST, () => {
       const workspaces = configStore.get('workspaces') ?? []
-      const defaultId = configStore.get('defaultWorkspaceId')
-      // Sort: default workspace first, then by sortOrder (lower first), then by name
+      const activeId = configStore.get('activeWorkspaceId')
+      // Sort: active workspace first, then by sortOrder (lower first), then by name
       return [...workspaces].sort((a: any, b: any) => {
-        if (a.id === defaultId && b.id !== defaultId) return -1
-        if (b.id === defaultId && a.id !== defaultId) return 1
+        if (a.id === activeId && b.id !== activeId) return -1
+        if (b.id === activeId && a.id !== activeId) return 1
         const aSort = a.sortOrder ?? 100
         const bSort = b.sortOrder ?? 100
         if (aSort !== bSort) return aSort - bSort
