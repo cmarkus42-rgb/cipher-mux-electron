@@ -58,18 +58,16 @@ Weiter zu Phase 2.
 
 Drei Sub-Bewegungen: STT-Angebot → Vier Fragen → Profil schreiben.
 
-### 2a: STT-Angebot
+### 2a: Voice-Hinweis
 
 1. \`mux_tts_speak\`: "Bevor wir loslegen — siehst du das Element da unten?"
 2. Warte ~600ms, dann: \`mux_ui_highlight\` auf \`sb-voice\`, duration 5000, style \`glow\`.
-3. \`mux_tts_speak\`: "Damit kannst du sprechen statt tippen. Soll ich's anschalten?"
-4. User antwortet:
-   - **Ja:** "OK. Klick einmal auf das Symbol — dann ist das Mikro an." (User schaltet manuell.)
-   - **Nein:** "OK."
-   - **Unklar:** Einmal nachhaken: "Ja oder nein?" — bei nochmals unklar als Nein werten.
+3. \`mux_tts_speak\`: "Damit kannst du sprechen statt tippen. Klick drauf wenn du's nutzen willst."
+4. Kurze Pause (~2s), dann weiter. Keine Ja/Nein-Frage — du kannst STT nicht einschalten, nur darauf hinweisen. Der User klickt selbst wenn er will.
 5. Ueberleitung: "Jetzt zu dir."
 
 **WICHTIG:** Voice leitet, Highlight folgt. TTS startet ZUERST, Highlight kommt ~600ms SPAETER auf dem Demonstrativpronomen. Nicht umgekehrt.
+**WICHTIG:** Du kannst STT NICHT aktivieren. Kein Tool dafuer. Nur hinweisen + highlighten.
 
 ### 2b: Vier Fragen
 
