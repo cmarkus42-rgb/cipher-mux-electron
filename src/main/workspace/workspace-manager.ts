@@ -121,6 +121,7 @@ export function resizeCells(
 export interface ApplyResultSession {
   cellIndex: number
   sessionId: string
+  entityId?: string
 }
 
 export async function applyWorkspace(
@@ -137,7 +138,7 @@ export async function applyWorkspace(
   gridCallback(workspace.cols, workspace.rows)
 
   // 2. Collect all cells that need sessions, then start them in parallel
-  const startTasks: Array<{ cellIndex: number; start: () => Promise<{ id: string }> }> = []
+  const startTasks: Array<{ cellIndex: number; entityId?: string; start: () => Promise<{ id: string }> }> = []
 
   for (let i = 0; i < workspace.cells.length; i++) {
     const cell = workspace.cells[i]
@@ -164,6 +165,7 @@ export async function applyWorkspace(
         : wsPaths
       startTasks.push({
         cellIndex: i,
+        entityId: presetId,
         start: () => sessionStarter.startEntity!(presetId, {
           workspacePrompt: wsPrompt || undefined,
           contextPaths: entityPaths,
@@ -194,7 +196,7 @@ export async function applyWorkspace(
   // Start all sessions in parallel
   const results = await Promise.allSettled(startTasks.map(async (task) => {
     const session = await task.start()
-    return { cellIndex: task.cellIndex, sessionId: session.id }
+    return { cellIndex: task.cellIndex, sessionId: session.id, entityId: task.entityId }
   }))
 
   for (const result of results) {
