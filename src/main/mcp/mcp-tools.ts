@@ -280,9 +280,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         visible: z.boolean().optional().describe('If true, session appears in the grid with focus'),
         shellOnly: z.boolean().optional().describe('If true, open plain shell without Claude CLI'),
         resume: z.boolean().optional().describe('If true, launch Claude with --resume flag'),
+        model: z.enum(['haiku', 'sonnet', 'opus']).optional().describe('Model to use for Claude CLI (--model flag)'),
       },
     },
-    async (args: { name: string; projectPath: string; command?: string; visible?: boolean; shellOnly?: boolean; resume?: boolean }) => {
+    async (args: { name: string; projectPath: string; command?: string; visible?: boolean; shellOnly?: boolean; resume?: boolean; model?: string }) => {
       try {
         // Build autoLaunch for Claude CLI (matches UI Launcher-Cell path in app.tsx)
         let autoLaunch: string | undefined
@@ -293,6 +294,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           const parts = [`cd '${escaped}' && clear; claude`]
           if (skipPerms) parts.push('--dangerously-skip-permissions')
           if (args.resume) parts.push('--resume')
+          if (args.model) parts.push('--model', args.model)
           autoLaunch = parts.join(' ') + '\n'
         }
 
