@@ -1,6 +1,6 @@
 import { describe, it, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { pcmToWav, appendSilence, splitSentences, getPauseDuration } from '../../src/main/voice/audio-utils'
+import { pcmToWav, appendSilence, concatenateWavs, splitSentences, getPauseDuration } from '../../src/main/voice/audio-utils'
 
 // ─── appendSilence ───────────────────────────────────────
 
@@ -62,6 +62,61 @@ describe('appendSilence', () => {
     const result = appendSilence(wav, 400, sr)
     const silenceBytes = Math.round(sr * 400 / 1000) * 2
     assert.equal(result.length, wav.length + silenceBytes)
+  })
+})
+
+// ─── concatenateWavs ─────────────────────────────────────
+
+describe('concatenateWavs', () => {
+  const sampleRate = 16000
+
+  function makeTestWav(numSamples: number, value = 0.5): Buffer {
+    const pcm = new Float32Array(numSamples).fill(value)
+    return pcmToWav(pcm, sampleRate)
+  }
+
+  it('returns empty buffer for empty array', () => {
+    const result = concatenateWavs([])
+    assert.equal(result.length, 0)
+  })
+
+  it('returns same buffer for single WAV', () => {
+    const wav = makeTestWav(10)
+    const result = concatenateWavs([wav])
+    assert.deepEqual(result, wav)
+  })
+
+  it('concatenates PCM data from multiple WAVs', () => {
+    const wav1 = makeTestWav(10)
+    const wav2 = makeTestWav(20)
+    const result = concatenateWavs([wav1, wav2])
+
+    // Header (44) + 10 samples * 2 bytes + 20 samples * 2 bytes = 44 + 60 = 104
+    assert.equal(result.length, 44 + (10 + 20) * 2)
+  })
+
+  it('updates RIFF and data sizes correctly', () => {
+    const wav1 = makeTestWav(10)
+    const wav2 = makeTestWav(15)
+    const result = concatenateWavs([wav1, wav2])
+
+    const riffSize = result.readUInt32LE(4)
+    assert.equal(riffSize, result.length - 8)
+
+    const dataSize = result.readUInt32LE(40)
+    assert.equal(dataSize, (10 + 15) * 2)
+  })
+
+  it('preserves audio content', () => {
+    const wav1 = makeTestWav(5, 0.5)
+    const wav2 = makeTestWav(5, -0.5)
+    const result = concatenateWavs([wav1, wav2])
+
+    // First 5 samples should be positive, last 5 negative
+    const firstSample = result.readInt16LE(44)
+    const lastSample = result.readInt16LE(44 + 8 * 2)
+    assert.ok(firstSample > 0, 'first sample should be positive')
+    assert.ok(lastSample < 0, 'last sample should be negative')
   })
 })
 

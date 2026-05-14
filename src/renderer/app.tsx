@@ -906,12 +906,19 @@ export function App() {
           applyMerges(ws.cols, ws.rows, ws.merges)
         }
       }
-      // Set slot types for notes cells before spawning sessions
+      // Reset all notes slots from previous workspace, then set new ones
+      const totalSlots = (ws?.cols ?? grid.config.cols) * (ws?.rows ?? grid.config.rows)
+      const newNoteSlots = new Set<number>()
       if (ws?.cells) {
         for (let i = 0; i < ws.cells.length; i++) {
-          if (ws.cells[i]?.type === 'notes') {
-            setSlotType(i, 'notes')
-          }
+          if (ws.cells[i]?.type === 'notes') newNoteSlots.add(i)
+        }
+      }
+      for (let i = 0; i < totalSlots; i++) {
+        if (newNoteSlots.has(i)) {
+          setSlotType(i, 'notes')
+        } else {
+          clearSlotType(i)
         }
       }
       const result = await api.workspaces.apply(workspaceId)
@@ -931,7 +938,7 @@ export function App() {
       setWorkspaceLoading(false)
     }
     setWorkspacesPopupVisible(false)
-  }, [resize, applyMerges, setSessionAtSlot, sessions, t])
+  }, [resize, applyMerges, setSessionAtSlot, setSlotType, clearSlotType, grid.config, sessions, t])
 
   // Called when RecoveryDialog finishes — auto-load active workspace only if no sessions exist yet
   const handleRecoveryDone = useCallback(async () => {
