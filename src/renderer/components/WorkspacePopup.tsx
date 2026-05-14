@@ -77,6 +77,8 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
   const [allTags, setAllTags] = useState<string[]>([])
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
   const [hasDetached, setHasDetached] = useState(false)
+  const [savePrompt, setSavePrompt] = useState('')
+  const [saveContextPaths, setSaveContextPaths] = useState<string[]>([])
 
   useEffect(() => {
     let mounted = true
@@ -201,7 +203,20 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     setSaveName(defaultName)
     setSaveTags([])
     setTagInput('')
+    setSavePrompt('')
+    setSaveContextPaths([])
     setShowSaveDialog(true)
+  }, [])
+
+  const handleSaveContextPathAdd = useCallback(async () => {
+    const api = (window as any).cipherMux
+    const result = await api.dialog.openDir({ title: t('workspacesTab.addDirectory') })
+    if (!result) return
+    setSaveContextPaths(prev => prev.includes(result) ? prev : [...prev, result])
+  }, [t])
+
+  const handleSaveContextPathRemove = useCallback((pathToRemove: string) => {
+    setSaveContextPaths(prev => prev.filter(p => p !== pathToRemove))
   }, [])
 
   const handleSaveCurrentConfirm = useCallback(async () => {
@@ -350,6 +365,44 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
                     </div>
                   )}
                 </div>
+              </div>
+              {/* Workspace Prompt */}
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-dim)', marginBottom: '4px' }}>
+                  {t('workspacesTab.workspacePrompt')}
+                </div>
+                <textarea
+                  class="input"
+                  value={savePrompt}
+                  placeholder={t('workspacesTab.workspacePromptPlaceholder')}
+                  onInput={(e) => setSavePrompt((e.target as HTMLTextAreaElement).value)}
+                  style={{ width: '100%', minHeight: '50px', resize: 'vertical' }}
+                />
+              </div>
+
+              {/* Kontext-Verzeichnisse */}
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-dim)', marginBottom: '4px' }}>
+                  {t('workspacesTab.contextDirectories')}
+                </div>
+                <div class="context-path-list">
+                  {saveContextPaths.map((p) => (
+                    <div key={p} class="context-path-item">
+                      <span class="context-path-text" title={p}>{p}</span>
+                      <button
+                        class="context-path-remove"
+                        onClick={() => handleSaveContextPathRemove(p)}
+                      >✕</button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  class="ghost"
+                  onClick={handleSaveContextPathAdd}
+                  style={{ width: '100%', marginTop: '4px' }}
+                >
+                  {t('workspacesTab.addDirectory')}
+                </button>
               </div>
               <div class="wp-save-dialog__info">
                 {currentGrid ? `${currentGrid.config.cols}×${currentGrid.config.rows} · ${currentGrid.slots.filter(s => s.sessionId).length} ${t('workspacePopup.activeSessions')}` : ''}
