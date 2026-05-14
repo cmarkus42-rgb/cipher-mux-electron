@@ -39,7 +39,7 @@ mux_send is NOT a prompt input mechanism. Claude sessions do not read the messag
 
 Correct procedure:
 
-1. mux_create_session — create session
+1. mux_create_session — create session. **Always pass subProjektId** so the model is auto-resolved from the SubProjekt record (you can also pass model explicitly to override).
 2. **Wait 8–10s** — tmux + zsh + Claude CLI need to start up
 3. \`tmux capture-pane -t <tmuxSession> -p | tail -30\` — Check if Claude prompt (❯) is visible
 4. If not ready: wait another 5s, retry (max 3 attempts)
@@ -70,7 +70,7 @@ Check connection on startup: call mux_status. If no response → inform user.
 ## Available MCP Tools
 
 - **mux_sessions** — list running sessions
-- **mux_create_session** — start new worker session
+- **mux_create_session** — start new worker session (pass subProjektId to auto-resolve model from SubProjekt)
 - **mux_kill_session** — terminate session
 - **mux_send** — write message to the message bus (inter-session, not prompt input)
 - **mux_read** — read messages from the bus

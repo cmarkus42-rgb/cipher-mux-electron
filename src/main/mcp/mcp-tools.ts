@@ -281,10 +281,22 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         shellOnly: z.boolean().optional().describe('If true, open plain shell without Claude CLI'),
         resume: z.boolean().optional().describe('If true, launch Claude with --resume flag'),
         model: z.enum(['haiku', 'sonnet', 'opus']).optional().describe('Model to use for Claude CLI (--model flag)'),
+        subProjektId: z.string().optional().describe('Cyber Factory SubProjekt ID — auto-resolves model from SubProjekt if no explicit model given'),
       },
     },
-    async (args: { name: string; projectPath: string; command?: string; visible?: boolean; shellOnly?: boolean; resume?: boolean; model?: string }) => {
+    async (args: { name: string; projectPath: string; command?: string; visible?: boolean; shellOnly?: boolean; resume?: boolean; model?: string; subProjektId?: string }) => {
       try {
+        // Resolve model from SubProjekt if not explicitly provided
+        let effectiveModel = args.model
+        if (!effectiveModel && args.subProjektId && ctx.memoryStore) {
+          const { CyberFactoryManager } = require('../cyber-factory/cyber-factory-manager')
+          const cfm = new CyberFactoryManager(ctx.memoryStore)
+          const sp = cfm.getSubProjekt(args.subProjektId)
+          if (sp?.model) {
+            effectiveModel = sp.model
+          }
+        }
+
         // Build autoLaunch for Claude CLI (matches UI Launcher-Cell path in app.tsx)
         let autoLaunch: string | undefined
         if (!args.command && !args.shellOnly) {
@@ -294,7 +306,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           const parts = [`cd '${escaped}' && clear; claude`]
           if (skipPerms) parts.push('--dangerously-skip-permissions')
           if (args.resume) parts.push('--resume')
-          if (args.model) parts.push('--model', args.model)
+          if (effectiveModel) parts.push('--model', effectiveModel)
           autoLaunch = parts.join(' ') + '\n'
         }
 
