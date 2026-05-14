@@ -179,13 +179,49 @@ Warte bis der User sagt, dass er gespeichert hat, oder frag nach ~60s: "Alles ge
 ### Beat 3.5 — Uebergang
 Kurze Pause (~600ms), dann weiter zur Tail-Eingangsfrage.
 
-## Abschluss
+## Phase 4+5: Tail — Guides + Uebergabe
 
-\`mux_tts_speak\`: "Alles klar. Ich bin hier in deiner Companion-Cell — frag einfach wenn was ist."
+### Eingangsfrage
+TTS: "Soll ich dir noch was zur App erzaehlen?"
+
+Drei Pfade:
+- **Ja** → Guide-Angebot (Beat T.1)
+- **Nein** → TTS: "OK. Ich bin in der Sidebar wenn was ist. Viel Spass." → Skill endet
+- **Direkte Frage** ("Was ist das mit den Workspaces?") → Spring direkt in den Guide
+
+### Beat T.1 — Guide-Angebot
+TTS: "Klar. Vorbereitet hab ich was zu: [Top 3 fuer Level]. Oder frag direkt — Grid, Sidebar, Voice, Entities, was auch immer."
+
+Top-3-Empfehlung nach Level:
+
+| Level | Top 3 |
+|-------|-------|
+| einsteiger | Das Grid, Die Sidebar, Die Entities |
+| fortgeschritten | Die Entities, Workspaces, Sprachsteuerung |
+| power-user | Workspaces, Sprachsteuerung, Notes |
+
+Guide-Dateinamen fuer Routing (aus \`guides/\`):
+- \`grid.md\` — Das Grid — Sessions verstehen und steuern
+- \`focus-popout.md\` — Focus Mode und Pop-Out Fenster
+- \`sidebar.md\` — Die Sidebar — Alles im Blick
+- \`entities.md\` — Die Entities — Wer macht was
+- \`workspaces.md\` — Workspaces — Layouts speichern und anwenden
+- \`notes.md\` — Notes — Notizen anlegen und organisieren
+- \`voice.md\` — Sprachsteuerung — Voice Input und TTS
+- \`04-prompting-fundamentals.md\` — Prompting Fundamentals
+- \`05-prompting-in-mux.md\` — Prompting in cipher-mux
+- \`06-token-craft.md\` — Token Craft
+
+### Beat T.2 — Guide-Loop
+1. User waehlt Guide oder fragt frei
+2. Du erklaerst — kurz, ~1-2 Minuten, mit TTS-Headlines + Terminal-Text
+3. Danach: "Noch was?"
+4. Loop endet bei: "nein", "passt", "danke", "ich leg los", Schweigen >30s, oder Frage die kein Guide ist
+
+### Beat T.3 — Schluss
+TTS: "Alles klar. Ich bin in deiner Companion-Cell — frag einfach."
 
 Skill \`/startup\` endet. Companion-Session laeuft normal weiter.
-
-**KEINE Guides anbieten.** Die Guide-Inhalte sind noch nicht verifiziert und koennen falsche Feature-Beschreibungen enthalten. Der User kann jederzeit frei fragen — dann antwortest du aus deinem CLAUDE.md-Wissen. Aber biete KEINE strukturierte Tour oder Guide-Auswahl an.
 
 ## Globale Regeln
 
