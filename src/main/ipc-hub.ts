@@ -2589,6 +2589,8 @@ ist dieses Entity fokussiert?
     })
 
     ipcMain.handle(IPC.HUB_PROJECTS_DIR, () => projectsDir())
+
+    ipcMain.handle(IPC.HUB_DEFAULT_PATH, () => path.join(os.homedir(), 'cipher-mux'))
   }
 
   // ─── Setup Wizard ─────────────────────────────────────────

@@ -288,6 +288,7 @@ export const IPC = {
   HUB_PROJECTS_DIR: 'cipher-mux:hub:projects-dir',
   HUB_SETUP: 'cipher-mux:hub:setup',
   HUB_GET_PATH: 'cipher-mux:hub:get-path',
+  HUB_DEFAULT_PATH: 'cipher-mux:hub:default-path',
 
   // Shell
   OPEN_EXTERNAL: 'cipher-mux:shell:open-external',
