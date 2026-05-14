@@ -22,8 +22,7 @@ describe('hub-paths', () => {
 
   it('hubRoot returns override', async () => {
     // Dynamic import to pick up env var
-    const { hubRoot, _resetHubRoot } = await import('../../../src/main/hub/hub-paths')
-    _resetHubRoot()
+    const { hubRoot } = await import('../../../src/main/hub/hub-paths')
     assert.equal(hubRoot(), tmpDir)
   })
 
