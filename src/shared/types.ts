@@ -69,6 +69,8 @@ export interface SessionInfo {
   claudeSessionId?: string
   /** Entity ID if this session belongs to a registered entity. */
   entityId?: EntityId
+  /** Number of sendKeys calls this session received. 0 = never used. */
+  interactionCount?: number
 }
 
 export interface StartSessionOpts {
