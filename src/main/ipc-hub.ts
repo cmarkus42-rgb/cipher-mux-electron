@@ -9,6 +9,7 @@ import { MessageBus } from './message-bus/message-bus'
 import { ProjectScanner } from './project/project-scanner'
 import { configStore } from './config/config-store'
 import { getActiveWorkspace } from './workspace/workspace-utils'
+import { projectsDir } from './hub/hub-paths'
 import { StatusLineMonitor } from './monitoring/statusline-monitor'
 import { McpServerManager } from './mcp/mcp-server'
 import { generateApiKey } from './mcp/mcp-auth'
@@ -1053,7 +1054,7 @@ export class IpcHub {
       if (!win) return null
       const result = await dialog.showOpenDialog(win, {
         title: opts?.title ?? 'Select Directory',
-        defaultPath: opts?.defaultPath ?? os.homedir(),
+        defaultPath: opts?.defaultPath ?? projectsDir(),
         properties: ['openDirectory', 'createDirectory'],
       })
       win.focus()
