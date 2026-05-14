@@ -387,13 +387,20 @@ export class SessionManager extends EventEmitter {
     this._cleanupGridSlot(sessionId)
 
     // 2. Send shutdown prompt and wait in background — fire-and-forget
-    this._backgroundGracefulKill(tmuxName, timeoutMs).catch((err) => {
+    const hadInteraction = (session.interactionCount ?? 0) > 0
+    this._backgroundGracefulKill(tmuxName, timeoutMs, hadInteraction).catch((err) => {
       console.error(`[SessionManager] Background graceful kill error:`, (err as Error).message)
     })
   }
 
   /** Background: send shutdown prompt, poll, then hard-kill on timeout. */
-  private async _backgroundGracefulKill(tmuxName: string, timeoutMs: number): Promise<void> {
+  private async _backgroundGracefulKill(tmuxName: string, timeoutMs: number, hadInteraction: boolean): Promise<void> {
+    if (!hadInteraction) {
+      console.log(`[SessionManager] Empty session "${tmuxName}", skipping graceful prompt`)
+      try { await this.tmux.killSession(tmuxName) } catch { /* already gone */ }
+      return
+    }
+
     const shutdownPrompt = [
       'Deine Session wird beendet. Bevor du gehst:',
       '1. Gibt es ungespeicherte Ergebnisse? → Als Note anlegen oder ins Memory schreiben',
@@ -702,6 +709,7 @@ export class SessionManager extends EventEmitter {
   async sendKeys(sessionId: string, keys: string): Promise<void> {
     const session = this.sessions.get(sessionId)
     if (!session) throw new Error(`Session ${sessionId} not found`)
+    session.interactionCount = (session.interactionCount ?? 0) + 1
     const target = session.tmuxPane ?? session.tmuxSession
     await this.tmux.sendKeys(target, keys)
   }
