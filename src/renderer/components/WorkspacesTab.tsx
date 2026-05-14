@@ -37,7 +37,7 @@ export function WorkspacesTab() {
   const [selectedCell, setSelectedCell] = useState(0)
   const [dirty, setDirty] = useState(false)
   const [knownProjects, setKnownProjects] = useState<Array<{ path: string; name: string }>>([])
-  const [defaultWsId, setDefaultWsId] = useState<string | null>(null)
+  const [activeWsForDefault, setActiveWsForDefault] = useState<string | null>(null)
   const entityPresets = useEntityPresets()
   const [allTags, setAllTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
@@ -62,7 +62,7 @@ export function WorkspacesTab() {
     // Load default workspace id
     try {
       const defId = await api.config.get('defaultWorkspaceId')
-      setDefaultWsId(defId ?? null)
+      setActiveWsForDefault(defId ?? null)
     } catch { /* ignore */ }
     // Load available tags for autocomplete
     try {
@@ -247,10 +247,10 @@ export function WorkspacesTab() {
     updateWs({ cells })
   }
 
-  const handleToggleDefault = async (wsId: string) => {
-    const nextId = defaultWsId === wsId ? null : wsId
+  const handleActivate = async (wsId: string) => {
+    const nextId = activeWsForDefault === wsId ? null : wsId
     await api.config.set('defaultWorkspaceId', nextId)
-    setDefaultWsId(nextId)
+    setActiveWsForDefault(nextId)
   }
 
   const handleTagInputChange = (value: string) => {
@@ -377,7 +377,7 @@ export function WorkspacesTab() {
                 {renderThumb(w)}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div class="ws-item-name">
-                    {defaultWsId === w.id && <span class="ws-default-star" title={t('workspacesTab.isDefault')}>&#9733; </span>}
+                    {activeWsForDefault === w.id && <span class="ws-active-marker" title={t('workspacesTab.isActive')}>{'\u25C9'} </span>}
                     {w.name}
                   </div>
                   <div class="ws-item-sub">
@@ -391,11 +391,11 @@ export function WorkspacesTab() {
                   )}
                 </div>
                 <button
-                  class={`ws-default-toggle${defaultWsId === w.id ? ' ws-default-toggle--active' : ''}`}
-                  onClick={(e) => { e.stopPropagation(); handleToggleDefault(w.id) }}
-                  title={defaultWsId === w.id ? t('workspacesTab.unsetDefault') : t('workspacesTab.setDefault')}
+                  class={`ws-default-toggle${activeWsForDefault === w.id ? ' ws-default-toggle--active' : ''}`}
+                  onClick={(e) => { e.stopPropagation(); handleActivate(w.id) }}
+                  title={t('workspacesTab.activate')}
                 >
-                  {defaultWsId === w.id ? '\u2605' : '\u2606'}
+                  {activeWsForDefault === w.id ? '\u25C9' : '\u25CB'}
                 </button>
               </div>
             )
@@ -409,18 +409,18 @@ export function WorkspacesTab() {
           <>
             {/* Name row */}
             <div class="ws-ed-row">
-              {defaultWsId === ws.id && <span class="ws-default-star" title={t('workspacesTab.isDefault')}>&#9733;</span>}
+              {activeWsForDefault === ws.id && <span class="ws-active-marker" title={t('workspacesTab.isActive')}>{'\u25C9'}</span>}
               <input
                 class="ws-ed-name"
                 value={ws.name}
                 onInput={(e) => updateWs({ name: (e.target as HTMLInputElement).value })}
               />
               <button
-                class={`ws-ed-tool${defaultWsId === ws.id ? ' ws-ed-tool--star-active' : ''}`}
-                onClick={() => handleToggleDefault(ws.id)}
-                title={defaultWsId === ws.id ? t('workspacesTab.unsetDefault') : t('workspacesTab.setDefault')}
+                class={`ws-ed-tool${activeWsForDefault === ws.id ? ' ws-ed-tool--star-active' : ''}`}
+                onClick={() => handleActivate(ws.id)}
+                title={t('workspacesTab.activate')}
               >
-                {defaultWsId === ws.id ? '\u2605' : '\u2606'}
+                {activeWsForDefault === ws.id ? '\u25C9' : '\u25CB'}
               </button>
               <button class="ws-ed-tool" onClick={handleDuplicate}>{t('workspacesTab.duplicate')}</button>
               <button class="ws-ed-tool danger" onClick={handleDelete}>{t('workspacesTab.delete')}</button>
