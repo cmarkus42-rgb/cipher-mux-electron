@@ -144,6 +144,7 @@ const api = {
     projectsDir: (): Promise<string> => ipcRenderer.invoke(IPC.HUB_PROJECTS_DIR),
     setup: (hubPath: string) => ipcRenderer.invoke(IPC.HUB_SETUP, hubPath),
     getPath: () => ipcRenderer.invoke(IPC.HUB_GET_PATH),
+    defaultPath: (): Promise<string> => ipcRenderer.invoke(IPC.HUB_DEFAULT_PATH),
   },
 
   // ─── Dialogs ──────────────────────────────────────────────

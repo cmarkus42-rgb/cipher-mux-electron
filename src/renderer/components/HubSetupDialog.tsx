@@ -1,6 +1,6 @@
 // src/renderer/components/HubSetupDialog.tsx
 import { h } from 'preact'
-import { useState, useCallback } from 'preact/hooks'
+import { useState, useCallback, useEffect } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import '../styles/hub-setup.css'
 
@@ -13,6 +13,11 @@ export function HubSetupDialog({ onComplete }: HubSetupDialogProps) {
   const [path, setPath] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    api.hub.defaultPath().then((p: string) => { if (p) setPath(p) })
+  }, [])
 
   const handleBrowse = useCallback(async () => {
     try {
