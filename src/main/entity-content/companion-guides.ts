@@ -1,8 +1,9 @@
 /**
  * Companion guides deployer.
  *
- * Deploys all 6 guide files for the Companion entity.
- * Content sourced from ~/.config/cipher-mux/entities/companion/guides/
+ * Deploys 10 guide files for the Companion entity:
+ * - 7 thematic guides (from verified Note content, 2026-05-11)
+ * - 3 prompting guides (04-06, legacy references fixed)
  */
 
 import * as fs from 'fs';
@@ -12,9 +13,13 @@ export function deployCompanionGuides(projectPath: string): void {
   const guidesDir = path.join(projectPath, 'guides');
 
   const files: Array<{ name: string; content: string }> = [
-    { name: '01-first-steps.md', content: GUIDE_01 },
-    { name: '02-daily-workflow.md', content: GUIDE_02 },
-    { name: '03-power-moves.md', content: GUIDE_03 },
+    { name: 'grid.md', content: GUIDE_GRID },
+    { name: 'focus-popout.md', content: GUIDE_FOCUS },
+    { name: 'sidebar.md', content: GUIDE_SIDEBAR },
+    { name: 'entities.md', content: GUIDE_ENTITIES },
+    { name: 'workspaces.md', content: GUIDE_WORKSPACES },
+    { name: 'notes.md', content: GUIDE_NOTES },
+    { name: 'voice.md', content: GUIDE_VOICE },
     { name: '04-prompting-fundamentals.md', content: GUIDE_04 },
     { name: '05-prompting-in-mux.md', content: GUIDE_05 },
     { name: '06-token-craft.md', content: GUIDE_06 },
@@ -27,595 +32,599 @@ export function deployCompanionGuides(projectPath: string): void {
   }
 }
 
-const GUIDE_01 = `# First Steps — From Launch to First Result
+const GUIDE_GRID = `# Guide: Das Grid — Sessions verstehen und steuern
 
-This guide walks a complete beginner through their first cipher-mux session. By the end, you will have two Claude sessions running side by side and understand how the grid works.
-
-**Type:** Tutorial (worked example)
-**Prerequisites:** cipher-mux installed, app launches successfully
-**Time:** 10-15 minutes
+Das Grid ist dein Arbeitsbereich. Hier laufen deine KI-Sessions — sichtbar, gleichzeitig, steuerbar.
 
 ---
 
-## What Is cipher-mux?
+## Was ist eine Session?
 
-cipher-mux is a command center for AI-assisted development. Think of it as a desk with multiple monitors — each screen shows a separate Claude Code session working on its own task. You see everything at once. The sessions can communicate with each other through a shared message system, and a coordinator (the Orchestrator) can manage them automatically.
+Stell dir vor, du rufst Claude gleichzeitig auf mehreren Telefonen an. Jeder Anruf ist unabhängig — eigenes Gedächtnis, eigene Aufgabe, eigenes Verzeichnis. Das Grid zeigt dir alle Anrufe auf einen Blick.
 
-The key idea: instead of one Claude conversation doing everything, you run multiple specialized sessions in parallel. One works on the frontend, another on the backend, a third reviews code. cipher-mux keeps them organized.
+Eine **Zelle** ist ein Slot im Grid. Leer → zeigt \\\`+\\\`. Belegt → zeigt eine laufende Session.
 
-## What You See When the App Starts
+---
 
-The main window has two areas:
+## Eine Session starten
 
-**The Grid** — the large central area. This is where your sessions live. Right now it is probably empty, showing cells with action buttons. Each cell is a slot that can hold a terminal session, a notes editor, or remain empty as a launcher.
+1. Klick auf \\\`+\\\` in einer leeren Zelle
+2. Das **Launcher-Popup** öffnet sich — drei Tabs:
+   - **Presets** — spezialisierte Rollen (Companion, Cyber Factory, etc.)
+   - **Path** — eigenen Projektordner öffnen
+   - **Notes** — eine Notiz in dieser Zelle anzeigen
+3. Preset oder Pfad wählen → Session startet
 
-**The Status Bar** — the strip at the bottom. This is your control panel. From left to right:
-- **Voice pill** — push-to-talk voice input (more on this in Guide 02)
-- **spalten/zeilen +/−** — add or remove grid columns and rows
-- **workspaces** — open the workspace and persona editor
-- **workshop** — start/stop the Workshop (Guide 03)
-- **mpo** — start/stop the Multi-Project Orchestrator (Guide 03)
-- **bugreport** — submit a bug report
-- **sidebar** — toggle the sidebar panel (messages, notes, background sessions)
-- **Theme name** — click to cycle through visual themes
-- **info** — open settings, shortcuts, feature list
-- **Version** — app version (right side)
+Alternativ: \\\`Cmd+N\\\` öffnet das Launcher-Popup in der nächsten freien Zelle.
 
-You do not need most of these yet. Focus on the grid and the sidebar button.
+---
 
-## Opening Your First Project
+## Die Zell-Kopfleiste lesen
 
-Let us get a session running.
+Jede Session hat eine Kopfleiste. Von links nach rechts:
 
-**Step 1:** Look at the empty grid. Each empty cell shows three buttons: "projekt", "session", and "notes".
+**Der Punkt** zeigt den Status:
+- Farbiger Punkt = Entity (Preset) aktiv — Farbe ist entitätsspezifisch
+- Grün = viel Context-Platz
+- Orange/Rot = Context wird eng
 
-**Step 2:** Click **"projekt"** in any cell.
+**Die Farb-Leiste** darunter (der schmale Balken oben im Header) zeigt die Context-Auslastung als Balken. Farbkodierung: grün → gelb → orange → rot.
 
-A popup appears — the **Project Popup**. It has three sections:
-- **Scan results** — projects cipher-mux found automatically on your machine. They show up as cards with the project name, git branch, and a badge showing the project phase.
-- **Custom path** — a text field where you can type or browse to any directory.
-- **Kickoff** — for creating a brand-new project from scratch (covered in Guide 03).
+**Die Buttons rechts** (von links nach rechts):
 
-**Step 3:** Pick a project — either click one from scan results, or enter a path manually and click "öffnen".
+| Symbol | Was es tut |
+|--------|------------|
+| Scan | **Focus Mode** — Session maximieren (→ Guide: Focus Mode) |
+| ↓/↑ | Zelle vertikal expandieren / kollabieren (nur bei 2+ Zeilen) |
+| GitBranch | Session **forken** — neue parallele Kopie |
+| Kamera | **Screenshot** — Snapshot in Zwischenablage |
+| ⇄ | **Projekt wechseln** — anderen Ordner zuweisen, Session bleibt |
+| ↑ | **In Hintergrund** — aus Grid entfernen, weiterläuft (→ Sidebar) |
+| Terminal | **Shell** im Projektverzeichnis öffnen |
+| Pfeil-raus | **Pop Out** — als eigenes Fenster öffnen (→ Guide: Pop-Out Fenster) |
+| ✕ | Session beenden |
 
-**Step 4:** A terminal appears in the cell. You see Claude Code starting up — the prompt indicator (❯) appears after a few seconds. The cell header shows the session name, and a small percentage indicator shows context usage (how much of Claude's memory is used).
+---
 
-That is it. You have a running Claude Code session inside cipher-mux.
+## Grid-Größe anpassen
 
-## What Is a Session?
+Unten in der Statusleiste: **spalten +/-** und **zeilen +/-**.
 
-Think of a session as a separate phone call with Claude. Each session is an independent conversation. Claude in Session A does not know what Claude in Session B is doing — each one has its own context window (working memory), its own files open, its own task.
+- Min. 1×1, Max. 7×3
+- Typisch: 2×1 für Alltag, 3×1 für drei parallele Sessions, 2×2 für Factory + Worker
 
-Behind the scenes, each session runs in tmux — a terminal multiplexer that keeps sessions alive even if the app window closes. This is why cipher-mux sessions survive crashes. Close the app, reopen it, and your sessions are still there.
+---
 
-## Adding a Second Session
+## Sessions verschieben
 
-**Step 1:** Find another empty cell in the grid. If you only have one column, click **spalten +** in the status bar to add a column. A new empty cell appears.
+Header einer Session anfassen und auf eine andere Zelle ziehen. Die beiden Sessions tauschen die Plätze.
 
-**Step 2:** Click **"session"** this time (not "projekt"). A dialog asks for a directory path. Enter any folder, or leave it empty to use your home directory. Click "öffnen".
+---
 
-**Step 3:** A second terminal appears. You now have two Claude sessions running side by side.
+## Context-Warnung ernst nehmen
 
-Click on a cell's header area to **focus** it — the focused session has a highlighted border. Keyboard input goes to the focused session. You can type in one, switch to the other, and both continue independently.
+Wenn der Balken orange oder rot wird, ist das Context Window fast voll. Claude "vergisst" dann ältere Teile des Gesprächs. Lösung: neue Session starten (\\\`/new\\\` in der Session oder Fork).
 
-## Resizing the Grid
+---
 
-The status bar has four small buttons for grid control:
-- **spalten +** / **spalten −** — add or remove columns (max 7)
-- **zeilen +** / **zeilen −** — add or remove rows (max 3)
-
-The grid can go up to 7 columns × 3 rows = 21 cells. Start small — 2×1 or 2×2 is typical for daily work.
-
-The app window resizes automatically when you change the grid dimensions.
-
-## Cell Controls
-
-Each session cell has a header bar with controls:
-
-| Button | What it does |
-|---|---|
-| **↥ / ↧** | Expand cell to full height or collapse back (only visible with 2+ rows) |
-| **⇄** | Switch to a different project without closing the session |
-| **\\\$** | Open a plain shell in the session's project directory |
-| **✕** | Close the session and free the cell |
-
-You can also **drag** a cell header to swap it with another cell. Click and hold the header, drag to another cell, release. The two cells swap positions.
-
-## The Sidebar
-
-Click **"sidebar"** in the status bar. A panel slides in from the right with up to four tabs:
-
-- **Messages** — shows inter-session chat messages (visible when Orchestrator is running)
-- **Background** — sessions running but not shown in the grid (click to add them)
-- **Input Requests** — questions from the MPO that need your answer
-- **Notes** — your saved notes with search and tag filtering
-
-For now, the Notes tab is the most relevant. The others become important when you use the Orchestrator (Guide 03).
-
-The sidebar has a **detach button** (⧉) that opens it as a separate window — useful on multi-monitor setups.
-
-## Closing Sessions and Cleaning Up
-
-To close a session: click **✕** in the cell header. The Claude process stops, the tmux session is killed, and the cell becomes empty again.
-
-To close all sessions: there is no bulk button — close them individually. This is intentional; accidental bulk-close would lose work.
-
-If the app crashes or you force-quit, sessions survive in tmux. On next launch, a **Recovery Dialog** appears offering to adopt orphaned sessions back into the grid or kill them.
-
-## What You Learned
-
-- [x] cipher-mux is a multi-session command center for Claude Code
-- [x] The grid holds sessions, notes, and launcher cells
-- [x] The status bar is the control panel for everything
-- [x] "projekt" opens a project in a session, "session" opens a raw terminal
-- [x] Sessions are independent — separate conversations, separate context
-- [x] Grid resizes with spalten/zeilen +/−, cells can be dragged, expanded, closed
-- [x] The sidebar shows messages, background sessions, and notes
-- [x] Sessions survive crashes thanks to tmux
-
-**Next step:** Guide 02 (Daily Workflow) covers voice input, notes, themes, and the features you will use every day.
+**Weiter:** Guide: Workspaces — Layouts speichern und anwenden
+**Weiter:** Guide: Focus Mode und Pop-Out Fenster
+**Weiter:** Guide: Die Sidebar — Alles im Blick
 `;
 
-const GUIDE_02 = `# Daily Workflow — The Features You Use Every Day
+const GUIDE_FOCUS = `# Guide: Focus Mode und Pop-Out Fenster
 
-This guide covers the cipher-mux features that make up your daily routine: managing sessions, using voice input, taking notes, customizing your environment, and handling common situations.
-
-**Type:** How-To Guide (task-oriented)
-**Prerequisites:** Guide 01 (First Steps)
-**Time:** 15-20 minutes
+Manchmal brauchst du Platz. Focus Mode und Pop-Out geben dir genau das — auf unterschiedliche Arten.
 
 ---
 
-## Managing Multiple Sessions
+## Focus Mode: Eine Session groß schalten
 
-You already know how to create sessions (Guide 01). Here is how to work with several at once.
+Der Focus Mode maximiert eine Session **im Grid** — sie belegt 2×2 Zellen. Die anderen Sessions rücken zusammen, bleiben aber sichtbar.
 
-**Focusing:** Click any cell header to focus that session. The focused cell gets a highlighted border. All keyboard input goes there. Only one session can be focused at a time.
+**Aktivieren:**
+- Scan-Icon (☰ mit Pfeilen) im Session-Header klicken
+- oder \\\`Cmd+Shift+F\\\`
 
-**Swapping positions:** Drag a cell header and drop it on another cell. The two swap places. Useful when you want your main session in the top-left corner.
+**Was passiert:**
+- Die Session expandiert auf 2×2
+- Eine floating **Focus-Bar** erscheint oben
 
-**Expanding a cell:** If your grid has more than one row, each cell has a height toggle button (↥ or ↧). Click ↥ to expand a cell to full grid height — good for reading long output. Click ↧ to collapse back to normal.
-
-**Opening a shell:** The \\\$ button in a cell header opens a plain terminal shell in that session's project directory. No Claude, just a regular shell — for running tests, checking git status, or anything you would do in a terminal.
-
-**Switching projects:** The ⇄ button opens the Project Popup inside an existing session, letting you switch to a different project without closing and reopening.
-
----
-
-## The Sidebar
-
-The sidebar is your information panel — it lives on the right edge and has up to four tabs depending on what is active.
-
-**Toggle:** Click "sidebar" in the status bar. Click again to hide it.
-
-**Detach:** Click the ⧉ button at the top of the sidebar to pop it out as a separate window. Great for multi-monitor setups — put the sidebar on your second screen while the grid fills your main display. It reattaches automatically when you close the separate window.
-
-### Messages Tab
-Visible when the Orchestrator is running. Shows inter-session chat messages (topic: "chat") in real time. This is where the Orchestrator reports progress, workers post status updates, and system warnings appear. Think of it as a project Slack channel.
-
-### Background Sessions Tab
-Visible when sessions exist that are not shown in the grid. Each card shows: session name, project path, context usage bar, and a live terminal preview that refreshes every few seconds. Click a card to pull the session into the next free grid slot.
-
-### Input Requests Tab
-Visible when the MPO is running. Shows questions from the Multi-Project Orchestrator that need your decision. Each request has: the question, 2-4 options (one marked as recommended), and a text field for custom answers. Submit with Cmd+Enter. Speed matters — MPO workers are waiting for your answer.
-
-### Notes Tab
-Always visible. Shows all your saved notes with search and tag filtering. Type in the search field to filter by title or tags. Click tag chips below the search to filter by specific tags (AND logic — clicking two tags shows notes that have both). Double-click a note to open it in a NotesCell in the grid. Hover over a note to reveal the delete button (🗑).
-
----
-
-## Voice Input
-
-cipher-mux has built-in speech-to-text. You talk, it types into the focused session.
-
-### Setup
-Voice input uses a local Whisper model — no internet required, no data sent anywhere. The model file lives at \\\`~/.config/cipher-mux/models/whisper/ggml-small.bin\\\`. If the model is missing, voice features are disabled.
-
-### How to Use
-1. **Enable:** Click the Voice pill in the status bar. The LED turns green (ready).
-2. **Talk:** Start speaking. The Silero VAD (voice activity detector) runs in the browser — it detects when you are speaking and starts recording automatically. The LED turns red (recording).
-3. **Stop talking.** After a brief silence, recording stops. The LED turns yellow (processing) while Whisper transcribes your speech.
-4. **Text appears** in the focused session — but it is NOT submitted yet. You can review it first.
-5. **Submit:** Say "abschicken", "absenden", or "senden" — this presses Enter. Or say "neue Zeile" for a newline without submitting.
-
-### Tips for Effective Voice Input
-- Speak in complete thoughts. Pauses trigger end-of-speech detection.
-- Voice is for natural language instructions, not code. Say "Erstell eine Funktion die Preise berechnet" — do not try to dictate \\\`function calculatePrice(items) { ... }\\\`.
-- Review the transcription before submitting. Whisper is good but not perfect, especially with technical terms.
-- You can mix voice and keyboard: dictate a paragraph, then type a correction, then voice-submit.
-- Ctrl+Shift+Space is the keyboard shortcut for voice toggle (when enabled).
-
----
-
-## Notes
-
-Notes are cipher-mux's built-in markdown editor — a third type of grid cell alongside sessions and launchers.
-
-### Creating a Note
-Click "notes" in any empty cell. A NotesCell appears with a blank editor. Start typing. The editor uses CodeMirror 6 with live markdown rendering — headings, bold, italic, links, code blocks, and quotes render as you type.
-
-### Frontmatter
-Every note has YAML frontmatter at the top:
-\\\`\\\`\\\`yaml
----
-title: My Note Title
-tags: [design, frontend, urgent]
----
+**Die Focus-Bar:**
 \\\`\\\`\\\`
-The title shows in the sidebar Notes tab and the cell tab bar. Tags are used for filtering and are auto-suggested.
+[Session-Name]  CTX 34%  |  Aa  |  ESC
+\\\`\\\`\\\`
+- **CTX XX%** — Context-Nutzung, farbkodiert
+- **Aa** — Font-Größe anpassen (klicken → \\\`-\\\` / px-Anzeige / \\\`+\\\`, Bereich 8–36px)
+- **ESC** — Focus Mode beenden
 
-### Auto-Save and Tagging
-- **Auto-save:** Your note is saved to disk automatically after 2 seconds of inactivity. No tagging happens on auto-save.
-- **Manual save (Cmd+S):** Saves AND triggers Ollama auto-tagging. The local Ollama model (gemma3:4b) reads your note content and suggests up to 5 tags from a repository of predefined + learned tags. You can accept, modify, or ignore the suggestions.
+**Beenden:** ESC-Taste, ESC-Button in der Bar, oder Scan-Icon erneut klicken.
 
-### Note Storage
-- **Global notes:** \\\`~/.config/cipher-mux/notes/\\\` — available in all workspaces
-- **Workspace-scoped notes:** \\\`~/.config/cipher-mux/notes/workspace-<id>/\\\` — tied to a specific workspace
-
-### Working with Notes
-- **Multiple tabs:** Open several notes in one NotesCell using the tab bar. Click + to create a new note. Click × to close a tab.
-- **Delete:** Click the 🗑 icon in the tab bar, or hover over a note in the sidebar and click the delete button. Both show a confirmation dialog.
-- **Search and filter:** Use the sidebar Notes tab to search by title/tags and filter by tag chips.
+**Tipp:** Bei einem 4×2-Grid kannst du zwei Focus-Sessions nebeneinander haben — jede belegt 2×2 ihrer Hälfte.
 
 ---
 
-## Themes
+## Pop-Out: Session als eigenes Fenster
 
-cipher-mux ships with 10 visual themes. Click the theme name in the status bar to cycle through them.
+Das Pop-Out trennt eine Session komplett vom Grid und öffnet sie als eigenständiges Electron-Fenster.
 
-| Theme | Character |
-|---|---|
-| cipher-ivory | Clean light theme, the default for light mode |
-| cipher-dark | The default dark theme, warm and focused |
-| blueprint | Engineer's draft — cyan and indigo on dark blue |
-| warm-paper | Minimal, sepia tones, easy on the eyes |
-| gruvbox-dark | Coder classic — warm retro palette |
-| nord | Cool Scandinavian frost — blue-grey tones |
-| synthwave | 80s sunset — magenta, violet, neon |
-| matrix | Phosphor green on black, pure terminal aesthetic |
-| brutalist | Black and white with signal red accents |
-| high-contrast | WCAG AAA accessible — maximum readability |
+**Aktivieren:** ExternalLink-Icon (Pfeil nach außen oben rechts) im Session-Header.
 
-Themes affect everything: the grid, terminals, sidebar, dialogs, status bar, and even the terminal's ANSI color palette. Your selection persists across sessions.
+**Was das Fenster hat:**
+- Minimale Titelleiste (ohne macOS-Decorations) — verschiebbar per Drag
+- Session-Name links, gedimmt
+- **Dock-Button** rechts: Session zurück ins Grid holen
+
+Die Session **läuft weiter** — kein Neustart, kein Unterbrechung. Gut für: lange laufende Workers die du im Blick behalten willst, oder zweiten Monitor.
 
 ---
 
-## Session Dialog vs. Project Popup
+## Sidebar als Fenster
 
-Two ways to create a session — here is when to use which:
+Die Sidebar kann ebenfalls als eigenes Fenster geöffnet werden.
 
-**Project Popup** (click "projekt"):
-- Shows auto-discovered projects from your scan paths
-- Shows git branch, dirty status, SDD phase
-- Has the Kickoff section for new projects
-- Use this when you want to work on a project
+**Aktivieren:** ⧉-Button im Sidebar-Header (oben rechts der Sidebar).
 
-**Session Dialog** (click "session"):
-- Just a directory path input
-- Creates a raw Claude Code session, no project scanning
-- Use this for quick one-off tasks, exploring a directory, or when you do not need project scaffolding
+**Zurück:** ⇤-Button im Sidebar-Fenster-Header.
+
+Praktisch für: Notes auf einem Monitor, Grid auf dem anderen.
 
 ---
 
-## Recovery After a Crash
-
-cipher-mux sessions run in tmux, which is independent of the Electron app. If the app crashes, closes unexpectedly, or your machine restarts while tmux is running:
-
-1. Relaunch cipher-mux
-2. The **Recovery Dialog** appears automatically, listing orphaned tmux sessions
-3. For each session, choose:
-   - **Übernehmen** — adopt it back into the grid (session continues where it left off)
-   - **Beenden** — kill the tmux session (lost work in that session)
-   - **Alle beenden** — kill all orphaned sessions at once
-
-Adopt first, kill only if a session is stuck or corrupted.
-
----
-
-## Settings
-
-Click "info" in the status bar → "einstellungen" tab.
-
-**Scan Paths:** Configure where cipher-mux looks for projects. Add directories with the + button, remove with ×. Adjust scan depth (1-5 levels deep). Click "rescan" to refresh.
-
-**Agent Settings:** "Skip Permissions" toggle — when enabled, Claude Code runs with \\\`--dangerously-skip-permissions\\\`, meaning it will not ask before editing files or running commands. Leave this off until you trust your setup. It is a power-user feature.
-
-**Theme:** Also configurable here, same as clicking the theme name in the status bar.
-
----
-
-## What You Learned
-
-- Managing multiple sessions: focus, swap, expand, shell, switch projects
-- The sidebar: four tabs, detachable, your information hub
-- Voice input: enable, talk, review, submit with "abschicken"
-- Notes: markdown editor, frontmatter, auto-save, Ollama tagging
-- 10 themes to match your mood and work style
-- Session Dialog for quick tasks, Project Popup for project work
-- Recovery: sessions survive crashes, adopt them back on restart
-- Settings: scan paths, permissions, theme
-
-**Next step:** Guide 04 (Prompting Fundamentals) teaches you how to get the best results from Claude — the skill that makes everything else work.
+**Zurück:** Guide: Das Grid — Sessions verstehen und steuern
+**Weiter:** Guide: Die Sidebar — Alles im Blick
 `;
 
-const GUIDE_03 = `# Power Moves — Orchestrator, MPO, Launcher, and Workspaces
+const GUIDE_SIDEBAR = `# Guide: Die Sidebar — Alles im Blick
 
-This guide covers the advanced systems that set cipher-mux apart from running Claude Code in a single terminal. These are the tools that turn multiple sessions into a coordinated team.
+Die Sidebar ist die Kommandozentrale für alles, was nicht direkt im Grid sichtbar ist: Notes, Hintergrund-Sessions, Nachrichten, Erinnerungen.
 
-**Type:** Explanation + Tutorial (hybrid)
-**Prerequisites:** Guide 01 (First Steps), Guide 02 (Daily Workflow)
-**Time:** 25-30 minutes
+**Öffnen:** \\\`sidebar\\\`-Button in der Statusleiste (leuchtet wenn Inhalt wartet).
 
 ---
 
-## Part 1: The Orchestrator
+## Die fünf Sektionen
 
-### What It Is
-
-The Orchestrator is your air traffic controller. It does not fly the planes — your worker sessions do that. The Orchestrator decides who works on what, monitors progress, handles failures, and reports back to you.
-
-It is a Claude Code session with a special template that gives it access to MCP tools for creating sessions, sending messages, reading status updates, and managing tasks. When you start the Orchestrator, it occupies one cell in the grid and runs like any other session — except its job is to manage other sessions.
-
-### When to Use It
-
-- **Complex multi-step tasks** — You have a feature that requires changes across five files in three different modules. Instead of doing it all in one session (which risks context rot), the Orchestrator breaks it into sub-tasks and assigns each to a worker.
-- **Automated bug fixing** — Submit a bugreport, and the Orchestrator picks it up, spawns a worker session to diagnose and fix it, then reports the result.
-- **Parallel work** — You want three different things done simultaneously. The Orchestrator manages the coordination so you do not have to.
-
-### When NOT to Use It
-
-- Simple single-file changes. Just do it in a regular session.
-- Quick questions or explorations. The Orchestrator adds overhead that is not worth it for small tasks.
-
-### How to Start It
-
-Click **"workshop"** in the status bar. A dot indicator appears when it is active. The Workshop session spawns in the next free grid slot.
-
-### What Happens Behind the Scenes
-
-The Orchestrator receives a generated CLAUDE.md template that includes:
-- Access to all MCP tools (create sessions, send messages, read status, manage tasks)
-- Rules for delegation (break tasks into independent sub-tasks, one per worker)
-- Failure handling (retry up to N times, then escalate to you)
-- Bug report processing (serial queue, one bug at a time)
-
-When you give the Orchestrator a task, it:
-1. Analyzes the task and breaks it into sub-tasks
-2. Creates worker sessions for each sub-task (\\\`mux_create_session\\\`)
-3. Waits for each worker to boot (8-10 seconds — tmux, shell, and Claude need to start)
-4. Verifies the worker is ready (checks for the Claude prompt)
-5. Sends the task instruction directly into the worker's terminal
-6. Monitors progress every 2 minutes (context usage + output)
-7. Reports results back to you in the sidebar Messages tab
-
-### The Worker-Startup Protocol
-
-This is a critical detail that explains why the Orchestrator waits before sending instructions. When a new session is created, three things need to start sequentially: tmux (the terminal multiplexer), zsh (the shell), and Claude Code (the AI). This takes 8-10 seconds. If the Orchestrator sends instructions before Claude is ready, they are lost — Claude is not listening yet.
-
-The protocol: create → wait → verify → send → verify again → monitor. It looks slow but prevents a common failure mode.
-
-### Bug Report Flow
-
-1. You submit a bugreport (via the bugreport dialog in the status bar)
-2. The report lands in the bugreport outbox (\\\`~/.config/cipher-mux/bugreports/outbox/\\\`)
-3. The Orchestrator detects the new report
-4. It creates a worker session named \\\`fix-{bugId}\\\`
-5. The worker diagnoses and fixes the bug
-6. The Orchestrator calls \\\`mux_bugreport_resolve\\\` to mark it done
-7. You see the result in the sidebar
-
-### Monitoring
-
-Watch the sidebar Messages tab for:
-- **Status updates** from workers ("Task 2/5 complete")
-- **Context warnings** ("Worker X is at 85% context usage")
-- **Escalations** ("Could not fix after 3 attempts — need your input")
-
-The context usage indicator in each cell header also shows worker health at a glance: green is fine, orange means getting full, red means critical.
+Jede Sektion ist auf- und zuklappbar — der Zustand wird gespeichert. Klick auf den Sektions-Header klappt sie ein oder aus.
 
 ---
 
-## Part 2: The MPO (Multi-Project Orchestrator)
+### 1. Notes
 
-### What It Is
+Dein Notiz-Browser. Zeigt alle Notes, durchsuchbar und nach Tags filterbar.
 
-If the Orchestrator is an air traffic controller handling individual flights, the MPO is a film director planning a multi-location shoot. It takes one big, complex requirement and breaks it into multiple independent sub-projects that run in parallel.
+**Workspace-Filterung:** Wenn ein Workspace aktiv ist, filtert die Notes-Sektion automatisch auf \\\`workspace:<Name>\\\`. Du siehst nur Notes die zu deinem aktuellen Workspace gehören. Filter manuell überschreibbar.
 
-The MPO is for the big stuff: "Build me a platform with authentication, a dashboard, and an API" — where the Orchestrator would handle "refactor the auth module."
+**Interaktion:**
+- Einfachklick → Details/Preview
+- Doppelklick → Note in Grid-Zelle öffnen
+- Drag → Note auf eine Grid-Zelle ziehen
 
-### The 10-Phase Lifecycle
-
-The MPO works through a structured sequence:
-
-**Phase 1-2: Understanding**
-The MPO reads your requirements document, validates that all necessary information is present (goal, audience, features, constraints), identifies ambiguities, and decides what it can resolve on its own versus what it needs to ask you.
-
-**Phase 3-4: Planning**
-It chooses a decomposition strategy (feature-based, layer-based, module-based, or hybrid), builds a dependency graph between sub-projects, writes a detail spec for each one, and saves it in the sub-project's directory.
-
-**Phase 5: Launch**
-Sub-projects launch in waves. Wave 1: independent projects with no blockers. Wave 2: projects that depend on Wave 1 results. And so on. Per wave, the MPO creates sessions, waits for boot, sends the detail spec, and creates tasks in the task queue.
-
-**Phase 6-8: Monitoring & Support**
-Every 7 minutes, the MPO checks all running sessions. It detects stuck signals (no output for 20+ minutes, context above 90%, repeated errors, rapid-fire questions). When a worker has a question, the MPO decides whether to answer it autonomously or escalate to you.
-
-**Phase 9-10: Completion**
-The MPO tracks sub-project completion (commit + 10 min inactivity, or explicit "fertig"), compiles a final summary, and sends it to you via the sidebar.
-
-### The 5 Escalation Levels
-
-Not every question needs your attention. The MPO has clear rules for what it handles alone:
-
-| Level | Source | What happens |
-|---|---|---|
-| 1 | Explicitly in requirements | MPO answers directly ("Requirements say REST-first, so using REST") |
-| 2 | Derivable from constraints | MPO answers with justification ("Stack implies TypeScript, choosing that") |
-| 3 | Another session's decision | MPO applies consistency ("Session B chose this pattern, applying to Session C") |
-| 4 | Needs web research | MPO researches, documents sources, applies result |
-| 5 | Taste, strategy, irreversible | MPO asks YOU via sidebar Input Request |
-
-**Heuristic:** If an answer requires 3+ steps or more than one assumption, the MPO considers it "guessed" and escalates to Level 5.
-
-### Input Requests
-
-When the MPO needs your decision (Level 5), it creates a bubble in the sidebar Input Requests tab. Each bubble shows:
-- The question
-- 2-4 concrete options with context
-- A recommended option (marked with a badge)
-- A text field for custom answers
-
-Answer by clicking an option or typing a custom response and pressing Cmd+Enter. The MPO distributes your answer to affected worker sessions and continues.
-
-**Speed matters.** Worker sessions are paused waiting for your decision. A quick answer keeps the pipeline flowing. If you need time to think, that is fine — but the workers are idle.
-
-### When MPO Is Overkill
-
-- Single-module changes → use regular Orchestrator
-- Anything that fits in one session → just do it directly
-- Unclear requirements → sort out what you want first, then use MPO
-
-### When MPO Shines
-
-- Multi-component features (frontend + backend + database)
-- New project scaffolding with clear requirements
-- Anything where you would otherwise manually coordinate 3+ sessions
+**Mehrere Notes:** Auswählen → löschen (mit 15 Sekunden Undo-Möglichkeit) oder Tags hinzufügen/entfernen.
 
 ---
 
-## Part 3: The Project Launcher
+### 2. Background Sessions
 
-### What It Is
+Sessions die aus dem Grid in den Hintergrund geschickt wurden (↑-Button im Header). Sie laufen weiter — du siehst sie hier.
 
-Think of it as a construction site foreman who prepares the site before workers arrive. The Launcher takes a project directory, scaffolds the development infrastructure (CLAUDE.md, SPEC.md skeleton, .claude/ directory, .gitignore), and hands off to a requirements interview.
+Jede Karte zeigt Name und Context-Nutzung.
 
-### How to Use It
+**Einfachklick:** Karte expandieren — zeigt Pfad, Context-Balken, Terminal-Preview (wird alle 5 Sekunden aktualisiert)
+**Doppelklick:** Session ins Grid holen
+**Drag:** Session auf eine Ziel-Zelle im Grid ziehen
 
-1. Click **"projekt"** in an empty cell
-2. In the Project Popup, expand the **Kickoff** section
-3. Fill in:
-   - **Projekt-Verzeichnis:** where the project will live (must exist)
-   - **Anforderungsdatei:** optional path to a requirements document (text, markdown, PDF)
-   - **Extra context:** anything else the launcher should know
-4. Click "starten"
+---
 
-### What Happens (Two Stages)
+### 3. Orphaned Sessions *(erscheint nur wenn vorhanden)*
 
-**Stage 1 — Scaffold:**
-A dedicated launcher session starts in the global template directory (\\\`~/.config/cipher-mux/projectlauncher/\\\`). It reads your requirements, analyzes the project scope, and generates the project skeleton in your target directory. This takes 2-10 minutes depending on complexity.
+tmux-Sessions die cipher-mux nicht kennt — Überbleibsel nach Abstürzen oder manuell gestartete Sessions.
 
-The scaffold includes:
-- \\\`CLAUDE.md\\\` — project instructions for Claude Code
-- \\\`docs/SPEC.md\\\` — technical specification skeleton
-- \\\`.claude/\\\` — settings and skills directory
-- \\\`.gitignore\\\` — sensible defaults
-- \\\`docs/decisions/\\\` — ADR (Architecture Decision Record) directory
+Pro Session: **Adoptieren** (ins System übernehmen) oder **Beenden**.
 
-**Stage 2 — Interview:**
-Once scaffolding is complete (detected by a marker file or MCP call), a new session opens in the target project directory and starts the \\\`/interview\\\` skill — a structured requirements gathering process.
+---
 
-### Writing Good Requirements
+### 4. Companion Memory
 
-The Launcher is only as good as the input you give it. A good requirements document includes:
+Gespeicherte Erinnerungen des Companions aus vergangenen Sessions. Standardmäßig eingeklappt. Durchsuchbar.
 
-- **Goal:** one sentence describing what this project does
-- **Target audience:** who will use it
-- **Functional requirements:** numbered list of what it must do
-- **Constraints:** tech stack, design preferences, what it must NOT do
-- **Non-functional requirements:** performance, security, accessibility needs
+---
 
-You do not need perfect prose. Bullet points work. The key is completeness — every missing piece is a gap the Launcher has to guess at.
+### 5. Messages
 
-**A good requirements file (example):**
+Nachrichten über den **Message Bus** — der gemeinsame Kanal aller Sessions. Zeigt Sender, Uhrzeit, Text.
+
+---
+
+## Sidebar als eigenes Fenster
+
+⧉-Button im Sidebar-Header öffnet die Sidebar als separates Fenster — ideal für Multi-Monitor. ⇤ dockt sie wieder zurück.
+
+---
+
+**Zurück:** Guide: Das Grid — Sessions verstehen und steuern
+**Weiter:** Guide: Workspaces — Layouts speichern und anwenden
+`;
+
+const GUIDE_ENTITIES = `# Guide: Die Entities — Wer macht was
+
+cipher-mux kommt mit einer Reihe spezialisierter KI-Rollen — **Entities** genannt. Jede hat ein klares Aufgabengebiet. Das Ziel: die richtige Rolle für den richtigen Job, statt eine Generalisten-Session für alles.
+
+---
+
+## Der Software-Lebenszyklus
+
+Die Entities sind entlang eines Entwicklungsablaufs angeordnet:
+
 \\\`\\\`\\\`
-Goal: A CLI tool that converts markdown files to PDF with custom styling.
-
-Audience: Technical writers who want consistent PDF output from markdown.
-
-Features:
-1. Accept one or more .md files as input
-2. Apply a CSS stylesheet for PDF rendering
-3. Support code blocks with syntax highlighting
-4. Generate table of contents from headings
-5. Output to specified directory or stdout
-
-Constraints:
-- Node.js, no native dependencies
-- Must work on macOS and Linux
-- No Electron or browser dependency
-- Target: single binary via pkg or similar
-
-Non-functional:
-- Process a 100-page document in under 10 seconds
-- Accessible PDF output (tagged PDF)
+Idee → Anforderungen → Implementierung → Testen → Bugs fixen
 \\\`\\\`\\\`
 
----
-
-## Part 4: Workspaces and Personas
-
-### What Is a Persona?
-
-A persona is a hat you put on Claude. "Today you are a frontend developer." "Today you are a code reviewer." "Today you are a security auditor." Each persona has:
-
-- **Name** — displayed in the cell header and workspace editor
-- **Color** — a swatch from the palette, for visual distinction in the grid
-- **Default Prompt** — the instructions Claude receives when this persona is activated
-
-cipher-mux ships with builtin personas: Orchestrator, MPO, Worker, and empty. These are locked (you can edit the prompt but not the name or color). You can create unlimited custom personas with your own names, colors, and prompts.
-
-### What Is a Workspace?
-
-A workspace is a pre-arranged conference room. You define the grid layout, assign a persona and project to each cell, and save it. Next time you need that setup, one click on "Apply" and cipher-mux:
-
-1. Resizes the grid to the workspace dimensions
-2. Applies row merges (cells that span multiple rows)
-3. Spawns sessions for each non-empty cell with assigned projects
-4. Sets the active workspace for scoped notes
-
-Instead of manually creating five sessions and remembering which one does what, you build the layout once and reuse it.
-
-### Creating a Workspace
-
-1. Click **"workspaces"** in the status bar. A separate window opens.
-2. Select the **"workspaces"** tab.
-3. Click **"+"** to create a new workspace.
-4. Use the **grid editor** to define dimensions and layout. Drag merge handles on cell borders to create vertically spanning cells (for example, a tall Orchestrator cell next to two smaller worker cells).
-5. Click a cell to open the **cell inspector**. Assign: persona, project directory, custom prompt (optional).
-6. Click **"save"**.
-
-### Applying a Workspace
-
-Two ways:
-- In the WorkspacesWindow: select workspace → click "Apply"
-- Via the **WorkspacePopup** (accessible from grid or status bar): click the workspace thumbnail
-
-Applying replaces the current grid layout. Existing sessions are closed. New sessions spawn for all non-empty cells.
-
-### Prompt Resolution
-
-When a session starts from a workspace, its prompt comes from three possible sources, checked in order:
-
-1. **Cell prompt** — specific to this cell in this workspace (highest priority)
-2. **Workspace prompt override** — an override for this persona within this workspace
-3. **Persona default prompt** — the persona's standard prompt (lowest priority)
-
-This lets you use the same "Frontend Developer" persona across workspaces but give it project-specific instructions in each one.
-
-### Persona Skill Sync
-
-When you save a persona, cipher-mux automatically generates a skill file at \\\`.claude/skills/personas/<persona-name>/SKILL.md\\\`. This means persona prompts are available as Claude Code skills in any project that has the cipher-mux skill directory linked.
+Und dahinter drei unterstützende Rollen: Companion, Audit, Workshop.
 
 ---
 
-## What You Learned
+## Die Entities im Überblick
 
-- **Orchestrator:** air traffic controller for task delegation and bug processing
-- **MPO:** film director for multi-project decomposition with autonomous decision-making
-- **Launcher:** site foreman who scaffolds projects before development begins
-- **Workspaces:** saved grid layouts with persona and project assignments
-- **Personas:** named roles with colors and prompts that shape Claude's behavior
+### Companion
+**Dein Einstiegspunkt.** Erklärt Konzepte, hilft bei Entscheidungen, nimmt Bug-Reports auf. Merkt sich deine Präferenzen über Sessions hinaus.
 
-**Next step:** Guide 05 (Prompting in cipher-mux) teaches you how to write effective instructions for these systems — the Orchestrator expects a different prompt style than a regular session.
+Nicht: Code schreiben oder ausführen. Der Companion *berät*, er *macht* nicht.
+
+---
+
+### Ideation Partner
+**Für rohe Ideen.** Du bringst eine vage Vorstellung — Ideation recherchiert, strukturiert, fokussiert. Ergebnis: ein Anforderungspaket das an Refinement übergeben werden kann.
+
+*Beispiel:* "Ich will eine Trading-Dashboard-App" → Ideation klärt: Welche Daten? Welche Ansichten? Welche Integrationen? → Anforderungspaket.
+
+---
+
+### Refinement
+**Für saubere Anforderungen.** Nimmt ein Anforderungspaket und macht daraus eine Detail-Spec mit REQ-IDs, Lücken-Audit, klaren Akzeptanzkriterien. Kein Code — nur Spec.
+
+---
+
+### Cyber Factory
+**Für große, strukturierte Implementierungsprojekte.** Plant Wellen, koordiniert bis zu 5 parallele Worker-Sessions, monitort Fortschritt, übergibt an Testing. Hoher Koordinationsaufwand — die "Fabrik".
+
+*Wann:* Wenn es mehrere größere Aufgaben gibt die aufeinander aufbauen.
+
+---
+
+### Workshop
+**Für kleine Jobs.** Einzelne Fixes, Wartungsaufgaben, alles zu klein für die Factory. Außerdem: Koordinator für **Bugreport-Triage** — nimmt Findings aus Testing-Sessions entgegen, verteilt sie an Debugger, Ideation oder Cyber Factory.
+
+*Wann:* "Mach das mal schnell" — oder nach einer Testing-Session wenn Bugs verteilt werden müssen.
+
+---
+
+### Testing Assistant
+**Für strukturiertes Testen.** Führt Testcases aus, probiert adversariale Szenarien, prüft Sicherheit, erstellt einen Findings-Report. Übergibt an Workshop.
+
+---
+
+### Debugger
+**Für gezieltes Bug-Fixen.** Bekommt Findings, analysiert Root Cause, plant Fix, führt aus, verifiziert. Entscheidet selbst: ist es klein → erledigt selbst, ist es groß → gibt an Workshop oder Cyber Factory weiter.
+
+---
+
+### Audit
+**Für Code-Review und Release-Entscheidung.** Prüft Code, Sicherheit, ADR-Konsistenz. Läuft als Schleife bis alles sauber ist. Gibt eine Release-Empfehlung.
+
+---
+
+### Launcher
+**Für den Projekt-Kickoff.** Scannt Projekte, startet die Orchestrierung. Spezialisierte Rolle im Kickoff-Flow.
+
+---
+
+## Die Weichen im System
+
+Zwei Entities sind besondere Weichen:
+
+**Debugger** entscheidet nach der Analyse: Ist der Job klein genug → macht er selbst weiter. Ist er zu groß → gibt er an Workshop (viele kleine) oder Cyber Factory (große Projekte) ab.
+
+**Workshop** ist die Schaltzentrale für Bug-Triage: empfängt Findings, klassifiziert (Trivialität / Bug / Feature / Eskalation), verteilt an die passende Entity.
+
+---
+
+## Welche Entity wann?
+
+| Situation | Entity |
+|-----------|--------|
+| Neue Idee entwickeln | Ideation Partner |
+| Anforderungen präzisieren | Refinement |
+| Größeres Feature bauen | Cyber Factory |
+| Schnelle Fixes / kleine Jobs | Workshop |
+| Testen und Bugs finden | Testing Assistant |
+| Einzelnen Bug analysieren und fixen | Debugger |
+| Code-Qualität und Release prüfen | Audit |
+| Fragen / Erklärungen / Orientierung | Companion |
+
+---
+
+**Zurück:** Guide: Workspaces — Layouts speichern und anwenden
+**Verwandt:** cipher-mux Wissensbase — Vollständige Feature-Dokumentation (Detailreferenz)
+`;
+
+const GUIDE_WORKSPACES = `# Guide: Workspaces — Layouts speichern und anwenden
+
+Ein Workspace ist ein gespeichertes Grid-Layout — welche Sessions wo laufen, mit welchen Projekten und Einstellungen. Ein Klick, alles steht.
+
+**Öffnen:** \\\`workspaces\\\` in der Statusleiste → eigenes Fenster mit 4 Tabs.
+
+---
+
+## Tab: Workspaces
+
+Links die Liste deiner Workspaces, rechts der Editor.
+
+### Workspace erstellen
+
+1. \\\`+ Neu\\\` in der Liste
+2. Name vergeben
+3. Spalten/Zeilen einstellen
+4. Zellen befüllen (Klick auf Zelle → EntityPicker)
+5. Speichern
+
+### Zelle konfigurieren
+
+Klick auf eine Zelle im Grid-Editor öffnet den **Cell Inspector**:
+
+- **Cell Type** — Session oder Notes-Zelle
+- **Preset** — welches Entity-Preset, oder eigener Projektpfad
+- **Cell Prompt** — optionaler Zusatz-Prompt nur für diese Zelle
+
+### Zellen zusammenführen
+
+Am unteren Rand einer Zelle erscheint ein Handle — klicken verbindet die Zelle mit der darunterliegenden. Nochmal klicken trennt sie.
+
+### Workspace-weite Einstellungen
+
+**Workspace Prompt:** Text der in *alle* Sessions dieses Workspaces injiziert wird.
+
+**Context Directories:** Verzeichnisse als zusätzlicher \\\`@\\\`-Kontext für alle Sessions.
+
+**Default Tags:** Tags die automatisch auf neue Notes angewendet werden (nur \\\`klasse:wert\\\`-Format).
+
+**Notes Global:** Notes-Sektion zeigt alle Notes global oder nur workspace-gefiltert.
+
+### Default-Workspace
+
+Stern-Button → wird beim App-Start automatisch geladen.
+
+---
+
+## Tab: Companion
+
+Characters (Personas) verwalten. Ein Character steuert Ton und Stil — für alle Entity-Sessions gleichzeitig. Der aktive Character-Block wird in jede Session injiziert.
+
+**Die sechs eingebauten Characters:**
+
+| Name | Kurzcharakter |
+|------|---------------|
+| **Relay** (Standard) | Ruhig, präzise, wissenschaftsjournalistisch. Kein Lob ohne Prüfung. |
+| **Cipher** | Positiver Cyberpunk, pragmatisch loyal. Trocken, direkt, Gegenargumente unaufgefordert. |
+| **Wayne** | Pragmatischer Enthusiast. "Das kriegen wir hin"-Attitude, leichter Nerd-Humor. |
+| **Der Kyniker** | Nur Fakten und Code. Kein Fließtext, kein Lob. Ja/Nein wenn möglich. |
+| **Theaitetos** | Führt durch Fragen, nicht Antworten. Deckt Lücken und Confirmation Bias auf. |
+| **Der Glitch** | Bricht Denkmuster. Unkonventionelle Metaphern, hinterfragt die Prämisse. |
+
+**Globaler Override:** Checkbox — dieser Character überschreibt alle preset-spezifischen Zuweisungen.
+
+Eigene Characters: Name + Farbe + Prompt-Text. Activate-Button macht ihn aktiv.
+
+---
+
+## Tab: Presets
+
+Zeigt alle Entity-Presets. CLAUDE.md-Inhalt direkt editierbar.
+
+Neues Custom-Preset: "Neu anlegen" — liefert ein Template mit Abschnitten: Rolle, Fähigkeiten, Arbeitsregeln, Scope.
+
+---
+
+## Tab: Tags
+
+Tag-Verwaltung. Tag-Klassen und vordefinierte Tags konfigurierbar.
+
+---
+
+**Zurück:** Guide: Das Grid — Sessions verstehen und steuern
+**Weiter:** Guide: Die Entities — Wer macht was
+`;
+
+const GUIDE_NOTES = `# Guide: Notes — Notizen anlegen und organisieren
+
+Das Notes-System ist der Wissensspeicher von cipher-mux. Sessions schreiben Notes, du liest sie, verlinkst sie, und gibst sie weiter — auch an andere Apps wie Obsidian.
+
+---
+
+## Note anlegen
+
+**Über den Launcher:** \\\`+\\\` in einer leeren Zelle → Tab **Notes** → "Neue Notiz".
+
+**Über die Sidebar:** Notes-Sektion → \\\`+\\\`-Button.
+
+**Per Session:** Jede Session kann Notes über MCP-Tools anlegen (\\\`mux_notes_create\\\`).
+
+---
+
+## Note bearbeiten
+
+Eine Note öffnet sich in einer **Grid-Zelle** als Markdown-Editor (CodeMirror).
+
+Unterstützte Formatierung: Überschriften, **fett**, *kursiv*, Links, Code-Blöcke, Zitate, Listen, Tabellen.
+
+**Speichern:**
+- \\\`Cmd+S\\\` → speichert und schlägt **Tags** vor (via lokalem KI-Modell)
+- **Auto-Save** nach 2 Sekunden Inaktivität (ohne Tag-Vorschlag)
+
+---
+
+## Tags
+
+Tags sind das Organisationsprinzip. Format immer: \\\`klasse:wert\\\`
+
+Beispiele:
+- \\\`workspace:CIPHER-MUX\\\`
+- \\\`kind:bugreport\\\`
+- \\\`entity:companion\\\`
+- \\\`status:open\\\`
+
+Beim Speichern mit \\\`Cmd+S\\\` schlägt das lokale Modell (Ollama) passende Tags vor. Du kannst sie übernehmen, ablehnen oder eigene tippen.
+
+**Tag-Autocomplete:** Beim Tippen eines Tags werden bekannte Tags vorgeschlagen.
+
+---
+
+## Notes in der Sidebar finden
+
+Sidebar → Sektion **Notes**. Suche (Volltextsuche) und Tag-Filter.
+
+**Workspace-Filter:** Wenn ein Workspace aktiv ist, zeigt die Sidebar automatisch nur Notes mit \\\`workspace:<Name>\\\`. Manuell überschreibbar.
+
+**Doppelklick** auf eine Note → öffnet sie in einer Grid-Zelle.
+**Drag** → Note auf eine leere Zelle ziehen.
+
+---
+
+## Notes als Workspace-Zelle
+
+In Workspaces kann eine Zelle als **Notes-Zelle** konfiguriert werden (statt Session). Sie zeigt dann direkt den Notes-Editor. Konfigurierbar im Workspace-Editor → Cell Type.
+
+---
+
+## Wann Note, wann Memory?
+
+| Note | Companion Memory |
+|------|--------------------|
+| Sichtbar in der Sidebar | Nicht im UI sichtbar |
+| Teilbar (auch in Obsidian) | Nur intern |
+| Für Inhalte die dokumentiert werden sollen | Für Präferenzen und Kontext |
+| Handoffs zwischen Sessions | Session-übergreifende Erinnerungen |
+
+**Faustregel:** Wenn du es in Obsidian lesen willst — Note. Wenn es nur die KI wissen soll — Memory.
+
+---
+
+## Handoff-Notes
+
+Sessions übergeben Aufgaben über **Handoff-Notes** — strukturierte Notes mit Tags wie \\\`kind:handoff\\\`, \\\`toEntity:debugger\\\`.
+
+Das ist der Standard-Weg wie z.B. Testing Assistant seine Findings an Workshop übergibt: als Note, nicht als direkter Chat.
+
+---
+
+## Bugreports als Notes
+
+Der Bugreport-Dialog (\\\`Cmd+B\\\`) legt Bugs und Feature-Requests als Notes an:
+- Tags: \\\`kind:bugreport\\\`, \\\`status:open\\\`
+- Sichtbar in der Sidebar unter dem workspace-Filter
+
+---
+
+**Zurück:** Guide: Die Sidebar — Alles im Blick
+**Verwandt:** Guide: Die Entities — Wer macht was
+**Verwandt:** cipher-mux Wissensbase — Vollständige Feature-Dokumentation (Detailreferenz)
+`;
+
+const GUIDE_VOICE = `# Guide: Sprachsteuerung — Voice Input und TTS
+
+cipher-mux hat eine vollständige Sprachsteuerung — lokal, ohne Cloud, ohne Netzwerk. Eingabe per Mikrofon (STT), Ausgabe per Stimme (TTS).
+
+---
+
+## Aktivieren
+
+Die Statusleiste zeigt drei Buttons: \\\`OFF\\\` / \\\`STT\\\` / \\\`COM\\\`
+
+- **OFF** — Sprachsteuerung aus
+- **STT** — Speech-to-Text: Mikrofon → Text wird in die fokussierte Session eingefügt
+- **COM** — Conversation-Modus: spricht direkt mit dem Voice Relay
+
+Die **LED** daneben zeigt den Status: aus / grün (bereit) / rot (nimmt auf) / gelb (verarbeitet).
+
+---
+
+## STT — Sprechen und Senden
+
+Wenn STT aktiv ist, wird gesprochener Text eingefügt — aber **nicht automatisch gesendet**. Du kannst korrigieren, dann senden.
+
+**Senden per Stimme:**
+- "abschicken" / "absenden" / "senden" → Enter
+- "neue zeile" → Zeilenumbruch
+
+Alles andere = normaler Text.
+
+---
+
+## Navigationsbefehle
+
+| Befehl | Aktion |
+|--------|--------|
+| "hoch" / "runter" | Eine Seite scrollen |
+| "ganz hoch" / "ganz runter" | Zum Anfang / Ende |
+| "zum marker" | Zur letzten Antwort |
+| "grid hoch/runter/links/rechts" | Grid-Fokus verschieben |
+| "kopieren" | Aktuelle Selektion in Zwischenablage |
+| "einfügen" | Clipboard in fokussierte Session |
+
+Varianten werden erkannt: "grit", "zelle", "focus".
+
+---
+
+## Voice Pin — Stimme an eine Session binden
+
+Im STT-Modus erscheint neben dem Session-Namen ein ◉-Button. Klicken → Voice geht immer in diese Session, egal wohin du im Grid klickst.
+
+---
+
+## COM-Modus — Voice Relay
+
+Der COM-Modus verbindet dich mit dem **Voice Relay** — das ist im Wesentlichen du und der Companion, aber für reine Sprachinteraktion optimiert.
+
+**Was der Voice Relay ist:**
+- Eine vollständige Session mit derselben Persona und demselben Wissen wie der aktive Character
+- Du redest *mit* ihm — direkt, nicht durch andere Sessions hindurch
+- Er kann die App steuern, Status abfragen, Notes anlegen, Bugs aufnehmen
+- Wenn du möchtest, gibt er Aufgaben an andere Sessions weiter — aber auf deinen Wunsch hin, nicht automatisch
+
+**Was sich ändert (nur die Form, nicht der Inhalt):**
+- Keine Markdown-Ausgabe — fließende Sätze
+- Kurze Turns (4–5 Sätze, dann Pause oder Rückfrage)
+- TTS ist primärer Ausgabekanal
+- IDs, Pfade, Code werden nie vorgelesen — immer zusammengefasst
+
+---
+
+## TTS — Konfiguration
+
+Einstellungen unter \\\`einstellungen\\\` → **Sprache** → TTS.
+
+**Optionen:**
+- **TTS ein/aus**
+- **Engine:** Piper (lokal, schnell) oder macOS-Systemstimme
+- **Verbosity:** Minimal (nur Kernantworten) oder Alles Relevante
+- **Installed Voices:** aktive Stimme wählen, Preview, löschen
+- **Voice Catalog:** neue Piper-Stimmen downloaden, Filter nach Sprache und Qualität
+
+**Barge-In:** Wenn die Session spricht und du anfängst zu reden, unterbricht das die TTS.
+
+---
+
+## Bluetooth-Fernbedienung
+
+BT Shutter (z.B. AB Shutter 3) als Auslöser. Aktivieren unter \\\`einstellungen\\\` → **Sprache** → BT Shutter.
+
+- **Auto:** Knopfdruck = sofort senden
+- **Manual:** Knopfdruck = Aufnahme starten, nochmal = stoppen und senden
+
+---
+
+**Zurück:** Guide: Das Grid — Sessions verstehen und steuern
+**Weiter:** Guide: Notes — Notizen anlegen und organisieren
 `;
 
 const GUIDE_04 = `# Prompting Fundamentals — Getting Real Results from AI
@@ -805,7 +814,7 @@ Generate first, review second — in separate passes. This is more effective tha
 1. First pass: generate the code, text, or plan. Accept that it will have issues.
 2. Second pass: review it critically. Use a fresh session, a different prompt, or even a different model. "Hier ist ein Code-Entwurf. Prüf ihn auf Fehler, Sicherheitslücken, und fehlende Edge Cases."
 
-Research consistently shows: three focused agents working in sequence (generate → review → fix) outperform one generalist working three times as long. This principle is built into cipher-mux's architecture — the Orchestrator delegates to specialized workers rather than doing everything in one session.
+Research consistently shows: three focused agents working in sequence (generate → review → fix) outperform one generalist working three times as long. This principle is built into cipher-mux's architecture — the Cyber Factory delegates to specialized workers rather than doing everything in one session.
 
 ---
 
@@ -835,36 +844,36 @@ The antidote: discipline. Clear prompts, focused sessions, verification before s
 | Anti-hallucination prompt | In CLAUDE.md for critical projects |
 | One topic per session | Always |
 
-**Next step:** Guide 05 (Prompting in cipher-mux) covers how to write effective instructions for the Orchestrator, MPO, and Launcher specifically.
+**Next step:** Guide 05 (Prompting in cipher-mux) covers how to write effective instructions for the Workshop, Cyber Factory, and Launcher specifically.
 `;
 
 const GUIDE_05 = `# Prompting in cipher-mux — Getting the Systems to Work for You
 
-This guide covers how to write effective input for cipher-mux's specialized systems: the Orchestrator, the MPO, the Launcher, voice input, bugreports, and inter-session communication.
+This guide covers how to write effective input for cipher-mux's specialized systems: the Workshop, the Cyber Factory, the Launcher, voice input, bugreports, and inter-session communication.
 
 **Type:** How-To Guide (task-oriented)
-**Prerequisites:** Guide 03 (Power Moves), Guide 04 (Prompting Fundamentals)
+**Prerequisites:** Guide: Die Entities, Guide 04 (Prompting Fundamentals)
 **Time:** 15-20 minutes
 
 ---
 
-## Writing Instructions for the Orchestrator
+## Writing Instructions for the Workshop
 
-The Orchestrator breaks your request into sub-tasks and assigns them to workers. This means your instruction needs to be decomposable — it must be possible to split it into independent pieces.
+The Workshop handles small jobs, maintenance, and single tasks. It breaks your request into sub-tasks and assigns them to workers. This means your instruction needs to be decomposable — it must be possible to split it into independent pieces.
 
-### What the Orchestrator Expects
+### What the Workshop Expects
 
-Clear scope, clear boundaries, clear success criteria. The Orchestrator thinks in terms of: "What sessions do I need to create? What does each one do? How do I know it is done?"
+Clear scope, clear boundaries, clear success criteria. The Workshop thinks in terms of: "What sessions do I need to create? What does each one do? How do I know it is done?"
 
-### Good vs. Bad Orchestrator Instructions
+### Good vs. Bad Workshop Instructions
 
 **Bad:** "Fix the auth stuff and make the frontend look better."
 
-Two problems: "auth stuff" is vague (fix what?), and "look better" is subjective with no success criteria. The Orchestrator cannot decompose this into worker tasks.
+Two problems: "auth stuff" is vague (fix what?), and "look better" is subjective with no success criteria. The Workshop cannot decompose this into worker tasks.
 
 **Good:** "Three tasks: 1. Extract the token validation logic from auth.ts into a new file token-validator.ts with unit tests. 2. Add rate limiting to the login endpoint — max 5 attempts per minute per IP. 3. Replace the inline styles in LoginForm.tsx with CSS modules. All tasks are independent."
 
-The Orchestrator can immediately create three workers, each with a clear, self-contained task.
+The Workshop can immediately create three workers, each with a clear, self-contained task.
 
 ### Sizing Worker Tasks
 
@@ -879,11 +888,11 @@ Rules of thumb:
 
 In the sidebar Messages tab:
 - **Progress updates** — workers report what they are doing
-- **Questions** — sometimes a worker asks for clarification. The Orchestrator tries to answer, but may escalate to you
+- **Questions** — sometimes a worker asks for clarification. The Workshop tries to answer, but may escalate to you
 - **Warnings** — context usage above 80%, repeated errors, or stalled workers
 - **Completion** — "All tasks complete. Summary: ..."
 
-If a worker seems stuck (no progress for 10+ minutes), check the sidebar. The Orchestrator's monitoring catches most stalls, but you can also check manually by looking at cell context usage indicators.
+If a worker seems stuck (no progress for 10+ minutes), check the sidebar. The Workshop's monitoring catches most stalls, but you can also check manually by looking at cell context usage indicators.
 
 ---
 
@@ -930,9 +939,9 @@ If cipher-mux has a quality baseline directory configured, the Launcher uses it 
 
 ---
 
-## Writing for MPO Input Requests
+## Writing for Cyber Factory Input Requests
 
-When the MPO cannot make a decision autonomously, it sends a bubble to the sidebar. Your response drives the direction of multiple worker sessions.
+When the Cyber Factory cannot make a decision autonomously, it sends a bubble to the sidebar. Your response drives the direction of multiple worker sessions.
 
 ### What a Bubble Looks Like
 
@@ -954,10 +963,10 @@ the stated constraints.
 
 ### How to Answer Effectively
 
-- **Read the recommendation first.** The MPO has context you might not have — it knows what all workers are doing. The recommended option usually has the best reasoning.
+- **Read the recommendation first.** The Cyber Factory has context you might not have — it knows what all workers are doing. The recommended option usually has the best reasoning.
 - **If you agree:** click the recommended option. Done. Fast.
 - **If you disagree:** click a different option, or write a custom answer with your reasoning: "Use B because we need session revocation, and JWT revocation is hard to get right."
-- **If you need more info:** write "Explain the trade-offs in more detail" in the custom field. The MPO will elaborate and re-ask.
+- **If you need more info:** write "Explain the trade-offs in more detail" in the custom field. The Cyber Factory will elaborate and re-ask.
 - **Speed matters.** Workers are paused. A 30-second decision keeps the pipeline moving. A 30-minute deliberation means 30 minutes of idle compute. If you genuinely need time, that is fine — but do not forget there are sessions waiting.
 
 ---
@@ -998,9 +1007,9 @@ This pattern catches Whisper's occasional mis-transcriptions before they become 
 
 ## Writing Effective Bugreports
 
-A bugreport feeds into the Orchestrator's bug queue. The better the report, the faster the fix.
+A bugreport feeds into the Workshop's bug queue. The better the report, the faster the fix.
 
-### What the Orchestrator Needs
+### What the Workshop Needs
 
 **Minimum:** What happened, what you expected, where it happened.
 
@@ -1014,7 +1023,7 @@ A bugreport feeds into the Orchestrator's bug queue. The better the report, the 
 
 ### Using Voice Interview Mode
 
-The bugreport dialog has a voice interview option. Ollama asks you questions about the bug and enriches your answers into a structured report. This is great when you are frustrated and just want to vent — the AI turns your stream of consciousness into actionable information.
+The bugreport dialog has a voice interview option. Claude asks you questions about the bug and enriches your answers into a structured report. This is great when you are frustrated and just want to vent — the AI turns your stream of consciousness into actionable information.
 
 ### Screenshot Capture
 
@@ -1028,7 +1037,7 @@ Sessions in cipher-mux communicate through two channels:
 
 ### The Message Bus
 
-A shared SQLite database where sessions post messages tagged with a topic. Anyone can read, anyone can write. The Orchestrator reads the bus regularly to monitor progress.
+A shared SQLite database where sessions post messages tagged with a topic. Anyone can read, anyone can write. The Workshop reads the bus regularly to monitor progress.
 
 **Topics:**
 - \\\`chat\\\` — user-facing messages, shown in sidebar Messages tab
@@ -1040,13 +1049,13 @@ The bus is asynchronous — you post a message, and other sessions pick it up wh
 
 ### tmux send-keys (Direct Injection)
 
-For immediate delivery, the Orchestrator uses tmux to type directly into a worker's terminal. This is how initial task instructions are sent — the message bus cannot deliver prompts to an idle Claude session (it is not reading the bus until it has a task).
+For immediate delivery, the Workshop uses tmux to type directly into a worker's terminal. This is how initial task instructions are sent — the message bus cannot deliver prompts to an idle Claude session (it is not reading the bus until it has a task).
 
 **When to use which:**
 - Status updates, reports, notifications → Message Bus
-- Initial task instructions, urgent redirects → tmux send-keys (handled by Orchestrator automatically)
+- Initial task instructions, urgent redirects → tmux send-keys (handled by Workshop automatically)
 
-As a user, you rarely interact with either directly. The Orchestrator handles routing. But understanding the distinction helps when debugging communication issues: if a worker did not receive an instruction, it is usually a timing issue with tmux send-keys (the worker was not ready yet), not a bus problem.
+As a user, you rarely interact with either directly. The Workshop handles routing. But understanding the distinction helps when debugging communication issues: if a worker did not receive an instruction, it is usually a timing issue with tmux send-keys (the worker was not ready yet), not a bus problem.
 
 ---
 
@@ -1054,9 +1063,9 @@ As a user, you rarely interact with either directly. The Orchestrator handles ro
 
 | System | Key principle |
 |---|---|
-| Orchestrator | Decomposable tasks with clear boundaries and success criteria |
-| MPO | Complete requirements doc with goal, audience, features, constraints |
-| MPO Input Requests | Fast decisions, trust recommendations, ask for detail when unsure |
+| Workshop | Decomposable tasks with clear boundaries and success criteria |
+| Cyber Factory | Complete requirements doc with goal, audience, features, constraints |
+| Cyber Factory Input Requests | Fast decisions, trust recommendations, ask for detail when unsure |
 | Voice | Natural language only, review before submit, no code dictation |
 | Bugreports | Steps to reproduce > vague descriptions. Use voice interview when frustrated |
 | Workers | Standard prompting (Guide 04) — one topic, specific, constrained |
@@ -1099,11 +1108,11 @@ Use for: simple changes, formatting, file operations, tasks with detailed specs,
 ### Multi-Model in cipher-mux
 
 cipher-mux's architecture naturally supports multi-model routing:
-- **Orchestrator:** use the most capable model (Opus). It makes decisions, decomposes problems, and coordinates — reasoning quality matters most here.
+- **Workshop / Cyber Factory:** use the most capable model (Opus). They make decisions, decompose problems, and coordinate — reasoning quality matters most here.
 - **Workers:** use Sonnet for implementation tasks. Good balance of quality and speed.
 - **Simple tasks:** if a worker's task is well-specified (e.g., "rename all instances of X to Y in files A, B, C"), Haiku is sufficient and faster.
 
-The MPO's escalation system is an implicit multi-model pattern: Level 1-4 decisions (autonomous) could run on Sonnet, while Level 5 escalations (to the user) naturally involve the most capable model.
+The Cyber Factory's escalation system is an implicit multi-model pattern: Level 1-4 decisions (autonomous) could run on Sonnet, while Level 5 escalations (to the user) naturally involve the most capable model.
 
 ---
 
@@ -1121,7 +1130,7 @@ Transformer attention creates pairwise relationships between tokens. In very lon
 
 A technique from the Manus AI team: maintain a \\\`todo.md\\\` or \\\`progress.md\\\` file that gets updated as work progresses. At the end of each major step, the model updates this file — pushing the current state and remaining tasks into the recency zone of the context.
 
-In cipher-mux terms: the Orchestrator does this naturally via the task system (\\\`mux_task_update\\\`). The tasks' current state is always queryable, always recent.
+In cipher-mux terms: the Workshop and Cyber Factory do this naturally via the task system (\\\`mux_task_update\\\`). The tasks' current state is always queryable, always recent.
 
 ### When to /compact vs. Start Fresh
 
@@ -1146,7 +1155,7 @@ If you switch topics in the same session, use \\\`/clear\\\` to reset the contex
 
 When you need to investigate something (scan the codebase for patterns, read documentation, explore alternatives), use a subagent. The subagent works in its own context window and returns a summary. Your main session stays clean.
 
-In cipher-mux, this happens naturally: the Orchestrator delegates exploration to workers, keeping its own context focused on coordination.
+In cipher-mux, this happens naturally: the Workshop and Cyber Factory delegate exploration to workers, keeping their own context focused on coordination.
 
 ### /btw for Side Questions
 
@@ -1232,7 +1241,7 @@ cipher-mux has several features that support token-efficient work without you th
 
 **StatusLine Monitor:** Real-time context usage per session, visible in each cell header. Green = healthy, orange = 80%+ (getting full), red = 90%+ (critical). This is your dashboard for session health.
 
-**Orchestrator Context Monitoring:** The Orchestrator checks worker context usage every 2 minutes. If a worker hits 90%, the Orchestrator can take action — finish the current sub-task, summarize, and start a fresh worker.
+**Workshop / Cyber Factory Context Monitoring:** Both check worker context usage every 2 minutes. If a worker hits 90%, they can take action — finish the current sub-task, summarize, and start a fresh worker.
 
 **Message Bus:** Lightweight asynchronous messaging. A status update on the bus is a few dozen tokens. The alternative — having two sessions share a full conversation — would cost thousands of tokens. The bus architecture is inherently token-efficient.
 
@@ -1256,5 +1265,5 @@ cipher-mux has several features that support token-efficient work without you th
 | Subagents for exploration | High — protects main context |
 | Multi-model routing | High — right model for right task |
 
-**This is the final guide in the learning path.** You now have the foundations (Guides 01-02), the power features (Guide 03), the prompting skills (Guides 04-05), and the efficiency knowledge to use it all sustainably.
+**This is the final guide in the learning path.** You now have the foundations (Grid, Sidebar, Notes guides), the power features (Entities, Workspaces, Voice guides), the prompting skills (Guides 04-05), and the efficiency knowledge to use it all sustainably.
 `;

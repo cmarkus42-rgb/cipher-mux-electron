@@ -69,7 +69,7 @@ Write a memory when any of these triggers apply:
 ### Entry format
 
 Short, concrete, with context:
-- "User findet Orchestrator-Analogie (Fluglotse) verwirrend — versteht es besser als 'Projektleiter, der Aufgaben verteilt'"
+- "User findet Workshop-Analogie (Schaltzentrale) verwirrend — versteht es besser als 'Triage-Desk, der kleine Jobs verteilt'"
 - "Baut Trading-Dashboard mit cipher-mux. Nutzt 3 parallele Sessions: UI, Backend, Datenbank"
 
 ### When to search
@@ -84,11 +84,15 @@ When a user asks something, read the appropriate knowledge file before respondin
 
 | User intent | Read this file |
 |---|---|
-| New user, "ich bin neu", first session | \`guides/01-first-steps.md\` |
-| "Wie starte ich ein Projekt?", daily usage | \`guides/02-daily-workflow.md\` |
-| Orchestrator, MPO, Launcher, Workspaces | \`guides/03-power-moves.md\` |
+| Grid, Sessions, Zellen, "wie starte ich?" | \`guides/grid.md\` |
+| Focus Mode, Pop-Out, Session-Fenster | \`guides/focus-popout.md\` |
+| Sidebar, Hintergrund-Sessions, Messages | \`guides/sidebar.md\` |
+| Entities, "wer macht was?", Rollen | \`guides/entities.md\` |
+| Workspaces, Characters, Presets, Layouts | \`guides/workspaces.md\` |
+| Notes, Notizen, Tags, Handoff-Notes | \`guides/notes.md\` |
+| Voice, STT, TTS, Sprachsteuerung | \`guides/voice.md\` |
 | "Wie prompte ich besser?", LLM basics | \`guides/04-prompting-fundamentals.md\` |
-| Requirements schreiben, Orchestrator-Instruktionen | \`guides/05-prompting-in-mux.md\` |
+| Requirements schreiben, Workshop-Instruktionen | \`guides/05-prompting-in-mux.md\` |
 | Token, Kontext, Modelle, Effizienz | \`guides/06-token-craft.md\` |
 | "Welche Features gibt es?", "Was kann X?" | \`ref/features.md\` |
 | MCP-Tools, Toolnamen, Parameter | \`ref/mcp-tools.md\` |
@@ -104,11 +108,11 @@ export function learningPathsBlock(): string {
 
 Suggest these paths based on user level:
 
-**Einsteiger:** \`01-first-steps\` → \`02-daily-workflow\` → \`04-prompting-fundamentals\`
+**Einsteiger:** \`grid\` → \`sidebar\` → \`notes\` → \`04-prompting-fundamentals\`
 Result: productive daily use of cipher-mux with solid prompting foundations.
 
-**Fortgeschritten:** \`03-power-moves\` → \`05-prompting-in-mux\` → \`06-token-craft\`
-Result: orchestration, advanced prompting, token efficiency.
+**Fortgeschritten:** \`entities\` → \`workspaces\` → \`voice\` → \`05-prompting-in-mux\` → \`06-token-craft\`
+Result: full entity workflow, advanced prompting, token efficiency.
 
-**Power-User:** Direct access to \`ref/*\` for lookup. Guides on demand for deep dives.`;
+**Power-User:** Direct access to \`ref/*\` for lookup. \`focus-popout\` and guides on demand for deep dives.`;
 }
