@@ -128,3 +128,34 @@ export function appendSilence(wavBuffer: Buffer, durationMs: number, sampleRate:
 
   return result
 }
+
+/**
+ * Concatenate multiple WAV buffers (same format: mono 16-bit PCM, same sampleRate)
+ * into a single WAV buffer. Strips individual headers, merges PCM data.
+ */
+export function concatenateWavs(wavBuffers: Buffer[]): Buffer {
+  if (wavBuffers.length === 0) return Buffer.alloc(0)
+  if (wavBuffers.length === 1) return wavBuffers[0]
+
+  const headerSize = 44
+  let totalPcmBytes = 0
+  for (const wav of wavBuffers) {
+    totalPcmBytes += wav.length - headerSize
+  }
+
+  // Copy header from first WAV, then append all PCM data
+  const result = Buffer.alloc(headerSize + totalPcmBytes)
+  wavBuffers[0].copy(result, 0, 0, headerSize)
+
+  let offset = headerSize
+  for (const wav of wavBuffers) {
+    wav.copy(result, offset, headerSize)
+    offset += wav.length - headerSize
+  }
+
+  // Update RIFF file size and data sub-chunk size
+  result.writeUInt32LE(result.length - 8, 4)
+  result.writeUInt32LE(totalPcmBytes, 40)
+
+  return result
+}

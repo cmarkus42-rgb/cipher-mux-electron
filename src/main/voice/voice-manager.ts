@@ -17,7 +17,7 @@ import { ConversationEngine, type ConversationTransport } from './conversation-e
 import { VoiceState } from './voice-state'
 import { VoiceInputRouter } from './voice-input-router'
 import { VoiceOutputRouter } from './voice-output-router'
-import { splitSentences, appendSilence, getPauseDuration, type PauseConfig } from './audio-utils'
+import { splitSentences, appendSilence, concatenateWavs, getPauseDuration, type PauseConfig } from './audio-utils'
 
 
 
@@ -430,6 +430,7 @@ export class VoiceManager extends EventEmitter {
 
     const pauseConfig = this._getPauseConfig()
     let produced = false
+    const collectedWavs: Buffer[] = []
 
     // Kick off ALL syntheses concurrently so later sentences render
     // while earlier ones are still playing — eliminates inter-sentence gaps.
@@ -450,13 +451,20 @@ export class VoiceManager extends EventEmitter {
 
       if (this._pipelineInterrupted) break
 
-      // Send to renderer queue (plays sequentially via onended chain)
       produced = true
       if (this.transport) {
+        // Send to renderer queue (gapless AudioContext scheduling)
         this.transport.sendAudioPlayback(wav.toString('base64'))
       } else {
-        await this.playWavViaAfplay(wav)
+        // Collect for single-shot afplay (no inter-sentence gaps)
+        collectedWavs.push(wav)
       }
+    }
+
+    // Without transport: concatenate all WAVs and play once via afplay
+    if (!this.transport && collectedWavs.length > 0) {
+      const merged = concatenateWavs(collectedWavs)
+      await this.playWavViaAfplay(merged)
     }
 
     return produced
