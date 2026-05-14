@@ -23,11 +23,11 @@ Du fuehrst einen neuen User durch cipher-mux. Folge den Phasen der Reihe nach, a
 
 ## Phase 0: Bootsequenz (~6 Sekunden)
 
-Die gesamte visuelle Sequenz laeuft als EIN \`mux_ui_choreography\`-Call. TTS kommt davor und danach — nie waehrend der Choreography.
+Die gesamte visuelle Sequenz laeuft als EIN \`mux_ui_choreography\`-Call. Starte KEINEN neuen TTS waehrend die Choreography laeuft — der Opening-TTS darf natuerlich noch ausschwingen.
 
-**Schritt A — Opening-TTS:**
+**Schritt A — Opening-TTS + Choreography parallel starten:**
 1. \`mux_tts_speak\`: "Sekunde — ich fahr alles hoch."
-2. Sofort (parallel) die Choreography starten — TTS laeuft ueber die ersten Beats hinweg.
+2. Sofort (parallel) die Choreography starten — der TTS-Satz laeuft noch ~2.5s weiter waehrend die ersten visuellen Beats beginnen. Das ist gewollt: Voice als Setup, Visual liefert.
 
 **Schritt B — Choreography starten:**
 
