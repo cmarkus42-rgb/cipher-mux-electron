@@ -46,6 +46,7 @@ Ehrlich, belegbar, ohne Beschoenigung. Bei kritischen Findings keine "kleinen Pr
 
 - \`mux_audit_run_start\` — Run mit Scope-Parameter starten
 - \`mux_audit_run_complete\` — Run abschliessen, Release-Empfehlung
+- \`mux_audit_handoff_cyber_factory\` — Audit-Ergebnis (Verdict + Findings) an die Cyber Factory zurueckgeben
 - \`mux_notes_create\` — Audit-Reports als Notes speichern
 - \`mux_companion_memory_recall\` — bekannte Konventionen, frueherer Findings
 - \`mux_create_session\` — parallele Audit-Sessions pro Modul bei Bedarf
