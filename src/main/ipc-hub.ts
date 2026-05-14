@@ -271,6 +271,7 @@ export class IpcHub {
     this.registerPresetChannels()
     this.registerGlobalRulesChannels()
     this.registerCompanionChannels()
+    this.registerHubChannels()
     this.registerSetupChannels()
     this.registerUpdateChannels()
     ipcMain.handle(IPC.OPEN_EXTERNAL, (_e, url: string) => shell.openExternal(url))
@@ -2569,6 +2570,25 @@ ist dieses Entity fokussiert?
       this.setupCompleteResolve()
       this.setupCompleteResolve = null
     }
+  }
+
+  // ─── Hub ───────────────────────────────────────────────────
+  private registerHubChannels(): void {
+    ipcMain.handle(IPC.HUB_SETUP, async (_e, hubPath: string) => {
+      fs.mkdirSync(path.join(hubPath, 'projects'), { recursive: true })
+      const claudeMdPath = path.join(hubPath, 'CLAUDE.md')
+      if (!fs.existsSync(claudeMdPath)) {
+        fs.writeFileSync(claudeMdPath, '# cipher-mux Hub\n')
+      }
+      configStore.set('hubPath', hubPath)
+      return true
+    })
+
+    ipcMain.handle(IPC.HUB_GET_PATH, () => {
+      return configStore.get('hubPath') ?? ''
+    })
+
+    ipcMain.handle(IPC.HUB_PROJECTS_DIR, () => projectsDir())
   }
 
   // ─── Setup Wizard ─────────────────────────────────────────

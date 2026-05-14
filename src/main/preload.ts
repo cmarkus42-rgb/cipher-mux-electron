@@ -139,6 +139,13 @@ const api = {
     },
   },
 
+  // ─── Hub ──────────────────────────────────────────────
+  hub: {
+    projectsDir: (): Promise<string> => ipcRenderer.invoke(IPC.HUB_PROJECTS_DIR),
+    setup: (hubPath: string) => ipcRenderer.invoke(IPC.HUB_SETUP, hubPath),
+    getPath: () => ipcRenderer.invoke(IPC.HUB_GET_PATH),
+  },
+
   // ─── Dialogs ──────────────────────────────────────────────
   dialog: {
     openFile: (opts?: { title?: string; filters?: Array<{ name: string; extensions: string[] }> }) =>

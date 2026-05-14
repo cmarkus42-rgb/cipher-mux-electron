@@ -284,6 +284,11 @@ export const IPC = {
   SETUP_PROGRESS: 'cipher-mux:setup:progress',
   SETUP_SKIP: 'cipher-mux:setup:skip',
 
+  // Hub
+  HUB_PROJECTS_DIR: 'cipher-mux:hub:projects-dir',
+  HUB_SETUP: 'cipher-mux:hub:setup',
+  HUB_GET_PATH: 'cipher-mux:hub:get-path',
+
   // Shell
   OPEN_EXTERNAL: 'cipher-mux:shell:open-external',
 

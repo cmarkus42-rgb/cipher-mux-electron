@@ -66,10 +66,16 @@ export function EntityPickerPopup({
   // Entity presets (dynamic from registry)
   const entityPresets = useEntityPresets()
 
-  // Load recent paths when mounted
+  // Hub projects dir for folder picker default
+  const [hubProjectsDir, setHubProjectsDir] = useState<string | undefined>(undefined)
+
+  // Load recent paths and hub projects dir when mounted
   useEffect(() => {
     cipherApi().config.get('app').then((cfg: any) => {
       setRecentPaths(cfg?.recentPaths ?? [])
+    }).catch(() => {})
+    cipherApi().hub.projectsDir().then((dir: string) => {
+      if (dir) setHubProjectsDir(dir)
     }).catch(() => {})
   }, [])
 
@@ -192,6 +198,7 @@ export function EntityPickerPopup({
               value={path}
               onChange={setPath}
               placeholder={t('unified.pathPlaceholder')}
+              defaultPath={hubProjectsDir}
               onKeyDown={handlePathKeyDown}
               autofocus
             />
