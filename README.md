@@ -218,7 +218,7 @@ All of these are valid choices. Pick what fits your workflow.
 
 ### How many MCP tools are there?
 
-37 tools across 9 categories: Session Management, Messaging, Task Management, Notes, Companion Memory, Grid & UI Control, Demo & Presentation, Voice/TTS, and Other. Every tool is callable by any entity that has MCP access. See [ref/mcp-tools.md](ref/mcp-tools.md) for the full reference.
+37 tools across 9 categories: Session Management, Messaging, Task Management, Notes, Companion Memory, Grid & UI Control, Demo & Presentation, Voice/TTS, and Other. Every tool is callable by any entity that has MCP access. See [docs/mcp-tools.md](docs/mcp-tools.md) for the full reference.
 
 ### What are entities?
 
