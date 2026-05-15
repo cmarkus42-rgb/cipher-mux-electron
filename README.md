@@ -21,7 +21,7 @@
   <a href="https://cipher-mux.dev"><img alt="Website" src="https://img.shields.io/badge/web-cipher--mux.dev-0088A0?style=flat-square&labelColor=000000"></a>
 </p>
 
-> **v0.9.101** — Open beta. Feedback welcome via [Issues](https://github.com/cmarkus42-rgb/cipher-mux-electron/issues).
+> **v0.9.103** — Open beta. Feedback welcome via [Issues](https://github.com/cmarkus42-rgb/cipher-mux-electron/issues).
 
 ---
 

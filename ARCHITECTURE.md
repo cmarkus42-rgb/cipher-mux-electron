@@ -1,4 +1,4 @@
-# Architecture (v0.9.995)
+# Architecture (v0.9.103)
 
 This document describes the high-level architecture of cipher-mux. It is intended for contributors who want to understand the codebase before making changes.
 
@@ -8,7 +8,7 @@ If you want to build a new adapter, see [CONTRIBUTING.md](CONTRIBUTING.md#writin
 
 cipher-mux is an Electron application with a classic two-process architecture: a **main process** (Node.js) that manages tmux sessions, a SQLite database, an MCP server, and all system integrations; and a **renderer process** (Preact) that displays the terminal grid, chatroom, and cockpit UI.
 
-As of v0.9.995 the system supports **11 entity types** (Launcher, Orchestrator, Refinement, Cyber Factory, Companion, Debugger, Testing Assistant, Audit, Ideation Partner, Voice Relay, Bugreport) that replace the old persona-based session model. The MCP server exposes **40+ tools** covering session management, message bus, tasks, notes, companion memory, voice, grid navigation, UI choreography, handoffs, and more. Key subsystems added since v0.9.6 include:
+As of v0.9.103 the system supports **11 entity types** (Launcher, Orchestrator, Refinement, Cyber Factory, Companion, Debugger, Testing Assistant, Audit, Ideation Partner, Voice Relay, Bugreport) that replace the old persona-based session model. The MCP server exposes **40+ tools** covering session management, message bus, tasks, notes, companion memory, voice, grid navigation, UI choreography, handoffs, and more. Key subsystems added since v0.9.6 include:
 
 - **Companion memory store** — per-entity SQLite FTS5 memory with recall/search/forget via MCP.
 - **Notes system** — full CRUD + search + Ollama auto-tagging, exposed as MCP tools (`mux_notes_*`).
@@ -23,7 +23,7 @@ Communication between main and renderer flows through typed IPC channels defined
 
 ```
 +---------------------------------------------------------------------+
-|                       Electron App (v0.9.995)                        |
+|                       Electron App (v0.9.103)                        |
 |                                                                      |
 |  +---------------------------------------------------------------+  |
 |  |                    Main Process                                |  |
@@ -156,7 +156,7 @@ Communication between main and renderer flows through typed IPC channels defined
 
 ## Entity Framework
 
-As of v0.9.995 cipher-mux uses an entity-based session model that replaces the earlier persona system.
+As of v0.9.103 cipher-mux uses an entity-based session model that replaces the earlier persona system.
 
 ### EntityRegistry
 
