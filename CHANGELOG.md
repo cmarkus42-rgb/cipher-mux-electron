@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.103] — 2026-05-15
+
+### Added
+- **Hub-First Setup:** New users are prompted to choose a Hub directory on first launch — the organizational home for all cipher-mux projects. Folder picker defaults to `hubPath/projects/`.
+- **Model Routing Pipeline:** `mux_create_session` accepts `model` parameter (haiku/sonnet/opus). SubProjekt.model is read at session spawn and passed as `--model` CLI flag to Claude Code.
+
+### Removed
+- **ProjectScanner:** The legacy project scanning system (`scanPaths`, `scanDepth`, `defaultProjectDir`, `ProjectCard`, `useProjects` hook) has been completely removed. Projects are now selected via folder picker, not automatic directory scanning.
+
+### Fixed
+- **HubSetupDialog default path:** Dialog pre-fills with resolved home path (`~/cipher-mux/`) instead of showing it only as placeholder.
+- **README broken link:** `ref/mcp-tools.md` → `docs/mcp-tools.md`.
+- **Security:** `.mcp.json` and `*-mcp-connection.md` added to `.gitignore` to prevent token leaks.
+
+## [0.9.102] — 2026-05-13
+
+### Changed
+- Development cruft removed from repository
+
 ## [0.9.101] — 2026-05-12
 
 ### Added
