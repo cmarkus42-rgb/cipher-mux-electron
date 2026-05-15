@@ -86,23 +86,17 @@ On first start, cipher-mux does three things:
 2. **Creates the app data directory** — `~/.config/cipher-mux/` on Linux and macOS. Config file `config.json`, SQLite databases (`messages.db`, `tasks.db`), and the bugreport outbox live here.
 3. **Starts the MCP server** — on `127.0.0.1:3100` (configurable) with a bearer token. The token is generated on first run and stored in `config.json` so that spawned sessions reconnect across restarts. Treat `config.json` like a credential file.
 
-You land in the **cockpit view**: an empty grid on the left, project cards in the middle, activity rail on the far left, chatroom panel on the far right.
+You land in the **cockpit view**: an empty grid with launcher cells, the activity rail on the far left, and the sidebar on the right.
 
-### Configure project scan paths
+### Hub setup (first launch only)
 
-Before the project launcher shows anything, tell cipher-mux where to scan for projects.
-
-- Open **Info/Help → Settings** via the activity rail.
-- Add one or more directories to **Scan Paths**. These should be parent folders that contain Claude Code projects (folders with a `CLAUDE.md` or `AGENTS.md` marker).
-- Save. The cockpit now lists projects.
-
-Example: if your Claude Code projects live under `~/code/`, add that path. Any folder under `~/code/` with a `CLAUDE.md` becomes a launchable project card.
+On first launch, cipher-mux asks you to choose a **Hub directory** — the central folder for all your projects. The default suggestion is `~/cipher-mux/`. After confirming, the app creates the folder (with a `projects/` subfolder) and remembers the path. This dialog appears only once.
 
 ---
 
 ## Start your first session
 
-Pick a project card in the cockpit and click **Launch**. Behind the scenes:
+Click a launcher cell in the grid, switch to the **Path** tab, and pick a project folder. The folder picker opens in your Hub's `projects/` directory by default. Behind the scenes:
 
 1. cipher-mux creates a tmux session named `cipher-mux-<ulid>`.
 2. It spawns a pane inside that session running `claude` with the project directory as CWD.
