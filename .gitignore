@@ -31,6 +31,8 @@ __pycache__/
 # Secrets
 *.env
 *.keystore
+.mcp.json
+*-mcp-connection.md
 
 # Superpowers brainstorm sessions
 .superpowers/
