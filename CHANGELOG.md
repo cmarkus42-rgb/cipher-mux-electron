@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.104] — 2026-05-17
+
+### Fixed
+- **BT Remote Tab:** Always visible in Settings — removed stale config gate that kept the tab hidden
+- **BT Remote Clipboard:** Cmd+C/V/X/A routed through native webContents API instead of synthetic keyboard events (fixes clipboard in terminal)
+- **BT Remote Passthrough:** Devices without profiles now pass keystrokes through natively instead of suppressing them as "unmapped"
+
 ## [0.9.103] — 2026-05-15
 
 ### Added
