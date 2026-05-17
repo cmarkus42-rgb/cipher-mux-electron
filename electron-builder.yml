@@ -31,6 +31,10 @@ dmg:
 extraResources:
   - from: assets/bin/ab-shutter-bridge
     to: bin/ab-shutter-bridge
+  - from: assets/bin/bt-remote-bridge
+    to: bin/bt-remote-bridge
+  - from: src/main/bluetooth/default-profiles
+    to: bt-remote-profiles
   - from: assets/voices
     to: voices
     filter:

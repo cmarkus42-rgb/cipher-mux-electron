@@ -78,6 +78,9 @@ const defaults: AppConfig = {
   btShutter: {
     enabled: false,
   },
+  btRemotes: {
+    enabled: false,
+  },
   refinement: {
     enabled: true,
     hardwiredOutputFormat: 'cyber-factory' as const,

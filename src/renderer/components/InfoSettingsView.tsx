@@ -11,6 +11,7 @@ import '../styles/a11y.css'
 import { A11ySettingsPage } from '../a11y/A11ySettingsPage'
 import { useA11ySettings } from '../a11y/hooks/useA11ySettings'
 import { VoiceSettingsTab } from './VoiceSettingsTab'
+import { RemoteSettingsTab } from './RemoteSettingsTab'
 
 interface RegisteredShortcut {
   combo: string
@@ -34,7 +35,7 @@ interface InfoSettingsViewProps {
 
 const api = (window as any).cipherMux
 
-type TabId = 'general' | 'sprache' | 'themes' | 'shortcuts' | 'a11y' | 'about'
+type TabId = 'general' | 'sprache' | 'themes' | 'shortcuts' | 'remote' | 'a11y' | 'about'
 // Legacy alias for external consumers
 type LegacyTabId = 'settings' | 'models' | 'voice' | TabId
 
@@ -115,7 +116,7 @@ const ENTITY_COLOR_LABELS: Record<string, string> = {
 export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorToggle, customThemes = [], activeCustomThemeId, onSelectCustomTheme, onSaveCustomTheme, onDeleteCustomTheme, onOpenBugreport, registeredShortcuts = [] }: InfoSettingsViewProps) {
   const { t } = useTranslation()
   // Map legacy 'settings' tab to 'general', validate tab name
-  const ALL_TABS: TabId[] = ['general', 'sprache', 'themes', 'shortcuts', 'a11y', 'about']
+  const ALL_TABS: TabId[] = ['general', 'sprache', 'themes', 'shortcuts', 'remote', 'a11y', 'about']
   const resolveTab = (t?: string): TabId => {
     if (t === 'settings' || t === 'models') return 'general'
     if (t === 'voice') return 'sprache'
@@ -142,6 +143,7 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
   const [ttsVoice, setTtsVoice] = useState<'local' | 'macos'>('local')
   const [voiceCommandsEnabled, setVoiceCommandsEnabled] = useState(true)
   const [keepWorking, setKeepWorking] = useState(false)
+  const [btRemotesEnabled, setBtRemotesEnabled] = useState(false)
 
   const load = useCallback(async () => {
     const sp: boolean = await api.config.getSkipPermissions()
@@ -170,6 +172,8 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
     setVoiceCommandsEnabled(vcEn ?? true)
     const kw = await api.config.get('keepWorking')
     setKeepWorking(kw ?? false)
+    const btRemotes = await api.config.get('btRemotes')
+    setBtRemotesEnabled(btRemotes?.enabled ?? false)
     setLoading(false)
   }, [])
 
@@ -292,6 +296,7 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
     sprache: t('info.tabSprache', 'Sprache'),
     themes: t('info.tabThemes', 'Themes'),
     shortcuts: t('info.tabShortcuts'),
+    remote: 'Remote',
     a11y: 'A11y',
     about: t('info.tabAbout'),
   }
@@ -299,7 +304,7 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
   return (
     <div class="settings-view" data-highlight="popup-info">
       <div class="info-tabs">
-        {(['general', 'sprache', 'themes', 'shortcuts', 'a11y', 'about'] as TabId[]).map((tab) => (
+        {(['general', 'sprache', 'themes', 'shortcuts', ...(btRemotesEnabled ? ['remote' as TabId] : []), 'a11y', 'about'] as TabId[]).map((tab) => (
           <button
             key={tab}
             class={`info-tab ${activeTab === tab ? 'info-tab--active' : ''}`}
@@ -331,6 +336,10 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
             {t('info.shortcutHint')}
           </div>
         </section>
+      )}
+
+      {activeTab === 'remote' && (
+        <RemoteSettingsTab registeredShortcuts={registeredShortcuts} />
       )}
 
       {activeTab === 'a11y' && (

@@ -230,11 +230,17 @@ export interface AppConfig {
   windows: {
     main: { x: number; y: number; width: number; height: number }
   }
-  /** BT Shutter Remote configuration. */
+  /** BT Shutter Remote configuration (legacy). */
   btShutter: {
     enabled: boolean
     binaryPath?: string
     deviceFilter?: { vendorId: number; productId: number }
+  }
+  /** BT Remote multi-device configuration. */
+  btRemotes: {
+    enabled: boolean
+    binaryPath?: string
+    profileDir?: string
   }
   /** Keep Working mode: save grid state on quit, resume all sessions on next start. */
   keepWorking?: boolean
