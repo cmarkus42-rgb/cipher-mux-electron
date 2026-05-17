@@ -148,7 +148,8 @@ export class BtRemoteManager extends EventEmitter {
     )
 
     if (!profile) {
-      return { type: 'unmapped', buttonId: 'unknown', deviceId: event.device }
+      // No profile → passthrough: let native HID reach the system
+      return { type: 'passthrough', buttonId: 'unknown', deviceId: event.device }
     }
 
     // Find button by usagePage + usage
@@ -157,7 +158,8 @@ export class BtRemoteManager extends EventEmitter {
     )
 
     if (!button) {
-      return { type: 'unmapped', buttonId: 'unknown', deviceId: event.device }
+      // Known device but unknown button → passthrough
+      return { type: 'passthrough', buttonId: 'unknown', deviceId: event.device }
     }
 
     const mapping = profile.mapping[button.id]
