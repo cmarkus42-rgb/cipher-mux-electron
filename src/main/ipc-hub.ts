@@ -2731,9 +2731,7 @@ ist dieses Entity fokussiert?
   private focusedSessionId: string | null = null
 
   private startBtRemote(): void {
-    // Support both old btShutter config and new btRemotes config
-    const btConfig = configStore.get('btRemotes') ?? configStore.get('btShutter')
-    if (!btConfig?.enabled) return
+    const btConfig = configStore.get('btRemotes') ?? configStore.get('btShutter') ?? {}
     if (this.btRemoteManager?.isRunning()) return
 
     const profileDir = (btConfig as any).profileDir
@@ -2752,21 +2750,32 @@ ist dieses Entity fokussiert?
       }
 
       if (action.type === 'shortcut' && action.combo) {
-        // Emit synthetic keyboard event → ShortcutRegistry handles it
         const mainWin = this.windowManager.getMainWindow()
         if (mainWin && !mainWin.isDestroyed()) {
-          const { keyCode, modifiers } = parseComboForElectron(action.combo)
-          mainWin.webContents.sendInputEvent({
-            type: 'keyDown',
-            keyCode,
-            modifiers: modifiers as any[],
-          })
-          // Also send keyUp for clean state
-          mainWin.webContents.sendInputEvent({
-            type: 'keyUp',
-            keyCode,
-            modifiers: modifiers as any[],
-          })
+          // Native clipboard ops must go through webContents API, not synthetic events
+          const comboLower = action.combo.toLowerCase().replace(/\s/g, '')
+          if (comboLower === 'cmd+c' || comboLower === 'meta+c') {
+            mainWin.webContents.copy()
+          } else if (comboLower === 'cmd+v' || comboLower === 'meta+v') {
+            mainWin.webContents.paste()
+          } else if (comboLower === 'cmd+x' || comboLower === 'meta+x') {
+            mainWin.webContents.cut()
+          } else if (comboLower === 'cmd+a' || comboLower === 'meta+a') {
+            mainWin.webContents.selectAll()
+          } else {
+            // All other shortcuts: synthetic keyboard event → ShortcutRegistry
+            const { keyCode, modifiers } = parseComboForElectron(action.combo)
+            mainWin.webContents.sendInputEvent({
+              type: 'keyDown',
+              keyCode,
+              modifiers: modifiers as any[],
+            })
+            mainWin.webContents.sendInputEvent({
+              type: 'keyUp',
+              keyCode,
+              modifiers: modifiers as any[],
+            })
+          }
         }
       } else if (action.type === 'passthrough') {
         // Let the original HID event pass through — bridge already suppressed it,

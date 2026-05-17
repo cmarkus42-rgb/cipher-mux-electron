@@ -489,6 +489,12 @@ Learning erkannt
 - **[Kurztitel]:** [Was ab jetzt gilt]. Quelle: [woher das Learning kommt].
 ```
 
+### Inter-Entity-Kommunikation
+
+- **Direkt antworten per `mux_send`:** Wenn du eine Nachricht von einer anderen Entity via `mux_send` erhaeltst (z.B. eine Rueckfrage, einen Handoff, ein Ergebnis), antworte direkt per `mux_send` an die sendende Session zurueck. Nicht nur Text an den User ausgeben — die anfragende Entity wartet auf die Antwort in ihrem Kontext.
+- **Pattern:** Nachricht empfangen → verarbeiten → `mux_send` an die Quell-Session mit der Antwort.
+- **Ohne:** Die anfragende Entity bekommt keine Antwort und blockiert oder wiederholt die Frage.
+
 ### Notes-Referenzierung
 
 - **Notes beim Titel nennen, nie bei der ID:** ULIDs sind kryptische interne Handles. Im Gespraech, in TTS und in schriftlichem Output immer den Note-Titel verwenden. Quelle: Refinement-Session 2026-05-04.
