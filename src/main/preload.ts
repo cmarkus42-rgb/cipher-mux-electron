@@ -531,10 +531,31 @@ const api = {
     recommendDownloads: () => ipcRenderer.invoke(IPC.VOICE_RECOMMEND_DOWNLOADS),
   },
 
-  // ─── BT Shutter Remote ─────────────────────────────────
+  // ─── BT Remote ────────────────────────────────────────
+  btRemote: {
+    onEvent: (cb: (data: any) => void) => {
+      const handler = (_e: unknown, data: any) => cb(data)
+      ipcRenderer.on(IPC.BT_REMOTE_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC.BT_REMOTE_EVENT, handler)
+    },
+    onStatus: (cb: (data: { status: string; error?: string }) => void) => {
+      const handler = (_e: unknown, data: { status: string; error?: string }) => cb(data)
+      ipcRenderer.on(IPC.BT_REMOTE_STATUS, handler)
+      return () => ipcRenderer.removeListener(IPC.BT_REMOTE_STATUS, handler)
+    },
+    onDevices: (cb: (devices: any[]) => void) => {
+      const handler = (_e: unknown, devices: any[]) => cb(devices)
+      ipcRenderer.on(IPC.BT_REMOTE_DEVICES, handler)
+      return () => ipcRenderer.removeListener(IPC.BT_REMOTE_DEVICES, handler)
+    },
+    getMapping: () => ipcRenderer.invoke(IPC.BT_REMOTE_MAPPING_GET),
+    setMapping: (vid: string, pid: string, buttonId: string, action: string) =>
+      ipcRenderer.invoke(IPC.BT_REMOTE_MAPPING_SET, { vid, pid, buttonId, action }),
+  },
+  // Legacy alias
   btShutter: {
-    onEvent: (cb: (data: { button: string; action: string }) => void) => {
-      const handler = (_e: unknown, data: { button: string; action: string }) => cb(data)
+    onEvent: (cb: (data: any) => void) => {
+      const handler = (_e: unknown, data: any) => cb(data)
       ipcRenderer.on(IPC.BT_SHUTTER_EVENT, handler)
       return () => ipcRenderer.removeListener(IPC.BT_SHUTTER_EVENT, handler)
     },

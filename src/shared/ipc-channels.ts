@@ -246,7 +246,13 @@ export const IPC = {
   // A11y
   A11Y_TERMINAL_FONT_SIZE: 'cipher-mux:a11y:terminal-font-size',
 
-  // BT Shutter Remote
+  // BT Remote
+  BT_REMOTE_EVENT: 'cipher-mux:bt-remote:event',
+  BT_REMOTE_STATUS: 'cipher-mux:bt-remote:status',
+  BT_REMOTE_DEVICES: 'cipher-mux:bt-remote:devices',
+  BT_REMOTE_MAPPING_GET: 'cipher-mux:bt-remote:mapping:get',
+  BT_REMOTE_MAPPING_SET: 'cipher-mux:bt-remote:mapping:set',
+  // Legacy aliases (backwards compat)
   BT_SHUTTER_EVENT: 'cipher-mux:bt-shutter:event',
   BT_SHUTTER_STATUS: 'cipher-mux:bt-shutter:status',
 

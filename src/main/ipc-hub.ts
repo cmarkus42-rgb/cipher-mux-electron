@@ -15,8 +15,8 @@ import { generateApiKey } from './mcp/mcp-auth'
 import { KickoffWorkshop } from './project/kickoff-orchestrator'
 import { BugreportManager } from './bugreport/bugreport-manager'
 import { VoiceManager } from './voice/voice-manager'
-import { BtShutterManager } from './bluetooth/bt-shutter-manager'
-import type { BtShutterEvent, BtShutterStatus } from './bluetooth/bt-shutter-manager'
+import { BtRemoteManager, parseComboForElectron } from './bluetooth/bt-remote-manager'
+import type { ResolvedAction, DeviceStatus } from './bluetooth/bt-remote-types'
 import type { ConversationTransport } from './voice/conversation-engine'
 import { TaskManager } from './task/task-manager'
 import { TaskWatcher } from './task/task-watcher'
@@ -83,7 +83,7 @@ export class IpcHub {
   private tagIndex!: TagIndex
   private noteWatcher!: NoteWatcher
   private memoryStore: MemoryStore | null = null
-  private btShutterManager: BtShutterManager | null = null
+  private btRemoteManager: BtRemoteManager | null = null
   private cyberFactoryManager: CyberFactoryManager | null = null
   private testingAssistantManager: TestingAssistantManager | null = null
   private auditManager: AuditManager | null = null
@@ -257,6 +257,7 @@ export class IpcHub {
     this.registerCyberFactoryChannels()
     this.registerBugreportChannels()
     this.registerVoiceChannels()
+    this.registerBtRemoteChannels()
     this.registerTaskChannels()
     this.registerPersonaChannels()
     this.registerCharacterChannels()
@@ -471,7 +472,7 @@ export class IpcHub {
       this.restoreDetachedWindows()
 
       // Start BT Shutter if enabled (independent of voice mode)
-      this.startBtShutter()
+      this.startBtRemote()
     }).catch((err) => {
       console.error('[IpcHub] startup failed:', err)
       // Debug: log startup failures for post-mortem
@@ -885,6 +886,32 @@ export class IpcHub {
         result[key] = value
       }
       return result
+    })
+  }
+
+  // ─── BT Remote ──────────────────────────────────────────
+  private registerBtRemoteChannels(): void {
+    ipcMain.handle(IPC.BT_REMOTE_MAPPING_GET, async () => {
+      if (!this.btRemoteManager) return { profiles: [], devices: [] }
+      return {
+        profiles: this.btRemoteManager.getProfiles(),
+        devices: this.btRemoteManager.getConnectedDevices(),
+      }
+    })
+
+    ipcMain.handle(IPC.BT_REMOTE_MAPPING_SET, async (_e, {
+      vid, pid, buttonId, action,
+    }: { vid: string; pid: string; buttonId: string; action: string }) => {
+      if (!this.btRemoteManager) return { ok: false }
+      // Validate action: must be 'passthrough', 'disabled', or a valid shortcut combo
+      if (action !== 'passthrough' && action !== 'disabled') {
+        // Shortcut combo: only allow Modifier+Key patterns (e.g. "Cmd+Shift+W", "Ctrl+U", "Escape")
+        if (!/^([A-Za-z]+\+)*[A-Za-z0-9]+$/.test(action)) {
+          return { ok: false, error: 'Invalid action format' }
+        }
+      }
+      const ok = this.btRemoteManager.updateMapping(vid, pid, buttonId, action)
+      return { ok }
     })
   }
 
@@ -1319,7 +1346,7 @@ export class IpcHub {
           this.voiceManager?.stopSpeech()
         })
         console.log('[Voice] VOICE_START_SESSION => ok')
-        this.startBtShutter()
+        this.startBtRemote()
         return { ok: true }
       } catch (err) {
         const msg = (err as Error).message
@@ -1414,7 +1441,7 @@ export class IpcHub {
 
         this.windowManager.sendToAllWindows(IPC.VOICE_COM_STATE, 'idle')
         console.log('[Voice] VOICE_START_COM => ok')
-        this.startBtShutter()
+        this.startBtRemote()
         return { ok: true }
       } catch (err) {
         const msg = (err as Error).message
@@ -1430,7 +1457,7 @@ export class IpcHub {
 
     ipcMain.handle(IPC.VOICE_STOP_COM, async () => {
       console.log('[Voice] VOICE_STOP_COM handler invoked')
-      this.stopBtShutter()
+      this.stopBtRemote()
       try {
         // Stop output routing
         if (this.voiceManager) {
@@ -1464,7 +1491,7 @@ export class IpcHub {
     ipcMain.on(IPC.VOICE_SET_ROUTING_MODE, (_event, { mode }: { mode: 'session' | 'off' }) => {
       this.voiceManager?.getInputRouter()?.setMode(mode)
       if (mode === 'off') {
-        this.stopBtShutter()
+        this.stopBtRemote()
       }
     })
 
@@ -2695,89 +2722,108 @@ ist dieses Entity fokussiert?
     })
   }
 
-  // ─── BT Shutter Remote ──────────────────────────────────
+  // ─── BT Remote ─────────────────────────────────────────
 
-  /** Timestamp of last BT Shutter button event — used to suppress the
-   *  duplicate HID keystroke that the shutter also sends to macOS. */
-  private btShutterLastEventTs = 0
-  private btShutterInputGuard: ((e: Electron.Event, input: Electron.Input) => void) | null = null
+  /** Timestamp of last BT Remote button event — used to suppress
+   *  duplicate HID keystrokes that arrive via macOS after the bridge handles them. */
+  private btRemoteLastEventTs = 0
+  private btRemoteInputGuard: ((e: Electron.Event, input: Electron.Input) => void) | null = null
   private focusedSessionId: string | null = null
 
-  private startBtShutter(): void {
-    const btConfig = configStore.get('btShutter')
+  private startBtRemote(): void {
+    // Support both old btShutter config and new btRemotes config
+    const btConfig = configStore.get('btRemotes') ?? configStore.get('btShutter')
     if (!btConfig?.enabled) return
-    if (this.btShutterManager?.isRunning()) return
+    if (this.btRemoteManager?.isRunning()) return
 
-    this.btShutterManager = new BtShutterManager({
-      binaryPath: btConfig.binaryPath,
-      deviceFilter: btConfig.deviceFilter,
+    const profileDir = (btConfig as any).profileDir
+      ?? path.join(os.homedir(), '.config', 'cipher-mux', 'bt-remotes')
+
+    this.btRemoteManager = new BtRemoteManager({
+      binaryPath: (btConfig as any).binaryPath,
+      profileDir,
     })
 
-    this.btShutterManager.on('button', (event: BtShutterEvent) => {
-      // Mark timestamp so the before-input-event guard can suppress the
-      // duplicate HID keystroke that arrives ~0-50ms later.
-      this.btShutterLastEventTs = Date.now()
+    this.btRemoteManager.on('action', (action: ResolvedAction) => {
+      // Only mark timestamp for non-passthrough actions — passthrough events
+      // must reach the terminal as native keystrokes, so we must not suppress them.
+      if (action.type !== 'passthrough') {
+        this.btRemoteLastEventTs = Date.now()
+      }
 
-      // Route shutter events: VoiceInputRouter (if voice active) → focused session (fallback)
-      let targetId: string | null = null
-      const router = this.voiceManager?.getInputRouter()
-      if (router) {
-        targetId = router.getActiveSessionId()
+      if (action.type === 'shortcut' && action.combo) {
+        // Emit synthetic keyboard event → ShortcutRegistry handles it
+        const mainWin = this.windowManager.getMainWindow()
+        if (mainWin && !mainWin.isDestroyed()) {
+          const { keyCode, modifiers } = parseComboForElectron(action.combo)
+          mainWin.webContents.sendInputEvent({
+            type: 'keyDown',
+            keyCode,
+            modifiers: modifiers as any[],
+          })
+          // Also send keyUp for clean state
+          mainWin.webContents.sendInputEvent({
+            type: 'keyUp',
+            keyCode,
+            modifiers: modifiers as any[],
+          })
+        }
+      } else if (action.type === 'passthrough') {
+        // Let the original HID event pass through — bridge already suppressed it,
+        // so we don't need to do anything (the event was consumed at bridge level).
+        // For buttons like Enter or mouse clicks, the user expects native behavior.
       }
-      if (!targetId) {
-        // Fallback: send to focused session (tracked via VOICE_SESSION_TARGET IPC)
-        targetId = this.focusedSessionId
-      }
-      if (targetId) {
-        const keys = event.action === 'submit' ? '\r' : '\x15'
-        this.sessionManager.sendKeys(targetId, keys).catch(err => {
-          console.error('[BtShutter] sendKeys failed:', (err as Error).message)
-        })
-      }
-      // Still notify renderer for UI feedback
-      this.windowManager.sendToMainWindow(IPC.BT_SHUTTER_EVENT, event)
+      // disabled and unmapped: no action
+
+      // Notify renderer for UI feedback
+      this.windowManager.sendToMainWindow(IPC.BT_REMOTE_EVENT, action)
+      // Legacy compat
+      this.windowManager.sendToMainWindow(IPC.BT_SHUTTER_EVENT, action)
     })
 
-    this.btShutterManager.on('status', (status: BtShutterStatus) => {
+    this.btRemoteManager.on('device', (status: DeviceStatus) => {
+      this.windowManager.sendToMainWindow(IPC.BT_REMOTE_DEVICES, this.btRemoteManager!.getConnectedDevices())
+    })
+
+    this.btRemoteManager.on('status', (status: { status: string; error?: string }) => {
+      this.windowManager.sendToMainWindow(IPC.BT_REMOTE_STATUS, status)
+      // Legacy compat
       this.windowManager.sendToMainWindow(IPC.BT_SHUTTER_STATUS, status)
     })
 
-    // Suppress the duplicate Enter keystroke that the BT Shutter HID device
-    // sends to macOS (arrives as a normal keydown in the Electron renderer).
+    // Suppress duplicate HID keystrokes arriving via macOS within 200ms of bridge event
     const mainWin = this.windowManager.getMainWindow()
     if (mainWin) {
-      this.btShutterInputGuard = (_e: Electron.Event, input: Electron.Input) => {
-        const elapsed = Date.now() - this.btShutterLastEventTs
-        if (elapsed < 200 && input.type === 'keyDown' && input.key === 'Enter') {
-          _e.preventDefault()
-          console.log('[BtShutter] Suppressed duplicate HID Enter keystroke')
+      this.btRemoteInputGuard = (_e: Electron.Event, input: Electron.Input) => {
+        const elapsed = Date.now() - this.btRemoteLastEventTs
+        if (elapsed < 200 && input.type === 'keyDown') {
+          // Suppress arrow keys and Enter that BT remotes inject as native HID
+          const suppressKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter']
+          if (suppressKeys.includes(input.key)) {
+            _e.preventDefault()
+            console.log(`[BtRemote] Suppressed duplicate HID ${input.key} keystroke`)
+          }
         }
       }
-      mainWin.webContents.on('before-input-event', this.btShutterInputGuard)
+      mainWin.webContents.on('before-input-event', this.btRemoteInputGuard)
     }
 
-    // BT Shutter volume-key side-effects are suppressed at two levels:
-    // 1. ab-shutter-bridge uses kIOHIDOptionsTypeSeizeDevice (exclusive HID capture)
-    // 2. Electron disables HardwareMediaKeyHandling (Chromium switch in main.ts)
-
-    this.btShutterManager.start()
+    this.btRemoteManager.start()
   }
 
-  private stopBtShutter(): void {
-    if (this.btShutterManager) {
-      this.btShutterManager.shutdown()
-      this.btShutterManager = null
+  private stopBtRemote(): void {
+    if (this.btRemoteManager) {
+      this.btRemoteManager.shutdown()
+      this.btRemoteManager = null
     }
 
-    // Remove the before-input-event guard
-    if (this.btShutterInputGuard) {
+    if (this.btRemoteInputGuard) {
       const mainWin = this.windowManager.getMainWindow()
       if (mainWin && !mainWin.isDestroyed()) {
-        mainWin.webContents.off('before-input-event', this.btShutterInputGuard)
+        mainWin.webContents.off('before-input-event', this.btRemoteInputGuard)
       }
-      this.btShutterInputGuard = null
+      this.btRemoteInputGuard = null
     }
-
   }
 
   /**
@@ -3018,7 +3064,7 @@ ist dieses Entity fokussiert?
       configStore.set('detachedWindows', undefined as any)
     }
 
-    this.stopBtShutter()
+    this.stopBtRemote()
     this.noteManager.destroy()
     this.memoryStore?.close()
     this.bugreportSource?.stop()
