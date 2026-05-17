@@ -143,7 +143,6 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
   const [ttsVoice, setTtsVoice] = useState<'local' | 'macos'>('local')
   const [voiceCommandsEnabled, setVoiceCommandsEnabled] = useState(true)
   const [keepWorking, setKeepWorking] = useState(false)
-  const [btRemotesEnabled, setBtRemotesEnabled] = useState(false)
 
   const load = useCallback(async () => {
     const sp: boolean = await api.config.getSkipPermissions()
@@ -172,8 +171,6 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
     setVoiceCommandsEnabled(vcEn ?? true)
     const kw = await api.config.get('keepWorking')
     setKeepWorking(kw ?? false)
-    const btRemotes = await api.config.get('btRemotes')
-    setBtRemotesEnabled(btRemotes?.enabled ?? false)
     setLoading(false)
   }, [])
 
@@ -304,7 +301,7 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
   return (
     <div class="settings-view" data-highlight="popup-info">
       <div class="info-tabs">
-        {(['general', 'sprache', 'themes', 'shortcuts', ...(btRemotesEnabled ? ['remote' as TabId] : []), 'a11y', 'about'] as TabId[]).map((tab) => (
+        {(['general', 'sprache', 'themes', 'shortcuts', 'remote', 'a11y', 'about'] as TabId[]).map((tab) => (
           <button
             key={tab}
             class={`info-tab ${activeTab === tab ? 'info-tab--active' : ''}`}

@@ -88,6 +88,12 @@ Learning erkannt
 - **[Kurztitel]:** [Was ab jetzt gilt]. Quelle: [woher das Learning kommt].
 \`\`\`
 
+### Inter-Entity-Kommunikation
+
+- **Direkt antworten per \`mux_send\`:** Wenn du eine Nachricht von einer anderen Entity via \`mux_send\` erhaeltst (z.B. eine Rueckfrage, einen Handoff, ein Ergebnis), antworte direkt per \`mux_send\` an die sendende Session zurueck. Nicht nur Text an den User ausgeben — die anfragende Entity wartet auf die Antwort in ihrem Kontext.
+- **Pattern:** Nachricht empfangen → verarbeiten → \`mux_send\` an die Quell-Session mit der Antwort.
+- **Ohne:** Die anfragende Entity bekommt keine Antwort und blockiert oder wiederholt die Frage.
+
 ### Notes-Status-Pflege
 
 - **Status-Tag aktualisieren:** Wenn du eine Note bearbeitest oder ihren Inhalt aenderst, MUSS der \`status:\`-Tag aktualisiert werden: \`status:open\` → \`status:in-progress\` → \`status:done\` / \`status:closed\`.

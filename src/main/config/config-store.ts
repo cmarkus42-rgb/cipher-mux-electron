@@ -79,7 +79,7 @@ const defaults: AppConfig = {
     enabled: false,
   },
   btRemotes: {
-    enabled: false,
+    enabled: true,
   },
   refinement: {
     enabled: true,
