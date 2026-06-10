@@ -70,7 +70,7 @@ export function VoiceSettingsTab({
     const voices: InstalledVoice[] = await api.voice.listInstalled()
     setInstalled(voices)
     const pv = await api.config.get('piperVoice')
-    setActiveVoice(pv ?? 'de_DE-cipher_adult-medium')
+    setActiveVoice(pv ?? 'de_DE-cipher_reachy3-medium')
   }, [])
 
   useEffect(() => { loadInstalled() }, [loadInstalled])

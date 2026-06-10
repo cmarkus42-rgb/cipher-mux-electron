@@ -29,7 +29,7 @@ export interface VoiceManagerConfig {
   skipTTS?: boolean
 }
 
-const DEFAULT_PIPER_VOICE = 'de_DE-cipher_adult-medium'
+const DEFAULT_PIPER_VOICE = 'de_DE-cipher_reachy3-medium'
 
 export class VoiceManager extends EventEmitter {
   private readonly config: Required<VoiceManagerConfig>

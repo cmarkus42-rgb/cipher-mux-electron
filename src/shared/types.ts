@@ -264,7 +264,7 @@ export interface AppConfig {
   ttsLevel?: 1 | 2
   /** TTS voice preference: 'local' = Piper, 'macos' = macOS say. Default: 'local'. */
   ttsVoice?: 'local' | 'macos'
-  /** Active Piper voice model name (e.g. 'de_DE-cipher_adult-medium'). */
+  /** Active Piper voice model name (e.g. 'de_DE-cipher_reachy3-medium'). */
   piperVoice?: string
   /** macOS say voice name (e.g. 'Anna', 'Daniel'). Empty = system default. */
   macosVoice?: string

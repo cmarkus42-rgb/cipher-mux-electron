@@ -206,16 +206,16 @@ async function installWhisperModel(onProgress: (msg: string) => void): Promise<b
 async function installPiperModel(onProgress: (msg: string) => void): Promise<boolean> {
   const destDir = path.join(
     os.homedir(),
-    '.config/cipher-mux/models/piper/vits-piper-de_DE-cipher_adult-medium'
+    '.config/cipher-mux/models/piper/vits-piper-de_DE-cipher_reachy3-medium'
   );
 
   // Check if already deployed (e.g. by voice-bundle from app resources)
   if (fs.existsSync(path.join(destDir, 'model.onnx'))) {
-    onProgress('Cipher Adult voice model already installed');
+    onProgress('Cipher Reachy v3 voice model already installed');
     return true;
   }
 
-  onProgress('Cipher Adult voice is bundled with the app.');
+  onProgress('Cipher Reachy v3 voice is bundled with the app.');
   onProgress('If missing, please reinstall cipher-mux from the latest DMG.');
   return false;
 }

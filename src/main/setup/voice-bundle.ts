@@ -54,7 +54,7 @@ const RECOMMENDED_VOICES: VoiceRecommendation[] = [
 ]
 
 const LANGUAGE_VOICE_DEFAULTS: Record<string, string> = {
-  de: 'de_DE-cipher_adult-medium',
+  de: 'de_DE-cipher_reachy3-medium',
   en: 'en_US-lessac-medium',
 }
 
