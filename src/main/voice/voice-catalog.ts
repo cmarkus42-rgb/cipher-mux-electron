@@ -12,7 +12,7 @@ export interface InstalledVoice {
 }
 
 const VITS_PIPER_PREFIX = 'vits-piper-'
-const BUNDLED_DATASETS = ['cipher_adult', 'dii']
+const BUNDLED_DATASETS = ['cipher_reachy3', 'dii']
 
 interface PiperModelJson {
   audio?: { sample_rate?: number }

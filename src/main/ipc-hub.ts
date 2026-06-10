@@ -343,7 +343,7 @@ export class IpcHub {
     // Deploy bundled voice models on first start
     try {
       const modelsDir = path.join(process.env.HOME ?? '', '.config', 'cipher-mux', 'models', 'piper')
-      for (const voiceName of ['de_DE-cipher_adult-medium', 'de_DE-dii-high']) {
+      for (const voiceName of ['de_DE-cipher_reachy3-medium', 'de_DE-dii-high']) {
         deployBundledVoice({
           resourcesPath: process.resourcesPath ?? '',
           modelsDir,

@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 
 const HF_BASE = 'https://huggingface.co/rhasspy/piper-voices/resolve/main'
-const BUNDLED_DATASETS = ['cipher_adult', 'dii']
+const BUNDLED_DATASETS = ['cipher_reachy3', 'dii']
 
 export interface DownloadProgress {
   voice: string

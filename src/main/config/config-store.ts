@@ -151,7 +151,7 @@ const defaults: AppConfig = {
   entityHidden: {} as Record<string, boolean>,
   entityPersonaOverrides: {} as Record<string, string>,
   voiceSubmitMode: 'auto' as const,
-  piperVoice: 'de_DE-cipher_adult-medium',
+  piperVoice: 'de_DE-cipher_reachy3-medium',
   macosVoice: '' as string,
   tts: {
     pauseAfterPeriod: 300,

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 
 // Mock configStore before importing VoiceManager
-let storedPiperVoice = 'de_DE-cipher_adult-medium'
+let storedPiperVoice = 'de_DE-cipher_reachy3-medium'
 const mockConfigStore = {
   get(key: string) {
     if (key === 'piperVoice') return storedPiperVoice
@@ -115,9 +115,9 @@ describe('VoiceManager hot-swap', () => {
   let mgr: SwapManager
 
   beforeEach(() => {
-    storedPiperVoice = 'de_DE-cipher_adult-medium'
+    storedPiperVoice = 'de_DE-cipher_reachy3-medium'
     mgr = new SwapManager()
-    mgr.piperTTS = new FakePiperTTS({ voice: 'de_DE-cipher_adult-medium' })
+    mgr.piperTTS = new FakePiperTTS({ voice: 'de_DE-cipher_reachy3-medium' })
     mgr.piperTTS.ready = true
   })
 
@@ -240,7 +240,7 @@ describe('language-based voice default', () => {
   it('getDefaultVoiceForLanguage returns correct voice per language', async () => {
     const { getDefaultVoiceForLanguage } = await import('../../src/main/setup/voice-bundle')
 
-    assert.equal(getDefaultVoiceForLanguage('de'), 'de_DE-cipher_adult-medium')
+    assert.equal(getDefaultVoiceForLanguage('de'), 'de_DE-cipher_reachy3-medium')
     assert.equal(getDefaultVoiceForLanguage('en'), 'en_US-lessac-medium')
     assert.equal(getDefaultVoiceForLanguage('fr'), null, 'unknown language returns null')
   })

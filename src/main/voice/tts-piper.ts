@@ -13,7 +13,7 @@ import { TTSEngine } from './tts-engine'
 import { pcmToWav } from './audio-utils'
 import { configStore } from '../config/config-store'
 
-const DEFAULT_VOICE = 'de_DE-cipher_adult-medium'
+const DEFAULT_VOICE = 'de_DE-cipher_reachy3-medium'
 
 function getConfiguredVoice(): string {
   try {

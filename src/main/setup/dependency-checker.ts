@@ -38,11 +38,11 @@ function whisperModelExists(): boolean {
 function piperModelExists(): boolean {
   // Check both possible model locations
   const configDir = path.join(
-    os.homedir(), '.config/cipher-mux/models/piper/vits-piper-de_DE-cipher_adult-medium'
+    os.homedir(), '.config/cipher-mux/models/piper/vits-piper-de_DE-cipher_reachy3-medium'
   );
   const appSupportDir = path.join(
     os.homedir(),
-    'Library/Application Support/cipher-mux-electron/models/piper/vits-piper-de_DE-cipher_adult-medium'
+    'Library/Application Support/cipher-mux-electron/models/piper/vits-piper-de_DE-cipher_reachy3-medium'
   );
   for (const dir of [configDir, appSupportDir]) {
     if (!fs.existsSync(dir)) continue;
@@ -98,11 +98,11 @@ export async function checkAll(): Promise<DependencyStatus[]> {
     },
     {
       id: 'piper-model',
-      name: 'Piper TTS Model (Cipher Adult)',
+      name: 'Piper TTS Model (Cipher Reachy v3)',
       installed: piperModelExists(),
       required: false,
-      size: '~79MB (bundled)',
-      description: 'Cipher Adult Stimme — im App-Bundle enthalten',
+      size: '~61MB (bundled)',
+      description: 'Cipher Reachy v3 Stimme (bilingual DE+EN) — im App-Bundle enthalten',
     },
   ];
 }
