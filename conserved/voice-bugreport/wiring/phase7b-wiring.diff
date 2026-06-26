@@ -1,0 +1,205 @@
+diff --git a/src/main/ipc-hub.ts b/src/main/ipc-hub.ts
+index 1f78e5a..97d70a6 100644
+--- a/src/main/ipc-hub.ts
++++ b/src/main/ipc-hub.ts
+@@ -11,6 +11,8 @@ import { McpServerManager } from './mcp/mcp-server'
+ import { generateApiKey } from './mcp/mcp-auth'
+ import { KickoffOrchestrator } from './project/kickoff-orchestrator'
+ import { BugreportManager } from './bugreport/bugreport-manager'
++import { VoiceManager } from './voice/voice-manager'
++import type { ConversationTransport } from './voice/conversation-engine'
+ import { IPC } from '../shared/ipc-channels'
+ import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../shared/constants'
+ import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest } from '../shared/types'
+@@ -28,6 +30,7 @@ export class IpcHub {
+   private mcpServer: McpServerManager
+   private kickoffOrchestrator: KickoffOrchestrator
+   private bugreportManager: BugreportManager
++  private voiceManager: VoiceManager | null = null
+   private cachedProjects: Awaited<ReturnType<ProjectScanner['scan']>> = []
+ 
+   constructor(private windowManager: WindowManager) {
+@@ -65,6 +68,7 @@ export class IpcHub {
+     this.registerDialogChannels()
+     this.registerOrchestratorChannels()
+     this.registerBugreportChannels()
++    this.registerVoiceChannels()
+     this.setupEventForwarding()
+ 
+     // Start context usage monitor
+@@ -469,7 +473,61 @@ export class IpcHub {
+     })
+   }
+ 
++  // ─── Voice ──────────────────────────────────────────────
++  private registerVoiceChannels(): void {
++    ipcMain.handle(IPC.VOICE_START, async () => {
++      try {
++        if (!this.voiceManager) {
++          this.voiceManager = new VoiceManager()
++          const transport: ConversationTransport = {
++            sendStartCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'recording'),
++            sendStopCapture: () => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, 'processing'),
++            sendTranscription: (text) => this.windowManager.sendToMainWindow(IPC.VOICE_TRANSCRIPTION, text),
++            sendAudioPlayback: (b64) => this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_AUDIO, b64),
++            sendStateChange: (state) => this.windowManager.sendToMainWindow(IPC.VOICE_STATE, state),
++          }
++          this.voiceManager.setTransport(transport)
++          await this.voiceManager.init()
++        }
++
++        const interview = this.voiceManager.startInterview()
++        interview.on('turn-update', (turn: { role: string; text: string }) => {
++          // Only forward assistant turns — user turns reach renderer via VOICE_TRANSCRIPTION
++          if (turn.role === 'assistant') {
++            this.windowManager.sendToMainWindow(IPC.VOICE_AGENT_TEXT, turn.text)
++          }
++        })
++        interview.on('interview-complete', (report) => {
++          this.windowManager.sendToMainWindow(IPC.VOICE_INTERVIEW_DONE, report)
++        })
++        interview.on('error', (err) => {
++          this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, (err as Error).message)
++        })
++        interview.start()
++        return { ok: true }
++      } catch (err) {
++        const msg = (err as Error).message
++        this.windowManager.sendToMainWindow(IPC.VOICE_ERROR, msg)
++        return { ok: false, error: msg }
++      }
++    })
++
++    ipcMain.handle(IPC.VOICE_STOP, () => {
++      this.voiceManager?.getConversation()?.handleToggle()
++      return { ok: true }
++    })
++
++    ipcMain.on(IPC.VOICE_AUDIO_CHUNK, (_event, chunk: ArrayBuffer) => {
++      this.voiceManager?.getConversation()?.receiveAudioChunk(chunk)
++    })
++
++    ipcMain.on(IPC.VOICE_PLAYBACK_DONE, () => {
++      this.voiceManager?.getConversation()?.onPlaybackComplete()
++    })
++  }
++
+   async destroy(): Promise<void> {
++    this.voiceManager?.shutdown()
+     await this.mcpServer.stop().catch(() => {})
+     this.statusLineMonitor.stop()
+     this.projectScanner.stopWatch()
+diff --git a/src/main/preload.ts b/src/main/preload.ts
+index 56dc9ce..8e8387f 100644
+--- a/src/main/preload.ts
++++ b/src/main/preload.ts
+@@ -132,6 +132,45 @@ const api = {
+     enrich: (description: string) =>
+       ipcRenderer.invoke(IPC.BUGREPORT_ENRICH, { description }),
+   },
++
++  // ─── Voice ──────────────────────────────────────────────
++  voice: {
++    start: () => ipcRenderer.invoke(IPC.VOICE_START),
++    stop: () => ipcRenderer.invoke(IPC.VOICE_STOP),
++    sendAudioChunk: (chunk: ArrayBuffer) =>
++      ipcRenderer.send(IPC.VOICE_AUDIO_CHUNK, chunk),
++    playbackDone: () => ipcRenderer.send(IPC.VOICE_PLAYBACK_DONE),
++    onState: (cb: (state: string) => void) => {
++      const handler = (_e: unknown, state: string) => cb(state)
++      ipcRenderer.on(IPC.VOICE_STATE, handler)
++      return () => ipcRenderer.removeListener(IPC.VOICE_STATE, handler)
++    },
++    onTranscription: (cb: (text: string) => void) => {
++      const handler = (_e: unknown, text: string) => cb(text)
++      ipcRenderer.on(IPC.VOICE_TRANSCRIPTION, handler)
++      return () => ipcRenderer.removeListener(IPC.VOICE_TRANSCRIPTION, handler)
++    },
++    onAgentText: (cb: (text: string) => void) => {
++      const handler = (_e: unknown, text: string) => cb(text)
++      ipcRenderer.on(IPC.VOICE_AGENT_TEXT, handler)
++      return () => ipcRenderer.removeListener(IPC.VOICE_AGENT_TEXT, handler)
++    },
++    onAgentAudio: (cb: (base64Wav: string) => void) => {
++      const handler = (_e: unknown, b64: string) => cb(b64)
++      ipcRenderer.on(IPC.VOICE_AGENT_AUDIO, handler)
++      return () => ipcRenderer.removeListener(IPC.VOICE_AGENT_AUDIO, handler)
++    },
++    onInterviewDone: (cb: (report: string) => void) => {
++      const handler = (_e: unknown, report: string) => cb(report)
++      ipcRenderer.on(IPC.VOICE_INTERVIEW_DONE, handler)
++      return () => ipcRenderer.removeListener(IPC.VOICE_INTERVIEW_DONE, handler)
++    },
++    onError: (cb: (msg: string) => void) => {
++      const handler = (_e: unknown, msg: string) => cb(msg)
++      ipcRenderer.on(IPC.VOICE_ERROR, handler)
++      return () => ipcRenderer.removeListener(IPC.VOICE_ERROR, handler)
++    },
++  },
+ }
+ 
+ contextBridge.exposeInMainWorld('cipherMux', api)
+diff --git a/src/renderer/styles/components.css b/src/renderer/styles/components.css
+index d382c57..a06c400 100644
+--- a/src/renderer/styles/components.css
++++ b/src/renderer/styles/components.css
+@@ -836,3 +836,36 @@
+ .bugreport-textarea:focus {
+   border-color: var(--color-neon-green);
+ }
++
++/* Voice Bugreport */
++.bugreport-input-row {
++  display: flex;
++  gap: 8px;
++  align-items: flex-start;
++}
++.bugreport-input-row .bugreport-textarea { flex: 1; }
++.bugreport-mic-btn {
++  flex-shrink: 0; width: 40px; height: 40px;
++  display: flex; align-items: center; justify-content: center;
++  border-radius: 50%; font-size: 18px; cursor: pointer;
++}
++.bugreport-mic--recording { animation: mic-pulse 1s infinite; color: #e74c3c; }
++.bugreport-mic--processing { animation: mic-spin 1s linear infinite; color: var(--color-text-secondary); }
++.bugreport-mic--speaking { color: var(--color-accent); }
++@keyframes mic-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
++@keyframes mic-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
++.bugreport-chat {
++  max-height: 200px; overflow-y: auto; display: flex; flex-direction: column;
++  gap: 6px; margin-bottom: 8px; padding: 8px;
++  background: var(--color-bg-secondary, #1a1a2e); border-radius: 6px;
++}
++.bugreport-chat__bubble {
++  max-width: 80%; padding: 6px 10px; border-radius: 8px;
++  font-size: 12px; line-height: 1.4;
++}
++.bugreport-chat__bubble--user {
++  align-self: flex-start; background: var(--color-bg-tertiary, #2a2a4a); color: var(--color-text-primary);
++}
++.bugreport-chat__bubble--assistant {
++  align-self: flex-end; background: var(--color-accent-dim, #3a2a4a); color: var(--color-text-primary);
++}
+diff --git a/src/shared/ipc-channels.ts b/src/shared/ipc-channels.ts
+index 55f3fd1..0b9ac8a 100644
+--- a/src/shared/ipc-channels.ts
++++ b/src/shared/ipc-channels.ts
+@@ -60,6 +60,18 @@ export const IPC = {
+   BUGREPORT_COLLECT: 'cipher-mux:bugreport:collect',
+   BUGREPORT_SUBMIT: 'cipher-mux:bugreport:submit',
+   BUGREPORT_ENRICH: 'cipher-mux:bugreport:enrich',
++
++  // Voice
++  VOICE_START: 'cipher-mux:voice:start',
++  VOICE_STOP: 'cipher-mux:voice:stop',
++  VOICE_AUDIO_CHUNK: 'cipher-mux:voice:audio-chunk',
++  VOICE_STATE: 'cipher-mux:voice:state',
++  VOICE_TRANSCRIPTION: 'cipher-mux:voice:transcription',
++  VOICE_AGENT_TEXT: 'cipher-mux:voice:agent-text',
++  VOICE_AGENT_AUDIO: 'cipher-mux:voice:agent-audio',
++  VOICE_INTERVIEW_DONE: 'cipher-mux:voice:interview-done',
++  VOICE_PLAYBACK_DONE: 'cipher-mux:voice:playback-done',
++  VOICE_ERROR: 'cipher-mux:voice:error',
+ } as const
+ 
+ export type IpcChannel = (typeof IPC)[keyof typeof IPC]
