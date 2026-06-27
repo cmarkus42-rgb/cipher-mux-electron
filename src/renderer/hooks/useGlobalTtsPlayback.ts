@@ -23,8 +23,51 @@ function decodeBase64Wav(ctx: AudioContext, base64: string): Promise<AudioBuffer
  * exact sample-accurate end time of the previous one. No onended polling,
  * no inter-chunk gap.
  */
+/**
+ * Build a tone-shaping EQ chain to de-harshen Piper-medium TTS output.
+ * Piper 22 kHz voices sound "blechern" (tinny/metallic): too much energy in
+ * the 3–6 kHz presence band, too little low-end body. Conservative defaults —
+ * tweak the gain/frequency values below to taste.
+ * Returns the chain's input node (connect sources here); output is wired to
+ * ctx.destination internally.
+ */
+function buildEqChain(ctx: AudioContext): AudioNode {
+  const lowShelf = ctx.createBiquadFilter()
+  lowShelf.type = 'lowshelf'
+  lowShelf.frequency.value = 220   // warmth / body
+  lowShelf.gain.value = 3
+
+  const presenceCut = ctx.createBiquadFilter()
+  presenceCut.type = 'peaking'
+  presenceCut.frequency.value = 3200 // metallic harshness band
+  presenceCut.Q.value = 1.2
+  presenceCut.gain.value = -4
+
+  const highShelf = ctx.createBiquadFilter()
+  highShelf.type = 'highshelf'
+  highShelf.frequency.value = 5500 // brittle highs
+  highShelf.gain.value = -4
+
+  const lowPass = ctx.createBiquadFilter()
+  lowPass.type = 'lowpass'
+  lowPass.frequency.value = 9000   // round off the sharp/sibilant top
+  lowPass.Q.value = 0.707
+
+  const makeup = ctx.createGain()
+  makeup.gain.value = 1.2          // compensate for the cuts
+
+  lowShelf.connect(presenceCut)
+  presenceCut.connect(highShelf)
+  highShelf.connect(lowPass)
+  lowPass.connect(makeup)
+  makeup.connect(ctx.destination)
+
+  return lowShelf
+}
+
 export function useGlobalTtsPlayback(): GlobalTtsState {
   const audioCtxRef = useRef<AudioContext | null>(null)
+  const eqInputRef = useRef<AudioNode | null>(null)
   const nextStartTimeRef = useRef(0)
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([])
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -34,6 +77,7 @@ export function useGlobalTtsPlayback(): GlobalTtsState {
   const getAudioCtx = useCallback((): AudioContext => {
     if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
       audioCtxRef.current = new AudioContext()
+      eqInputRef.current = buildEqChain(audioCtxRef.current)
       nextStartTimeRef.current = 0
     }
     if (audioCtxRef.current.state === 'suspended') {
@@ -46,7 +90,7 @@ export function useGlobalTtsPlayback(): GlobalTtsState {
     const ctx = getAudioCtx()
     const source = ctx.createBufferSource()
     source.buffer = buffer
-    source.connect(ctx.destination)
+    source.connect(eqInputRef.current ?? ctx.destination)
 
     // Schedule at exact end of previous chunk (sample-accurate, no gap)
     const startAt = Math.max(nextStartTimeRef.current, ctx.currentTime)
