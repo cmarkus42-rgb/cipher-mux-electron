@@ -256,6 +256,7 @@ Renderer (Silero VAD) → IPC → Main (ConversationEngine → Whisper STT → V
 - **Terminal-Registry:** `src/renderer/terminal-registry.ts` — globale Map fuer xterm.js Instanzen + Scroll-Marker per sessionId
 - **tmux sendKeys:** Verwendet `\r` (0x0d, Carriage Return) fuer Enter, nicht `\n` (0x0a)
 - **CODING_BIAS_PROMPT:** Whisper-Prompt mit Coding-Terminologie + Voice-Command-Woertern fuer bessere Erkennung
+- **Piper Voice Deployment:** Neue Custom-Voices brauchen ONNX-Metadata direkt im Modell (nicht nur in model.onnx.json). Sherpa-onnx liest `sample_rate`, `model_type`, `has_espeak` etc. aus den ONNX Custom-Metadata-Feldern — fehlen sie, haengt der Worker bis zum 30s-Timeout und faellt auf macOS say zurueck. Fix: `python3 -c "import onnx; m=onnx.load('model.onnx'); [setattr(m.metadata_props.add(),'key',k) or setattr(m.metadata_props[-1],'value',v) for k,v in {'comment':'piper','language':'German','model_type':'vits','voice':'de','n_speakers':'1','has_espeak':'1','sample_rate':'22050'}.items()]; onnx.save(m,'model.onnx')"`. Pruefen mit `python3 -c "import onnxruntime as rt; print(rt.InferenceSession('model.onnx',providers=['CPUExecutionProvider']).get_modelmeta().custom_metadata_map)"`.
 
 ## AgentAdapter Interface (TP-2)
 
