@@ -444,6 +444,14 @@ Alle gaengigen BT Camera Shutter Remotes nutzen dasselbe HID Consumer Control Pr
 8. **Token-Disziplin.** Antwort-Laenge passt zur Frage. Kein Wiederholen, keine Floskeln, kein "Hoffe das hilft".
 9. **Sicherheit.** Keine PII leaken, keine Credentials lesen/zitieren, keine Default-Geheimnisse in Code.
 
+### Pre-Work-Check (Doppelarbeit & Kollision vermeiden)
+
+**Vor JEDEM Arbeitsbeginn — auch bei klarem Handoff/Spec — zuerst pruefen, ob die Arbeit schon laeuft oder schon erledigt ist. Handoffs und Specs koennen stale sein.**
+
+1. **Ist es schon gebaut?** Den Ist-Zustand im Code/Tree gegen das verifizieren, was der Handoff/die Spec verlangt (grep nach Kern-Symbolen/Dateien/Endpunkten). Wenn vorhanden → NICHT neu bauen, sondern Vollstaendigkeit + Live-Stand pruefen und das melden. Quelle: CF 2026-06-19 — stale Refinement-Handoff "Start bei Task 1", obwohl das komplette Manual-Override-Paket (11 Tasks) bereits in `main` lag; fast komplett neu gebaut.
+2. **Arbeitet schon jemand dran?** `mux_sessions` + ggf. `tmux capture-pane` checken: laeuft eine andere Session am selben Repo/Target? Wenn ja → koordinieren (Branch/Worktree, Reihenfolge), nicht blind in denselben Working-Tree/`main` schreiben. Quelle: CF 2026-06-19 — fremder inventory-Commit landete auf `main`, waehrend ein Fix lief (kein Konflikt nur durch Zufall verschiedener Dateien).
+3. **Parallel-Worker auf gemeinsamem Repo → Worktree-Isolation.** Jeder schreibende Worker in eigenem git-worktree + Branch; Merge nach `main` erst nach Gruen. Live-`main`-Checkout (Deploy-Quelle) bleibt bis Merge unangetastet.
+
 ### Companion Memory
 
 Alle Entities haben Zugriff auf persistente Memory-Tools:
@@ -488,6 +496,8 @@ Learning erkannt
 ```
 - **[Kurztitel]:** [Was ab jetzt gilt]. Quelle: [woher das Learning kommt].
 ```
+
+- **Komponenten-Lieferung ohne Mount ist keine Lieferung:** Build-Abnahme prueft pro neuer Komponente, dass sie tatsaechlich in einer Route importiert/gemountet ist (grep auf Imports genuegt). Eine Build-Session lieferte 8 Journal-Komponenten, 6 davon nie importiert — zwei Debug-Zyklen jagten einen Phantom-Bug in nie gerendertem Code. Quelle: Debugger-Session 2026-06-10 (MixEventForm-Bug, cipher-grow-kit).
 
 ### Inter-Entity-Kommunikation
 
