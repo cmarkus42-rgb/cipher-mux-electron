@@ -12,6 +12,7 @@ import { fork, type ChildProcess, execFileSync } from 'node:child_process'
 import { TTSEngine } from './tts-engine'
 import { pcmToWav } from './audio-utils'
 import { configStore } from '../config/config-store'
+import { loadRespellings, applyRespellings, invalidateRespellings, type RespellingMap } from './respellings'
 
 const DEFAULT_VOICE = 'de_DE-cipher_reachy3-medium'
 
@@ -106,6 +107,7 @@ export class PiperTTS extends TTSEngine {
   private worker: ChildProcess | null = null
   private ready = false
   private _interrupted = false
+  private respellings: RespellingMap | null = null
   private pendingMessages = new Map<string, {
     resolve: (msg: WorkerMessage) => void
     reject: (err: Error) => void
@@ -141,6 +143,9 @@ export class PiperTTS extends TTSEngine {
         `Download the model and place it in ${this.modelsDir}/`
       )
     }
+
+    // Load per-voice pronunciation respellings (optional; absent → no-op).
+    this.respellings = loadRespellings(modelDir, this.voice)
 
     // 3. Fork the worker under system Node.js
     let workerPath = path.join(__dirname, 'piper-worker.js')
@@ -256,6 +261,9 @@ export class PiperTTS extends TTSEngine {
 
     this._interrupted = false
 
+    // Apply per-voice pronunciation respellings before phonemization (no-op if none).
+    text = applyRespellings(text, this.respellings)
+
     // Split text into sentences
     const sentences = text.match(/[^.!?]+[.!?]*\s*/g)
     if (!sentences || sentences.length === 0) {
@@ -304,7 +312,8 @@ export class PiperTTS extends TTSEngine {
     if (!this.ready || !this.worker) return null
     if (this._interrupted) return null
 
-    const trimmed = text.trim()
+    // Apply per-voice pronunciation respellings before phonemization (no-op if none).
+    const trimmed = applyRespellings(text.trim(), this.respellings)
     if (!trimmed) return null
 
     const id = `tts-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -342,6 +351,9 @@ export class PiperTTS extends TTSEngine {
   dispose(): void {
     this.ready = false
     this._interrupted = true
+    // Invalidate cached respellings so a re-init re-reads from disk.
+    invalidateRespellings(this.voice)
+    this.respellings = null
 
     if (!this.worker) return
 
