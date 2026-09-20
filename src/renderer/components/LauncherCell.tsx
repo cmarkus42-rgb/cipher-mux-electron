@@ -135,6 +135,7 @@ export function LauncherCell({
           entityStatus={entityStatus}
           startingEntity={starting}
           activeWorkspaceId={activeWorkspaceId}
+          allowWorkspaceChoice
         />
       )}
     </div>
