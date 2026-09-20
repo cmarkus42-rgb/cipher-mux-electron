@@ -33,6 +33,7 @@ import { getCachedGlobalRules } from '../config/global-rules'
 import { extractCharacterBlock } from '../character/character-defaults'
 import { resolvePersonaForPreset } from './persona-resolver'
 import { ensureRunDir, resolveRunDir } from './entity-run-dir'
+import { buildMcpServerConfig } from '../mcp/workspace-header'
 import { findEntitySessions, entityStartKey } from './entity-session-lookup'
 import type { Workspace } from '../../shared/persona-types'
 
@@ -274,6 +275,7 @@ export class SessionManager extends EventEmitter {
             mcpUrl: mcpFullUrl,
             mcpApiKey: this.mcpConfig.mcpApiKey,
             sessionId: id,
+            workspaceId: opts.workspaceId ?? null,
           })
         } catch (err) {
           console.warn('[SessionManager] Adapter MCP injection failed:', err)
@@ -1141,11 +1143,7 @@ export class SessionManager extends EventEmitter {
       const mcpJsonPath = path.join(runDir, '.mcp.json')
       const mcpJson = {
         mcpServers: {
-          'cipher-mux': {
-            type: 'http',
-            url: mcpUrl,
-            headers: { Authorization: `Bearer ${this.mcpConfig.mcpApiKey}` },
-          },
+          'cipher-mux': buildMcpServerConfig(mcpUrl, this.mcpConfig.mcpApiKey, workspaceId),
         },
       }
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2), 'utf-8')

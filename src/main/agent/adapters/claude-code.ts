@@ -11,6 +11,7 @@ import type {
 } from '../agent-adapter'
 import type { AdapterFeature, AdapterCapabilities } from '../../../shared/types'
 import { runCommand } from '../../util/exec-util'
+import { buildMcpServerConfig } from '../../mcp/workspace-header'
 
 /** Minimal interface for reading the agent config section. */
 export interface AgentConfigReader {
@@ -74,11 +75,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
    * 3. Direct write to `~/.claude/projects/<hash>/settings.json` (project-scoped fallback)
    */
   async postLaunchInjection(ctx: AdapterContext): Promise<void> {
-    const mcpServerConfig = {
-      type: 'http',
-      url: ctx.mcpUrl,
-      headers: { Authorization: `Bearer ${ctx.mcpApiKey}` },
-    }
+    const mcpServerConfig = buildMcpServerConfig(ctx.mcpUrl, ctx.mcpApiKey, ctx.workspaceId)
 
     // Path 1: Direct write to local settings.local.json (most reliable)
     // This is the same file used by statusLine hook — Claude Code always reads it.
