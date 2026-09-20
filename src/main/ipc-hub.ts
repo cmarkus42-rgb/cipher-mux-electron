@@ -47,6 +47,7 @@ import { CyberFactoryManager } from './cyber-factory/cyber-factory-manager'
 import { scanAndRegisterEntities } from './session/entity-scanner'
 import { resolvePersonaForPreset } from './session/persona-resolver'
 import { resolveSessionTopic } from './session/resolve-session-topic'
+import { resolveRestoredWorkspaceId } from './session/resolve-restored-workspace'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST, MAX_MANUAL_TAGS } from '../shared/constants'
 import { BRAND } from '../shared/brand'
@@ -2891,9 +2892,13 @@ ist dieses Entity fokussiert?
         if (entry.entityId && !match.entityId) {
           this.sessionManager.linkEntity(match.id, entry.entityId)
         }
-        // Re-bind workspace from snapshot — recovered sessions get fresh
-        // in-memory SessionInfo objects with no workspaceId of their own.
-        this.sessionManager.bindWorkspace(match.id, entry.workspaceId ?? null)
+        // Re-bind workspace from snapshot, but only when the snapshot entry
+        // actually carries one. recover() already restores workspaceId onto
+        // `match` from the persisted store (session-manager.ts recover()),
+        // so an old snapshot with no workspaceId key must not clobber it —
+        // and a projectPath-fallback match (same project open in two
+        // workspaces) must not stamp the wrong workspace's id onto it either.
+        this.sessionManager.bindWorkspace(match.id, resolveRestoredWorkspaceId(entry.workspaceId, match.workspaceId))
         console.log(`[IpcHub] keepWorking: reusing recovered "${match.name}" (${match.id}) → slot ${entry.gridSlot}`)
       } else {
         // No matching recovered session — start new with --resume
