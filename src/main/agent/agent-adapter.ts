@@ -55,6 +55,8 @@ export interface AdapterContext {
   mcpApiKey: string
   /** Session ULID */
   sessionId: string
+  /** Workspace this session is bound to. null = unbound. */
+  workspaceId: string | null
 }
 
 export interface ProjectInstructions {
