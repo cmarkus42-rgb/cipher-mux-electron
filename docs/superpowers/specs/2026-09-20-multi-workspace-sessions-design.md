@@ -303,6 +303,34 @@ Verhalten exakt wie heute. Kein Sonderpfad, nur ein Default.
 nach dem Update als global. Bewusst nicht geraten: eine Session dem gerade aktiven Workspace
 zuzuschlagen wäre eine Erfindung.
 
+**Was „global" konkret heißt** (präzisiert nach dem Task-10-Review, 2026-09-20). Eine Session ohne
+Bindung ist aus **jedem** Workspace sichtbar, nicht aus keinem. Der Spec sagte „gelten als global"
+und der Sentinel heißt `_global`, aber die Auswirkung auf die Laufend-Anzeige stand nirgends
+ausformuliert — die erste Implementierung hat streng auf `workspaceKey(activeWorkspaceId)`
+geschlüsselt und ungebundene Sessions damit überall ausgeblendet.
+
+Das ist aus drei Gründen falsch:
+
+1. Companion, Refinement und Audit sind **nicht** `singleInstance`. Wird eine laufende ungebundene
+   Instanz als „läuft nicht" angezeigt, startet ein Klick im Launcher eine **zweite** — statt die
+   vorhandene zu fokussieren.
+2. Ungebundene Entity-Sessions entstehen heute regulär: der namensbasierte Recovery-Pfad
+   (`session-manager.ts:643`) setzt `entityId`, aber kein `workspaceId`; jede vor Task 1
+   persistierte Session hat das Feld nicht; und `api.entity.start(id, null)` ist laut Task 9 ein
+   ausdrücklich unterstützter Aufruf.
+3. „Nirgends sichtbar" widerspricht der Badge-Regel weiter unten, die eine ungebundene Session
+   gerade **nicht** als fremd markiert.
+
+Gegenstück dazu: weil eine ungebundene Session damit überall auftaucht, muss sie unterscheidbar
+bleiben. Die Badge-Regel bekommt deshalb einen zweiten Fall — bei aktivem Workspace trägt eine
+ungebundene Session eine eigene, dezente Markierung statt gar keiner.
+
+**Nicht mitgeändert, bewusst:** die Main-Seite (`findEntitySessions` für den
+`singleInstance`-Check und das Handoff-Routing) behandelt ungebundene Sessions weiterhin als
+eigenen Bereich, der nicht in Workspaces hineinreicht. Das ist die konservative Richtung — sie
+blockiert nichts und greift in nichts hinein. Ob Main nachziehen soll, ist eine eigene
+Entscheidung und steht als offener Punkt im Ledger.
+
 **Keep Working Restore.** In der CLAUDE.md als fragile Zone markiert und betroffen: der
 `keepWorkingSnapshot` muss `workspaceId` mitschreiben, sonst verlieren wiederhergestellte Sessions
 ihre Bindung. Die dort dokumentierten Regeln gelten unverändert — jeder neue Feldzugriff defensiv

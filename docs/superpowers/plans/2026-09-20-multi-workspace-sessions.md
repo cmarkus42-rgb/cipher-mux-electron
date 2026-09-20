@@ -1966,6 +1966,7 @@ In `src/renderer/locales/de.json` (flache Keys, alphabetisch bei den übrigen `u
 ```json
   "unified.startInWorkspace": "In anderem Workspace starten",
   "unified.workspaceBadgeTitle": "Läuft in Workspace: {{name}}",
+  "unified.workspaceBadgeGlobal": "ohne Workspace",
   "unified.runningInWorkspaces": "Läuft in: {{names}}",
 ```
 
@@ -1974,6 +1975,7 @@ In `src/renderer/locales/en.json`:
 ```json
   "unified.startInWorkspace": "Start in another workspace",
   "unified.workspaceBadgeTitle": "Running in workspace: {{name}}",
+  "unified.workspaceBadgeGlobal": "no workspace",
   "unified.runningInWorkspaces": "Running in: {{names}}",
 ```
 
@@ -2295,7 +2297,10 @@ In `SessionCell.tsx` (und analog in der Sidebar-Session-Liste in `SidebarPanel.t
   const workspaceBadge = useMemo(() => {
     const sessionWs = session.workspaceId ?? null
     if (sessionWs === (activeWorkspaceId ?? null)) return null
-    if (sessionWs === null) return null
+    // Unbound sessions are visible from every workspace (see spec, "Was 'global' konkret heisst"),
+    // so while a workspace is active they need their own marker — otherwise they are
+    // indistinguishable from sessions that actually belong to it.
+    if (sessionWs === null) return activeWorkspaceId ? t('unified.workspaceBadgeGlobal') : null
     const ws = workspaces.find(w => w.id === sessionWs)
     // A workspace that no longer exists still gets a badge — its sessions keep
     // running, and hiding the binding would make them indistinguishable.
