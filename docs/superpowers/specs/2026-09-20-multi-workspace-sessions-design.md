@@ -118,12 +118,32 @@ Neu als Arbeitsverzeichnis der Session:
 ├── CLAUDE.md                    ← generiert (preset.md + Persona + Global Rules
 │                                   + Workspace Prompt + Context Paths + Session Identity)
 ├── .mcp.json                    ← generiert, mit X-Mux-Workspace-Header
+├── skills/                      → Symlink auf <entities>/<id>/skills
+├── guides/                      → Symlink auf <entities>/<id>/guides
+├── ref/                         → Symlink auf <entities>/<id>/ref
+├── brain/                       → Symlink auf <entities>/<id>/brain
+├── deliverables/                → Symlink auf <entities>/<id>/deliverables
 └── .claude/
     ├── settings.local.json      ← generiert
-    └── skills/                  → Symlink auf <entities>/<id>/.claude/skills
+    └── commands/                → Symlink auf <entities>/<id>/.claude/commands
 ```
 
 Ohne aktiven Workspace: `runs/_global/<entityId>/`.
+
+**Korrigiert nach dem Task-3-Review (2026-09-20).** Der Spec nannte hier ursprünglich nur
+`skills/`, verlinkt aus `<entityDir>/.claude/skills`. Beides war falsch: kein Code im Repo
+schreibt je nach `<entityDir>/.claude/skills`. Die tatsächlichen Ablageorte sind top-level —
+`<entityDir>/skills/<name>/SKILL.md`, `guides/`, `ref/`, `brain/`, `deliverables/` —, nur die
+Slash-Kommandos liegen unter `.claude/commands/`. Die ursprüngliche Link-Liste wäre ein No-op
+gewesen und das Run-Verzeichnis hätte überhaupt keine authored Assets erhalten: das
+`/startup`-Kommando des Companion wäre verschwunden, seine `guides`/`ref`-Routingtabelle hätte
+ins Leere gezeigt, Refinement hätte `brain/` und `deliverables/` verloren.
+
+Daraus zwei Konsequenzen für `ensureRunDir`: ein Link-Name wird relativ zu **beiden**
+Verzeichnissen aufgelöst (`<entityDir>/<name>` → `<runDir>/<name>`) statt fest unter `.claude`,
+womit derselbe Mechanismus top-level-Assets und `.claude/commands` abdeckt; und der Aufruf erfolgt
+**nach** dem `deploy*`-Block, weil die Link-Ziele beim allerersten Start eines Entity sonst noch
+nicht existieren und übersprungen würden.
 
 Bewusst pro Workspace, nicht pro Session: Instanzen im selben Workspace haben identischen
 Workspace-Kontext und teilen zu Recht eine CLAUDE.md. Der Pfad ist damit stabil, aus
@@ -179,6 +199,18 @@ mit der bisherigen Fehlermeldung.
 `resolveTargetSession()` (`src/main/mcp/handoff-kernel.ts:84`) filtert Kandidaten zusätzlich nach
 dem Workspace der aufrufenden Session. `startEntitySession()` erbt ihn. Ein Debugger-Handoff aus
 Workspace B landet nicht beim Debugger in A. Aufrufer ohne Bindung → Ziel ohne Bindung.
+
+**Der `projectPath` der Handoff-Aufrufer wird Kontext, nicht cwd** (ergänzt nach dem
+Task-3-Review). `mux_entity_start` führt `projectPath` als optionalen Override, der
+Cyber-Factory-Handoff sogar als Pflichtfeld (`handoff-kernel.ts:428`). Bisher wurde daraus das
+Arbeitsverzeichnis der Entity-Session. Seit Entity-Sessions im Run-Verzeichnis laufen, geht das
+nicht mehr — der Pfad würde die Workspace-Isolation wieder aufbrechen.
+
+Er wird deshalb als zusätzlicher Eintrag in `## Context Directories` in die CLAUDE.md injiziert.
+Die Information des Aufrufers bleibt erhalten, und es entspricht dem, was `applyWorkspace()` mit
+`cell.project` bei Preset-Cells ohnehin schon tut (`workspace-manager.ts:164`) — beide Wege sind
+danach konsistent. Still verwerfen wäre die schlechtere Variante: der CF-Handoff verlangt das Feld,
+also meint der Aufrufer etwas damit.
 
 ### 6. Renderer-State
 
