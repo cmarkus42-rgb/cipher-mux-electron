@@ -5,6 +5,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { APP_NAME, APP_VERSION, MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../../shared/constants'
 import { validateBearer } from './mcp-auth'
 import { registerTools, ToolContext } from './mcp-tools'
+import { parseWorkspaceHeader, resolveWorkspaceId } from './workspace-header'
 
 /** Session timeout: sessions inactive for longer than this are garbage-collected. */
 export const SESSION_TIMEOUT_MS = 4 * 60 * 60 * 1000 // 4 hours
@@ -135,7 +136,7 @@ export class McpServerManager {
   /**
    * Create a new MCP session (McpServer + Transport) for a connecting client.
    */
-  private async createSession(): Promise<McpSession> {
+  private async createSession(workspaceId: string | null = null): Promise<McpSession> {
     // Enforce session limit — evict oldest if at capacity
     if (this.sessions.size >= MAX_MCP_SESSIONS) {
       await this.evictOldestSession()
@@ -146,8 +147,10 @@ export class McpServerManager {
       { capabilities: { tools: {} } }
     )
 
-    // Register tools on the new server instance
-    registerTools(mcpServer, this.toolCtx!)
+    // Bind the workspace into this session's tool closures. Tools registered
+    // here see one workspace for their whole lifetime — that binding is the
+    // per-session identity the transport cannot otherwise provide.
+    registerTools(mcpServer, { ...this.toolCtx!, workspaceId })
 
     const sessionId = randomUUID()
 
@@ -172,7 +175,7 @@ export class McpServerManager {
     const session: McpSession = { sessionId, mcpServer, transport, lastActivity: Date.now() }
     this.sessions.set(sessionId, session)
 
-    console.log(`[McpServer] new session created: ${sessionId} (total: ${this.sessions.size})`)
+    console.log(`[McpServer] new session created: ${sessionId} workspace=${workspaceId ?? '_global'} (total: ${this.sessions.size})`)
     return session
   }
 
@@ -288,7 +291,13 @@ export class McpServerManager {
       const isInit = this.isInitializeRequest(body)
       if (isInit) {
         try {
-          const session = await this.createSession()
+          // Bind the workspace once, here — this is the only point in the
+          // connection's life where the client's headers are available.
+          const workspaceId = resolveWorkspaceId(
+            parseWorkspaceHeader(req.headers),
+            this.listKnownWorkspaceIds(),
+          )
+          const session = await this.createSession(workspaceId)
           session.lastActivity = Date.now()
           res.on('finish', () => { session.lastActivity = Date.now() })
           session.transport.handleRequest(req, res, body)
@@ -423,6 +432,21 @@ export class McpServerManager {
    */
   async _sweepForTest(): Promise<void> {
     await this.sweepStaleSessions()
+  }
+
+  /**
+   * IDs of the workspaces that currently exist. Read at initialize only —
+   * a workspace deleted later leaves its bound sessions alone.
+   */
+  private listKnownWorkspaceIds(): string[] {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { configStore } = require('../config/config-store')
+      const workspaces = (configStore.get('workspaces') ?? []) as Array<{ id: string }>
+      return workspaces.map(w => w.id)
+    } catch {
+      return []
+    }
   }
 
   /**
