@@ -48,10 +48,32 @@ export interface EntityPickerPopupProps {
   entityStatus?: Record<string, string[]>
   /** Entity currently being started (shows spinner) */
   startingEntity?: string | null
-  /** All configured workspaces, for the alternate-start chips. Optional override — the popup loads its own list when omitted. */
+  /**
+   * All configured workspaces, for the alternate-start chips. Optional
+   * override — the popup loads its own list when omitted. Only meaningful
+   * when `allowWorkspaceChoice` is true.
+   */
   workspaces?: WorkspaceOption[]
-  /** The currently active workspace — excluded from the chip list. */
+  /**
+   * The currently active workspace — excluded from the chip list. Only
+   * meaningful when `allowWorkspaceChoice` is true.
+   */
   activeWorkspaceId?: string | null
+  /**
+   * Show the ⤳ "start in another workspace" button and its inline chip row.
+   * Default false.
+   *
+   * This popup has two callers with different meanings for "no active
+   * workspace": the launcher (`LauncherCell`, real sessions, an active
+   * workspace always exists) and `WorkspacesTab`'s cell-assignment editor
+   * (design-time, no session, no active workspace, `activeWorkspaceId` is
+   * simply never passed). Gating on `activeWorkspaceId !== undefined`
+   * would overload the undefined/null/value distinction this plan uses
+   * elsewhere for "no preference vs. explicitly unbound" to also mean
+   * "which mode am I in" — same spelling, unrelated meaning. An explicit
+   * flag says what it means: only `LauncherCell` passes `true`.
+   */
+  allowWorkspaceChoice?: boolean
 }
 
 export function EntityPickerPopup({
@@ -65,6 +87,7 @@ export function EntityPickerPopup({
   startingEntity,
   workspaces: workspacesProp,
   activeWorkspaceId,
+  allowWorkspaceChoice = false,
 }: EntityPickerPopupProps) {
   const { t } = useTranslation()
   const [tab, setTab] = useState<TabMode>('presets')
@@ -98,14 +121,14 @@ export function EntityPickerPopup({
     }).catch(() => {})
   }, [])
 
-  // Load the workspace list for the alternate-start chips, unless the caller
-  // already supplied one (e.g. WorkspacesTab overriding for its own editor).
+  // Load the workspace list for the alternate-start chips — only needed when
+  // the caller allows the choice, and only if it didn't already supply a list.
   useEffect(() => {
-    if (workspacesProp) return
+    if (!allowWorkspaceChoice || workspacesProp) return
     cipherApi().workspaces.list().then((list: Array<{ id: string; name: string }>) => {
       setLoadedWorkspaces((list ?? []).map(w => ({ id: w.id, name: w.name })))
     }).catch(() => { /* no workspaces configured */ })
-  }, [workspacesProp])
+  }, [allowWorkspaceChoice, workspacesProp])
 
   const workspaces = workspacesProp ?? loadedWorkspaces
 
@@ -187,8 +210,15 @@ export function EntityPickerPopup({
                 // must still start a fresh instance here — that's the whole
                 // point of the second start button.
                 const effectiveRunning = runsHere && (preset.singleInstance ?? false)
-                const otherWorkspaces = workspaces.filter(w => w.id !== activeWorkspaceId)
-                const expanded = wsPickerFor === preset.id
+                // The chip list only makes sense where the caller actually
+                // wants a workspace choice (LauncherCell) — WorkspacesTab's
+                // cell-assignment editor has no active workspace and no
+                // session to start, so it must never show this control even
+                // though it self-loads the same workspace list.
+                const otherWorkspaces = allowWorkspaceChoice
+                  ? workspaces.filter(w => w.id !== activeWorkspaceId)
+                  : []
+                const expanded = allowWorkspaceChoice && wsPickerFor === preset.id
                 const runningNames = runningIn.map(k =>
                   k === GLOBAL_WORKSPACE_KEY ? '—' : (workspaces.find(w => w.id === k)?.name ?? k)
                 )
