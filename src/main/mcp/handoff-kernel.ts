@@ -360,7 +360,7 @@ function registerEntityStartTool(server: McpServer, ctx: ToolContext): void {
         + 'Testing Assistant, Debugger, Audit, etc.',
       inputSchema: {
         entityId: z.string().describe('Entity identifier (e.g. "cyber-factory", "refinement", "debugger")'),
-        projectPath: z.string().optional().describe('Override project path (optional)'),
+        projectPath: z.string().optional().describe('Project directory to hand the entity as context — NOT the session working directory (that is always the entity\'s run directory). Listed under Context Directories in its CLAUDE.md.'),
         name: z.string().optional().describe('Override display name (optional)'),
       },
     },
@@ -425,7 +425,7 @@ export function registerAllHandoffTools(server: McpServer, ctx: ToolContext): vo
     senderEntityId: 'refinement',
     inputSchema: {
       detailSpecPath: z.string().describe('Absolute path to the detail spec file with REQ-IDs'),
-      projectPath: z.string().describe('Project directory path for the Cyber Factory session'),
+      projectPath: z.string().describe('Project directory to hand the Cyber Factory session as context — NOT its working directory (that is always its run directory). Listed under Context Directories in its CLAUDE.md; also used to derive the session name.'),
       lifecyclePhase: z.string().optional().describe('Target lifecycle phase (default: architect)'),
     },
     buildPayload: (args) => ({
