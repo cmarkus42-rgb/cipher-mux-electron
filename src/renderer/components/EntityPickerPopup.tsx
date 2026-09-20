@@ -6,6 +6,8 @@ import { FolderPickerInput } from './FolderPickerInput'
 import { useNotes } from '../hooks/useNotes'
 import { useEntityPresets } from '../hooks/useEntityPresets'
 import type { EntityId } from '../../shared/types'
+import { isEntityRunningIn } from '../../shared/entity-status'
+import { GLOBAL_WORKSPACE_KEY } from '../../shared/workspace-key'
 
 const cipherApi = () => (window as any).cipherMux
 
@@ -20,9 +22,18 @@ export interface PathStartOpts {
 
 type TabMode = 'presets' | 'path' | 'notes'
 
+export interface WorkspaceOption {
+  id: string
+  name: string
+}
+
 export interface EntityPickerPopupProps {
-  /** Called when user clicks a preset. If entityStatus shows running, this is a focus action. */
-  onSelectPreset: (presetId: EntityId, running: boolean) => void
+  /**
+   * Called when the user picks a preset.
+   * workspaceId undefined = start in the active workspace (the default path).
+   * workspaceId set = start in that workspace instead.
+   */
+  onSelectPreset: (presetId: EntityId, running: boolean, workspaceId?: string) => void
   /** Called when user clicks Resume on a running preset */
   onResumePreset?: (presetId: EntityId) => void
   /** Called when user confirms a path start */
@@ -33,10 +44,14 @@ export interface EntityPickerPopupProps {
   onNewNote?: () => void
   /** Close the popup */
   onClose: () => void
-  /** Running status per entity id — if omitted, no running indicators shown */
-  entityStatus?: Record<string, boolean>
+  /** entityId → workspace keys the preset currently runs in — if omitted, no running indicators shown */
+  entityStatus?: Record<string, string[]>
   /** Entity currently being started (shows spinner) */
   startingEntity?: string | null
+  /** All configured workspaces, for the alternate-start chips. Optional override — the popup loads its own list when omitted. */
+  workspaces?: WorkspaceOption[]
+  /** The currently active workspace — excluded from the chip list. */
+  activeWorkspaceId?: string | null
 }
 
 export function EntityPickerPopup({
@@ -48,9 +63,13 @@ export function EntityPickerPopup({
   onClose,
   entityStatus,
   startingEntity,
+  workspaces: workspacesProp,
+  activeWorkspaceId,
 }: EntityPickerPopupProps) {
   const { t } = useTranslation()
   const [tab, setTab] = useState<TabMode>('presets')
+  const [wsPickerFor, setWsPickerFor] = useState<string | null>(null)
+  const [loadedWorkspaces, setLoadedWorkspaces] = useState<WorkspaceOption[]>([])
 
   // Path state
   const [path, setPath] = useState('')
@@ -78,6 +97,17 @@ export function EntityPickerPopup({
       if (dir) setHubProjectsDir(dir)
     }).catch(() => {})
   }, [])
+
+  // Load the workspace list for the alternate-start chips, unless the caller
+  // already supplied one (e.g. WorkspacesTab overriding for its own editor).
+  useEffect(() => {
+    if (workspacesProp) return
+    cipherApi().workspaces.list().then((list: Array<{ id: string; name: string }>) => {
+      setLoadedWorkspaces((list ?? []).map(w => ({ id: w.id, name: w.name })))
+    }).catch(() => { /* no workspaces configured */ })
+  }, [workspacesProp])
+
+  const workspaces = workspacesProp ?? loadedWorkspaces
 
   // Escape to close
   useEffect(() => {
@@ -146,43 +176,87 @@ export function EntityPickerPopup({
           <div class="launcher-popup__body">
             <div class="launcher-popup__presets">
               {entityPresets.map(preset => {
-                const running = entityStatus?.[preset.id] ?? false
+                const runningIn = entityStatus?.[preset.id] ?? []
+                // Single source of truth for "is it running here?" — see
+                // shared/entity-status.ts. Must stay in sync with app.tsx's
+                // collapsed boolean map; both call the same function.
+                const runsHere = isEntityRunningIn(entityStatus ?? {}, preset.id, activeWorkspaceId ?? null)
                 const isStarting = startingEntity === preset.id
-                // Multi-instance presets: always start new, never focus-only
-                const effectiveRunning = running && (preset.singleInstance ?? false)
+                // Focus instead of start only when a singleInstance preset is
+                // already running *in this workspace*. Running in another one
+                // must still start a fresh instance here — that's the whole
+                // point of the second start button.
+                const effectiveRunning = runsHere && (preset.singleInstance ?? false)
+                const otherWorkspaces = workspaces.filter(w => w.id !== activeWorkspaceId)
+                const expanded = wsPickerFor === preset.id
+                const runningNames = runningIn.map(k =>
+                  k === GLOBAL_WORKSPACE_KEY ? '—' : (workspaces.find(w => w.id === k)?.name ?? k)
+                )
+
                 return (
-                  <div key={preset.id} class="unified-dialog__card-row">
-                    <button
-                      class={`unified-dialog__card${running ? ' unified-dialog__card--running' : ''}`}
-                      onClick={() => onSelectPreset(preset.id as EntityId, effectiveRunning)}
-                      disabled={isStarting}
-                      style={{ '--entity-color': preset.color } as any}
-                    >
-                      <div class="unified-dialog__card-info">
-                        <span class="unified-dialog__card-name">
-                          {running && <span class="unified-dialog__card-dot" />}
-                          {preset.displayName}
-                        </span>
-                      </div>
-                      {running && preset.singleInstance && (
-                        <span class="unified-dialog__card-status">{t('unified.running')}</span>
-                      )}
-                      {running && !preset.singleInstance && (
-                        <span class="unified-dialog__card-status">+</span>
-                      )}
-                      {isStarting && (
-                        <span class="unified-dialog__card-status">{t('unified.starting')}</span>
-                      )}
-                    </button>
-                    {onResumePreset && (
+                  <div key={preset.id}>
+                    <div class="unified-dialog__card-row">
                       <button
-                        class="unified-dialog__card-resume"
-                        onClick={(e: any) => { e.stopPropagation(); onResumePreset(preset.id as EntityId) }}
+                        class={`unified-dialog__card${runsHere ? ' unified-dialog__card--running' : ''}`}
+                        onClick={() => onSelectPreset(preset.id as EntityId, effectiveRunning)}
                         disabled={isStarting}
-                        title={t('unified.resume')}
+                        style={{ '--entity-color': preset.color } as any}
                       >
-                        {t('unified.resumeShort')}
+                        <div class="unified-dialog__card-info">
+                          <span class="unified-dialog__card-name">
+                            {runsHere && <span class="unified-dialog__card-dot" />}
+                            {preset.displayName}
+                          </span>
+                        </div>
+                        {runningIn.length > 0 && (
+                          <span
+                            class="unified-dialog__card-status"
+                            title={t('unified.runningInWorkspaces', { names: runningNames.join(', ') })}
+                          >
+                            {runningNames.slice(0, 2).join(', ')}
+                            {runningNames.length > 2 ? ` +${runningNames.length - 2}` : ''}
+                          </span>
+                        )}
+                        {isStarting && (
+                          <span class="unified-dialog__card-status">{t('unified.starting')}</span>
+                        )}
                       </button>
+                      {otherWorkspaces.length > 0 && (
+                        <button
+                          class="unified-dialog__card-ws"
+                          onClick={() => setWsPickerFor(expanded ? null : preset.id)}
+                          disabled={isStarting}
+                          title={t('unified.startInWorkspace')}
+                        >
+                          ⤳
+                        </button>
+                      )}
+                      {onResumePreset && (
+                        <button
+                          class="unified-dialog__card-resume"
+                          onClick={() => onResumePreset(preset.id as EntityId)}
+                          disabled={isStarting}
+                          title={t('unified.resume')}
+                        >
+                          {t('unified.resumeShort')}
+                        </button>
+                      )}
+                    </div>
+                    {expanded && (
+                      <div class="unified-dialog__ws-chips">
+                        {otherWorkspaces.map(w => (
+                          <button
+                            key={w.id}
+                            class="unified-dialog__ws-chip"
+                            onClick={() => {
+                              setWsPickerFor(null)
+                              onSelectPreset(preset.id as EntityId, false, w.id)
+                            }}
+                          >
+                            {w.name}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )

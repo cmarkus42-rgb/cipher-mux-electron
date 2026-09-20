@@ -61,3 +61,28 @@ export function findEntitySessionId(
   )
   return unbound?.id ?? null
 }
+
+/**
+ * Whether an entity counts as "running" from the vantage point of one workspace.
+ *
+ * True when the entity's workspace-key list contains the requested workspace
+ * OR the `_global` sentinel (unbound sessions are visible from every
+ * workspace — see the ruling in commit 333de16 and `findEntitySessionId`
+ * above). A session bound to a *different* workspace does not count.
+ *
+ * This is the single source of truth for the running-here rule. Callers
+ * (the launcher's card click, the picker's chip list, app.tsx's collapsed
+ * boolean map) must all go through this function rather than re-deriving
+ * the `.includes(wsKey) || .includes(GLOBAL_WORKSPACE_KEY)` check inline —
+ * two copies of that rule in two files is exactly the drift that produces a
+ * launcher which disagrees with the rest of the app about what is running.
+ */
+export function isEntityRunningIn(
+  statusByWorkspace: Record<string, string[]>,
+  entityId: string,
+  workspaceId: string | null,
+): boolean {
+  const keys = statusByWorkspace[entityId] ?? []
+  const wsKey = key(workspaceId)
+  return keys.includes(wsKey) || keys.includes(GLOBAL_WORKSPACE_KEY)
+}

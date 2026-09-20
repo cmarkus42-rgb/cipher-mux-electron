@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { deriveEntityStatus, findEntitySessionId } from '../../src/shared/entity-status'
+import { deriveEntityStatus, findEntitySessionId, isEntityRunningIn } from '../../src/shared/entity-status'
 import { GLOBAL_WORKSPACE_KEY } from '../../src/shared/workspace-key'
 
 const SESSIONS = [
@@ -105,5 +105,43 @@ describe('findEntitySessionId — unbound fallback is one-directional (fix round
 
   it('returns null for an entity with no sessions at all', () => {
     assert.equal(findEntitySessionId(FALLBACK_SESSIONS, 'nonexistent-entity', 'ws-alpha'), null)
+  })
+})
+
+describe('isEntityRunningIn', () => {
+  // This is the single source of truth for "is it running here?" — the
+  // launcher card click, the workspace-chip picker, and app.tsx's collapsed
+  // boolean map all have to agree, so this exercises every branch of the
+  // rule directly rather than through a consuming component.
+  const STATUS = {
+    debugger: ['ws-alpha'],
+    audit: [GLOBAL_WORKSPACE_KEY],
+    'cyber-factory': ['ws-alpha', 'ws-beta'],
+  }
+
+  it('is true when the entity runs in the requested workspace', () => {
+    assert.equal(isEntityRunningIn(STATUS, 'debugger', 'ws-alpha'), true)
+  })
+
+  it('is true when the entity runs only unbound (_global)', () => {
+    assert.equal(isEntityRunningIn(STATUS, 'audit', 'ws-alpha'), true)
+    assert.equal(isEntityRunningIn(STATUS, 'audit', null), true)
+  })
+
+  it('is false when the entity runs only in a different workspace', () => {
+    assert.equal(isEntityRunningIn(STATUS, 'debugger', 'ws-beta'), false)
+  })
+
+  it('is false when the entity is not running at all', () => {
+    assert.equal(isEntityRunningIn(STATUS, 'nonexistent', 'ws-alpha'), false)
+  })
+
+  it('is true when the requested workspace is null and the entity is bound to the _global key', () => {
+    assert.equal(isEntityRunningIn(STATUS, 'audit', null), true)
+  })
+
+  it('is true for a multi-workspace entity checked against either of its workspaces', () => {
+    assert.equal(isEntityRunningIn(STATUS, 'cyber-factory', 'ws-alpha'), true)
+    assert.equal(isEntityRunningIn(STATUS, 'cyber-factory', 'ws-beta'), true)
   })
 })
