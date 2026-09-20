@@ -234,7 +234,11 @@ läuft in A, du bist in B, Klick auf die Karte → **startet** in B.
 
 `PaneHeader` und die Sidebar-Session-Liste zeigen ein Workspace-Badge — **nur wenn
 `session.workspaceId !== activeWorkspaceId`**. Im Normalfall bleibt der Header unverändert ruhig;
-das Badge ist ein Abweichungs-Signal, keine Dauerdekoration. Eingefärbt in der Workspace-Farbe.
+das Badge ist ein Abweichungs-Signal, keine Dauerdekoration.
+
+Inhalt ist der Workspace-Name, Darstellung neutral über bestehende Badge-Tokens. `Workspace` hat
+kein `color`-Feld (`persona-types.ts:20` — nur `Persona` hat eins), und eines einzuführen hieße,
+den Workspace-Editor mit einem Farbwähler zu erweitern. Das gehört nicht in dieses Paket.
 
 ### Unverändert
 
