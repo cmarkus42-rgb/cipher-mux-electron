@@ -28,10 +28,12 @@ import type { PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
 import { configStore } from '../config/config-store'
-import { getActiveWorkspace } from '../workspace/workspace-utils'
+import { resolveEntityWorkspace } from '../workspace/workspace-utils'
 import { getCachedGlobalRules } from '../config/global-rules'
 import { extractCharacterBlock } from '../character/character-defaults'
 import { resolvePersonaForPreset } from './persona-resolver'
+import { ensureRunDir } from './entity-run-dir'
+import type { Workspace } from '../../shared/persona-types'
 
 /**
  * Generate the ## Voice Output section content based on ttsLevel.
@@ -1001,6 +1003,19 @@ export class SessionManager extends EventEmitter {
       throw new Error(`Unknown entity: ${entityId}`)
     }
 
+    const targetWorkspace = resolveEntityWorkspace(
+      opts?.workspaceId,
+      (configStore.get('workspaces') ?? []) as Workspace[],
+      (configStore.get('activeWorkspaceId') ?? null) as string | null,
+    )
+    const workspaceId = targetWorkspace?.id ?? null
+    // Authored artefacts (preset.md, skills, guides) stay in the entity dir.
+    // Generated artefacts (CLAUDE.md, .mcp.json, settings) go to the run dir,
+    // which is separate per workspace — that is what stops two instances in
+    // different workspaces from overwriting each other's CLAUDE.md.
+    const entityDir = config.projectPath
+    const runDir = ensureRunDir(workspaceId, entityId, entityDir, ['skills'])
+
     // Mutex: prevent concurrent starts of the same entity
     if (this.startingEntities.has(entityId)) {
       throw new Error(`${config.displayName} is already starting`)
@@ -1067,7 +1082,7 @@ export class SessionManager extends EventEmitter {
       if (config.features.includes('mcp') && this.mcpConfig) {
         const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}/mcp`
         fs.writeFileSync(
-          path.join(config.projectPath, '.mcp-connection.md'),
+          path.join(runDir, '.mcp-connection.md'),
           `# MCP-Verbindung (auto-generiert, nicht editieren)\n\n- **URL:** ${mcpUrl}\n- **Auth:** Bearer ${this.mcpConfig.mcpApiKey}\n`,
           'utf-8',
         )
@@ -1077,7 +1092,7 @@ export class SessionManager extends EventEmitter {
       // Without pre-approved permissions, Claude Code blocks on tool approval
       // prompts — fatal for non-interactive sessions like voice-relay.
       if (config.features.includes('mcp') && this.mcpConfig) {
-        const claudeDir = path.join(config.projectPath, '.claude')
+        const claudeDir = path.join(runDir, '.claude')
         const settingsPath = path.join(claudeDir, 'settings.local.json')
         fs.mkdirSync(claudeDir, { recursive: true })
 
@@ -1100,7 +1115,7 @@ export class SessionManager extends EventEmitter {
     // Write .mcp.json for MCP auto-discovery (if entity uses MCP)
     if (config.features.includes('mcp') && this.mcpConfig) {
       const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}/mcp`
-      const mcpJsonPath = path.join(config.projectPath, '.mcp.json')
+      const mcpJsonPath = path.join(runDir, '.mcp.json')
       const mcpJson = {
         mcpServers: {
           'cipher-mux': {
@@ -1117,30 +1132,28 @@ export class SessionManager extends EventEmitter {
     // Read preset.md as source-of-truth, assemble with injected layers,
     // write result as CLAUDE.md. No regex-replace — pure concatenation.
     {
+      // Source of truth stays in the entity dir; the assembled result lands in
+      // the run dir, which is the session's cwd.
       const presetMdPath = path.join(config.projectPath, 'preset.md')
-      const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
+      const legacyClaudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
+      const claudeMdPath = path.join(runDir, 'CLAUDE.md')
 
       // Read preset.md; fallback to existing CLAUDE.md if preset.md missing
       let presetContent: string | null = null
       if (fs.existsSync(presetMdPath)) {
         presetContent = fs.readFileSync(presetMdPath, 'utf-8')
-      } else if (fs.existsSync(claudeMdPath)) {
-        presetContent = fs.readFileSync(claudeMdPath, 'utf-8')
+      } else if (fs.existsSync(legacyClaudeMdPath)) {
+        presetContent = fs.readFileSync(legacyClaudeMdPath, 'utf-8')
       }
 
       if (presetContent !== null) {
-        // Resolve workspace prompt + context paths: explicit opts take priority,
-        // otherwise read from active workspace (covers launcher/autostart entities)
+        // Explicit opts win; otherwise the workspace this session is bound to
+        // (already resolved above — no second lookup, no getActiveWorkspace()).
         let wsPrompt = opts?.workspacePrompt
         let wsPaths = opts?.contextPaths
-        if (!wsPrompt && !wsPaths) {
-          try {
-            const ws = getActiveWorkspace()
-            if (ws) {
-              if (ws.workspacePrompt?.trim()) wsPrompt = ws.workspacePrompt.trim()
-              if (ws.contextPaths?.length) wsPaths = ws.contextPaths
-            }
-          } catch { /* configStore not available */ }
+        if (!wsPrompt && !wsPaths && targetWorkspace) {
+          if (targetWorkspace.workspacePrompt?.trim()) wsPrompt = targetWorkspace.workspacePrompt.trim()
+          if (targetWorkspace.contextPaths?.length) wsPaths = targetWorkspace.contextPaths
         }
         const assembled = this.assembleEntityClaudeMd(
           presetContent,
@@ -1162,10 +1175,12 @@ export class SessionManager extends EventEmitter {
     }
 
     // Start session
+    const { projectPath: _callerProjectPath, ...restOpts } = opts ?? {}
     const session = await this.start({
       name: displayName,
-      projectPath: config.projectPath,
-      ...opts,
+      ...restOpts,
+      projectPath: runDir,
+      workspaceId,
       _entityInjected: true,
     })
 
@@ -1173,7 +1188,7 @@ export class SessionManager extends EventEmitter {
     // Voice-relay and bugreport use TTS as primary channel and are exempt from focus gate.
     if (entityId !== 'voice-relay' && entityId !== 'bugreport') {
       try {
-        const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
+        const claudeMdPath = path.join(runDir, 'CLAUDE.md')
         if (fs.existsSync(claudeMdPath)) {
           const content = fs.readFileSync(claudeMdPath, 'utf-8')
           const section = `Your cipher-mux session ID is \`${session.id}\`. Pass this as \`sessionId\` parameter in every \`mux_tts_speak\` call.`
