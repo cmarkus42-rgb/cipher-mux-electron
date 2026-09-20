@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { RecoveryResult, EntityId } from '../shared/types'
 import { deriveEntityStatus, findEntitySessionId } from '../shared/entity-status'
-import { workspaceKey } from '../shared/workspace-key'
+import { workspaceKey, GLOBAL_WORKSPACE_KEY } from '../shared/workspace-key'
 import { useSessions } from './hooks/useSessions'
 import { useContextUsage } from './hooks/useContextUsage'
 import { useGrid } from './hooks/useGrid'
@@ -385,13 +385,17 @@ export function App() {
   // Entity status map for unified dialog/sidebar — computed dynamically from active
   // sessions, scoped to the workspace currently shown in the grid. Any entity
   // (including dynamic ones like watchdog, projectlauncher, etc.) is recognised as
-  // running, not just a hardcoded few — but only if it runs in THIS workspace; an
-  // instance running elsewhere must not read as "already open" here.
+  // running, not just a hardcoded few — but only if it runs in THIS workspace, OR
+  // is unbound (_global): an unbound session is visible from every workspace, not
+  // from none (ruling in commit 333de16 — otherwise a click on a running-but-unbound,
+  // non-singleInstance preset like companion/refinement/audit spawns a second
+  // instance instead of focusing the existing one). An instance bound to a
+  // *different* workspace still must not read as "already open" here.
   const entityStatus = useMemo<Record<string, boolean>>(() => {
     const wsKey = workspaceKey(activeWorkspaceId)
     const status: Record<string, boolean> = {}
     for (const [eid, wsKeys] of Object.entries(entityStatusByWorkspace)) {
-      status[eid] = wsKeys.includes(wsKey)
+      status[eid] = wsKeys.includes(wsKey) || wsKeys.includes(GLOBAL_WORKSPACE_KEY)
     }
     return status
   }, [entityStatusByWorkspace, activeWorkspaceId])
