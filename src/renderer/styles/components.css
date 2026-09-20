@@ -3393,6 +3393,50 @@
   cursor: wait;
 }
 
+.unified-dialog__card-ws {
+  flex-shrink: 0;
+  padding: 6px 9px;
+  background: var(--session-action-btn-bg, transparent);
+  border: 1px solid var(--session-action-btn-border, var(--color-border));
+  color: var(--session-action-btn-text, var(--color-accent));
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+}
+
+.unified-dialog__card-ws:hover:not(:disabled) {
+  background: var(--session-action-btn-bg-hover, var(--color-accent-soft));
+  border-color: var(--session-action-btn-text, var(--color-accent));
+  color: var(--session-action-btn-text-hover, var(--color-text));
+}
+
+.unified-dialog__ws-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: var(--space-xs) 0 var(--space-sm) var(--space-md);
+}
+
+.unified-dialog__ws-chip {
+  padding: 2px var(--space-sm);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle, var(--color-border));
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.unified-dialog__ws-chip:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 .unified-dialog__options {
   display: flex;
   flex-direction: column;

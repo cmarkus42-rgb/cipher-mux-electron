@@ -2,8 +2,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { RecoveryResult, EntityId } from '../shared/types'
-import { deriveEntityStatus, findEntitySessionId } from '../shared/entity-status'
-import { workspaceKey, GLOBAL_WORKSPACE_KEY } from '../shared/workspace-key'
+import { deriveEntityStatus, findEntitySessionId, isEntityRunningIn } from '../shared/entity-status'
 import { useSessions } from './hooks/useSessions'
 import { useContextUsage } from './hooks/useContextUsage'
 import { useGrid } from './hooks/useGrid'
@@ -392,10 +391,9 @@ export function App() {
   // instance instead of focusing the existing one). An instance bound to a
   // *different* workspace still must not read as "already open" here.
   const entityStatus = useMemo<Record<string, boolean>>(() => {
-    const wsKey = workspaceKey(activeWorkspaceId)
     const status: Record<string, boolean> = {}
-    for (const [eid, wsKeys] of Object.entries(entityStatusByWorkspace)) {
-      status[eid] = wsKeys.includes(wsKey) || wsKeys.includes(GLOBAL_WORKSPACE_KEY)
+    for (const eid of Object.keys(entityStatusByWorkspace)) {
+      status[eid] = isEntityRunningIn(entityStatusByWorkspace, eid, activeWorkspaceId)
     }
     return status
   }, [entityStatusByWorkspace, activeWorkspaceId])
@@ -1293,7 +1291,7 @@ export function App() {
           theme={theme}
           workshopSessionId={getEntitySessionId('workshop')}
           activeWorkspaceId={activeWorkspaceId}
-          entityStatus={entityStatus}
+          entityStatus={entityStatusByWorkspace}
           voiceTargetSessionId={voiceTargetSessionId}
           voicePinned={voicePinned}
           voiceState={voiceState}

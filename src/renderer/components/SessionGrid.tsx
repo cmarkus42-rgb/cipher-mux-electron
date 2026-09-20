@@ -19,7 +19,8 @@ interface SessionGridProps {
   theme: ThemeName
   workshopSessionId: string | null
   activeWorkspaceId: string | null
-  entityStatus: Record<string, boolean>
+  /** entityId → workspace keys the entity currently runs in (see shared/entity-status.ts). */
+  entityStatus: Record<string, string[]>
   voiceTargetSessionId: string | null
   voicePinned: boolean
   voiceState: string
@@ -39,7 +40,7 @@ interface SessionGridProps {
   onFocusModeBySlot?: (slotIndex: number) => void
   focusModeSlots?: Set<number>
   focusModeOverlapped?: Set<number>
-  onStartEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
+  onStartEntity: (entityId: EntityId, slotIndex: number, workspaceId?: string) => Promise<void>
   onResumeEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
   onFocusEntity: (entityId: EntityId) => void
   onStartPath: (path: string, opts: PathStartOpts, slotIndex: number) => void
@@ -313,7 +314,7 @@ export function SessionGrid({
               slotIndex={idx}
               slotCol={idx % cols}
               slotRow={Math.floor(idx / cols)}
-              onStartEntity={(entityId) => onStartEntity(entityId, idx)}
+              onStartEntity={(entityId, workspaceId) => onStartEntity(entityId, idx, workspaceId)}
               onResumeEntity={(entityId) => onResumeEntity(entityId, idx)}
               onFocusEntity={onFocusEntity}
               onStartPath={(path, opts) => onStartPath(path, opts, idx)}

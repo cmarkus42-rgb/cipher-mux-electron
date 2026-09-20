@@ -467,7 +467,9 @@
   "unified.desc.voice": "Sprach-Konversation (Hintergrund-Session)",
   "unified.desc.audit": "Sicherheits- und Code-Qualitaets-Audit",
   "unified.running": "laeuft",
+  "unified.runningInWorkspaces": "Läuft in: {{names}}",
   "unified.starting": "startet...",
+  "unified.startInWorkspace": "In anderem Workspace starten",
   "unified.resume": "Letzte Konversation fortsetzen (stoppt aktuelle, startet mit --resume)",
   "unified.resumeShort": "Resume",
   "unified.pathPlaceholder": "Projektpfad oder Ordner...",
@@ -478,6 +480,7 @@
   "unified.cancel": "Abbrechen",
   "unified.start": "Starten",
   "unified.focusEntity": "Fokussieren",
+  "unified.workspaceBadgeTitle": "Läuft in Workspace: {{name}}",
   "statusBar.newSession": "+",
 
   "info.tabVoice": "stimme",
