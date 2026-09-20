@@ -1401,6 +1401,17 @@ export class SessionManager extends EventEmitter {
     this.emit('session-changed', session)
   }
 
+  /**
+   * Re-bind a recovered session to a workspace (used by keepWorking restore).
+   * No-op for unknown session IDs — never throws into the init chain.
+   */
+  bindWorkspace(sessionId: string, workspaceId: string | null): void {
+    const session = this.sessions.get(sessionId)
+    if (!session) return
+    session.workspaceId = workspaceId
+    this.persistSession(session)
+  }
+
   // ─── Session Resume / Fork ──────────────────────────────
 
   /**

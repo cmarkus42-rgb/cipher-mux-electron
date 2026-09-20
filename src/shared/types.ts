@@ -254,7 +254,14 @@ export interface AppConfig {
   keepWorking?: boolean
   /** Snapshot of sessions saved on keepWorking quit — consumed on next start. */
   keepWorkingSnapshot?: {
-    sessions: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }>
+    sessions: Array<{
+      name: string
+      projectPath: string
+      gridSlot: number
+      entityId?: string
+      topic?: string
+      workspaceId?: string | null
+    }>
     gridConfig?: { cols: number; rows: number }
     notesSlots?: Array<{ slotIndex: number; notesId?: string; openNoteIds?: string[] }>
   }

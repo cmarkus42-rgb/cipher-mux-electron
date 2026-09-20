@@ -424,7 +424,7 @@ export class IpcHub {
           kwEnabled,
           hasSnapshot: !!rawSnapshot,
           snapshotSessions: rawSnapshot && !Array.isArray(rawSnapshot) ? rawSnapshot.sessions?.length : (Array.isArray(rawSnapshot) ? rawSnapshot.length : 0),
-          recovered: result.recovered.map(r => ({ id: r.id, name: r.name })),
+          recovered: result.recovered.map(r => ({ id: r.id, name: r.name, workspaceId: r.workspaceId ?? null })),
           orphaned: result.orphaned.length,
         }
         fs.writeFileSync('/tmp/kw-debug.json', JSON.stringify(debugInfo, null, 2))
@@ -2263,7 +2263,10 @@ export class IpcHub {
 
   // ─── Entity Framework ──────────────────────────────────
   private registerEntityChannels(): void {
-    ipcMain.handle(IPC.ENTITY_START, async (_e, { entityId }: { entityId: EntityId }) => {
+    ipcMain.handle(IPC.ENTITY_START, async (_e, { entityId, workspaceId }: {
+      entityId: EntityId
+      workspaceId?: string | null
+    }) => {
       // Feature flag gate: debugger is opt-in (defaults to disabled)
       if (entityId === 'debugger') {
         const debuggerConfig = configStore.get('debugger')
@@ -2272,6 +2275,12 @@ export class IpcHub {
         }
       }
 
+      // Explicit choice wins; otherwise the globally active workspace.
+      // undefined means "caller did not choose" — null means "explicitly unbound".
+      const effectiveWorkspaceId = workspaceId === undefined
+        ? (configStore.get('activeWorkspaceId') ?? null)
+        : workspaceId
+
       const mcpConfig = configStore.get('mcp')
       // Ensure MCP config is set on session manager
       this.sessionManager.setMcpConfig({
@@ -2279,7 +2288,9 @@ export class IpcHub {
         mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
         mcpApiKey: mcpConfig?.apiKey ?? '',
       })
-      const session = await this.sessionManager.startEntity(entityId)
+      const session = await this.sessionManager.startEntity(entityId, {
+        workspaceId: effectiveWorkspaceId,
+      })
       // Queue Claude launch for entity — pass session.id for multi-instance support
       try {
         this.sessionManager.queueEntityClaude(entityId, session.id)
@@ -2843,9 +2854,9 @@ ist dieses Entity fokussiert?
    * persisted ui.grid config.
    */
   private async restoreKeepWorkingFromRecovery(
-    snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }>,
+    snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string; workspaceId?: string | null }>,
     gridConfig: { cols: number; rows: number } | undefined,
-    recovered: Array<{ id: string; name: string; projectPath: string | null; entityId?: string }>,
+    recovered: Array<{ id: string; name: string; projectPath: string | null; entityId?: string; workspaceId?: string | null }>,
     notesSlots?: Array<{ slotIndex: number; notesId?: string; openNoteIds?: string[] }>,
   ): Promise<void> {
     const effectiveGrid = gridConfig ?? { cols: 1, rows: 1 }
@@ -2880,6 +2891,9 @@ ist dieses Entity fokussiert?
         if (entry.entityId && !match.entityId) {
           this.sessionManager.linkEntity(match.id, entry.entityId)
         }
+        // Re-bind workspace from snapshot — recovered sessions get fresh
+        // in-memory SessionInfo objects with no workspaceId of their own.
+        this.sessionManager.bindWorkspace(match.id, entry.workspaceId ?? null)
         console.log(`[IpcHub] keepWorking: reusing recovered "${match.name}" (${match.id}) → slot ${entry.gridSlot}`)
       } else {
         // No matching recovered session — start new with --resume
@@ -2897,6 +2911,7 @@ ist dieses Entity fokussiert?
             name: entry.name,
             projectPath: entry.projectPath,
             autoLaunch,
+            workspaceId: entry.workspaceId ?? null,
           })
           // Restore entity link for newly created sessions too
           if (entry.entityId) {
@@ -2962,7 +2977,7 @@ ist dieses Entity fokussiert?
     const sessions = this.sessionManager.list().filter(s => s.status === 'active')
     if (sessions.length === 0) return
     const allTasks = this.taskManager ? this.taskManager.list() : []
-    const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }> = []
+    const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string; workspaceId?: string | null }> = []
     for (const s of sessions) {
       const slotIdx = grid.slots.findIndex(slot => slot.sessionId === s.id)
       if (!s.projectPath || slotIdx < 0) continue
@@ -2976,6 +2991,7 @@ ist dieses Entity fokussiert?
         gridSlot: slotIdx,
         entityId: s.entityId,
         topic: resolveSessionTopic(s, allTasks, capture),
+        workspaceId: s.workspaceId ?? null,
       })
     }
     // Collect notes slots for restoration
@@ -3031,7 +3047,7 @@ ist dieses Entity fokussiert?
       const gridState = this.sessionManager.getSessionStore().getGridState()
       if (sessions.length > 0 && gridState) {
         const allTasks = this.taskManager ? this.taskManager.list() : []
-        const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }> = []
+        const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string; workspaceId?: string | null }> = []
         for (const s of sessions) {
           const slotIdx = gridState.slots.findIndex(slot => slot.sessionId === s.id)
           if (!s.projectPath || slotIdx < 0) continue
@@ -3045,6 +3061,7 @@ ist dieses Entity fokussiert?
             gridSlot: slotIdx,
             entityId: s.entityId,
             topic: resolveSessionTopic(s, allTasks, capture),
+            workspaceId: s.workspaceId ?? null,
           })
         }
         // Collect notes slots for restoration

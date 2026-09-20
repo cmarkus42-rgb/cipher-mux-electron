@@ -397,7 +397,12 @@ const api = {
 
   // ─── Entities ──────────────────────────────────────────
   entity: {
-    start: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_START, { entityId }),
+    start: (entityId: string, workspaceId?: string | null) =>
+      // Do not coalesce: undefined ("no preference") and null ("explicitly
+      // unbound") must both survive the IPC boundary distinctly. Structured
+      // clone preserves `undefined` as a property value, so a straight
+      // pass-through keeps all three states (undefined / null / string).
+      ipcRenderer.invoke(IPC.ENTITY_START, { entityId, workspaceId }),
     resume: (entityId: string, sessionId?: string) => ipcRenderer.invoke(IPC.ENTITY_RESUME, { entityId, sessionId }),
     stop: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_STOP, { entityId }),
     status: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_STATUS, { entityId }),
