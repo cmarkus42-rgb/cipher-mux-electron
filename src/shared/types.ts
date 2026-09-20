@@ -69,6 +69,12 @@ export interface SessionInfo {
   claudeSessionId?: string
   /** Entity ID if this session belongs to a registered entity. */
   entityId?: EntityId
+  /**
+   * Workspace this session was started in. null = no workspace binding.
+   * Survives restarts via sessions.json. Never inferred from the currently
+   * active workspace during recovery — an unbound session stays unbound.
+   */
+  workspaceId?: string | null
   /** Number of sendKeys calls this session received. 0 = never used. */
   interactionCount?: number
 }
@@ -90,6 +96,8 @@ export interface StartSessionOpts {
   workspacePrompt?: string
   /** Context directory paths — injected as ## Context Directories in project CLAUDE.md. */
   contextPaths?: string[]
+  /** Workspace this session belongs to. null/undefined = no binding. */
+  workspaceId?: string | null
   /** Model override — passed as --model <id> to the agent CLI. */
   model?: string
   /** Internal flag: global rules already injected by startEntity(). */

@@ -22,9 +22,9 @@ import {
   generateIdeationPartnerClaudeMd,
 } from '../entity-content'
 import { EntityRegistry } from './entity-registry'
-import { SessionStore } from './session-store'
+import { SessionStore, toPersistedSession } from './session-store'
 import { runCommand } from '../util/exec-util'
-import type { PersistedSession, PersistedGridState } from './session-store'
+import type { PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
 import { configStore } from '../config/config-store'
@@ -324,6 +324,7 @@ export class SessionManager extends EventEmitter {
       updatedAt: now,
       adapterId: adapter.id,
       capabilities: adapter.getCapabilities(),
+      workspaceId: opts.workspaceId ?? null,
     }
 
     this.sessions.set(id, session)
@@ -560,6 +561,7 @@ export class SessionManager extends EventEmitter {
             createdAt: Date.now(),
             updatedAt: Date.now(),
             entityId: ps.entityId ?? undefined,
+            workspaceId: ps.workspaceId ?? null,
           }
           this.sessions.set(session.id, session)
           this.tmux.watchSession(ps.tmuxSession, session.id)
@@ -1588,15 +1590,9 @@ export class SessionManager extends EventEmitter {
    * calls persistGridState() to update slot assignments.
    */
   private persistSession(session: SessionInfo): void {
-    this.sessionStore.upsertSession({
-      id: session.id,
-      name: session.name,
-      tmuxSession: session.tmuxSession,
-      entityId: (session.entityId as EntityId) ?? null,
-      projectPath: session.projectPath,
-      gridSlot: null, // updated by renderer via persistGridState()
-      status: 'active',
-    })
+    const ps = toPersistedSession(session, null)
+    ps.status = 'active'
+    this.sessionStore.upsertSession(ps)
   }
 
   /**
