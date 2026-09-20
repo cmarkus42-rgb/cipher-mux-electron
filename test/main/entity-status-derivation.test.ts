@@ -60,4 +60,50 @@ describe('findEntitySessionId', () => {
   it('returns the first match when several instances run in one workspace', () => {
     assert.equal(findEntitySessionId(SESSIONS, 'companion', 'ws-alpha'), 's1')
   })
+
+  // Fix round 1 (coordinator review, commit 333de16): unbound sessions
+  // (workspaceId null → key _global) are visible from EVERY workspace, not
+  // from none. Otherwise a running-but-unbound instance of a non-singleInstance
+  // preset (companion/refinement/audit) reads as "not running" everywhere a
+  // real workspace is active, and clicking it spawns a second instance instead
+  // of focusing the existing one.
+
+  it('finds an unbound session when a lookup for a real (non-null) workspace has no bound match', () => {
+    // 'audit' in SESSIONS has only the unbound s5 — no session bound to ws-alpha.
+    // Before the fix, strict keying returned null here.
+    assert.equal(findEntitySessionId(SESSIONS, 'audit', 'ws-alpha'), 's5')
+  })
+})
+
+describe('findEntitySessionId — unbound fallback is one-directional (fix round 1)', () => {
+  // Kept in its own fixture, separate from SESSIONS above, so these additions
+  // cannot perturb the already-reviewed assertions on that fixture (in
+  // particular the exact-count assertions in the deriveEntityStatus block).
+  //
+  // Deliberately ordered bound-session-first, unbound-session-second: a naive
+  // over-wide fix ("an entity's session matches from ANY workspace, not just
+  // _global") would do a plain unfiltered find() and return the bound f2
+  // first due to array order — which is exactly the leak the "does not leak"
+  // test below must catch.
+  const FALLBACK_SESSIONS = [
+    { id: 'f2', entityId: 'watchdog', status: 'active', workspaceId: 'ws-alpha' }, // bound
+    { id: 'f1', entityId: 'watchdog', status: 'active', workspaceId: null },       // unbound
+  ]
+
+  it('prefers a bound session over an unbound one when both exist for the same workspace', () => {
+    assert.equal(findEntitySessionId(FALLBACK_SESSIONS, 'watchdog', 'ws-alpha'), 'f2')
+  })
+
+  it('does not leak a session bound to one workspace into a lookup for another workspace', () => {
+    // ws-beta has neither a bound nor is it ws-alpha (where f2 lives). The correct
+    // fallback is the unbound f1 — NOT f2. If this returns 'f2', the widening has
+    // gone from "unbound -> every workspace" to "bound -> every OTHER workspace too",
+    // which breaks the workspace isolation the whole multi-workspace-sessions plan
+    // is about.
+    assert.equal(findEntitySessionId(FALLBACK_SESSIONS, 'watchdog', 'ws-beta'), 'f1')
+  })
+
+  it('returns null for an entity with no sessions at all', () => {
+    assert.equal(findEntitySessionId(FALLBACK_SESSIONS, 'nonexistent-entity', 'ws-alpha'), null)
+  })
 })
