@@ -9,6 +9,7 @@ import type { EntityId, SessionInfo } from '../../shared/types'
 import { IPC } from '../../shared/ipc-channels'
 import type { ToolContext } from './mcp-tools'
 import type { Topic } from '../../shared/types'
+import { findEntitySessions } from '../session/entity-session-lookup'
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -79,13 +80,16 @@ interface SessionCandidate {
  * Priority: visible+idle > background+idle > visible+busy(singleInstance) >
  *           background+busy(singleInstance) > new session
  */
-async function findBestSession(
+export async function findBestSession(
   ctx: ToolContext,
   entityId: EntityId,
 ): Promise<{ session: SessionInfo; wasExisting: true } | null> {
-  const sessions = ctx.sessionManager.list()
-  const entitySessions = sessions.filter(
-    s => s.entityId === entityId && s.status === 'active'
+  // Stay inside the caller's workspace. A handoff from workspace B must not
+  // land in the debugger sitting in workspace A — it starts its own instead.
+  const entitySessions = findEntitySessions(
+    ctx.sessionManager.list(),
+    entityId,
+    ctx.workspaceId ?? null,
   )
 
   if (entitySessions.length === 0) return null
@@ -157,6 +161,7 @@ export async function startEntitySession(
 ): Promise<SessionInfo> {
   const session = await ctx.sessionManager.startEntity(entityId, {
     name: opts?.name ?? entityId,
+    workspaceId: ctx.workspaceId ?? null,
     ...(opts?.projectPath ? { projectPath: opts.projectPath } : {}),
   })
 
