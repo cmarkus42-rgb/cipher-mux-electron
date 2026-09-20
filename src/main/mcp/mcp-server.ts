@@ -6,6 +6,7 @@ import { APP_NAME, APP_VERSION, MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../..
 import { validateBearer } from './mcp-auth'
 import { registerTools, ToolContext } from './mcp-tools'
 import { parseWorkspaceHeader, resolveWorkspaceId } from './workspace-header'
+import { configStore } from '../config/config-store'
 
 /** Session timeout: sessions inactive for longer than this are garbage-collected. */
 export const SESSION_TIMEOUT_MS = 4 * 60 * 60 * 1000 // 4 hours
@@ -440,11 +441,15 @@ export class McpServerManager {
    */
   private listKnownWorkspaceIds(): string[] {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { configStore } = require('../config/config-store')
       const workspaces = (configStore.get('workspaces') ?? []) as Array<{ id: string }>
       return workspaces.map(w => w.id)
-    } catch {
+    } catch (err) {
+      // Fail-open by design: an unbound session is better than a broken
+      // initialize. But a transient read failure here looks identical in
+      // the logs to a genuinely deleted workspace (resolveWorkspaceId logs
+      // "unknown workspace id ... treating as unbound") unless we name the
+      // real cause here.
+      console.error(`[McpServer] listKnownWorkspaceIds failed, treating as no known workspaces: ${err instanceof Error ? err.message : String(err)}`)
       return []
     }
   }
