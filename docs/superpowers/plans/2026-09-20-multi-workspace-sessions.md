@@ -17,6 +17,7 @@
 - **Kein Test darf in `~/.config/cipher-mux/` schreiben.** Neue Module, die Pfade auflösen, nehmen das Basisverzeichnis als optionalen letzten Parameter mit Default. Tests übergeben ein `fs.mkdtempSync`-Verzeichnis.
 - **Tests brauchen Node 22.** Vor jedem Testbefehl: `export PATH="/opt/homebrew/opt/node@22/bin:$PATH"`. Unter dem System-Node 26.8.2 kompiliert `better-sqlite3@11.10.0` nicht (V8-API-Fehler), der `rebuild:node`-Schritt bricht ab und die `&&`-Kette im `test`-Skript führt keinen einzigen Test aus. `.nvmrc` und `engines.node` im Repo halten die Version fest, aber npm wertet sie nicht selbst aus — der PATH-Export bleibt nötig.
 - **Der volle Testbefehl lautet `npm run test`** und nimmt keine Dateiargumente entgegen (`node --test ... $(find test -name '*.test.ts')`). Für einen einzelnen Lauf: `export PATH="/opt/homebrew/opt/node@22/bin:$PATH" && node --test --import tsx test/main/<datei>.test.ts`.
+- **`npm run lint` ist projektweit rot und war es vor diesem Paket schon** — 830 Probleme, 478 Fehler, 352 Warnungen über `src/`. Ein grüner Gesamtlauf ist kein erreichbares Abnahmekriterium. Das Gate lautet: **die vom Task berührten Dateien fügen kein neues Problem hinzu**. Prüfen mit `npx eslint <die geänderten Dateien>` und die Treffer gegen `git blame` abgleichen, statt `npm run lint` als Ja/Nein zu lesen.
 - **Die Baseline ist bekannt rot.** Stand vor Task 1: **1531 Tests, 1526 pass, 3 fail, 2 cancelled**. Vorbestehend rot und nicht Teil dieses Pakets: `migrate-to-cyber-factory.test.ts`, `task-hooks.test.ts` (Event-Loop-Flake), `voice-catalog.test.ts`, `voice-downloader.test.ts`. Abnahme heißt: **genau diese vier und keine weiteren**, und die Gesamtzahl der Tests steigt. Die Angabe "858 Tests, 0 Failures" in der CLAUDE.md ist veraltet.
 - **`npm run test` läuft gegen Node-ABI, `npm start` gegen Electron-ABI.** Nach einem Testlauf nie `electron .` direkt starten — immer `npm start` (prestart-Hook rebuildet better-sqlite3).
 - **Defensiv bei neuen Feldern.** Jeder Lesezugriff auf `workspaceId` aus persistierten Daten nutzt `?? null`. Ein Crash in der Init-Chain killt Keep-Working still und vollständig (siehe CLAUDE.md, Abschnitt "Keep Working Restore — Fragile Zone").
@@ -760,7 +761,7 @@ Zusätzlich: `grep -rn "entities/" src/main/ --include="*.ts" | grep -v entity-r
 - [ ] **Step 12: Verify build and full suite**
 
 Run: `export PATH="/opt/homebrew/opt/node@22/bin:$PATH" && npm run lint && npx tsc --noEmit -p tsconfig.main.json && npm run test`
-Expected: Lint und Typecheck sauber; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren. Besonders auf `entity-claudemd-assembly.test.ts` achten — die Assembly-Funktion selbst ist unverändert, nur ihr Ziel-Pfad.
+Expected: Typecheck sauber, keine neuen Lint-Probleme in den geänderten Dateien; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren. Besonders auf `entity-claudemd-assembly.test.ts` achten — die Assembly-Funktion selbst ist unverändert, nur ihr Ziel-Pfad.
 
 - [ ] **Step 13: Commit**
 
@@ -999,7 +1000,7 @@ Keine neue Methode auf Vorrat anlegen — `hasActiveEntitySession` und `findEnti
 - [ ] **Step 8: Verify build and full suite**
 
 Run: `export PATH="/opt/homebrew/opt/node@22/bin:$PATH" && npm run lint && npx tsc --noEmit -p tsconfig.main.json && npm run test`
-Expected: Lint und Typecheck sauber; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
+Expected: Typecheck sauber, keine neuen Lint-Probleme in den geänderten Dateien; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
 
 - [ ] **Step 9: Commit**
 
@@ -1286,7 +1287,7 @@ Jede Stelle, die ein `AdapterContext`-Objekt baut (inklusive Mocks in Tests), br
 - [ ] **Step 6: Verify build and full suite**
 
 Run: `export PATH="/opt/homebrew/opt/node@22/bin:$PATH" && npm run lint && npx tsc --noEmit -p tsconfig.main.json && npm run test`
-Expected: Lint und Typecheck sauber; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
+Expected: Typecheck sauber, keine neuen Lint-Probleme in den geänderten Dateien; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
 
 - [ ] **Step 7: Commit**
 
@@ -1426,7 +1427,7 @@ Im Log-Statement von `createSession()` (Zeile ~175):
 - [ ] **Step 6: Verify build and full suite**
 
 Run: `export PATH="/opt/homebrew/opt/node@22/bin:$PATH" && npm run lint && npx tsc --noEmit -p tsconfig.main.json && npm run test`
-Expected: Lint und Typecheck sauber; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren. `mcp-server-lifecycle.test.ts` besonders beachten — falls es `createSession()` direkt aufruft, funktioniert der Default-Parameter, aber der Test sollte zusätzlich einen gebundenen Fall abdecken, wenn er die Signatur ohnehin anfasst.
+Expected: Typecheck sauber, keine neuen Lint-Probleme in den geänderten Dateien; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren. `mcp-server-lifecycle.test.ts` besonders beachten — falls es `createSession()` direkt aufruft, funktioniert der Default-Parameter, aber der Test sollte zusätzlich einen gebundenen Fall abdecken, wenn er die Signatur ohnehin anfasst.
 
 - [ ] **Step 7: Commit**
 
@@ -1580,7 +1581,7 @@ Expected: PASS, 6 Tests.
 - [ ] **Step 6: Verify build and full suite**
 
 Run: `export PATH="/opt/homebrew/opt/node@22/bin:$PATH" && npm run lint && npx tsc --noEmit -p tsconfig.main.json && npm run test`
-Expected: Lint und Typecheck sauber; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
+Expected: Typecheck sauber, keine neuen Lint-Probleme in den geänderten Dateien; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
 
 - [ ] **Step 7: Commit**
 
@@ -1709,7 +1710,7 @@ Und in den Debug-Dump (Zeile ~427):
 - [ ] **Step 5: Verify build and full suite**
 
 Run: `export PATH="/opt/homebrew/opt/node@22/bin:$PATH" && npm run lint && npx tsc --noEmit -p tsconfig.main.json && npm run test`
-Expected: Lint und Typecheck sauber; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
+Expected: Typecheck sauber, keine neuen Lint-Probleme in den geänderten Dateien; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
 
 - [ ] **Step 6: Commit**
 
@@ -1932,7 +1933,7 @@ Nach dem Umbau darf der obige grep **keine** Treffer mehr liefern außer in Komm
 - [ ] **Step 7: Verify build and full suite**
 
 Run: `export PATH="/opt/homebrew/opt/node@22/bin:$PATH" && npm run lint && npx tsc --noEmit -p tsconfig.renderer.json && npm run test`
-Expected: Lint und Typecheck sauber; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
+Expected: Typecheck sauber, keine neuen Lint-Probleme in den geänderten Dateien; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
 
 - [ ] **Step 8: Commit**
 
@@ -2227,7 +2228,7 @@ Kein `border-radius`: das Theme setzt `--radius-sm/md/lg` durchgängig auf `0` (
 - [ ] **Step 7: Verify build**
 
 Run: `export PATH="/opt/homebrew/opt/node@22/bin:$PATH" && npm run lint && npx tsc --noEmit -p tsconfig.renderer.json && npm run test`
-Expected: Lint und Typecheck sauber; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
+Expected: Typecheck sauber, keine neuen Lint-Probleme in den geänderten Dateien; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
 
 - [ ] **Step 8: Commit**
 
@@ -2351,7 +2352,7 @@ Der `try`/`catch` ist nicht optional: ein Wurf an dieser Stelle liegt in der Ini
 - [ ] **Step 5: Verify build and full suite**
 
 Run: `export PATH="/opt/homebrew/opt/node@22/bin:$PATH" && npm run lint && npx tsc --noEmit -p tsconfig.main.json && npx tsc --noEmit -p tsconfig.renderer.json && npm run test`
-Expected: Lint und Typecheck sauber; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
+Expected: Typecheck sauber, keine neuen Lint-Probleme in den geänderten Dateien; Testlauf zeigt genau die vier bekannt-roten Dateien und keine weiteren.
 
 - [ ] **Step 6: Run the app and walk the manual acceptance**
 
