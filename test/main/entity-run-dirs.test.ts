@@ -96,6 +96,22 @@ describe('ensureRunDir', () => {
     const dir = ensureRunDir('ws-alpha', 'companion', entityDir, ['nope'], base)
     assert.equal(fs.existsSync(path.join(dir, '.claude', 'nope')), false)
   })
+
+  it('does not replace a real directory with a symlink', () => {
+    const dir = resolveRunDir('ws-alpha', 'companion', base)
+    const claudeDir = path.join(dir, '.claude')
+    fs.mkdirSync(claudeDir, { recursive: true })
+    const realSkillsDir = path.join(claudeDir, 'skills')
+    fs.mkdirSync(realSkillsDir)
+    fs.writeFileSync(path.join(realSkillsDir, 'user-data.txt'), 'precious', 'utf-8')
+
+    ensureRunDir('ws-alpha', 'companion', entityDir, ['skills'], base)
+
+    const link = path.join(dir, '.claude', 'skills')
+    const stat = fs.lstatSync(link)
+    assert.equal(stat.isSymbolicLink(), false, 'skills should still be a real directory')
+    assert.equal(fs.readFileSync(path.join(link, 'user-data.txt'), 'utf-8'), 'precious', 'user data must be preserved')
+  })
 })
 
 describe('pruneRunDirs', () => {
