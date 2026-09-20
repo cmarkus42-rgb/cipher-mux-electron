@@ -17,8 +17,8 @@ let entityDir: string
 beforeEach(() => {
   base = fs.mkdtempSync(path.join(os.tmpdir(), 'cmux-runs-'))
   entityDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cmux-entity-'))
-  fs.mkdirSync(path.join(entityDir, '.claude', 'skills'), { recursive: true })
-  fs.writeFileSync(path.join(entityDir, '.claude', 'skills', 'a.md'), 'skill', 'utf-8')
+  fs.mkdirSync(path.join(entityDir, 'skills'), { recursive: true })
+  fs.writeFileSync(path.join(entityDir, 'skills', 'a.md'), 'skill', 'utf-8')
 })
 
 afterEach(() => {
@@ -66,9 +66,9 @@ describe('ensureRunDir', () => {
     assert.ok(fs.existsSync(dir))
   })
 
-  it('links requested names from the entity dir into .claude/', () => {
+  it('links requested top-level names from the entity dir into the run dir', () => {
     const dir = ensureRunDir('ws-alpha', 'companion', entityDir, ['skills'], base)
-    const link = path.join(dir, '.claude', 'skills')
+    const link = path.join(dir, 'skills')
     assert.ok(fs.existsSync(link))
     assert.equal(fs.readFileSync(path.join(link, 'a.md'), 'utf-8'), 'skill')
   })
@@ -76,13 +76,13 @@ describe('ensureRunDir', () => {
   it('is idempotent — a second call does not throw', () => {
     ensureRunDir('ws-alpha', 'companion', entityDir, ['skills'], base)
     ensureRunDir('ws-alpha', 'companion', entityDir, ['skills'], base)
-    const link = path.join(base, 'ws-alpha', 'companion', '.claude', 'skills')
+    const link = path.join(base, 'ws-alpha', 'companion', 'skills')
     assert.ok(fs.existsSync(link))
   })
 
   it('repairs a dangling symlink instead of leaving it broken', () => {
     const dir = ensureRunDir('ws-alpha', 'companion', entityDir, ['skills'], base)
-    const link = path.join(dir, '.claude', 'skills')
+    const link = path.join(dir, 'skills')
     fs.unlinkSync(link)
     fs.symlinkSync(path.join(entityDir, 'does-not-exist'), link)
     assert.equal(fs.existsSync(link), false, 'precondition: link is dangling')
@@ -94,23 +94,37 @@ describe('ensureRunDir', () => {
 
   it('skips link names that do not exist in the entity dir', () => {
     const dir = ensureRunDir('ws-alpha', 'companion', entityDir, ['nope'], base)
-    assert.equal(fs.existsSync(path.join(dir, '.claude', 'nope')), false)
+    assert.equal(fs.existsSync(path.join(dir, 'nope')), false)
   })
 
   it('does not replace a real directory with a symlink', () => {
     const dir = resolveRunDir('ws-alpha', 'companion', base)
-    const claudeDir = path.join(dir, '.claude')
-    fs.mkdirSync(claudeDir, { recursive: true })
-    const realSkillsDir = path.join(claudeDir, 'skills')
+    fs.mkdirSync(dir, { recursive: true })
+    const realSkillsDir = path.join(dir, 'skills')
     fs.mkdirSync(realSkillsDir)
     fs.writeFileSync(path.join(realSkillsDir, 'user-data.txt'), 'precious', 'utf-8')
 
     ensureRunDir('ws-alpha', 'companion', entityDir, ['skills'], base)
 
-    const link = path.join(dir, '.claude', 'skills')
+    const link = path.join(dir, 'skills')
     const stat = fs.lstatSync(link)
     assert.equal(stat.isSymbolicLink(), false, 'skills should still be a real directory')
     assert.equal(fs.readFileSync(path.join(link, 'user-data.txt'), 'utf-8'), 'precious', 'user data must be preserved')
+  })
+
+  it('creates the .claude dir even when no link name is under it', () => {
+    const dir = ensureRunDir('ws-alpha', 'companion', entityDir, ['skills'], base)
+    assert.ok(fs.existsSync(path.join(dir, '.claude')))
+  })
+
+  it('links a nested name end to end (Companion /startup command)', () => {
+    fs.mkdirSync(path.join(entityDir, '.claude', 'commands'), { recursive: true })
+    fs.writeFileSync(path.join(entityDir, '.claude', 'commands', 'startup.md'), 'startup routine', 'utf-8')
+
+    const dir = ensureRunDir('ws-alpha', 'companion', entityDir, ['.claude/commands'], base)
+    const linkedFile = path.join(dir, '.claude', 'commands', 'startup.md')
+    assert.ok(fs.existsSync(linkedFile))
+    assert.equal(fs.readFileSync(linkedFile, 'utf-8'), 'startup routine')
   })
 })
 

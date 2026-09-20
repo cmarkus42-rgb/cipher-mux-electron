@@ -28,8 +28,14 @@ export function resolveRunDir(
 /**
  * Create the run directory and (re-)link authored assets from the entity dir.
  *
- * Links live under <run>/.claude/<name> because .claude itself must stay a
- * real directory — settings.local.json is generated into it.
+ * Each link name resolves relative to BOTH directories the same way —
+ * `path.join(entityDir, name)` as the target, `path.join(runDir, name)` as
+ * the link — so a name can be a top-level entry (`skills`, `guides`) or a
+ * nested path (`.claude/commands`) without special-casing. The link's parent
+ * directory is created first, so nested names work.
+ *
+ * `<runDir>/.claude` itself is always created (even with no matching link
+ * name) because the generated `settings.local.json` needs it to exist.
  *
  * Idempotent: re-links dangling symlinks, leaves healthy ones alone, and skips
  * names the entity dir does not provide.
@@ -42,14 +48,14 @@ export function ensureRunDir(
   baseDir: string = RUNS_BASE,
 ): string {
   const runDir = resolveRunDir(workspaceId, entityId, baseDir)
-  const claudeDir = path.join(runDir, '.claude')
-  fs.mkdirSync(claudeDir, { recursive: true })
+  fs.mkdirSync(path.join(runDir, '.claude'), { recursive: true })
 
   for (const name of linkNames) {
-    const target = path.join(entityDir, '.claude', name)
+    const target = path.join(entityDir, name)
     if (!fs.existsSync(target)) continue
 
-    const link = path.join(claudeDir, name)
+    const link = path.join(runDir, name)
+    fs.mkdirSync(path.dirname(link), { recursive: true })
     let needsLink = true
     try {
       const stat = fs.lstatSync(link)

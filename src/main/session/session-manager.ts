@@ -32,7 +32,7 @@ import { resolveEntityWorkspace } from '../workspace/workspace-utils'
 import { getCachedGlobalRules } from '../config/global-rules'
 import { extractCharacterBlock } from '../character/character-defaults'
 import { resolvePersonaForPreset } from './persona-resolver'
-import { ensureRunDir } from './entity-run-dir'
+import { ensureRunDir, resolveRunDir } from './entity-run-dir'
 import type { Workspace } from '../../shared/persona-types'
 
 /**
@@ -1009,12 +1009,24 @@ export class SessionManager extends EventEmitter {
       (configStore.get('activeWorkspaceId') ?? null) as string | null,
     )
     const workspaceId = targetWorkspace?.id ?? null
+    // The caller's projectPath (e.g. mux_entity_start override, or the CF
+    // handoff's required project directory) no longer becomes the session's
+    // cwd — the run dir always does. It survives as a Context Directories
+    // entry instead (see the assembly block below and the start() call).
+    const { projectPath: callerProjectPath, ...restOpts } = opts ?? {}
     // Authored artefacts (preset.md, skills, guides) stay in the entity dir.
     // Generated artefacts (CLAUDE.md, .mcp.json, settings) go to the run dir,
     // which is separate per workspace — that is what stops two instances in
     // different workspaces from overwriting each other's CLAUDE.md.
     const entityDir = config.projectPath
-    const runDir = ensureRunDir(workspaceId, entityId, entityDir, ['skills'])
+    // Path only — no disk access yet. The directory itself is needed right
+    // below (preset.md / .mcp-connection.md / settings.local.json writes),
+    // but the authored-asset symlinks must wait until AFTER the deploy*()
+    // calls below have populated their targets (skills/, guides/, ...) —
+    // otherwise ensureRunDir would silently skip every one of them on a
+    // brand-new entity. See the ensureRunDir(...) call after the deploy block.
+    const runDir = resolveRunDir(workspaceId, entityId)
+    fs.mkdirSync(runDir, { recursive: true })
 
     // Mutex: prevent concurrent starts of the same entity
     if (this.startingEntities.has(entityId)) {
@@ -1078,6 +1090,13 @@ export class SessionManager extends EventEmitter {
         // Generic fallback — only write once to preserve manual edits
         fs.writeFileSync(presetMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')
       }
+
+      // Link authored assets into the run dir now that the deploy*() calls
+      // above have populated their targets in the entity dir (on a brand-new
+      // entity these targets do not exist before this point — ensureRunDir
+      // silently skips names whose target is missing).
+      ensureRunDir(workspaceId, entityId, entityDir, ['skills', 'guides', 'ref', 'brain', 'deliverables', '.claude/commands'])
+
       // Always update MCP connection file for entities that use MCP
       if (config.features.includes('mcp') && this.mcpConfig) {
         const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}/mcp`
@@ -1155,6 +1174,12 @@ export class SessionManager extends EventEmitter {
           if (targetWorkspace.workspacePrompt?.trim()) wsPrompt = targetWorkspace.workspacePrompt.trim()
           if (targetWorkspace.contextPaths?.length) wsPaths = targetWorkspace.contextPaths
         }
+        // The caller's projectPath is no longer the session cwd — it still
+        // needs to reach the entity, so it goes into Context Directories.
+        // Unconditional: independent of the workspace-fallback branch above.
+        if (callerProjectPath) {
+          wsPaths = [...(wsPaths ?? []), callerProjectPath].filter((v, i, a) => a.indexOf(v) === i)
+        }
         const assembled = this.assembleEntityClaudeMd(
           presetContent,
           entityId,
@@ -1175,7 +1200,6 @@ export class SessionManager extends EventEmitter {
     }
 
     // Start session
-    const { projectPath: _callerProjectPath, ...restOpts } = opts ?? {}
     const session = await this.start({
       name: displayName,
       ...restOpts,
