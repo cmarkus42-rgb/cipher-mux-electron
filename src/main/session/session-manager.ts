@@ -33,6 +33,7 @@ import { getCachedGlobalRules } from '../config/global-rules'
 import { extractCharacterBlock } from '../character/character-defaults'
 import { resolvePersonaForPreset } from './persona-resolver'
 import { ensureRunDir, resolveRunDir } from './entity-run-dir'
+import { findEntitySessions, entityStartKey } from './entity-session-lookup'
 import type { Workspace } from '../../shared/persona-types'
 
 /**
@@ -157,8 +158,8 @@ export class SessionManager extends EventEmitter {
   private entityRegistry: EntityRegistry
   /** Maps entity IDs to their active session IDs (supports multi-instance). */
   private entitySessionIds: Map<EntityId, Set<string>> = new Map()
-  /** Mutex: entities currently being started (prevents double-start race). */
-  private startingEntities: Set<EntityId> = new Set()
+  /** Mutex: (entity, workspace) pairs currently being started — prevents double-start races. */
+  private startingEntities: Set<string> = new Set()
   /**
    * Commands queued to be sent to a session once its terminal reports
    * the real (post-mount) size via markReady(). Prevents launching TUIs
@@ -1028,23 +1029,26 @@ export class SessionManager extends EventEmitter {
     const runDir = resolveRunDir(workspaceId, entityId)
     fs.mkdirSync(runDir, { recursive: true })
 
-    // Mutex: prevent concurrent starts of the same entity
-    if (this.startingEntities.has(entityId)) {
+    // Mutex: prevent concurrent starts of the same entity in the same workspace
+    const startKey = entityStartKey(entityId, workspaceId)
+    if (this.startingEntities.has(startKey)) {
       throw new Error(`${config.displayName} is already starting`)
     }
-    this.startingEntities.add(entityId)
+    this.startingEntities.add(startKey)
 
     try {
-    // Singleton check — only block multi-start for singleInstance entities
+    // Singleton check — singleInstance means "once per workspace", not app-wide.
     if (config.singleInstance) {
-      const existingIds = this.getAllEntitySessionIds(entityId)
-      for (const eid of existingIds) {
-        const existing = this.sessions.get(eid)
-        if (existing && existing.status === 'active') {
-          throw new Error(`${config.displayName} is already running`)
+      const active = findEntitySessions(this.list(), entityId, workspaceId)
+      if (active.length > 0) {
+        throw new Error(`${config.displayName} is already running`)
+      }
+      // Drop stale links for this entity whose sessions are gone.
+      for (const eid of this.getAllEntitySessionIds(entityId)) {
+        if (!this.sessions.has(eid)) {
+          this.removeEntitySession(entityId, eid)
+          this.entityRegistry.unlinkSession(eid)
         }
-        this.removeEntitySession(entityId, eid)
-        this.entityRegistry.unlinkSession(eid)
       }
     }
 
@@ -1240,7 +1244,7 @@ export class SessionManager extends EventEmitter {
     this.emit('entity-started', { entityId, session })
     return session
     } finally {
-      this.startingEntities.delete(entityId)
+      this.startingEntities.delete(startKey)
     }
   }
 
