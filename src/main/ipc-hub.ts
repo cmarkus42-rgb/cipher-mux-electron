@@ -2892,13 +2892,16 @@ ist dieses Entity fokussiert?
         if (entry.entityId && !match.entityId) {
           this.sessionManager.linkEntity(match.id, entry.entityId)
         }
-        // Re-bind workspace from snapshot, but only when the snapshot entry
-        // actually carries one. recover() already restores workspaceId onto
-        // `match` from the persisted store (session-manager.ts recover()),
-        // so an old snapshot with no workspaceId key must not clobber it —
-        // and a projectPath-fallback match (same project open in two
-        // workspaces) must not stamp the wrong workspace's id onto it either.
-        this.sessionManager.bindWorkspace(match.id, resolveRestoredWorkspaceId(entry.workspaceId, match.workspaceId))
+        // Re-bind workspace: the recovered session's own binding (restored
+        // by recover() straight from sessions.json — the continuously
+        // maintained record) takes precedence over the snapshot entry — a
+        // coarser, once-at-quit record matched back to sessions heuristically
+        // by name/projectPath. The snapshot entry is only a fallback for a
+        // recovered session with no binding of its own (e.g. a pre-upgrade
+        // sessions.json). This also means a projectPath-fallback mismatch
+        // (entry actually belongs to a different session) can't stamp the
+        // wrong workspace onto `match` as long as `match` already has one.
+        this.sessionManager.bindWorkspace(match.id, resolveRestoredWorkspaceId(match.workspaceId, entry.workspaceId))
         console.log(`[IpcHub] keepWorking: reusing recovered "${match.name}" (${match.id}) → slot ${entry.gridSlot}`)
       } else {
         // No matching recovered session — start new with --resume
