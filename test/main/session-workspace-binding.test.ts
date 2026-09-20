@@ -114,23 +114,35 @@ describe('SessionManager.bindWorkspace', () => {
 
 // ─── resolveRestoredWorkspaceId ───────────────────────────────────
 //
-// Pure three-way resolution rule used by restoreKeepWorkingFromRecovery()
-// in ipc-hub.ts when re-binding a recovered session to a workspace. Pinned
+// Pure resolution rule used by restoreKeepWorkingFromRecovery() in
+// ipc-hub.ts when re-binding a recovered session to a workspace. Pinned
 // here directly since IpcHub itself isn't cheaply constructible in a unit
 // test (tmux, MCP server, window manager, ...).
+//
+// The recovered session's own binding (from sessions.json, via recover())
+// wins — it's the continuously-maintained, structured record. The snapshot
+// entry (written once at quit, matched back to sessions heuristically by
+// name/projectPath) is only a fallback for when the recovered session has
+// no binding of its own.
 
 describe('resolveRestoredWorkspaceId', () => {
-  it('prefers the snapshot entry value when the entry has one', () => {
-    assert.equal(resolveRestoredWorkspaceId('ws-from-entry', 'ws-from-match'), 'ws-from-entry')
+  it('protects against a projectPath-fallback mismatch: match wins over a different entry value', () => {
+    assert.equal(resolveRestoredWorkspaceId('ws-from-match', 'ws-from-entry'), 'ws-from-match')
   })
 
-  it('falls back to the recovered session value when the entry has none', () => {
-    assert.equal(resolveRestoredWorkspaceId(undefined, 'ws-from-match'), 'ws-from-match')
-    assert.equal(resolveRestoredWorkspaceId(null, 'ws-from-match'), 'ws-from-match')
+  it('old-snapshot case: match wins when the entry has no workspaceId key at all', () => {
+    assert.equal(resolveRestoredWorkspaceId('ws-from-match', undefined), 'ws-from-match')
   })
 
-  it('resolves to null when neither source has a value', () => {
-    assert.equal(resolveRestoredWorkspaceId(undefined, undefined), null)
+  it('pre-upgrade sessions.json fallback: entry wins when match has no binding', () => {
+    assert.equal(resolveRestoredWorkspaceId(null, 'ws-from-entry'), 'ws-from-entry')
+  })
+
+  it('resolves to null when match is explicitly unbound and the entry agrees', () => {
     assert.equal(resolveRestoredWorkspaceId(null, null), null)
+  })
+
+  it('resolves to null when match has no binding and the entry has no key either', () => {
+    assert.equal(resolveRestoredWorkspaceId(null, undefined), null)
   })
 })
