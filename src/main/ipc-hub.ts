@@ -48,6 +48,7 @@ import { scanAndRegisterEntities } from './session/entity-scanner'
 import { resolvePersonaForPreset } from './session/persona-resolver'
 import { resolveSessionTopic } from './session/resolve-session-topic'
 import { resolveRestoredWorkspaceId } from './session/resolve-restored-workspace'
+import { pruneRunDirs, liveWorkspaceIds } from './session/entity-run-dir'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST, MAX_MANUAL_TAGS } from '../shared/constants'
 import { BRAND } from '../shared/brand'
@@ -481,7 +482,6 @@ export class IpcHub {
       // CLAUDE.md ("Keep Working Restore — Fragile Zone") an uncaught error
       // anywhere in that chain kills session restore silently.
       try {
-        const { pruneRunDirs, liveWorkspaceIds } = require('./session/entity-run-dir')
         const workspaces = (configStore.get('workspaces') ?? []) as Array<{ id: string }>
         const keepIds = liveWorkspaceIds(
           workspaces.map((w) => w.id),
@@ -2328,14 +2328,24 @@ export class IpcHub {
       return session
     })
 
-    ipcMain.handle(IPC.ENTITY_RESUME, async (_e, { entityId, sessionId }: { entityId: EntityId; sessionId?: string }) => {
+    ipcMain.handle(IPC.ENTITY_RESUME, async (_e, { entityId, sessionId, workspaceId }: {
+      entityId: EntityId
+      sessionId?: string
+      workspaceId?: string | null
+    }) => {
       const mcpConfig = configStore.get('mcp')
       this.sessionManager.setMcpConfig({
         mcpHost: mcpConfig?.host ?? MCP_DEFAULT_HOST,
         mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
         mcpApiKey: mcpConfig?.apiKey ?? '',
       })
-      const session = await this.sessionManager.resumeEntity(entityId, sessionId)
+      // Same three-state resolution as ENTITY_START: only `undefined` means
+      // "caller had no preference" — an explicit null must stay unbound, so
+      // `??` would be wrong here.
+      const effectiveWorkspaceId = workspaceId === undefined
+        ? (configStore.get('activeWorkspaceId') ?? null)
+        : workspaceId
+      const session = await this.sessionManager.resumeEntity(entityId, sessionId, effectiveWorkspaceId)
       return session
     })
 

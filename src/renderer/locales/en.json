@@ -481,6 +481,7 @@
   "unified.start": "Start",
   "unified.focusEntity": "Focus",
   "unified.workspaceBadgeTitle": "Running in workspace: {{name}}",
+  "unified.workspaceBadgeTitleGlobal": "Running without a workspace binding",
   "unified.workspaceBadgeGlobal": "no workspace",
   "unified.workspaceBadgeDeleted": "{{name}} (deleted)",
   "statusBar.newSession": "+",

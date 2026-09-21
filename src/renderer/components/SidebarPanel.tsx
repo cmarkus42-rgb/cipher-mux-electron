@@ -293,12 +293,20 @@ export function SidebarPanel({
               : badge.deleted
                 ? t('unified.workspaceBadgeDeleted', { name: badge.label })
                 : badge.label
+          // Own sentence for the global case — "Läuft in Workspace: ohne
+          // Workspace" is what the shared title key produces otherwise.
+          const workspaceBadgeTitle = badge == null
+            ? undefined
+            : badge.global
+              ? t('unified.workspaceBadgeTitleGlobal')
+              : t('unified.workspaceBadgeTitle', { name: badge.label })
           return (
           <BackgroundSessionCard
             key={s.id}
             session={s}
             contextUsage={contextUsages[s.id]}
             workspaceBadge={workspaceBadgeText}
+            workspaceBadgeTitle={workspaceBadgeTitle}
             onClick={() => onAddToGrid(s.id)}
             onKill={() => onKillSession(s.id)}
             voiceGlow={s.name === 'Voice' ? voiceComState : undefined}
@@ -388,13 +396,15 @@ interface BackgroundSessionCardProps {
   contextUsage?: { usedPercentage: number; used?: number; total?: number }
   /** Precomputed, already-localized badge text; null hides the badge. */
   workspaceBadge?: string | null
+  /** Tooltip for the badge — the global case needs a different sentence than a workspace name. */
+  workspaceBadgeTitle?: string
   onClick: () => void
   onKill: () => void
   voiceGlow?: string
   topic?: string
 }
 
-function BackgroundSessionCard({ session, contextUsage, workspaceBadge, onClick, onKill, voiceGlow, topic }: BackgroundSessionCardProps) {
+function BackgroundSessionCard({ session, contextUsage, workspaceBadge, workspaceBadgeTitle, onClick, onKill, voiceGlow, topic }: BackgroundSessionCardProps) {
   const { t } = useTranslation()
   const [lastOutput, setLastOutput] = useState<string>('')
   const [expanded, setExpanded] = useState(false)
@@ -471,7 +481,7 @@ function BackgroundSessionCard({ session, contextUsage, workspaceBadge, onClick,
           {workspaceBadge && (
             <span
               class="bg-card__ws-badge"
-              title={t('unified.workspaceBadgeTitle', { name: workspaceBadge })}
+              title={workspaceBadgeTitle ?? t('unified.workspaceBadgeTitle', { name: workspaceBadge })}
             >
               {workspaceBadge}
             </span>

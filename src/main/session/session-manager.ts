@@ -1276,21 +1276,50 @@ export class SessionManager extends EventEmitter {
    * For singleInstance entities or when targetSessionId is given: stops the
    * targeted session first. For multi-instance entities without a target:
    * starts a new session without killing existing ones.
+   *
+   * `workspaceId` follows the usual three states (undefined = no preference →
+   * active workspace, null = explicitly unbound, string = that workspace) and
+   * scopes BOTH halves of the resume: which instance gets stopped and where
+   * the replacement starts. Without it a resume clicked in workspace A would
+   * stop a singleInstance entity's instance in workspace B and recreate it in
+   * A — the run dir, MCP workspace header and badge of that session would all
+   * silently move workspaces.
    */
-  async resumeEntity(entityId: EntityId, targetSessionId?: string): Promise<SessionInfo> {
+  async resumeEntity(
+    entityId: EntityId,
+    targetSessionId?: string,
+    workspaceId?: string | null,
+  ): Promise<SessionInfo> {
     const config = this.entityRegistry.get(entityId)
     if (!config) throw new Error(`Unknown entity: ${entityId}`)
 
-    // Stop only the targeted session, or all for singleInstance entities
+    // Resolve the target workspace exactly as startEntity does, so the stop
+    // below and the start further down cannot disagree about which instance
+    // this resume is about (e.g. for an id pointing at a deleted workspace,
+    // where both must land on "unbound").
+    const targetWorkspace = resolveEntityWorkspace(
+      workspaceId,
+      (configStore.get('workspaces') ?? []) as Workspace[],
+      (configStore.get('activeWorkspaceId') ?? null) as string | null,
+    )
+    const effectiveWorkspaceId = targetWorkspace?.id ?? null
+
+    // Stop only the targeted session, or — for singleInstance entities — the
+    // instance in the target workspace. Deliberately NOT isEntityRunning() /
+    // stopEntity(entityId): both are app-wide and would tear down instances in
+    // other workspaces. singleInstance means "once per workspace" here, same
+    // rule as the singleton check in startEntity.
     if (targetSessionId) {
       await this.stopEntity(entityId, targetSessionId)
-    } else if (config.singleInstance && this.isEntityRunning(entityId)) {
-      await this.stopEntity(entityId)
+    } else if (config.singleInstance) {
+      for (const s of findEntitySessions(this.list(), entityId, effectiveWorkspaceId)) {
+        await this.stopEntity(entityId, s.id)
+      }
     }
     // Multi-instance without target: don't kill existing sessions
 
-    // Start fresh session
-    const session = await this.startEntity(entityId)
+    // Start fresh session — in the same workspace the stop above was scoped to
+    const session = await this.startEntity(entityId, { workspaceId: effectiveWorkspaceId })
 
     // Queue Claude launch with --resume flag
     const adapter = this.adapterRegistry.getDefault()
@@ -1333,6 +1362,10 @@ export class SessionManager extends EventEmitter {
   /**
    * Stop an entity session. For singleInstance entities, stops the one session.
    * For multi-instance, stops a specific session (by targetSessionId) or ALL sessions.
+   *
+   * Scope note: without targetSessionId this is APP-WIDE (all workspaces) on
+   * purpose — "stop this entity everywhere" is what the shutdown and entity-off
+   * paths want. Callers that mean one workspace must pass a session id.
    */
   async stopEntity(entityId: EntityId, targetSessionId?: string): Promise<void> {
     const sessionIds = targetSessionId
@@ -1359,6 +1392,11 @@ export class SessionManager extends EventEmitter {
 
   /**
    * Check if an entity is currently running (any instance).
+   *
+   * Scope note: APP-WIDE by design, across all workspaces — not an oversight
+   * next to the per-workspace singleton check in startEntity(). Use
+   * hasActiveEntitySession(this.list(), entityId, workspaceId) when the
+   * question is "does it run in THIS workspace".
    */
   isEntityRunning(entityId: EntityId): boolean {
     for (const sid of this.getAllEntitySessionIds(entityId)) {
@@ -1371,6 +1409,11 @@ export class SessionManager extends EventEmitter {
   /**
    * Get the first session ID for an entity (or null).
    * For multi-instance entities, returns the most recently tracked session.
+   *
+   * Scope note: APP-WIDE by design — it answers "any instance anywhere" and is
+   * used that way by callers outside the workspace feature. The renderer's
+   * workspace-scoped counterpart is findEntitySessionId() in
+   * shared/entity-status.ts.
    */
   getEntitySessionId(entityId: EntityId): string | null {
     return this.getFirstEntitySessionId(entityId) ?? null

@@ -102,6 +102,16 @@ export function SessionGrid({
     return badge.label
   }, [activeWorkspaceId, workspaceList, t])
 
+  // Tooltip for the same badge. The global case needs its own sentence —
+  // feeding "ohne Workspace" into "Läuft in Workspace: {{name}}" reads
+  // "Läuft in Workspace: ohne Workspace".
+  const workspaceBadgeTitleFor = useCallback((session: SessionInfo): string | undefined => {
+    const badge = computeWorkspaceBadge(session.workspaceId, activeWorkspaceId, workspaceList)
+    if (badge == null) return undefined
+    if (badge.global) return t('unified.workspaceBadgeTitleGlobal')
+    return t('unified.workspaceBadgeTitle', { name: badge.label })
+  }, [activeWorkspaceId, workspaceList, t])
+
   // Grid navigation via voice commands
   useEffect(() => {
     const api = (window as any).cipherMux
@@ -329,6 +339,7 @@ export function SessionGrid({
                 onFocusMode={onFocusMode}
                 topic={topicMap?.[session.id]}
                 workspaceBadge={workspaceBadgeFor(session)}
+                workspaceBadgeTitle={workspaceBadgeTitleFor(session)}
                 onDragStart={() => handleDragStart(idx)}
                 onDragOver={(e: DragEvent) => handleDragOver(idx, e)}
                 onDragLeave={handleDragLeave}

@@ -17,6 +17,26 @@ export function SidebarWindow() {
   const workshopActive = sessions.some(s => s.name === 'Workshop' && s.status === 'active')
   const cyberFactoryActive = sessions.some(s => s.name === 'Cyber Factory' && s.status === 'active')
   const [voiceComState, setVoiceComState] = useState('idle')
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
+
+  // The detached window is its own renderer — it has no App state to inherit
+  // the active workspace from and must load it itself. A hardcoded null here
+  // makes computeWorkspaceBadge() badge EVERY bound session as foreign, which
+  // is the inverse of the intended "deviation signal only" rule.
+  // Resubscribe pattern copied from SidebarPanel's workspace-list loader.
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.workspaces?.active) return
+    let mounted = true
+    const load = () => {
+      api.workspaces.active().then((id: string | null) => {
+        if (mounted) setActiveWorkspaceId(id ?? null)
+      }).catch(() => {})
+    }
+    load()
+    const unsub = api.workspaces.onChanged?.(load)
+    return () => { mounted = false; unsub?.() }
+  }, [])
 
   useEffect(() => {
     const api = (window as any).cipherMux
@@ -57,7 +77,7 @@ export function SidebarWindow() {
           onAddToGrid={handleAddToGrid}
           onKillSession={handleKillSession}
           onReattach={handleDock}
-          activeWorkspaceId={null}
+          activeWorkspaceId={activeWorkspaceId}
           hasNotesCell={false}
           voiceComState={voiceComState}
         />

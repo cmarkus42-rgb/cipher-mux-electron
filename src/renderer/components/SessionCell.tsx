@@ -66,13 +66,15 @@ interface SessionCellProps {
   topic?: string
   /** Precomputed, already-localized workspace badge text; null/undefined hides it. */
   workspaceBadge?: string | null
+  /** Tooltip for the badge — the global case needs a different sentence than a workspace name. */
+  workspaceBadgeTitle?: string
 }
 
 export function SessionCell({
   session, contextUsage, focused, isWorkshop, isVoiceTarget, isVoicePinned, voiceState, isSpeaking, onToggleVoicePin, theme,
   rowSpan, maxRows, slotCol, slotRow, focusModeStyle,
   onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDetach, onFocusMode, onDragStart, onDragOver, onDragLeave, onDrop, dragOver,
-  topic, workspaceBadge,
+  topic, workspaceBadge, workspaceBadgeTitle,
 }: SessionCellProps) {
   const { t } = useTranslation()
   const { terminalRef } = useTerminal(session.id, theme, session.createdAt)
@@ -231,7 +233,7 @@ export function SessionCell({
           {workspaceBadge && (
             <span
               class="cell-header__ws-badge"
-              title={t('unified.workspaceBadgeTitle', { name: workspaceBadge })}
+              title={workspaceBadgeTitle ?? t('unified.workspaceBadgeTitle', { name: workspaceBadge })}
             >
               {workspaceBadge}
             </span>
