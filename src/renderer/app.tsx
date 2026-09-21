@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { RecoveryResult, EntityId } from '../shared/types'
+import { deriveEntityStatus, findEntitySessionId, isEntityRunningIn } from '../shared/entity-status'
 import { useSessions } from './hooks/useSessions'
 import { useContextUsage } from './hooks/useContextUsage'
 import { useGrid } from './hooks/useGrid'
@@ -310,33 +311,20 @@ export function App() {
     return session?.name ?? null
   }, [focusedSessionId, sessions])
 
-  const [workshopSessionId, setWorkshopSessionId] = useState<string | null>(null)
-  const [cyberFactorySessionId, setCyberFactorySessionId] = useState<string | null>(null)
-  const [companionSessionId, setCompanionSessionId] = useState<string | null>(null)
-  const [refinementSessionId, setRefinementSessionId] = useState<string | null>(null)
-  const [voiceRelaySessionId, setVoiceRelaySessionId] = useState<string | null>(null)
-  const [auditSessionId, setAuditSessionId] = useState<string | null>(null)
+  // Entity running state, derived from the session list — never hand-maintained.
+  // A preset can run in several workspaces at once, so "runs somewhere" (a single
+  // boolean) cannot express the state; deriveEntityStatus keeps the workspace keys
+  // an entity is active in, per entityId.
+  const entityStatusByWorkspace = useMemo(() => deriveEntityStatus(sessions), [sessions])
 
-  // Entity session dispatch maps — eliminate repeated entityId→setter conditionals.
-  // useState setters are referentially stable, so empty deps is correct.
-  const entitySetters = useMemo<Record<string, (sid: string | null) => void>>(() => ({
-    'workshop': setWorkshopSessionId,
-    'cyber-factory': setCyberFactorySessionId,
-    'companion': setCompanionSessionId,
-    'refinement': setRefinementSessionId,
-    'voice-relay': setVoiceRelaySessionId,
-    'audit': setAuditSessionId,
-  }), [])
-
-  // Current entity→sessionId map (reactive, updates when any entity session changes)
-  const entitySessionMap = useMemo<Record<string, string | null>>(() => ({
-    'workshop': workshopSessionId,
-    'cyber-factory': cyberFactorySessionId,
-    'companion': companionSessionId,
-    'refinement': refinementSessionId,
-    'voice-relay': voiceRelaySessionId,
-    'audit': auditSessionId,
-  }), [workshopSessionId, cyberFactorySessionId, companionSessionId, refinementSessionId, voiceRelaySessionId, auditSessionId])
+  // Session ID of one entity's instance, scoped to a workspace. Defaults to the
+  // workspace currently shown in the grid — the launcher wants "the instance I'm
+  // looking at", not "any instance anywhere" (see per-caller note in the task report).
+  const getEntitySessionId = useCallback(
+    (entityId: EntityId, workspaceId: string | null = activeWorkspaceId): string | null =>
+      findEntitySessionId(sessions, entityId, workspaceId),
+    [sessions, activeWorkspaceId],
+  )
 
   // RT-X1 fix: after initial session list load, clean up grid slots referencing dead sessions.
   // Runs once after a short delay to let recovery/restore complete first.
@@ -376,7 +364,7 @@ export function App() {
     .filter((s, idx) => s.sessionId && !focusModeOverlapped.has(idx))
     .map(s => s.sessionId!)
 
-  const sidebarHasContent = !!workshopSessionId || !!cyberFactorySessionId ||
+  const sidebarHasContent = !!getEntitySessionId('workshop') || !!getEntitySessionId('cyber-factory') ||
     sessions.some(s => s.status === 'active' && !gridSessionIds.includes(s.id) && !detachedIds.has(s.id)) ||
     grid.slots.some(s => s.type === 'notes')
 
@@ -389,45 +377,40 @@ export function App() {
     api.window.fitGrid(grid.config.cols, grid.config.rows, pw)
   }, [sidebarVisible, sidebarDetached, grid.config.cols, grid.config.rows])
 
-  // A.3 fix: clear entity session IDs when their sessions no longer exist.
-  // This prevents orphaned entities from blocking preset starts.
-  useEffect(() => {
-    if (!initialCleanupDone.current) return
-    const activeIds = new Set(sessions.map(s => s.id))
-    for (const [eid, currentSid] of Object.entries(entitySessionMap)) {
-      if (currentSid && !activeIds.has(currentSid)) entitySetters[eid]?.(null)
-    }
-  }, [sessions, entitySessionMap, entitySetters])
+  // (A.3's dead-entity cleanup is gone: deriveEntityStatus/findEntitySessionId read
+  // straight from `sessions`, so a session that no longer exists there simply isn't
+  // reported as running — nothing to null out separately.)
 
-  // Entity status map for unified dialog — computed dynamically from active sessions
-  // so that ANY entity (including dynamic ones like watchdog, projectlauncher, etc.)
-  // is recognised as running, not just the 6 hardcoded ones.
+  // Entity status map for unified dialog/sidebar — computed dynamically from active
+  // sessions, scoped to the workspace currently shown in the grid. Any entity
+  // (including dynamic ones like watchdog, projectlauncher, etc.) is recognised as
+  // running, not just a hardcoded few — but only if it runs in THIS workspace, OR
+  // is unbound (_global): an unbound session is visible from every workspace, not
+  // from none (ruling in commit 333de16 — otherwise a click on a running-but-unbound,
+  // non-singleInstance preset like companion/refinement/audit spawns a second
+  // instance instead of focusing the existing one). An instance bound to a
+  // *different* workspace still must not read as "already open" here.
   const entityStatus = useMemo<Record<string, boolean>>(() => {
     const status: Record<string, boolean> = {}
-    for (const s of sessions) {
-      if (s.entityId && s.status === 'active') status[s.entityId] = true
+    for (const eid of Object.keys(entityStatusByWorkspace)) {
+      status[eid] = isEntityRunningIn(entityStatusByWorkspace, eid, activeWorkspaceId)
     }
     return status
-  }, [sessions])
+  }, [entityStatusByWorkspace, activeWorkspaceId])
 
   const placeWorkshop = useCallback((sessionId: string) => {
-    setWorkshopSessionId(sessionId)
     setSessionAtSlot(0, sessionId)
   }, [setSessionAtSlot])
 
   const placeCyberFactory = useCallback((sessionId: string) => {
-    setCyberFactorySessionId((prev) => {
-      if (prev === sessionId) return prev
-      // Try auto-placement first; only show popup if grid is full
-      if (gridRef.current.slots.some(s => s.sessionId === sessionId)) {
-        // Already placed (e.g. by handleStartEntity)
-      } else if (gridRef.current.slots.some(s => !s.sessionId && s.type === 'session')) {
-        addSession(sessionId)
-      } else {
-        setPlacementPopup({ sessionId })
-      }
-      return sessionId
-    })
+    // Try auto-placement first; only show popup if grid is full
+    if (gridRef.current.slots.some(s => s.sessionId === sessionId)) {
+      // Already placed (e.g. by handleStartEntity)
+    } else if (gridRef.current.slots.some(s => !s.sessionId && s.type === 'session')) {
+      addSession(sessionId)
+    } else {
+      setPlacementPopup({ sessionId })
+    }
   }, [addSession])
 
   const placeEntity = useCallback((sessionId: string) => {
@@ -768,9 +751,9 @@ export function App() {
         addSession(session.id)
       }
     }
-    for (const session of result.recovered) {
-      entitySetters[session.entityId]?.(session.id)
-    }
+    // Entity session tracking is derived from `sessions` (via useSessions), which
+    // already reflects recovered sessions once the list refreshes — no separate
+    // entity-setter bookkeeping needed here.
     if (result.recovered.length > 0) {
       setFocusedSessionId(result.recovered[0].id)
     }
@@ -987,13 +970,14 @@ export function App() {
     ;(window as any).cipherMux.window.openWorkspaces(tab)
   }, [])
 
-  // ─── Unified Dialog: Entity Start/Focus ───���─────────────
+  // ─── Unified Dialog: Entity Start/Focus ─────────────────
+  // getEntitySessionId is defined above, derived from `sessions`.
 
-  const getEntitySessionId = useCallback((entityId: EntityId): string | null => {
-    return entitySessionMap[entityId] ?? null
-  }, [entitySessionMap])
-
-  const handleStartEntity = useCallback(async (entityId: EntityId, slotIndex: number) => {
+  const handleStartEntity = useCallback(async (
+    entityId: EntityId,
+    slotIndex: number,
+    workspaceId?: string | null,
+  ) => {
     const api = (window as any).cipherMux
     // Mark entity as in-flight BEFORE the await — closes the race window where
     // the onStarted IPC event arrives before the await resolves (RT-X2 fix).
@@ -1002,10 +986,9 @@ export function App() {
       const custom = CUSTOM_START[entityId]
       const session = custom
         ? await custom.start(api)
-        : await api.entity.start(entityId)
+        : await api.entity.start(entityId, workspaceId)
       const sid = custom ? custom.extractId(session) : session?.id
       if (sid) {
-        entitySetters[entityId]?.(sid)
         setSessionAtSlot(slotIndex, sid)
         setFocusedSessionId(sid)
       }
@@ -1014,23 +997,30 @@ export function App() {
       // already deleted it, but Set.delete is idempotent.
       inFlightEntityStarts.current.delete(entityId)
     }
-  }, [setSessionAtSlot, entitySetters])
+  }, [setSessionAtSlot])
 
   const handleResumeEntity = useCallback(async (entityId: EntityId, slotIndex: number) => {
     const api = (window as any).cipherMux
     inFlightEntityStarts.current.add(entityId)
     try {
-      const session = await api.entity.resume(entityId)
+      // Resume the instance the user is actually looking at, in the workspace
+      // they are looking at. Without both, a resume here stops a singleInstance
+      // preset's instance in another workspace and recreates it in this one.
+      // `?? undefined` and not a literal null: "the renderer has not loaded an
+      // active workspace yet" is not the same statement as "explicitly
+      // unbound". undefined lets main resolve it — which yields null anyway
+      // when no workspace is truly active.
+      const targetSessionId = getEntitySessionId(entityId) ?? undefined
+      const session = await api.entity.resume(entityId, targetSessionId, activeWorkspaceId ?? undefined)
       const sid = session?.id
       if (sid) {
-        entitySetters[entityId]?.(sid)
         setSessionAtSlot(slotIndex, sid)
         setFocusedSessionId(sid)
       }
     } finally {
       inFlightEntityStarts.current.delete(entityId)
     }
-  }, [setSessionAtSlot, entitySetters])
+  }, [setSessionAtSlot, getEntitySessionId, activeWorkspaceId])
 
   const handleFocusEntity = useCallback((entityId: EntityId) => {
     const sid = getEntitySessionId(entityId)
@@ -1168,39 +1158,36 @@ export function App() {
       // Skip if session is already placed in the grid
       const alreadyPlaced = grid.slots.some(s => s.sessionId === sid)
       if (alreadyPlaced) return
+      // Workspace this session was started in — scope the "already tracked?" check to
+      // it, not to any workspace, so the same preset can auto-register once per workspace.
+      const startedWorkspaceId: string | null = data.session?.workspaceId ?? null
       for (const { id, background } of AUTO_REGISTER_ENTITIES) {
-        if (data.entityId === id && !entitySessionMap[id]) {
-          entitySetters[id](sid)
+        if (data.entityId === id && !getEntitySessionId(id, startedWorkspaceId)) {
           if (!background) placeEntity(sid)
           break
         }
       }
     })
     return () => unsub()
-  }, [entitySessionMap, entitySetters, placeEntity])
+  }, [getEntitySessionId, placeEntity])
 
-  // Check entity status on mount
+  // Auto-place presets that are already running (found via `sessions`, scoped to the
+  // active workspace) but not yet placed in the grid — covers entities that started
+  // before this window mounted, e.g. surviving a renderer reload or a workspace switch
+  // that reveals an instance already running there. Each discovered session is placed
+  // at most once; ejecting it from the grid afterwards does not bring it back.
+  // NOTE: replaces a previous per-entity `api.entity.status()` poll — that IPC channel
+  // is workspace-blind (see Task 10 report), so status now comes from `sessions` only.
+  const autoPlacedEntitySessionIds = useRef(new Set<string>())
   useEffect(() => {
-    let mounted = true
-    const api = (window as any).cipherMux
-    if (!api.entity?.status) return
-    const entities: Array<{ id: EntityId; setter: (sid: string) => void; background?: boolean }> = [
-      { id: 'companion', setter: (sid) => setCompanionSessionId(sid) },
-      { id: 'refinement', setter: (sid) => setRefinementSessionId(sid) },
-      { id: 'voice-relay', setter: (sid) => setVoiceRelaySessionId(sid), background: true },
-      { id: 'audit', setter: (sid) => setAuditSessionId(sid) },
-    ]
-    for (const { id, setter, background } of entities) {
-      api.entity.status(id).then((s: { running: boolean; sessionId?: string }) => {
-        if (!mounted) return
-        if (s.running && s.sessionId) {
-          setter(s.sessionId)
-          if (!background) placeEntity(s.sessionId)
-        }
-      })
+    for (const { id, background } of AUTO_REGISTER_ENTITIES) {
+      if (background) continue
+      const sid = getEntitySessionId(id)
+      if (!sid || autoPlacedEntitySessionIds.current.has(sid)) continue
+      autoPlacedEntitySessionIds.current.add(sid)
+      if (!grid.slots.some(s => s.sessionId === sid)) placeEntity(sid)
     }
-    return () => { mounted = false }
-  }, [placeEntity])
+  }, [getEntitySessionId, grid.slots, placeEntity])
 
   // Listen for MCP UI_OPEN events
   useEffect(() => {
@@ -1310,9 +1297,9 @@ export function App() {
           contextUsages={contextUsages}
           focusedSessionId={focusedSessionId}
           theme={theme}
-          workshopSessionId={workshopSessionId}
+          workshopSessionId={getEntitySessionId('workshop')}
           activeWorkspaceId={activeWorkspaceId}
-          entityStatus={entityStatus}
+          entityStatus={entityStatusByWorkspace}
           voiceTargetSessionId={voiceTargetSessionId}
           voicePinned={voicePinned}
           voiceState={voiceState}
@@ -1350,8 +1337,8 @@ export function App() {
         {!sidebarDetached && (
           <SidebarPanel
             visible={sidebarVisible}
-            workshopActive={!!workshopSessionId}
-            cyberFactoryActive={!!cyberFactorySessionId}
+            workshopActive={entityStatus['workshop'] ?? false}
+            cyberFactoryActive={entityStatus['cyber-factory'] ?? false}
             sessions={sessions}
             gridSessionIds={gridSessionIds}
             detachedIds={detachedIds}

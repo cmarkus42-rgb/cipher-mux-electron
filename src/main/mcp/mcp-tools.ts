@@ -35,6 +35,13 @@ export interface ToolContext {
   testingAssistantManager?: import('../testing-assistant/testing-assistant-manager').TestingAssistantManager
   auditManager?: import('../audit/audit-manager').AuditManager
   getFocusedSessionId?: () => string | null
+  /**
+   * Workspace of the connection these tools were registered for.
+   * null = unbound (no header, or an id that no longer exists).
+   * Bound once per MCP session at initialize — never read from
+   * configStore at call time, which is the whole point.
+   */
+  workspaceId?: string | null
 }
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']

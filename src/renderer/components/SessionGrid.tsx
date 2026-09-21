@@ -1,8 +1,10 @@
 // src/renderer/components/SessionGrid.tsx
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
+import { useTranslation } from 'react-i18next'
 import type { SessionInfo, ContextUsage, EntityId } from '../../shared/types'
 import { computeGridStyle, getCoveredSlots, getFocusModePlacement, findNavigationTarget } from '../../shared/grid-types'
 import type { GridState, ThemeName } from '../../shared/grid-types'
+import { computeWorkspaceBadge, type WorkspaceBadgeLookup } from '../../shared/workspace-badge'
 import { SessionCell } from './SessionCell'
 import { LauncherCell } from './LauncherCell'
 import type { PathStartOpts } from './LauncherCell'
@@ -19,7 +21,8 @@ interface SessionGridProps {
   theme: ThemeName
   workshopSessionId: string | null
   activeWorkspaceId: string | null
-  entityStatus: Record<string, boolean>
+  /** entityId → workspace keys the entity currently runs in (see shared/entity-status.ts). */
+  entityStatus: Record<string, string[]>
   voiceTargetSessionId: string | null
   voicePinned: boolean
   voiceState: string
@@ -39,7 +42,7 @@ interface SessionGridProps {
   onFocusModeBySlot?: (slotIndex: number) => void
   focusModeSlots?: Set<number>
   focusModeOverlapped?: Set<number>
-  onStartEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
+  onStartEntity: (entityId: EntityId, slotIndex: number, workspaceId?: string) => Promise<void>
   onResumeEntity: (entityId: EntityId, slotIndex: number) => Promise<void>
   onFocusEntity: (entityId: EntityId) => void
   onStartPath: (path: string, opts: PathStartOpts, slotIndex: number) => void
@@ -70,7 +73,44 @@ export function SessionGrid({
   onDropSession, onDropNoteOnEmpty, onDropNoteOnSession,
   topicMap,
 }: SessionGridProps) {
+  const { t } = useTranslation()
   useScrollHandler(grid)
+
+  // Full workspace list for the badge (name lookup by id). Kept fresh across
+  // create/rename/delete via the workspaces:changed push so a deleted
+  // workspace still resolves to its last-known name for the "(deleted)" case.
+  const [workspaceList, setWorkspaceList] = useState<WorkspaceBadgeLookup[]>([])
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.workspaces?.list) return
+    let mounted = true
+    const load = () => {
+      api.workspaces.list().then((list: WorkspaceBadgeLookup[]) => {
+        if (mounted) setWorkspaceList(list ?? [])
+      }).catch(() => {})
+    }
+    load()
+    const unsub = api.workspaces.onChanged?.(load)
+    return () => { mounted = false; unsub?.() }
+  }, [])
+
+  const workspaceBadgeFor = useCallback((session: SessionInfo): string | null => {
+    const badge = computeWorkspaceBadge(session.workspaceId, activeWorkspaceId, workspaceList)
+    if (badge == null) return null
+    if (badge.global) return t('unified.workspaceBadgeGlobal')
+    if (badge.deleted) return t('unified.workspaceBadgeDeleted', { name: badge.label })
+    return badge.label
+  }, [activeWorkspaceId, workspaceList, t])
+
+  // Tooltip for the same badge. The global case needs its own sentence —
+  // feeding "ohne Workspace" into "Läuft in Workspace: {{name}}" reads
+  // "Läuft in Workspace: ohne Workspace".
+  const workspaceBadgeTitleFor = useCallback((session: SessionInfo): string | undefined => {
+    const badge = computeWorkspaceBadge(session.workspaceId, activeWorkspaceId, workspaceList)
+    if (badge == null) return undefined
+    if (badge.global) return t('unified.workspaceBadgeTitleGlobal')
+    return t('unified.workspaceBadgeTitle', { name: badge.label })
+  }, [activeWorkspaceId, workspaceList, t])
 
   // Grid navigation via voice commands
   useEffect(() => {
@@ -298,6 +338,8 @@ export function SessionGrid({
                 onDetach={onDetach}
                 onFocusMode={onFocusMode}
                 topic={topicMap?.[session.id]}
+                workspaceBadge={workspaceBadgeFor(session)}
+                workspaceBadgeTitle={workspaceBadgeTitleFor(session)}
                 onDragStart={() => handleDragStart(idx)}
                 onDragOver={(e: DragEvent) => handleDragOver(idx, e)}
                 onDragLeave={handleDragLeave}
@@ -313,7 +355,7 @@ export function SessionGrid({
               slotIndex={idx}
               slotCol={idx % cols}
               slotRow={Math.floor(idx / cols)}
-              onStartEntity={(entityId) => onStartEntity(entityId, idx)}
+              onStartEntity={(entityId, workspaceId) => onStartEntity(entityId, idx, workspaceId)}
               onResumeEntity={(entityId) => onResumeEntity(entityId, idx)}
               onFocusEntity={onFocusEntity}
               onStartPath={(path, opts) => onStartPath(path, opts, idx)}

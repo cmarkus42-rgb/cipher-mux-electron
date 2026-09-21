@@ -47,6 +47,8 @@ import { CyberFactoryManager } from './cyber-factory/cyber-factory-manager'
 import { scanAndRegisterEntities } from './session/entity-scanner'
 import { resolvePersonaForPreset } from './session/persona-resolver'
 import { resolveSessionTopic } from './session/resolve-session-topic'
+import { resolveRestoredWorkspaceId } from './session/resolve-restored-workspace'
+import { pruneRunDirs, liveWorkspaceIds } from './session/entity-run-dir'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST, MAX_MANUAL_TAGS } from '../shared/constants'
 import { BRAND } from '../shared/brand'
@@ -424,7 +426,7 @@ export class IpcHub {
           kwEnabled,
           hasSnapshot: !!rawSnapshot,
           snapshotSessions: rawSnapshot && !Array.isArray(rawSnapshot) ? rawSnapshot.sessions?.length : (Array.isArray(rawSnapshot) ? rawSnapshot.length : 0),
-          recovered: result.recovered.map(r => ({ id: r.id, name: r.name })),
+          recovered: result.recovered.map(r => ({ id: r.id, name: r.name, workspaceId: r.workspaceId ?? null })),
           orphaned: result.orphaned.length,
         }
         fs.writeFileSync('/tmp/kw-debug.json', JSON.stringify(debugInfo, null, 2))
@@ -468,6 +470,31 @@ export class IpcHub {
           this.autoStartDefault()
         }
       }
+
+      // Remove run dirs of workspaces that no longer exist. Placed after the
+      // Keep-Working restore above (not before) so sessions it just recovered
+      // still find their run dir on disk. Sessions of a deleted workspace
+      // keep running — their dirs survive until the next start after they are
+      // gone, because `sessionManager.list()` already reflects both recover()
+      // and restoreKeepWorkingFromRecovery() by this point, and its
+      // workspaceIds are unioned into the keep-set below. A throw here must
+      // never propagate: this sits in the startup init chain, and per
+      // CLAUDE.md ("Keep Working Restore — Fragile Zone") an uncaught error
+      // anywhere in that chain kills session restore silently.
+      try {
+        const workspaces = (configStore.get('workspaces') ?? []) as Array<{ id: string }>
+        const keepIds = liveWorkspaceIds(
+          workspaces.map((w) => w.id),
+          this.sessionManager.list().map((s) => s.workspaceId),
+        )
+        const removed = pruneRunDirs(keepIds)
+        if (removed.length > 0) {
+          console.log(`[IpcHub] pruned ${removed.length} orphaned run dir(s)`)
+        }
+      } catch (err) {
+        console.warn('[IpcHub] run dir prune failed:', err)
+      }
+
       // Restore detached windows from previous session
       this.restoreDetachedWindows()
 
@@ -2263,7 +2290,10 @@ export class IpcHub {
 
   // ─── Entity Framework ──────────────────────────────────
   private registerEntityChannels(): void {
-    ipcMain.handle(IPC.ENTITY_START, async (_e, { entityId }: { entityId: EntityId }) => {
+    ipcMain.handle(IPC.ENTITY_START, async (_e, { entityId, workspaceId }: {
+      entityId: EntityId
+      workspaceId?: string | null
+    }) => {
       // Feature flag gate: debugger is opt-in (defaults to disabled)
       if (entityId === 'debugger') {
         const debuggerConfig = configStore.get('debugger')
@@ -2272,6 +2302,12 @@ export class IpcHub {
         }
       }
 
+      // Explicit choice wins; otherwise the globally active workspace.
+      // undefined means "caller did not choose" — null means "explicitly unbound".
+      const effectiveWorkspaceId = workspaceId === undefined
+        ? (configStore.get('activeWorkspaceId') ?? null)
+        : workspaceId
+
       const mcpConfig = configStore.get('mcp')
       // Ensure MCP config is set on session manager
       this.sessionManager.setMcpConfig({
@@ -2279,7 +2315,9 @@ export class IpcHub {
         mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
         mcpApiKey: mcpConfig?.apiKey ?? '',
       })
-      const session = await this.sessionManager.startEntity(entityId)
+      const session = await this.sessionManager.startEntity(entityId, {
+        workspaceId: effectiveWorkspaceId,
+      })
       // Queue Claude launch for entity — pass session.id for multi-instance support
       try {
         this.sessionManager.queueEntityClaude(entityId, session.id)
@@ -2290,14 +2328,24 @@ export class IpcHub {
       return session
     })
 
-    ipcMain.handle(IPC.ENTITY_RESUME, async (_e, { entityId, sessionId }: { entityId: EntityId; sessionId?: string }) => {
+    ipcMain.handle(IPC.ENTITY_RESUME, async (_e, { entityId, sessionId, workspaceId }: {
+      entityId: EntityId
+      sessionId?: string
+      workspaceId?: string | null
+    }) => {
       const mcpConfig = configStore.get('mcp')
       this.sessionManager.setMcpConfig({
         mcpHost: mcpConfig?.host ?? MCP_DEFAULT_HOST,
         mcpPort: mcpConfig?.port ?? MCP_DEFAULT_PORT,
         mcpApiKey: mcpConfig?.apiKey ?? '',
       })
-      const session = await this.sessionManager.resumeEntity(entityId, sessionId)
+      // Same three-state resolution as ENTITY_START: only `undefined` means
+      // "caller had no preference" — an explicit null must stay unbound, so
+      // `??` would be wrong here.
+      const effectiveWorkspaceId = workspaceId === undefined
+        ? (configStore.get('activeWorkspaceId') ?? null)
+        : workspaceId
+      const session = await this.sessionManager.resumeEntity(entityId, sessionId, effectiveWorkspaceId)
       return session
     })
 
@@ -2843,9 +2891,9 @@ ist dieses Entity fokussiert?
    * persisted ui.grid config.
    */
   private async restoreKeepWorkingFromRecovery(
-    snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }>,
+    snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string; workspaceId?: string | null }>,
     gridConfig: { cols: number; rows: number } | undefined,
-    recovered: Array<{ id: string; name: string; projectPath: string | null; entityId?: string }>,
+    recovered: Array<{ id: string; name: string; projectPath: string | null; entityId?: string; workspaceId?: string | null }>,
     notesSlots?: Array<{ slotIndex: number; notesId?: string; openNoteIds?: string[] }>,
   ): Promise<void> {
     const effectiveGrid = gridConfig ?? { cols: 1, rows: 1 }
@@ -2880,6 +2928,16 @@ ist dieses Entity fokussiert?
         if (entry.entityId && !match.entityId) {
           this.sessionManager.linkEntity(match.id, entry.entityId)
         }
+        // Re-bind workspace: the recovered session's own binding (restored
+        // by recover() straight from sessions.json — the continuously
+        // maintained record) takes precedence over the snapshot entry — a
+        // coarser, once-at-quit record matched back to sessions heuristically
+        // by name/projectPath. The snapshot entry is only a fallback for a
+        // recovered session with no binding of its own (e.g. a pre-upgrade
+        // sessions.json). This also means a projectPath-fallback mismatch
+        // (entry actually belongs to a different session) can't stamp the
+        // wrong workspace onto `match` as long as `match` already has one.
+        this.sessionManager.bindWorkspace(match.id, resolveRestoredWorkspaceId(match.workspaceId, entry.workspaceId))
         console.log(`[IpcHub] keepWorking: reusing recovered "${match.name}" (${match.id}) → slot ${entry.gridSlot}`)
       } else {
         // No matching recovered session — start new with --resume
@@ -2897,6 +2955,7 @@ ist dieses Entity fokussiert?
             name: entry.name,
             projectPath: entry.projectPath,
             autoLaunch,
+            workspaceId: entry.workspaceId ?? null,
           })
           // Restore entity link for newly created sessions too
           if (entry.entityId) {
@@ -2962,7 +3021,7 @@ ist dieses Entity fokussiert?
     const sessions = this.sessionManager.list().filter(s => s.status === 'active')
     if (sessions.length === 0) return
     const allTasks = this.taskManager ? this.taskManager.list() : []
-    const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }> = []
+    const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string; workspaceId?: string | null }> = []
     for (const s of sessions) {
       const slotIdx = grid.slots.findIndex(slot => slot.sessionId === s.id)
       if (!s.projectPath || slotIdx < 0) continue
@@ -2976,6 +3035,7 @@ ist dieses Entity fokussiert?
         gridSlot: slotIdx,
         entityId: s.entityId,
         topic: resolveSessionTopic(s, allTasks, capture),
+        workspaceId: s.workspaceId ?? null,
       })
     }
     // Collect notes slots for restoration
@@ -3031,7 +3091,7 @@ ist dieses Entity fokussiert?
       const gridState = this.sessionManager.getSessionStore().getGridState()
       if (sessions.length > 0 && gridState) {
         const allTasks = this.taskManager ? this.taskManager.list() : []
-        const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string }> = []
+        const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string; workspaceId?: string | null }> = []
         for (const s of sessions) {
           const slotIdx = gridState.slots.findIndex(slot => slot.sessionId === s.id)
           if (!s.projectPath || slotIdx < 0) continue
@@ -3045,6 +3105,7 @@ ist dieses Entity fokussiert?
             gridSlot: slotIdx,
             entityId: s.entityId,
             topic: resolveSessionTopic(s, allTasks, capture),
+            workspaceId: s.workspaceId ?? null,
           })
         }
         // Collect notes slots for restoration

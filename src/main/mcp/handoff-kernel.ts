@@ -9,6 +9,7 @@ import type { EntityId, SessionInfo } from '../../shared/types'
 import { IPC } from '../../shared/ipc-channels'
 import type { ToolContext } from './mcp-tools'
 import type { Topic } from '../../shared/types'
+import { findEntitySessions } from '../session/entity-session-lookup'
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -79,13 +80,16 @@ interface SessionCandidate {
  * Priority: visible+idle > background+idle > visible+busy(singleInstance) >
  *           background+busy(singleInstance) > new session
  */
-async function findBestSession(
+export async function findBestSession(
   ctx: ToolContext,
   entityId: EntityId,
 ): Promise<{ session: SessionInfo; wasExisting: true } | null> {
-  const sessions = ctx.sessionManager.list()
-  const entitySessions = sessions.filter(
-    s => s.entityId === entityId && s.status === 'active'
+  // Stay inside the caller's workspace. A handoff from workspace B must not
+  // land in the debugger sitting in workspace A — it starts its own instead.
+  const entitySessions = findEntitySessions(
+    ctx.sessionManager.list(),
+    entityId,
+    ctx.workspaceId ?? null,
   )
 
   if (entitySessions.length === 0) return null
@@ -157,6 +161,7 @@ export async function startEntitySession(
 ): Promise<SessionInfo> {
   const session = await ctx.sessionManager.startEntity(entityId, {
     name: opts?.name ?? entityId,
+    workspaceId: ctx.workspaceId ?? null,
     ...(opts?.projectPath ? { projectPath: opts.projectPath } : {}),
   })
 
@@ -360,7 +365,7 @@ function registerEntityStartTool(server: McpServer, ctx: ToolContext): void {
         + 'Testing Assistant, Debugger, Audit, etc.',
       inputSchema: {
         entityId: z.string().describe('Entity identifier (e.g. "cyber-factory", "refinement", "debugger")'),
-        projectPath: z.string().optional().describe('Override project path (optional)'),
+        projectPath: z.string().optional().describe('Project directory to hand the entity as context — NOT the session working directory (that is always the entity\'s run directory). Listed under Context Directories in its CLAUDE.md.'),
         name: z.string().optional().describe('Override display name (optional)'),
       },
     },
@@ -425,7 +430,7 @@ export function registerAllHandoffTools(server: McpServer, ctx: ToolContext): vo
     senderEntityId: 'refinement',
     inputSchema: {
       detailSpecPath: z.string().describe('Absolute path to the detail spec file with REQ-IDs'),
-      projectPath: z.string().describe('Project directory path for the Cyber Factory session'),
+      projectPath: z.string().describe('Project directory to hand the Cyber Factory session as context — NOT its working directory (that is always its run directory). Listed under Context Directories in its CLAUDE.md; also used to derive the session name.'),
       lifecyclePhase: z.string().optional().describe('Target lifecycle phase (default: architect)'),
     },
     buildPayload: (args) => ({

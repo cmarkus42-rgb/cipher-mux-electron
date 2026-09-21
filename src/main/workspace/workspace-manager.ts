@@ -8,9 +8,25 @@ export interface ApplyResult {
   warnings: string[]
 }
 
+/**
+ * SessionStarter — the slice of SessionManager applyWorkspace needs.
+ *
+ * `workspaceId` is part of both signatures on purpose: applyWorkspace runs
+ * BEFORE `activeWorkspaceId` is written (the IPC handler awaits the apply and
+ * only then persists the new active id), so a starter that falls back to the
+ * globally active workspace would bind every session of workspace B to the
+ * outgoing workspace A — wrong run dir, wrong MCP workspace header, wrong
+ * badge. Passing the id explicitly makes the binding independent of when the
+ * config write happens.
+ *
+ * Three-state contract, same as everywhere else:
+ *   undefined → no preference (callee may fall back to the active workspace)
+ *   null      → explicitly unbound
+ *   string    → that workspace
+ */
 export interface SessionStarter {
-  start(opts: { name: string; projectPath: string; autoLaunch?: string; workspacePrompt?: string; contextPaths?: string[] }): Promise<{ id: string }>
-  startEntity?(entityId: string, opts?: { workspacePrompt?: string; contextPaths?: string[] }): Promise<{ id: string }>
+  start(opts: { name: string; projectPath: string; autoLaunch?: string; workspacePrompt?: string; contextPaths?: string[]; workspaceId?: string | null }): Promise<{ id: string }>
+  startEntity?(entityId: string, opts?: { workspacePrompt?: string; contextPaths?: string[]; workspaceId?: string | null }): Promise<{ id: string }>
 }
 
 /**
@@ -169,6 +185,9 @@ export async function applyWorkspace(
         start: () => sessionStarter.startEntity!(presetId, {
           workspacePrompt: wsPrompt || undefined,
           contextPaths: entityPaths,
+          // Explicit: the workspace being applied, never the one still marked
+          // active in config while this apply is running.
+          workspaceId: workspace.id,
         }),
       })
       continue
@@ -189,7 +208,10 @@ export async function applyWorkspace(
     const project = cell.project
     startTasks.push({
       cellIndex: i,
-      start: () => sessionStarter.start({ name: sessionName, projectPath: project, autoLaunch: launchCmd, workspacePrompt: effectivePrompt, contextPaths: effectivePaths }),
+      // workspaceId explicit for the same reason as the preset branch above —
+      // without it these sessions stay unbound and every cell of the freshly
+      // applied workspace renders the "no workspace" badge.
+      start: () => sessionStarter.start({ name: sessionName, projectPath: project, autoLaunch: launchCmd, workspacePrompt: effectivePrompt, contextPaths: effectivePaths, workspaceId: workspace.id }),
     })
   }
 
