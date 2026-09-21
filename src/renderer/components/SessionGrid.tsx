@@ -1,8 +1,10 @@
 // src/renderer/components/SessionGrid.tsx
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
+import { useTranslation } from 'react-i18next'
 import type { SessionInfo, ContextUsage, EntityId } from '../../shared/types'
 import { computeGridStyle, getCoveredSlots, getFocusModePlacement, findNavigationTarget } from '../../shared/grid-types'
 import type { GridState, ThemeName } from '../../shared/grid-types'
+import { computeWorkspaceBadge, type WorkspaceBadgeLookup } from '../../shared/workspace-badge'
 import { SessionCell } from './SessionCell'
 import { LauncherCell } from './LauncherCell'
 import type { PathStartOpts } from './LauncherCell'
@@ -71,7 +73,34 @@ export function SessionGrid({
   onDropSession, onDropNoteOnEmpty, onDropNoteOnSession,
   topicMap,
 }: SessionGridProps) {
+  const { t } = useTranslation()
   useScrollHandler(grid)
+
+  // Full workspace list for the badge (name lookup by id). Kept fresh across
+  // create/rename/delete via the workspaces:changed push so a deleted
+  // workspace still resolves to its last-known name for the "(deleted)" case.
+  const [workspaceList, setWorkspaceList] = useState<WorkspaceBadgeLookup[]>([])
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.workspaces?.list) return
+    let mounted = true
+    const load = () => {
+      api.workspaces.list().then((list: WorkspaceBadgeLookup[]) => {
+        if (mounted) setWorkspaceList(list ?? [])
+      }).catch(() => {})
+    }
+    load()
+    const unsub = api.workspaces.onChanged?.(load)
+    return () => { mounted = false; unsub?.() }
+  }, [])
+
+  const workspaceBadgeFor = useCallback((session: SessionInfo): string | null => {
+    const badge = computeWorkspaceBadge(session.workspaceId, activeWorkspaceId, workspaceList)
+    if (badge == null) return null
+    if (badge.global) return t('unified.workspaceBadgeGlobal')
+    if (badge.deleted) return t('unified.workspaceBadgeDeleted', { name: badge.label })
+    return badge.label
+  }, [activeWorkspaceId, workspaceList, t])
 
   // Grid navigation via voice commands
   useEffect(() => {
@@ -299,6 +328,7 @@ export function SessionGrid({
                 onDetach={onDetach}
                 onFocusMode={onFocusMode}
                 topic={topicMap?.[session.id]}
+                workspaceBadge={workspaceBadgeFor(session)}
                 onDragStart={() => handleDragStart(idx)}
                 onDragOver={(e: DragEvent) => handleDragOver(idx, e)}
                 onDragLeave={handleDragLeave}

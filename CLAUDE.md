@@ -200,6 +200,28 @@ Personas definieren Rollen (Name, Farbe, Default-Prompt). Workspaces kombinieren
 - **Workspace Apply:** Grid wird auf Workspace-Dimensionen resized, Merges werden als rowSpans uebertragen, Sessions spawnen fuer non-empty Cells mit zugewiesenen Projekten. Prompt geht via CLAUDE.md-Injection, autoLaunch startet nur `claude --dangerously-skip-permissions` ohne Prompt-Arg.
 - **Grid-Limits:** Max 7 Cols x 3 Rows (konsistent mit MAX_GRID_COLS/MAX_GRID_ROWS in constants.ts)
 - **Persona Skill Sync:** Generiert .claude/skills/personas/ Skills aus Persona-Prompts.
+- **Multi-Workspace-Sessions:** Jede Session traegt ihren Workspace (`SessionInfo.workspaceId`,
+  persistiert in `sessions.json`). Entity-Sessions laufen in `~/.config/cipher-mux/runs/<workspaceId>/<entityId>/`
+  (generierte Artefakte) und lesen aus `~/.config/cipher-mux/entities/<id>/` (preset.md, Skills).
+  `singleInstance` gilt pro Workspace. MCP-Aufrufe tragen `X-Mux-Workspace` und binden den
+  Workspace beim `initialize`. Launcher: ⤳-Button startet ein Preset in einem anderen Workspace.
+  **Workspace-Badge:** `computeWorkspaceBadge()` (`src/shared/workspace-badge.ts`) ist die eine
+  Wahrheitsquelle fuer die Anzeige — kein Badge wenn `session.workspaceId === activeWorkspaceId`;
+  ein ungebundener Session (`workspaceId === null`) zeigt "ohne Workspace"
+  (`unified.workspaceBadgeGlobal`) sobald ein Workspace aktiv ist, sonst kein Badge; eine Session
+  in einem anderen (noch existierenden) Workspace zeigt dessen Namen; eine Session in einem
+  geloeschten Workspace zeigt die ID mit "(gelöscht)"-Marker (`unified.workspaceBadgeDeleted`).
+  Tooltip ueberall `unified.workspaceBadgeTitle`. Gerendert in `SessionCell.tsx` (Grid-Zellen) und
+  `SidebarPanel.tsx` (Background-Session-Karten) — `PaneHeader.tsx`/`TerminalPane.tsx` haben die
+  gleiche Prop, sind aber aktuell in keiner Route gemountet (siehe Lesson zu "Komponenten-Lieferung
+  ohne Mount"). **Run-Dir-Aufraeumung:** `pruneRunDirs()` (`src/main/session/entity-run-dir.ts`)
+  laeuft am Ende der Init-Chain in `ipc-hub.ts`, bewusst NACH dem Keep-Working-Restore (sonst
+  faenden wiederhergestellte Sessions ihr Run-Verzeichnis nicht mehr vor) und in eigenem
+  `try`/`catch` (ein Wurf in der Init-Chain toetet Keep-Working sonst still). Das Keep-Set ist die
+  Union aus konfigurierten Workspace-IDs und den `workspaceId`s aller aktuell gelisteten Sessions
+  (`liveWorkspaceIds()`), damit eine Session eines gerade geloeschten Workspace ihr Verzeichnis
+  nicht unter sich weggezogen bekommt, waehrend sie noch laeuft.
+  **Noch global:** Notes-Tagging und Companion-Memory-Scope (Paket B).
 
 ## MCP-Server: Worker-Session-Handling
 

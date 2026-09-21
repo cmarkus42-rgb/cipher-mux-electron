@@ -469,6 +469,32 @@ export class IpcHub {
           this.autoStartDefault()
         }
       }
+
+      // Remove run dirs of workspaces that no longer exist. Placed after the
+      // Keep-Working restore above (not before) so sessions it just recovered
+      // still find their run dir on disk. Sessions of a deleted workspace
+      // keep running — their dirs survive until the next start after they are
+      // gone, because `sessionManager.list()` already reflects both recover()
+      // and restoreKeepWorkingFromRecovery() by this point, and its
+      // workspaceIds are unioned into the keep-set below. A throw here must
+      // never propagate: this sits in the startup init chain, and per
+      // CLAUDE.md ("Keep Working Restore — Fragile Zone") an uncaught error
+      // anywhere in that chain kills session restore silently.
+      try {
+        const { pruneRunDirs, liveWorkspaceIds } = require('./session/entity-run-dir')
+        const workspaces = (configStore.get('workspaces') ?? []) as Array<{ id: string }>
+        const keepIds = liveWorkspaceIds(
+          workspaces.map((w) => w.id),
+          this.sessionManager.list().map((s) => s.workspaceId),
+        )
+        const removed = pruneRunDirs(keepIds)
+        if (removed.length > 0) {
+          console.log(`[IpcHub] pruned ${removed.length} orphaned run dir(s)`)
+        }
+      } catch (err) {
+        console.warn('[IpcHub] run dir prune failed:', err)
+      }
+
       // Restore detached windows from previous session
       this.restoreDetachedWindows()
 

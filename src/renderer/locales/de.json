@@ -481,6 +481,8 @@
   "unified.start": "Starten",
   "unified.focusEntity": "Fokussieren",
   "unified.workspaceBadgeTitle": "Läuft in Workspace: {{name}}",
+  "unified.workspaceBadgeGlobal": "ohne Workspace",
+  "unified.workspaceBadgeDeleted": "{{name}} (gelöscht)",
   "statusBar.newSession": "+",
 
   "info.tabVoice": "stimme",

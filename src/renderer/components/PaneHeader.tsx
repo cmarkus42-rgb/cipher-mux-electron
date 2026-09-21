@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { AdapterCapabilities, EntityId } from '../../shared/types'
 
 interface PaneHeaderProps {
@@ -7,6 +8,14 @@ interface PaneHeaderProps {
   entityId?: EntityId
   voiceState?: string   // idle | ready | user_speaking | recording | processing | agent_speaking
   isSpeaking?: boolean  // true when TTS audio is playing in renderer
+  /**
+   * Workspace name to show as a badge. The badge is a deviation signal, not
+   * decoration — pass null/undefined to hide it. Callers compute this with
+   * `computeWorkspaceBadge` (src/shared/workspace-badge.ts): null when the
+   * session sits in the active workspace, or is unbound with no workspace
+   * active; otherwise the resolved workspace name (or a "(deleted)" label).
+   */
+  workspaceBadge?: string | null
 }
 
 /** Entity color mapping — references CSS custom properties from themes.json. */
@@ -48,7 +57,8 @@ function voiceTooltip(voiceState: string | undefined, isSpeaking: boolean | unde
   return ''
 }
 
-export function PaneHeader({ sessionName, contextUsage, capabilities, entityId, voiceState, isSpeaking }: PaneHeaderProps) {
+export function PaneHeader({ sessionName, contextUsage, capabilities, entityId, voiceState, isSpeaking, workspaceBadge }: PaneHeaderProps) {
+  const { t } = useTranslation()
   const showContextUsage = capabilities?.['status-line'] !== false
   const entityColor = entityId ? ENTITY_COLORS[entityId] : undefined
   const dotClass = voiceDotClass(voiceState, isSpeaking)
@@ -62,6 +72,11 @@ export function PaneHeader({ sessionName, contextUsage, capabilities, entityId, 
         <span>{sessionName}</span>
         {voiceActive && dotClass && (
           <span class={dotClass} title={voiceTooltip(voiceState, isSpeaking)} aria-hidden="true" />
+        )}
+        {workspaceBadge && (
+          <span class="pane-header__ws-badge" title={t('unified.workspaceBadgeTitle', { name: workspaceBadge })}>
+            {workspaceBadge}
+          </span>
         )}
       </div>
       <div style={{ flex: 1 }} />
