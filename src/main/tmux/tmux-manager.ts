@@ -133,7 +133,13 @@ export class TmuxManager extends EventEmitter {
   watchSession(sessionName: string, emitId: string): void {
     if (this.outputWatchers.has(sessionName)) return
 
-    const proc = spawn('tmux', ['-C', 'attach-session', '-t', sessionName, '-r'], {
+    // NOT `-r` (read-only): verified on tmux 3.7c, a command issued from outside
+    // tmux resolves its target client to the best attached one — if that is read-only,
+    // tmux rejects the command with "client is read-only". A single read-only
+    // watcher therefore breaks `send-keys` for ALL sessions (no Claude launch,
+    // no keyboard input). `-f ignore-size` keeps the watcher from dictating the
+    // session dimensions, which is the only thing `-r` gave us here.
+    const proc = spawn('tmux', ['-C', 'attach-session', '-t', sessionName, '-f', 'ignore-size'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, TERM: 'xterm-256color' },
     })
