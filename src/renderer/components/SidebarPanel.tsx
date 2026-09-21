@@ -6,12 +6,13 @@ import { NotesTreeView } from './NotesTreeView'
 import type { TagFilterState } from './NotesTreeView'
 import { CompanionMemoryView } from './CompanionMemoryView'
 import { useTranslation } from 'react-i18next'
+import { computeWorkspaceBadge, type WorkspaceBadgeLookup } from '../../shared/workspace-badge'
 
 interface SidebarPanelProps {
   visible: boolean
   workshopActive: boolean
   cyberFactoryActive: boolean
-  sessions: Array<{ id: string; name: string; status: string; projectPath?: string }>
+  sessions: Array<{ id: string; name: string; status: string; projectPath?: string; workspaceId?: string | null }>
   gridSessionIds: string[]
   detachedIds?: Set<string>
   contextUsages: Record<string, { usedPercentage: number; used?: number; total?: number }>
@@ -80,6 +81,24 @@ export function SidebarPanel({
   const [searchTerm, setSearchTerm] = useState('')
   const [workspaceDefaultTags, setWorkspaceDefaultTags] = useState<string[]>([])
   const [workspaceName, setWorkspaceName] = useState<string | null>(null)
+  const [workspaceList, setWorkspaceList] = useState<WorkspaceBadgeLookup[]>([])
+
+  // Full workspace list for the badge (name lookup by id) — kept fresh across
+  // create/rename/delete so a deleted workspace still resolves for the badge
+  // until its sessions are gone.
+  useEffect(() => {
+    const api = (window as any).cipherMux
+    if (!api?.workspaces?.list) return
+    let mounted = true
+    const load = () => {
+      api.workspaces.list().then((list: WorkspaceBadgeLookup[]) => {
+        if (mounted) setWorkspaceList(list ?? [])
+      }).catch(() => {})
+    }
+    load()
+    const unsub = api.workspaces.onChanged?.(load)
+    return () => { mounted = false; unsub?.() }
+  }, [])
 
   const { notes, tagRepo, tagClassRepo, tagIndex, deleteNote, trashMany, restoreMany, bulkTagAdd, bulkTagRemove, searchNotes } = useNotes()
 
@@ -265,17 +284,28 @@ export function SidebarPanel({
         >
           <span>{collapsed.background ? '▸' : '▾'} {t('sidebar.backgroundSessions')}</span>
         </div>
-        {!collapsed.background && hasBackground && backgroundSessions.map(s => (
+        {!collapsed.background && hasBackground && backgroundSessions.map(s => {
+          const badge = computeWorkspaceBadge(s.workspaceId, activeWorkspaceId, workspaceList)
+          const workspaceBadgeText = badge == null
+            ? null
+            : badge.global
+              ? t('unified.workspaceBadgeGlobal')
+              : badge.deleted
+                ? t('unified.workspaceBadgeDeleted', { name: badge.label })
+                : badge.label
+          return (
           <BackgroundSessionCard
             key={s.id}
             session={s}
             contextUsage={contextUsages[s.id]}
+            workspaceBadge={workspaceBadgeText}
             onClick={() => onAddToGrid(s.id)}
             onKill={() => onKillSession(s.id)}
             voiceGlow={s.name === 'Voice' ? voiceComState : undefined}
             topic={topicMap?.[s.id]}
           />
-        ))}
+          )
+        })}
       </section>
 
       {/* ─── Orphaned Sessions (conditional) ─── */}
@@ -356,13 +386,15 @@ export function SidebarPanel({
 interface BackgroundSessionCardProps {
   session: { id: string; name: string; projectPath?: string }
   contextUsage?: { usedPercentage: number; used?: number; total?: number }
+  /** Precomputed, already-localized badge text; null hides the badge. */
+  workspaceBadge?: string | null
   onClick: () => void
   onKill: () => void
   voiceGlow?: string
   topic?: string
 }
 
-function BackgroundSessionCard({ session, contextUsage, onClick, onKill, voiceGlow, topic }: BackgroundSessionCardProps) {
+function BackgroundSessionCard({ session, contextUsage, workspaceBadge, onClick, onKill, voiceGlow, topic }: BackgroundSessionCardProps) {
   const { t } = useTranslation()
   const [lastOutput, setLastOutput] = useState<string>('')
   const [expanded, setExpanded] = useState(false)
@@ -432,9 +464,19 @@ function BackgroundSessionCard({ session, contextUsage, onClick, onKill, voiceGl
       draggable
       onDragStart={handleDragStart}
     >
-      {/* Line 1: Name + Kill */}
+      {/* Line 1: Name + Workspace Badge + Kill */}
       <div class="bg-card__head">
-        <span class="bg-card__name">{dName}</span>
+        <span class="bg-card__name-group">
+          <span class="bg-card__name">{dName}</span>
+          {workspaceBadge && (
+            <span
+              class="bg-card__ws-badge"
+              title={t('unified.workspaceBadgeTitle', { name: workspaceBadge })}
+            >
+              {workspaceBadge}
+            </span>
+          )}
+        </span>
         <button
           class="bg-card__kill"
           onClick={handleKill}

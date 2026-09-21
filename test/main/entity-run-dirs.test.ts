@@ -9,6 +9,7 @@ const {
   resolveRunDir,
   ensureRunDir,
   pruneRunDirs,
+  liveWorkspaceIds,
 } = require('../../src/main/session/entity-run-dir')
 
 let base: string
@@ -150,5 +151,32 @@ describe('pruneRunDirs', () => {
   it('returns an empty list when the base dir does not exist yet', () => {
     const missing = path.join(base, 'not-created')
     assert.deepEqual(pruneRunDirs(['ws-alpha'], missing), [])
+  })
+})
+
+describe('liveWorkspaceIds', () => {
+  it('unions configured ids with session workspace ids', () => {
+    const ids = liveWorkspaceIds(['ws-alpha'], ['ws-beta'])
+    assert.deepEqual([...ids].sort(), ['ws-alpha', 'ws-beta'])
+  })
+
+  it('deduplicates ids present in both sources', () => {
+    const ids = liveWorkspaceIds(['ws-alpha'], ['ws-alpha'])
+    assert.deepEqual(ids, ['ws-alpha'])
+  })
+
+  it('keeps a session workspace id alive even if the workspace was deleted', () => {
+    // Simulates: workspace deleted from config, but its session is still running.
+    const ids = liveWorkspaceIds([], ['ws-gone'])
+    assert.deepEqual(ids, ['ws-gone'])
+  })
+
+  it('ignores null and undefined session workspace ids (unbound sessions)', () => {
+    const ids = liveWorkspaceIds(['ws-alpha'], [null, undefined, 'ws-beta'])
+    assert.deepEqual([...ids].sort(), ['ws-alpha', 'ws-beta'])
+  })
+
+  it('returns an empty list when nothing is configured or running', () => {
+    assert.deepEqual(liveWorkspaceIds([], []), [])
   })
 })

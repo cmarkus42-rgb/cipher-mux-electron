@@ -84,6 +84,24 @@ export function ensureRunDir(
 }
 
 /**
+ * Union of configured workspace ids and the workspaceId of every currently
+ * listed session. Feed this (not the configured list alone) to
+ * `pruneRunDirs` on startup: a session's run dir must not be pulled out from
+ * under it just because its workspace was deleted while the session keeps
+ * running in tmux.
+ */
+export function liveWorkspaceIds(
+  configuredIds: Iterable<string>,
+  sessionWorkspaceIds: Iterable<string | null | undefined>,
+): string[] {
+  const ids = new Set<string>(configuredIds)
+  for (const id of sessionWorkspaceIds) {
+    if (id) ids.add(id)
+  }
+  return [...ids]
+}
+
+/**
  * Remove run directories belonging to workspaces that no longer exist.
  * The _global directory is never pruned. Returns the removed paths.
  *
