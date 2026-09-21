@@ -1003,7 +1003,15 @@ export function App() {
     const api = (window as any).cipherMux
     inFlightEntityStarts.current.add(entityId)
     try {
-      const session = await api.entity.resume(entityId)
+      // Resume the instance the user is actually looking at, in the workspace
+      // they are looking at. Without both, a resume here stops a singleInstance
+      // preset's instance in another workspace and recreates it in this one.
+      // `?? undefined` and not a literal null: "the renderer has not loaded an
+      // active workspace yet" is not the same statement as "explicitly
+      // unbound". undefined lets main resolve it — which yields null anyway
+      // when no workspace is truly active.
+      const targetSessionId = getEntitySessionId(entityId) ?? undefined
+      const session = await api.entity.resume(entityId, targetSessionId, activeWorkspaceId ?? undefined)
       const sid = session?.id
       if (sid) {
         setSessionAtSlot(slotIndex, sid)
@@ -1012,7 +1020,7 @@ export function App() {
     } finally {
       inFlightEntityStarts.current.delete(entityId)
     }
-  }, [setSessionAtSlot])
+  }, [setSessionAtSlot, getEntitySessionId, activeWorkspaceId])
 
   const handleFocusEntity = useCallback((entityId: EntityId) => {
     const sid = getEntitySessionId(entityId)

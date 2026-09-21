@@ -288,14 +288,19 @@ describe('resizeCells', () => {
 
 describe('applyWorkspace', () => {
   function mockStarter() {
-    const started: Array<{ workspacePrompt?: string; contextPaths?: string[]; autoLaunch?: string }> = []
+    const started: Array<{ workspacePrompt?: string; contextPaths?: string[]; autoLaunch?: string; workspaceId?: string | null }> = []
+    const startedEntities: Array<{ entityId: string; workspaceId?: string | null; contextPaths?: string[] }> = []
     const starter: SessionStarter = {
       start: async (opts) => {
-        started.push({ workspacePrompt: opts.workspacePrompt, contextPaths: opts.contextPaths, autoLaunch: opts.autoLaunch })
+        started.push({ workspacePrompt: opts.workspacePrompt, contextPaths: opts.contextPaths, autoLaunch: opts.autoLaunch, workspaceId: opts.workspaceId })
         return { id: `sess-${started.length}` }
       },
+      startEntity: async (entityId, opts) => {
+        startedEntities.push({ entityId, workspaceId: opts?.workspaceId, contextPaths: opts?.contextPaths })
+        return { id: `entity-sess-${startedEntities.length}` }
+      },
     }
-    return { started, starter }
+    return { started, startedEntities, starter }
   }
 
   it('workspace-level prompt is passed to all project cells', async () => {
@@ -377,5 +382,64 @@ describe('applyWorkspace', () => {
     await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
     assert.ok(!started[0].autoLaunch?.includes('my prompt'))
     assert.ok(started[0].autoLaunch?.includes('--dangerously-skip-permissions'))
+  })
+
+  // ── workspace binding ──────────────────────────────────────────────────────
+  // applyWorkspace runs while `activeWorkspaceId` still names the OUTGOING
+  // workspace (the IPC handler awaits the apply and writes the new active id
+  // afterwards). A start call without an explicit workspaceId therefore binds
+  // the session to the wrong workspace: wrong run dir, wrong MCP workspace
+  // header, "ohne Workspace" badge on every cell. The id must be passed, not
+  // left to the callee's fallback — hence the strict `undefined` assertions:
+  // "workspaceId is set to something" would also pass against the fallback.
+
+  it('preset cell start receives the applied workspace id (never undefined)', async () => {
+    const { startedEntities, starter } = mockStarter()
+    const ws = makeWorkspace({
+      id: 'ws-incoming',
+      cols: 1, rows: 1,
+      cells: [makeCell({ persona: 'worker', project: '', prompt: '', presetId: 'debugger' })],
+    })
+
+    await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
+    assert.strictEqual(startedEntities.length, 1)
+    assert.notStrictEqual(startedEntities[0].workspaceId, undefined,
+      'startEntity must not leave workspaceId to the active-workspace fallback')
+    assert.strictEqual(startedEntities[0].workspaceId, 'ws-incoming')
+  })
+
+  it('project cell start receives the applied workspace id (never undefined)', async () => {
+    const { started, starter } = mockStarter()
+    const ws = makeWorkspace({
+      id: 'ws-incoming',
+      cols: 1, rows: 1,
+      cells: [makeCell({ persona: 'worker', project: '/proj', prompt: '' })],
+    })
+
+    await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
+    assert.strictEqual(started.length, 1)
+    assert.notStrictEqual(started[0].workspaceId, undefined,
+      'start must not leave workspaceId to the active-workspace fallback')
+    assert.strictEqual(started[0].workspaceId, 'ws-incoming')
+  })
+
+  it('every started session of a mixed workspace is bound to that workspace', async () => {
+    const { started, startedEntities, starter } = mockStarter()
+    const ws = makeWorkspace({
+      id: 'ws-mixed',
+      cols: 3, rows: 1,
+      cells: [
+        makeCell({ persona: 'worker', project: '/proj-a', prompt: '' }),
+        makeCell({ persona: 'worker', project: '/proj-b', prompt: '' }),
+        makeCell({ persona: 'worker', project: '', prompt: '', presetId: 'audit' }),
+      ],
+    })
+
+    await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
+    assert.strictEqual(started.length, 2)
+    assert.strictEqual(startedEntities.length, 1)
+    for (const opts of [...started, ...startedEntities]) {
+      assert.strictEqual(opts.workspaceId, 'ws-mixed')
+    }
   })
 })

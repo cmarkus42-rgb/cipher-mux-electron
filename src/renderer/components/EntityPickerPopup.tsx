@@ -219,8 +219,12 @@ export function EntityPickerPopup({
                   ? workspaces.filter(w => w.id !== activeWorkspaceId)
                   : []
                 const expanded = allowWorkspaceChoice && wsPickerFor === preset.id
+                // Same concept as the grid/sidebar badge, so the same wording:
+                // the unbound case is "ohne Workspace", not a bare dash.
                 const runningNames = runningIn.map(k =>
-                  k === GLOBAL_WORKSPACE_KEY ? '—' : (workspaces.find(w => w.id === k)?.name ?? k)
+                  k === GLOBAL_WORKSPACE_KEY
+                    ? t('unified.workspaceBadgeGlobal')
+                    : (workspaces.find(w => w.id === k)?.name ?? k)
                 )
 
                 return (
