@@ -14,6 +14,8 @@ export interface PersistedSession {
   projectPath: string | null
   gridSlot: number | null
   status: 'active' | 'background'
+  /** Workspace binding. null = unbound. Absent in stores written before v0.9.12. */
+  workspaceId: string | null
 }
 
 export interface PersistedGridState {
@@ -114,5 +116,32 @@ export class SessionStore {
     } catch (err) {
       console.error('[SessionStore] flush failed:', err)
     }
+  }
+}
+
+/**
+ * Map an in-memory session to its persisted shape.
+ * Pure — no disk access — so the mapping can be tested directly.
+ */
+export function toPersistedSession(
+  session: {
+    id: string
+    name: string
+    tmuxSession: string
+    entityId?: string | null
+    projectPath: string | null
+    workspaceId?: string | null
+  },
+  gridSlot: number | null,
+): PersistedSession {
+  return {
+    id: session.id,
+    name: session.name,
+    tmuxSession: session.tmuxSession,
+    entityId: (session.entityId as EntityId) ?? null,
+    projectPath: session.projectPath,
+    gridSlot,
+    status: gridSlot === null ? 'background' : 'active',
+    workspaceId: session.workspaceId ?? null,
   }
 }

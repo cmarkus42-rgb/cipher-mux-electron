@@ -12,13 +12,14 @@ interface LauncherCellProps {
   slotIndex: number
   slotCol?: number
   slotRow?: number
-  onStartEntity: (entityId: EntityId) => Promise<void>
+  onStartEntity: (entityId: EntityId, workspaceId?: string) => Promise<void>
   onResumeEntity: (entityId: EntityId) => Promise<void>
   onFocusEntity: (entityId: EntityId) => void
   onStartPath: (path: string, opts: PathStartOpts) => void
   onOpenNotes: () => void
   onOpenNote: (note: any) => void
-  entityStatus: Record<string, boolean>
+  /** entityId → workspace keys the entity currently runs in (see shared/entity-status.ts). */
+  entityStatus: Record<string, string[]>
   activeWorkspaceId: string | null
   workspaceLoading?: boolean
   onDragOver: (e: DragEvent) => void
@@ -64,7 +65,11 @@ export function LauncherCell({
     setPopupOpen(false)
   }, [])
 
-  const handleSelectPreset = useCallback(async (entityId: EntityId, running: boolean) => {
+  const handleSelectPreset = useCallback(async (
+    entityId: EntityId,
+    running: boolean,
+    workspaceId?: string,
+  ) => {
     if (running) {
       onFocusEntity(entityId)
       setPopupOpen(false)
@@ -72,7 +77,7 @@ export function LauncherCell({
     }
     setStarting(entityId)
     try {
-      await onStartEntity(entityId)
+      await onStartEntity(entityId, workspaceId)
       setPopupOpen(false)
     } catch (err) {
       console.error(`[LauncherCell] Failed to start ${entityId}:`, err)
@@ -129,6 +134,8 @@ export function LauncherCell({
           onClose={handleClose}
           entityStatus={entityStatus}
           startingEntity={starting}
+          activeWorkspaceId={activeWorkspaceId}
+          allowWorkspaceChoice
         />
       )}
     </div>

@@ -64,13 +64,17 @@ interface SessionCellProps {
   onDrop: (e: DragEvent) => void
   dragOver?: boolean
   topic?: string
+  /** Precomputed, already-localized workspace badge text; null/undefined hides it. */
+  workspaceBadge?: string | null
+  /** Tooltip for the badge — the global case needs a different sentence than a workspace name. */
+  workspaceBadgeTitle?: string
 }
 
 export function SessionCell({
   session, contextUsage, focused, isWorkshop, isVoiceTarget, isVoicePinned, voiceState, isSpeaking, onToggleVoicePin, theme,
   rowSpan, maxRows, slotCol, slotRow, focusModeStyle,
   onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDetach, onFocusMode, onDragStart, onDragOver, onDragLeave, onDrop, dragOver,
-  topic,
+  topic, workspaceBadge, workspaceBadgeTitle,
 }: SessionCellProps) {
   const { t } = useTranslation()
   const { terminalRef } = useTerminal(session.id, theme, session.createdAt)
@@ -226,6 +230,14 @@ export function SessionCell({
             : <span class={`neon-dot ${dotClass}`} aria-hidden="true" />}
           <StatusIcon status={session.status} />
           <span class="cell-name" title={topic || undefined}>{session.name}</span>
+          {workspaceBadge && (
+            <span
+              class="cell-header__ws-badge"
+              title={workspaceBadgeTitle ?? t('unified.workspaceBadgeTitle', { name: workspaceBadge })}
+            >
+              {workspaceBadge}
+            </span>
+          )}
           {voiceActive && <span class={voiceDotClass} title={voiceDotTitle} aria-hidden="true" />}
           {isVoiceTarget && voiceActive && (
             <VoiceStatusLabel voiceState={voiceState} isSpeaking={isSpeaking} />

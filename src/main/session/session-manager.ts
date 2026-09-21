@@ -22,16 +22,20 @@ import {
   generateIdeationPartnerClaudeMd,
 } from '../entity-content'
 import { EntityRegistry } from './entity-registry'
-import { SessionStore } from './session-store'
+import { SessionStore, toPersistedSession } from './session-store'
 import { runCommand } from '../util/exec-util'
-import type { PersistedSession, PersistedGridState } from './session-store'
+import type { PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
 import { configStore } from '../config/config-store'
-import { getActiveWorkspace } from '../workspace/workspace-utils'
+import { resolveEntityWorkspace } from '../workspace/workspace-utils'
 import { getCachedGlobalRules } from '../config/global-rules'
 import { extractCharacterBlock } from '../character/character-defaults'
 import { resolvePersonaForPreset } from './persona-resolver'
+import { ensureRunDir, resolveRunDir } from './entity-run-dir'
+import { buildMcpServerConfig } from '../mcp/workspace-header'
+import { findEntitySessions, entityStartKey } from './entity-session-lookup'
+import type { Workspace } from '../../shared/persona-types'
 
 /**
  * Generate the ## Voice Output section content based on ttsLevel.
@@ -155,8 +159,8 @@ export class SessionManager extends EventEmitter {
   private entityRegistry: EntityRegistry
   /** Maps entity IDs to their active session IDs (supports multi-instance). */
   private entitySessionIds: Map<EntityId, Set<string>> = new Map()
-  /** Mutex: entities currently being started (prevents double-start race). */
-  private startingEntities: Set<EntityId> = new Set()
+  /** Mutex: (entity, workspace) pairs currently being started — prevents double-start races. */
+  private startingEntities: Set<string> = new Set()
   /**
    * Commands queued to be sent to a session once its terminal reports
    * the real (post-mount) size via markReady(). Prevents launching TUIs
@@ -271,6 +275,7 @@ export class SessionManager extends EventEmitter {
             mcpUrl: mcpFullUrl,
             mcpApiKey: this.mcpConfig.mcpApiKey,
             sessionId: id,
+            workspaceId: opts.workspaceId ?? null,
           })
         } catch (err) {
           console.warn('[SessionManager] Adapter MCP injection failed:', err)
@@ -324,6 +329,7 @@ export class SessionManager extends EventEmitter {
       updatedAt: now,
       adapterId: adapter.id,
       capabilities: adapter.getCapabilities(),
+      workspaceId: opts.workspaceId ?? null,
     }
 
     this.sessions.set(id, session)
@@ -560,6 +566,7 @@ export class SessionManager extends EventEmitter {
             createdAt: Date.now(),
             updatedAt: Date.now(),
             entityId: ps.entityId ?? undefined,
+            workspaceId: ps.workspaceId ?? null,
           }
           this.sessions.set(session.id, session)
           this.tmux.watchSession(ps.tmuxSession, session.id)
@@ -999,23 +1006,51 @@ export class SessionManager extends EventEmitter {
       throw new Error(`Unknown entity: ${entityId}`)
     }
 
-    // Mutex: prevent concurrent starts of the same entity
-    if (this.startingEntities.has(entityId)) {
+    const targetWorkspace = resolveEntityWorkspace(
+      opts?.workspaceId,
+      (configStore.get('workspaces') ?? []) as Workspace[],
+      (configStore.get('activeWorkspaceId') ?? null) as string | null,
+    )
+    const workspaceId = targetWorkspace?.id ?? null
+    // The caller's projectPath (e.g. mux_entity_start override, or the CF
+    // handoff's required project directory) no longer becomes the session's
+    // cwd — the run dir always does. It survives as a Context Directories
+    // entry instead (see the assembly block below and the start() call).
+    const { projectPath: callerProjectPath, ...restOpts } = opts ?? {}
+    // Authored artefacts (preset.md, skills, guides) stay in the entity dir.
+    // Generated artefacts (CLAUDE.md, .mcp.json, settings) go to the run dir,
+    // which is separate per workspace — that is what stops two instances in
+    // different workspaces from overwriting each other's CLAUDE.md.
+    const entityDir = config.projectPath
+    // Path only — no disk access yet. The directory itself is needed right
+    // below (preset.md / .mcp-connection.md / settings.local.json writes),
+    // but the authored-asset symlinks must wait until AFTER the deploy*()
+    // calls below have populated their targets (skills/, guides/, ...) —
+    // otherwise ensureRunDir would silently skip every one of them on a
+    // brand-new entity. See the ensureRunDir(...) call after the deploy block.
+    const runDir = resolveRunDir(workspaceId, entityId)
+    fs.mkdirSync(runDir, { recursive: true })
+
+    // Mutex: prevent concurrent starts of the same entity in the same workspace
+    const startKey = entityStartKey(entityId, workspaceId)
+    if (this.startingEntities.has(startKey)) {
       throw new Error(`${config.displayName} is already starting`)
     }
-    this.startingEntities.add(entityId)
+    this.startingEntities.add(startKey)
 
     try {
-    // Singleton check — only block multi-start for singleInstance entities
+    // Singleton check — singleInstance means "once per workspace", not app-wide.
     if (config.singleInstance) {
-      const existingIds = this.getAllEntitySessionIds(entityId)
-      for (const eid of existingIds) {
-        const existing = this.sessions.get(eid)
-        if (existing && existing.status === 'active') {
-          throw new Error(`${config.displayName} is already running`)
+      const active = findEntitySessions(this.list(), entityId, workspaceId)
+      if (active.length > 0) {
+        throw new Error(`${config.displayName} is already running`)
+      }
+      // Drop stale links for this entity whose sessions are gone.
+      for (const eid of this.getAllEntitySessionIds(entityId)) {
+        if (!this.sessions.has(eid)) {
+          this.removeEntitySession(entityId, eid)
+          this.entityRegistry.unlinkSession(eid)
         }
-        this.removeEntitySession(entityId, eid)
-        this.entityRegistry.unlinkSession(eid)
       }
     }
 
@@ -1061,11 +1096,18 @@ export class SessionManager extends EventEmitter {
         // Generic fallback — only write once to preserve manual edits
         fs.writeFileSync(presetMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')
       }
+
+      // Link authored assets into the run dir now that the deploy*() calls
+      // above have populated their targets in the entity dir (on a brand-new
+      // entity these targets do not exist before this point — ensureRunDir
+      // silently skips names whose target is missing).
+      ensureRunDir(workspaceId, entityId, entityDir, ['skills', 'guides', 'ref', 'brain', 'deliverables', '.claude/commands'])
+
       // Always update MCP connection file for entities that use MCP
       if (config.features.includes('mcp') && this.mcpConfig) {
         const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}/mcp`
         fs.writeFileSync(
-          path.join(config.projectPath, '.mcp-connection.md'),
+          path.join(runDir, '.mcp-connection.md'),
           `# MCP-Verbindung (auto-generiert, nicht editieren)\n\n- **URL:** ${mcpUrl}\n- **Auth:** Bearer ${this.mcpConfig.mcpApiKey}\n`,
           'utf-8',
         )
@@ -1075,7 +1117,7 @@ export class SessionManager extends EventEmitter {
       // Without pre-approved permissions, Claude Code blocks on tool approval
       // prompts — fatal for non-interactive sessions like voice-relay.
       if (config.features.includes('mcp') && this.mcpConfig) {
-        const claudeDir = path.join(config.projectPath, '.claude')
+        const claudeDir = path.join(runDir, '.claude')
         const settingsPath = path.join(claudeDir, 'settings.local.json')
         fs.mkdirSync(claudeDir, { recursive: true })
 
@@ -1098,14 +1140,10 @@ export class SessionManager extends EventEmitter {
     // Write .mcp.json for MCP auto-discovery (if entity uses MCP)
     if (config.features.includes('mcp') && this.mcpConfig) {
       const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}/mcp`
-      const mcpJsonPath = path.join(config.projectPath, '.mcp.json')
+      const mcpJsonPath = path.join(runDir, '.mcp.json')
       const mcpJson = {
         mcpServers: {
-          'cipher-mux': {
-            type: 'http',
-            url: mcpUrl,
-            headers: { Authorization: `Bearer ${this.mcpConfig.mcpApiKey}` },
-          },
+          'cipher-mux': buildMcpServerConfig(mcpUrl, this.mcpConfig.mcpApiKey, workspaceId),
         },
       }
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2), 'utf-8')
@@ -1115,30 +1153,34 @@ export class SessionManager extends EventEmitter {
     // Read preset.md as source-of-truth, assemble with injected layers,
     // write result as CLAUDE.md. No regex-replace — pure concatenation.
     {
+      // Source of truth stays in the entity dir; the assembled result lands in
+      // the run dir, which is the session's cwd.
       const presetMdPath = path.join(config.projectPath, 'preset.md')
-      const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
+      const legacyClaudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
+      const claudeMdPath = path.join(runDir, 'CLAUDE.md')
 
       // Read preset.md; fallback to existing CLAUDE.md if preset.md missing
       let presetContent: string | null = null
       if (fs.existsSync(presetMdPath)) {
         presetContent = fs.readFileSync(presetMdPath, 'utf-8')
-      } else if (fs.existsSync(claudeMdPath)) {
-        presetContent = fs.readFileSync(claudeMdPath, 'utf-8')
+      } else if (fs.existsSync(legacyClaudeMdPath)) {
+        presetContent = fs.readFileSync(legacyClaudeMdPath, 'utf-8')
       }
 
       if (presetContent !== null) {
-        // Resolve workspace prompt + context paths: explicit opts take priority,
-        // otherwise read from active workspace (covers launcher/autostart entities)
+        // Explicit opts win; otherwise the workspace this session is bound to
+        // (already resolved above — no second lookup, no getActiveWorkspace()).
         let wsPrompt = opts?.workspacePrompt
         let wsPaths = opts?.contextPaths
-        if (!wsPrompt && !wsPaths) {
-          try {
-            const ws = getActiveWorkspace()
-            if (ws) {
-              if (ws.workspacePrompt?.trim()) wsPrompt = ws.workspacePrompt.trim()
-              if (ws.contextPaths?.length) wsPaths = ws.contextPaths
-            }
-          } catch { /* configStore not available */ }
+        if (!wsPrompt && !wsPaths && targetWorkspace) {
+          if (targetWorkspace.workspacePrompt?.trim()) wsPrompt = targetWorkspace.workspacePrompt.trim()
+          if (targetWorkspace.contextPaths?.length) wsPaths = targetWorkspace.contextPaths
+        }
+        // The caller's projectPath is no longer the session cwd — it still
+        // needs to reach the entity, so it goes into Context Directories.
+        // Unconditional: independent of the workspace-fallback branch above.
+        if (callerProjectPath) {
+          wsPaths = [...(wsPaths ?? []), callerProjectPath].filter((v, i, a) => a.indexOf(v) === i)
         }
         const assembled = this.assembleEntityClaudeMd(
           presetContent,
@@ -1162,8 +1204,9 @@ export class SessionManager extends EventEmitter {
     // Start session
     const session = await this.start({
       name: displayName,
-      projectPath: config.projectPath,
-      ...opts,
+      ...restOpts,
+      projectPath: runDir,
+      workspaceId,
       _entityInjected: true,
     })
 
@@ -1171,7 +1214,7 @@ export class SessionManager extends EventEmitter {
     // Voice-relay and bugreport use TTS as primary channel and are exempt from focus gate.
     if (entityId !== 'voice-relay' && entityId !== 'bugreport') {
       try {
-        const claudeMdPath = path.join(config.projectPath, 'CLAUDE.md')
+        const claudeMdPath = path.join(runDir, 'CLAUDE.md')
         if (fs.existsSync(claudeMdPath)) {
           const content = fs.readFileSync(claudeMdPath, 'utf-8')
           const section = `Your cipher-mux session ID is \`${session.id}\`. Pass this as \`sessionId\` parameter in every \`mux_tts_speak\` call.`
@@ -1199,7 +1242,7 @@ export class SessionManager extends EventEmitter {
     this.emit('entity-started', { entityId, session })
     return session
     } finally {
-      this.startingEntities.delete(entityId)
+      this.startingEntities.delete(startKey)
     }
   }
 
@@ -1233,21 +1276,50 @@ export class SessionManager extends EventEmitter {
    * For singleInstance entities or when targetSessionId is given: stops the
    * targeted session first. For multi-instance entities without a target:
    * starts a new session without killing existing ones.
+   *
+   * `workspaceId` follows the usual three states (undefined = no preference →
+   * active workspace, null = explicitly unbound, string = that workspace) and
+   * scopes BOTH halves of the resume: which instance gets stopped and where
+   * the replacement starts. Without it a resume clicked in workspace A would
+   * stop a singleInstance entity's instance in workspace B and recreate it in
+   * A — the run dir, MCP workspace header and badge of that session would all
+   * silently move workspaces.
    */
-  async resumeEntity(entityId: EntityId, targetSessionId?: string): Promise<SessionInfo> {
+  async resumeEntity(
+    entityId: EntityId,
+    targetSessionId?: string,
+    workspaceId?: string | null,
+  ): Promise<SessionInfo> {
     const config = this.entityRegistry.get(entityId)
     if (!config) throw new Error(`Unknown entity: ${entityId}`)
 
-    // Stop only the targeted session, or all for singleInstance entities
+    // Resolve the target workspace exactly as startEntity does, so the stop
+    // below and the start further down cannot disagree about which instance
+    // this resume is about (e.g. for an id pointing at a deleted workspace,
+    // where both must land on "unbound").
+    const targetWorkspace = resolveEntityWorkspace(
+      workspaceId,
+      (configStore.get('workspaces') ?? []) as Workspace[],
+      (configStore.get('activeWorkspaceId') ?? null) as string | null,
+    )
+    const effectiveWorkspaceId = targetWorkspace?.id ?? null
+
+    // Stop only the targeted session, or — for singleInstance entities — the
+    // instance in the target workspace. Deliberately NOT isEntityRunning() /
+    // stopEntity(entityId): both are app-wide and would tear down instances in
+    // other workspaces. singleInstance means "once per workspace" here, same
+    // rule as the singleton check in startEntity.
     if (targetSessionId) {
       await this.stopEntity(entityId, targetSessionId)
-    } else if (config.singleInstance && this.isEntityRunning(entityId)) {
-      await this.stopEntity(entityId)
+    } else if (config.singleInstance) {
+      for (const s of findEntitySessions(this.list(), entityId, effectiveWorkspaceId)) {
+        await this.stopEntity(entityId, s.id)
+      }
     }
     // Multi-instance without target: don't kill existing sessions
 
-    // Start fresh session
-    const session = await this.startEntity(entityId)
+    // Start fresh session — in the same workspace the stop above was scoped to
+    const session = await this.startEntity(entityId, { workspaceId: effectiveWorkspaceId })
 
     // Queue Claude launch with --resume flag
     const adapter = this.adapterRegistry.getDefault()
@@ -1290,6 +1362,10 @@ export class SessionManager extends EventEmitter {
   /**
    * Stop an entity session. For singleInstance entities, stops the one session.
    * For multi-instance, stops a specific session (by targetSessionId) or ALL sessions.
+   *
+   * Scope note: without targetSessionId this is APP-WIDE (all workspaces) on
+   * purpose — "stop this entity everywhere" is what the shutdown and entity-off
+   * paths want. Callers that mean one workspace must pass a session id.
    */
   async stopEntity(entityId: EntityId, targetSessionId?: string): Promise<void> {
     const sessionIds = targetSessionId
@@ -1316,6 +1392,11 @@ export class SessionManager extends EventEmitter {
 
   /**
    * Check if an entity is currently running (any instance).
+   *
+   * Scope note: APP-WIDE by design, across all workspaces — not an oversight
+   * next to the per-workspace singleton check in startEntity(). Use
+   * hasActiveEntitySession(this.list(), entityId, workspaceId) when the
+   * question is "does it run in THIS workspace".
    */
   isEntityRunning(entityId: EntityId): boolean {
     for (const sid of this.getAllEntitySessionIds(entityId)) {
@@ -1328,6 +1409,11 @@ export class SessionManager extends EventEmitter {
   /**
    * Get the first session ID for an entity (or null).
    * For multi-instance entities, returns the most recently tracked session.
+   *
+   * Scope note: APP-WIDE by design — it answers "any instance anywhere" and is
+   * used that way by callers outside the workspace feature. The renderer's
+   * workspace-scoped counterpart is findEntitySessionId() in
+   * shared/entity-status.ts.
    */
   getEntitySessionId(entityId: EntityId): string | null {
     return this.getFirstEntitySessionId(entityId) ?? null
@@ -1356,6 +1442,17 @@ export class SessionManager extends EventEmitter {
     if (entityId === 'cyber-factory') this.cyberFactorySessionId = sessionId
     this.persistSession(session)
     this.emit('session-changed', session)
+  }
+
+  /**
+   * Re-bind a recovered session to a workspace (used by keepWorking restore).
+   * No-op for unknown session IDs — never throws into the init chain.
+   */
+  bindWorkspace(sessionId: string, workspaceId: string | null): void {
+    const session = this.sessions.get(sessionId)
+    if (!session) return
+    session.workspaceId = workspaceId
+    this.persistSession(session)
   }
 
   // ─── Session Resume / Fork ──────────────────────────────
@@ -1588,15 +1685,9 @@ export class SessionManager extends EventEmitter {
    * calls persistGridState() to update slot assignments.
    */
   private persistSession(session: SessionInfo): void {
-    this.sessionStore.upsertSession({
-      id: session.id,
-      name: session.name,
-      tmuxSession: session.tmuxSession,
-      entityId: (session.entityId as EntityId) ?? null,
-      projectPath: session.projectPath,
-      gridSlot: null, // updated by renderer via persistGridState()
-      status: 'active',
-    })
+    const ps = toPersistedSession(session, null)
+    ps.status = 'active'
+    this.sessionStore.upsertSession(ps)
   }
 
   /**

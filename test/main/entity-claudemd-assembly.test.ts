@@ -257,3 +257,37 @@ describe('assembleEntityClaudeMd — full assembly', () => {
     assert.ok(!result.includes('## Context Directories'))
   })
 })
+
+// ── resolveEntityWorkspace ───────────────────────────────────────────────────
+
+const { resolveEntityWorkspace } = require('../../src/main/workspace/workspace-utils')
+
+const WORKSPACES = [
+  { id: 'ws-alpha', name: 'Alpha', workspacePrompt: 'Prompt A', contextPaths: ['/a'] },
+  { id: 'ws-beta', name: 'Beta', workspacePrompt: 'Prompt B', contextPaths: ['/b'] },
+]
+
+describe('resolveEntityWorkspace', () => {
+  it('takes the explicitly requested workspace, not the active one', () => {
+    const ws = resolveEntityWorkspace('ws-beta', WORKSPACES, 'ws-alpha')
+    assert.equal(ws?.id, 'ws-beta')
+    assert.equal(ws?.workspacePrompt, 'Prompt B')
+  })
+
+  it('falls back to the active workspace when the caller did not choose', () => {
+    const ws = resolveEntityWorkspace(undefined, WORKSPACES, 'ws-alpha')
+    assert.equal(ws?.id, 'ws-alpha')
+  })
+
+  it('treats an explicit null as unbound and does NOT fall back to active', () => {
+    assert.equal(resolveEntityWorkspace(null, WORKSPACES, 'ws-alpha'), null)
+  })
+
+  it('returns null for a workspace id that no longer exists', () => {
+    assert.equal(resolveEntityWorkspace('ws-deleted', WORKSPACES, 'ws-alpha'), null)
+  })
+
+  it('returns null when nothing is chosen and nothing is active', () => {
+    assert.equal(resolveEntityWorkspace(undefined, WORKSPACES, null), null)
+  })
+})

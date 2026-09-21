@@ -397,8 +397,16 @@ const api = {
 
   // ─── Entities ──────────────────────────────────────────
   entity: {
-    start: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_START, { entityId }),
-    resume: (entityId: string, sessionId?: string) => ipcRenderer.invoke(IPC.ENTITY_RESUME, { entityId, sessionId }),
+    start: (entityId: string, workspaceId?: string | null) =>
+      // Do not coalesce: undefined ("no preference") and null ("explicitly
+      // unbound") must both survive the IPC boundary distinctly. Structured
+      // clone preserves `undefined` as a property value, so a straight
+      // pass-through keeps all three states (undefined / null / string).
+      ipcRenderer.invoke(IPC.ENTITY_START, { entityId, workspaceId }),
+    // Same no-coalescing rule as start(): undefined / null / string are three
+    // distinct answers and all three must reach main unchanged.
+    resume: (entityId: string, sessionId?: string, workspaceId?: string | null) =>
+      ipcRenderer.invoke(IPC.ENTITY_RESUME, { entityId, sessionId, workspaceId }),
     stop: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_STOP, { entityId }),
     status: (entityId: string) => ipcRenderer.invoke(IPC.ENTITY_STATUS, { entityId }),
     list: () => ipcRenderer.invoke(IPC.ENTITY_LIST),
