@@ -1,37 +1,62 @@
-# Mux als Prozess-Substrat — Strategie
+# Mux als Prozess-Substrat — Strategie und Zielgebung
 
 **Datum:** 2026-09-29
-**Status:** Erfassung eines Gesprächs, noch keine abgestimmte Entscheidung
+**Status:** Zielgebung entschieden, Umsetzungsfragen offen
 **Anlass:** Der Mux hat seinen Vorsprung gegenüber der nackten CLI weitgehend verloren. Was bleibt, ist nicht Orchestrierung, sondern Prozess.
 
 ---
 
-## 1. Der Ausgangsbefund
+## 1. Zielgebung — entschieden
 
-Mit Claude 4.6 war der Mux deutlich besser als die CLI allein. Heute macht es im Kern
-keinen großen Unterschied mehr. Claude Code hat sich die Orchestrierung einverleibt:
-Subagents, Background-Tasks, Workflows, Plan Mode, 1M Kontext.
+**Der Mux wird fertig gebaut. cipher-keel liefert Bausteine und Gedanken, nicht die Richtung.**
 
-Das war das sichtbarste Verkaufsargument des Mux, und es ist weg. Der Versuch, „up to date
-mit Claude" zu bleiben, ist ein Rennen gegen einen Hersteller, der schneller liefert als ein
-Einzelprojekt — jede nachgebaute Orchestrierung wird im nächsten Release überflüssig.
+Begründung des Users (2026-09-29), sinngemäß: keels Prozess ist zu groß gedacht. Er würde
+ihn für sich selbst bauen. Es war spannend, die Kette bis zum Laufen zu bringen, aber in dem
+Moment, in dem sie lief, hatte sie keinen Mehrwert — weder für ihn noch für irgendwelche
+interessierten Abnehmer. Der Mux ist zugänglicher und hat als **Maker-Cockpit** eine
+Zielgruppe, zu der er stehen kann, auch wenn sie ihn nicht nutzt.
 
-**Nicht einverleibt wurde:**
+### Das ist ein Entwurfsfilter, keine Absichtserklärung
 
-- **Dauerhaftigkeit über Tage.** Ein Subagent stirbt mit seinem Turn. Eine tmux-Session
-  überlebt den App-Absturz.
-- **Menschliche Einsicht und Eingriff.** Fünf Panes sehen und in einem eingreifen.
-- **Rollen mit Gedächtnis.** Identitäten über Wochen, keine Tasks über Turns.
-- **Voice.**
+„Zugänglich" und „Maker-Cockpit" entscheiden konkrete Fragen:
 
-## 2. Zwei Achsen, die nicht dasselbe sind
+- **Gegen** verborgene Stores, Graph-Semantik, alles, was man verstehen muss, bevor es nützt
+- **Für** sichtbare Artefakte, Dinge, die man anfassen, lesen und weiterreichen kann
+- **Für** den Menschen in der Schleife als Normalfall, nicht als Notausgang
 
-Die wichtigste begriffliche Korrektur des Gesprächs:
+Wo eine Entwurfsfrage auftaucht, gewinnt die Variante, die ein Mensch ohne Einarbeitung
+nachvollziehen kann — auch wenn sie weniger kann.
+
+### Eine Umformulierung, die ich anbiete
+
+„keel ist zu groß gedacht" trifft es nicht ganz. keel zielt auf **Autonomie** — eine Kette,
+die durchfährt, ohne dass jemand hinsieht. Der Wert, den du tatsächlich suchst, liegt in
+**Steuerbarkeit**: vorausdenken, Rollen trennen, sehen was passiert, eingreifen können.
+
+Das ist nicht „zu groß", das ist ein anderes Ziel. Und es sagt präzise, was aus keel **nicht**
+zu übernehmen ist: der Ketten-Runner, die Trigger-Läufer, die Notbremse. Die bedienen
+Autonomie. Zu übernehmen ist, was Steuerbarkeit und Ökonomie bedient.
+
+## 2. Der Ausgangsbefund
+
+Mit Claude 4.6 war der Mux deutlich besser als die CLI allein. Heute macht es im Kern keinen
+großen Unterschied mehr. Claude Code hat sich die Orchestrierung einverleibt: Subagents,
+Background-Tasks, Workflows, Plan Mode, 1M Kontext.
+
+Der Versuch, „up to date mit Claude" zu bleiben, ist ein Rennen gegen einen Hersteller, der
+schneller liefert als ein Einzelprojekt. Jede nachgebaute Orchestrierung wird im nächsten
+Release überflüssig.
+
+**Nicht einverleibt wurde:** Dauerhaftigkeit über Tage (ein Subagent stirbt mit seinem Turn,
+eine tmux-Session überlebt den App-Absturz) · menschliche Einsicht und Eingriff · Rollen mit
+Gedächtnis über Wochen · Voice.
+
+## 3. Zwei Achsen, die nicht dasselbe sind
 
 **Orchestrierung** — wer startet wen, wer wartet auf wen, Fan-out und Fan-in.
 → Kann Claude Code. Abgeben.
 
-**Rollentrennung** — welcher Kontext macht welche Arbeit, und wo liegt die Übergabegrenze.
+**Rollentrennung** — welcher Kontext macht welche Arbeit, wo liegt die Übergabegrenze.
 → Kann Claude Code **nicht**, auch nicht mit Subagents. Ein Subagent ist Helfer *einer*
 Session: er stirbt, sein Kontext ist weg, der Elternkontext bleibt vollgelaufen. Gebraucht
 werden Peers mit eigener Identität, eigenem Gedächtnis, eigenem Modell, die sich
@@ -41,7 +66,7 @@ Rollentrennung ist Kontexthygiene, und sie ist mehr als „der Kontext ist voll"
 die eine Spec geschrieben hat, ist auf ihre eigenen Entscheidungen **verankert** und merkt
 nicht, dass die Spec falsch ist. Deshalb darf Refinement nicht bauen, nachdem es gespect hat.
 
-## 3. Der Beleg aus der eigenen Praxis
+## 4. Der Beleg aus der eigenen Praxis
 
 Das Multi-Workspace-Paket (12 Tasks, 28 Commits, 2026-09-20/21) ist die Datenbasis.
 
@@ -55,93 +80,86 @@ Defekte:
 | `PaneHeader` als Badge-Heimat, Komponente nie gemountet | Implementer |
 | `applyWorkspace` konnte Sessions gar nicht binden (Critical) | Erst das Whole-Branch-Review |
 
-**Was daraus folgt — drei Dinge:**
+**Drei Folgerungen:**
 
 1. **Detailtiefe zahlt sich aus, weil sie den Plan falsifizierbar macht.** Ein vager Plan
    kann nicht widerlegt werden, ein präziser schon. Der Fehler wird lokal und früh statt
-   global und spät. Das ist ein anderer Mechanismus als „vorausdenken spart Runden".
+   global und spät. Anderer Mechanismus als „vorausdenken spart Runden".
 2. **Es braucht eine Stufe, die das Ganze sieht.** Der Critical lag in einer Datei, die in
    keiner Dateiliste des Plans stand. Kein Task-Review konnte ihn finden.
 3. **Implementer müssen widersprechen dürfen.** Zwei von vier Defekten fand jemand, der
-   seiner Anweisung widersprochen hat. Das ist eine Prompt- und Kultureigenschaft, keine
-   Werkzeugeigenschaft.
+   seiner Anweisung widersprach. Prompt- und Kultureigenschaft, keine Werkzeugeigenschaft.
 
-## 4. Was bei Artefakt-Übergaben tatsächlich fehlt
+## 5. Übergaben: das Notes-System trägt sie
 
-In **jedem** Dispatch dieser Session stand ein Abschnitt „Context the brief cannot know".
-Das war kein Luxus — die Briefs waren ab Task 3 veraltet, einer nannte eine tote Komponente.
+### Was bei Artefakt-Übergaben fehlte
 
-Aufgeschlüsselt, was von Hand nachgeliefert werden musste:
+In **jedem** Dispatch der Multi-Workspace-Session stand ein Abschnitt „Context the brief
+cannot know". Die Briefs waren ab Task 3 veraltet, einer nannte eine tote Komponente.
 
-**Berechenbar aus dem Repo (größter Block):** veraltete Zeilennummern nach Umbauten,
-uncommittete Fremdänderungen, vorbestehende Lint-Fehler samt `git blame`, exakte Signaturen
-der Schnittstellen aus vorherigen Tasks.
+Aufgeschlüsselt:
 
-**Task- und Befundzustand:** welche Tasks fertig sind, welche Befunde offen oder geparkt
-sind, welche Lücke bewusst stehenbleibt.
+- **Berechenbar aus dem Repo** (größter Block): veraltete Zeilennummern nach Umbauten,
+  uncommittete Fremdänderungen, vorbestehende Lint-Fehler samt `git blame`, exakte
+  Signaturen der Schnittstellen aus vorherigen Tasks
+- **Task- und Befundzustand:** was fertig ist, was offen oder geparkt ist, welche Lücke
+  bewusst stehenbleibt
+- **Echte Memory:** Entscheidungen samt verworfener Alternativen, entdeckte Fakten,
+  Begründungen von Regeln
 
-**Echte Memory:** Entscheidungen samt verworfener Alternativen, entdeckte Fakten
-(„PaneHeader wird nie gemountet"), Begründungen von Regeln.
+### Die Entscheidung: Übergaben sind Notes
 
-### Die Regel, die daraus folgt
+Nicht ein verborgener Store, nicht ein Graph. **Eine Übergabe ist eine Note.** Sie ist
+sichtbar, lesbar, editierbar, und der Mensch kann sie aus der Sidebar heraus an eine Session
+weiterreichen. Das ist kein Kompromiss gegenüber dem Graphen, sondern der Punkt: In einem
+Maker-Cockpit muss man die Übergabe *sehen* können.
 
-**Alles, was aus dem Repo ableitbar ist, gehört nicht ins Gedächtnis.**
+**Das ist zum Teil schon gebaut.** `NoteManager.createHandoff()` existiert und schreibt
+Frontmatter mit `from_session`, `to_entity` und `handoff_status: 'pending' | 'consumed'` —
+die Übergabe hat bereits einen Lebenszyklus. `mux_notes_handoff_create` und
+`mux_notes_handoff_search` sind als MCP-Tools registriert, `mux_notes_update` kann den Status
+auf `consumed` drehen. Der Tag `handoff` ist im Tag-Repository geführt und gegen
+Auto-Tagging geschützt.
 
-Nicht nur billiger — verlässlicher. Eine gespeicherte Erinnerung kann veralten und behauptet
-sich danach mit derselben Bestimmtheit wie eine wahre. Ein `git diff` kann nicht veralten.
-Wer Berechenbares speichert, baut einen zweiten, schlechteren Wahrheitsbegriff neben git.
+Es geht also ums **Fertigbauen**, nicht ums Neubauen.
 
-Companion-Memory und Workspace-Memory sind für das letzte Drittel richtig — und nur dafür.
-Sie dort einzusetzen, wo berechnet werden kann, ist der Weg zur Tokenverbrennfabrik.
+### Memory zeigt auf die Note
+
+`companion_memory_*` wird auf die **Companion-Rolle begrenzt**. Dort gehört es hin:
+persönliches, rollengebundenes Gedächtnis.
+
+Für Übergaben gilt: **Die Memory-Zeile ist ein Zeiger, die Note ist der Inhalt.** Ein
+Eintrag trägt Titel, Einzeiler und Note-ID — nicht den Text. Das löst genau das
+Token-Problem: Recall liefert Karteikarten statt Inhalte, der Inhalt wird nur gezogen, wenn
+er gebraucht wird.
+
+Damit wird Memory zu dem Relevanz-Index, der heute fehlt. `companion_memory_recall` liefert
+„die letzten N", recency-sortiert — das skaliert gegen einen, je voller der Store, desto mehr
+Irrelevantes pro Sessionstart. Als Zeiger-Index ist dieselbe Mechanik brauchbar.
+
+### Was **nicht** in die Note gehört
+
+**Der berechnete Weltzustand.** Er veraltet in dem Moment, in dem er geschrieben wird.
+
+Regel: **Alles, was aus dem Repo ableitbar ist, gehört weder ins Gedächtnis noch in die
+Note.** Nicht nur billiger — verlässlicher. Eine gespeicherte Erinnerung kann veralten und
+behauptet sich danach mit derselben Bestimmtheit wie eine wahre. Ein `git diff` kann nicht
+veralten. Wer Berechenbares speichert, baut einen zweiten, schlechteren Wahrheitsbegriff
+neben git.
+
+Die Auflösung: Die Note trägt den **dauerhaften** Teil — Auftrag, Entscheidungen, verworfene
+Alternativen, Zeiger. Der Delta wird **beim Dispatch** berechnet und der Note vorangestellt,
+nicht in ihr gespeichert. Der Mensch sieht in der Sidebar die Note plus einen Zustandsblock,
+der beim Öffnen frisch entsteht.
 
 ### Wo die Token wirklich verbrennen
 
-Nicht beim Schreiben. Beim **Abrufen** und beim **Orientieren**.
+Nicht beim Schreiben. Beim Abrufen und beim **Orientieren**. Task 10 brauchte 89
+Tool-Aufrufe, Task 11 83, die Fix-Welle 102 — ein erheblicher Teil davon reines Suchen nach
+dem aktuellen Zustand.
 
-`companion_memory_recall` liefert die letzten N — recency-sortiert, nicht relevanz-sortiert.
-Das skaliert gegen einen: je voller der Store, desto mehr Irrelevantes pro Sessionstart.
-`companion_memory_search` (FTS5) ist das ökonomische Primitiv, `recall` das teure.
-
-Der größere Posten ist Orientierung: Task 10 brauchte 89 Tool-Aufrufe, Task 11 83, die
-Fix-Welle 102 — ein erheblicher Teil davon reines Suchen nach dem aktuellen Zustand.
-
-**Ökonomie und Qualität zeigen hier in dieselbe Richtung:** Der berechnete Weltzustand spart
+Ökonomie und Qualität zeigen hier in dieselbe Richtung: Der berechnete Weltzustand spart
 Token *und* verhindert den Stale-Brief-Fehler.
-
-### Die Form: Handoff-Manifest
-
-Dünn, und **generiert statt geschrieben**:
-
-- Zeiger auf Spec/Plan — das „Was", bleibt wo es ist
-- **Berechnet beim Handoff:** Diff seit dem Basis-Commit des Artefakts, beschränkt auf
-  Dateien, die das Artefakt erwähnt
-- **Offene Befunde** dieses Workspace aus einem Findings-Store
-- **Drei bis sieben Memory-Zeiger** — IDs und Einzeiler, nicht Inhalte; die Rolle zieht nach
-- Entscheidungen und verworfene Alternativen (der memory-förmige Teil)
-
-Kuratiert wird nur die Memory-Auswahl. Alles andere entsteht im Moment der Übergabe und kann
-deshalb nicht veralten.
-
-## 5. Zielbild
-
-Der Mux hört auf, Orchestrator sein zu wollen, und wird **Prozess- und Artefakt-Substrat**:
-der Ort, an dem der Prozess und seine Artefakte liegen, mit einem Menschen, der sehen und
-steuern kann.
-
-Was aus der Multi-Workspace-Session überlebt hat und wertvoll ist, liegt in
-`.superpowers/sdd/...`: Spec, Plan, Briefs, Reports, Review-Pakete, Ledger. Markdown und
-Dateisystem, kein Claude-spezifisches Bit. Das ist bereits die zeitlose Realisierung — sie
-existiert nur als Scratch-Verzeichnis eines Plugins statt als Mux-Konzept. Mux weiß nichts
-davon, obwohl „welcher Task, wer arbeitet dran, was sagte das Review, was ist geparkt" genau
-das ist, was er anzeigen und steuern könnte.
-
-**Randbedingung:** Gerüst für die eigene Arbeit, OSS veröffentlicht. Multi-CLI ist damit
-nicht durch Portabilität begründet, sondern durch **Routing** — der beste Coder muss nicht
-der beste Ideation-Partner sein. Und Review von einer anderen Modellfamilie als der
-implementierenden ist ein Qualitätshebel, weil Fehlermuster sich unterscheiden; ein
-Geschwistermodell teilt die blinden Flecken.
-
-**Zuschnitt:** größere Vorhaben. Kleines geht weiter direkt in Workshop oder Terminal.
 
 ## 6. cipher-keel — Ist-Aufnahme (2026-09-29)
 
@@ -150,73 +168,60 @@ the ground up around the graph rather than around a message bus."*
 
 **Lage:** 1006 Commits, zuletzt 2026-09-28, in den letzten acht Wochen 20–40 Commits an fast
 jedem Arbeitstag. 2760 Tests über 203 Testdateien. Phasen 1–8 abgeschlossen, 3a bis 5 mit
-formalem Audit und RELEASE-Verdikt. Nicht liegengeblieben — ein laufendes Zweitsystem.
-
-Die letzten Wellen bauen eine autonome Kette: *„Architect delegiert, Worker arbeitet, der
-Läufer weckt den Aussteller"*, gemessen mit **46 ct für 90 Minuten**, mit Git-Wächter am
-Kettenanfang und Notbremse.
+formalem Audit und RELEASE-Verdikt. Die letzten Wellen bauen eine autonome Kette:
+*„Architect delegiert, Worker arbeitet, der Läufer weckt den Aussteller"*, gemessen mit
+**46 ct für 90 Minuten**, mit Git-Wächter und Notbremse.
 
 Methodisch ist keel voraus: „measured rather than assumed", Feldprotokolle statt Testgrün,
-ein Prompt-Preview, der zeichenweise gegen die tatsächlich übergebene Datei verglichen wurde,
-weil *„a preview that shows something other than what is delivered would be worse than none"*.
-
-### Was dort bereits gebaut ist
-
-| Im Gespräch als Lücke benannt | In keel |
-|---|---|
-| Rolle → (Adapter, Modell) | `model/registry.ts`, `rollen.ts`, `eignung.ts`, `slots.ts` — Capability-Records, sieben Tier/Rollen/Session-Slots, Endpoint-Auflösung, Keychain-Keys, im Settings-Fenster editierbar |
-| Rollengrenzen als Constraint | `harness/pfadwache.ts`, `netzwache.ts`, `intent-vor-effekt.ts`, `faehigkeiten.ts` |
-| CLI-/Modell-Agnostik | `harness/codec-anthropic.ts`, `codec-openai-chat.ts`, `fortsetzbarkeit.ts` |
-| Handoff-Manifest, generiert | **Phaseninput-Layer** — „the preceding phase's output artefacts, resolved from the graph into the prompt" |
-| Befunde als erstklassiges Objekt | `graph/phase-contract.ts`, `gate-cache.ts`, typisierte Knoten |
-| Token-Ökonomie | `harness/budget.ts`, `preise.ts` |
+ein Prompt-Preview, der zeichenweise gegen die tatsächlich übergebene Datei verglichen wurde.
 
 ### Kopplungsanalyse — was sich heben lässt
 
 **Graph-frei, also mitnehmbar:**
 
-| Baustein | Zeilen |
-|---|---|
-| `model/` komplett (`registry`, `rollen`, `eignung`, `slots`, `entry`, `defaults`) | — |
-| `codec.ts`, `codec-anthropic.ts`, `codec-openai-chat.ts` | ~405 |
-| `budget.ts`, `preise.ts` | ~377 |
-| `pfadwache.ts`, `netzwache.ts` | ~890 |
-| `faehigkeiten.ts`, `fortsetzbarkeit.ts` | ~380 |
+| Baustein | Zeilen | Dient |
+|---|---|---|
+| `model/` komplett (`registry`, `rollen`, `eignung`, `slots`, `entry`, `defaults`) | — | Rolle → Modell/Adapter |
+| `codec.ts`, `codec-anthropic.ts`, `codec-openai-chat.ts` | ~405 | Anbieter-Abstraktion |
+| `budget.ts`, `preise.ts` | ~377 | Ökonomie |
+| `pfadwache.ts`, `netzwache.ts` | ~890 | Rollengrenzen als Constraint |
+| `faehigkeiten.ts`, `fortsetzbarkeit.ts` | ~380 | Fähigkeiten, Wiederaufnahme |
 
-**Graph-gekoppelt, nicht mitnehmbar:** `lauf.ts`, `werkzeuge*.ts`, `sandkasten.ts`,
-`trigger-*.ts` — und der **Phaseninput-Layer**, per Definition.
+**Graph-gekoppelt:** `lauf.ts`, `werkzeuge*.ts`, `sandkasten.ts`, `trigger-*.ts` und der
+Phaseninput-Layer.
 
-Das ist die unangenehme Pointe: Vier der fünf Punkte lassen sich sauber heben. Der fünfte —
-das generierte Handoff-Manifest, im Gespräch als das Wertvollste bezeichnet — ist genau der,
-der am Graph hängt.
+**Bewusst nicht zu übernehmen** (dient Autonomie, nicht Steuerbarkeit): Ketten-Runner,
+Trigger-Läufer, Notbremse, der eigene Agent-Loop (`lauf.ts`). Der Mux startet CLIs; er
+braucht keine eigene Schleife um ein Modell.
+
+Der Phaseninput-Layer entfällt als Portierungsziel — seine Funktion übernimmt das
+Notes-System nach Abschnitt 5.
 
 ## 7. Offene Entscheidungen
 
-**Tendenz des Users (2026-09-29):** keel liefert Bausteine und Gedanken, die Richtung wird im
-Mux gebaut.
-
-Daraus folgt, noch nicht entschieden:
-
-1. **Was ersetzt den Graph für den Phaseninput?** Ein Findings-/Artefakt-Store auf SQLite im
-   Mux wäre ein Teil-Nachbau dessen, was in keel fertig und auditiert ist. Alternativen:
-   den Phaseninput schmaler schneiden (nur berechneter Delta + Befundliste, ohne
-   Graph-Semantik), oder den Punkt bewusst offen lassen.
-2. **Wie viel `model/` wird übernommen?** Die Registry hängt an `preset/`, `agent/`,
-   `worker/` und `config-store` von keel. Portierung heißt Anpassung, nicht Kopie.
-3. **Was wird zuerst gebaut?** Kandidaten, grob nach Hebel pro Aufwand:
-   - *Delta-Berechnung beim Handoff* — rein deterministisch, kein Modellaufruf, ersetzt den
-     größten Posten der Handarbeit
-   - *Befunde als erstklassiges Objekt* — Buchhaltung, kein Modellaufruf
-   - *Rolle → Modell/Adapter* — klein, sofort nutzbar, setzt das `AgentAdapter`-Interface
-     zum ersten Mal unter echten Druck
+1. **Befunde — wohin?** Review-Ergebnisse, geparkte Minors, bewusst offene Lücken sind das,
+   was die nächste Rolle braucht, und sie sind heute nirgends ein Objekt. Als Notes würden
+   sie die Liste fluten; in einer eigenen Tabelle wären sie unsichtbar, was der Zielgebung
+   widerspricht. Denkbar: leichter Store, der bei Bedarf als Note materialisiert.
+2. **Delta-Berechnung — Umfang.** Minimal: Commits und Diff seit dem Anker-Commit der Note,
+   beschränkt auf Dateien, die sie erwähnt. Reicht das, oder braucht es Lint- und
+   Testzustand dazu?
+3. **Handoff-Notes brauchen einen Anker.** `createHandoff()` kennt heute Absender, Empfänger
+   und Status — aber keinen Basis-Commit. Ohne den lässt sich kein Delta berechnen. Und:
+   die Methode setzt `scope: 'global'` hart, obwohl Notes workspace-skopiert sein können.
+4. **Wie viel `model/` wird portiert?** Die Registry hängt an `preset/`, `agent/`, `worker/`
+   und `config-store` von keel. Portierung heißt Anpassung, nicht Kopie.
+5. **Reihenfolge.** Kandidaten nach Hebel pro Aufwand:
+   - *Delta beim Dispatch* — rein deterministisch, kein Modellaufruf, ersetzt den größten
+     Posten der Handarbeit
+   - *Handoff-Note um Anker und Scope ergänzen* — klein, Voraussetzung für das Delta
+   - *Memory auf Companion begrenzen, Zeiger-Semantik einführen*
+   - *Rolle → Modell/Adapter* — setzt das `AgentAdapter`-Interface zum ersten Mal unter
+     echten Druck
    - *Rollengrenzen über `settings.local.json`* — die Mechanik schreibt Mux bereits pro
      Entity (`getMcpPermissionsForEntity`), bisher nur für MCP-Tools
-4. **Bleibt keel parallel in Betrieb?** Es ist ein aktives System mit einer laufenden
-   autonomen Kette. Ein Mux, der dieselbe Richtung einschlägt, konkurriert mit ihm um
-   dieselbe Aufmerksamkeit.
 
 ## 8. Was bewusst nicht drinsteht
 
-Kein Task-Zuschnitt, keine Dateilisten, keine Reihenfolge. Das ist eine Erfassung des
-Gesprächsstands, kein Implementierungsplan. Der entsteht erst, wenn Punkt 1 und 3 aus
-Abschnitt 7 entschieden sind.
+Kein Task-Zuschnitt, keine Dateilisten. Das ist Zielgebung plus Gesprächsstand, kein
+Implementierungsplan. Der entsteht, wenn die Punkte aus Abschnitt 7 entschieden sind.
