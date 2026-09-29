@@ -1,457 +1,179 @@
 # cipher-mux-electron
 
-Electron-basierte Kommandozentrale für Claude Code Projekte. Ein Fenster mit eingebetteten Terminals (tmux + xterm.js), Message Bus für Inter-Session-Kommunikation, MCP-Server, Orchestrator-Session und komfortablem Projekt-Kick-off.
+Electron-Kommandozentrale für Coding-CLIs: ein Fenster mit eingebetteten Terminals
+(tmux + xterm.js), Rollen-Presets mit eigenem Kontext, Notes als sichtbare Übergabe-Artefakte,
+MCP-Server und Projekt-Kick-off. Zielbild und Begründung:
+`docs/superpowers/specs/2026-09-29-prozess-substrat-strategie.md`.
 
-## Hub
+## Bevor du hier arbeitest — die vier Fallen
 
-cipher-mux uses a Hub directory as the organizational home for all projects. The Hub path is stored in config (`hubPath`). On first launch, users are prompted to choose or create a Hub directory via `HubSetupDialog`. The Launcher folder picker defaults to `hubPath/projects/`. Hub path resolution is centralized in `src/main/project/hub-paths.ts`.
-
-## Aktueller Status
-
-**Phase: Komplett — Polish & Erweiterung**
-
-Phasen-Übersicht:
-1. ~~Anforderungsinterview (Touchpoint) → `docs/requirements.md`~~ ✅ (2026-04-13)
-2. ~~Spezifikation erstellen (Autonom) → `docs/SPEC.md`~~ ✅ (2026-04-13)
-3. ~~Technische Entscheidungen (Touchpoint) → `docs/decisions/`~~ ✅ (2026-04-13)
-4. ~~Task-Dekomposition (Autonom) → `docs/todo.md`~~ ✅ (2026-04-13)
-5. ~~Autonome Implementierung (Autonom) → Code~~ ✅ (2026-04-14)
-6. ~~Review, Test & Iteration → Feedback-Loop~~ ✅ (2026-04-17)
-7. ~~Voice-Pipeline (VAD + STT + TTS) + Bugreport-Interview~~ ✅ (2026-04-19)
-8. ~~AgentAdapter (TP-2) + Task-System + Cyber Factory~~ ✅ (2026-04-23)
-9. ~~Phase A (Theme-System) + Phase B (MCP/Terminal/StatusLine Polish)~~ ✅ (2026-04-23)
-10. ~~Phase C4 (Session Coloring) + Phase D (Workspaces + Personas) + Phase E (Communication) + Phase G1 (Shell Button)~~ ✅ (2026-04-24)
-11. ~~v0.9.1–0.9.5: Unified Sidebar, Workspace Apply E2E, Bugfixes, Cell Split, Terminal Width~~ ✅ (2026-04-24)
-12. ~~v0.9.6: Notes Editor — dritte Grid-Cell-Option, CodeMirror 6, Ollama Auto-Tagging~~ ✅ (2026-04-25)
-13. ~~v0.9.7–0.9.8: Hands-Free Scroll, Voice Settings, Grid-Nav, Keep Working, TTS Stop~~ ✅ (2026-05-02)
-14. ~~v0.9.9: Keep Working Restore Fix, BT Shutter App-Bundle~~ ✅ (2026-05-02)
-15. ~~v0.9.10: Keep Working Restore Fix v2 — 3-Layer Bug~~ ✅ (2026-05-02)
-
-**Status:** Cyber-Factory-Pack Welle 5 (Cutover) Infrastruktur komplett. 858 Tests (0 Failures). Feature-Flags auf production, Migrations-Skript mit Forward/Reverse, Rollback-Skript. E2E-Validierung ausstehend.
-
-### Cyber-Factory-Pack Wellen-Status
-
-| Welle | Status | Inhalt |
-|-------|--------|--------|
-| 1a/1b/1c | ✅ | Personas, Global Rules, Refinement, Ideation Partner |
-| 2 | ✅ | Cyber Factory (MPO-Ersatz), Companion-DB CF-Tabellen, scope-Spalten |
-| 3 | ✅ | Debugger (9 Module, 43 Tests) |
-| 4 | ✅ | Testing Assistant (10 Module), Audit Vollausbau (8 Module), Workspace-Memory Cleanup+Filter |
-| 5 | infra ✅ | Feature-Flags auf true, Migrations-Skript, Rollback, 12 Test-Regressions gefixt. E2E-Runs ausstehend |
-| 6 | ausstehend | Cleanup (alte Module entfernen, v1.0) |
-
-### Keep Working Restore — Fragile Zone
-
-Keep Working Restore war Gegenstand von 3 Bug-Fix-Runden (v0.9.9–v0.9.10). Die Kette ist lang und hat enge Timing-Abhängigkeiten. **Wenn du in dieser Gegend arbeitest, lies das hier.**
-
-#### Datenfluss (happy path)
-
-```
-Quit:  destroy() → keepWorkingSnapshot in Config schreiben (Session-Namen, Pfade, Grid-Slots)
-       → tmux.disconnect() (Sessions überleben, tmux-Server bleibt)
-
-Start: init() → synchron: stale Session-IDs aus ui.grid clearen
-       → async: mcpServer.start → tmux.connect → sessionManager.recover()
-         → restoreKeepWorkingFromRecovery(): tmux-Sessions matchen, Grid-State in Config schreiben
-         → Push KEEP_WORKING_RESTORE an Renderer + Cache setzen
-       Renderer: Poll (500ms/10s) holt Cache → applyKeepWorkingRestore() → Grid + Sessions da
-```
-
-#### Was leicht kaputtgeht
-
-1. **tmux-Output ist nicht sauber.** `listSessions()` parst `tmux list-panes -a` — das liefert gelegentlich malformed Lines (leere Felder, Zombie-Sessions). Jeder Code der auf `tmuxSession.name` etc. zugreift MUSS defensiv sein. Ein Crash hier killt die gesamte Init-Chain still.
-
-2. **Session-IDs überleben keinen Restart.** `recover()` vergibt neue IDs für recovered Sessions. `ui.grid` Config enthält alte IDs. Deshalb werden Slot-Session-IDs beim Startup synchron genullt. Wenn du an `configStore` oder `ui.grid` Persistence arbeitest: nie davon ausgehen, dass Session-IDs über Restarts stabil sind.
-
-3. **Timing Main ↔ Renderer.** Die Init-Chain ist async (200ms–2s). Der Renderer mounted schneller. Deshalb: Pull ist ein Poll (nicht einmaliger Abruf), und Push kann vor `dom-ready` gedropt werden. Wenn du neue IPC-Events in der Init-Chain hinzufügst: gleiches Pattern (Cache + Poll + Push als Backup).
-
-4. **`destroy()` muss durchlaufen.** Nur Cmd+Q schreibt den Snapshot. Force-Kill → kein Snapshot → kein Restore. Das ist by design, aber wichtig zu wissen.
-
-#### Diagnostik
-
-- **`/tmp/kw-debug.json`** — wird bei jedem Startup geschrieben (Success UND Error-Fall). Prüfe `phase`, `error`, `recovered`, `orphaned`.
-- **Terminal-Start für Logs:** `/Applications/cipher-mux.app/Contents/MacOS/cipher-mux 2>&1 | tee /tmp/kw-test.log`
+1. **Tests brauchen Node 22.** Vor jedem Test-/Typecheck-Befehl:
+   `export PATH="/opt/homebrew/opt/node@22/bin:$PATH"`. Unter dem System-Node 26 kompiliert
+   `better-sqlite3` nicht, `rebuild:node` bricht ab, und die `&&`-Kette in `npm run test`
+   führt **null** Tests aus — sieht aus wie ein sauberer Lauf. Keine Testausgabe heißt:
+   PATH vergessen. `.nvmrc` und `engines.node` sind gesetzt, npm wertet beides nicht aus.
+2. **Vier Test-Suites sind vorbestehend rot** und gehören niemandem: `migrate-to-cyber-factory`,
+   `task-hooks` (wird als `TaskHooks` gedruckt), `voice-catalog`, `voice-downloader`.
+   Stand: **1633 Tests, 1628 pass, 3 fail, 2 cancelled.** `node:test` druckt vier `not ok`-Zeilen,
+   zählt aber `fail 3` + `cancelled 2` — das ist normal, kein Widerspruch.
+3. **`npm run lint` ist projektweit rot** (827 Probleme, 478 Fehler) und war es vorher schon.
+   Ein grüner Lauf ist kein erreichbares Abnahmekriterium. Das Gate lautet: *keine neuen
+   Probleme in den geänderten Dateien*, geprüft per `npx eslint <dateien>` gegen `git blame`.
+4. **Vier Sektionen dieser Datei werden von Mux injiziert**, nicht von Hand gepflegt:
+   `## Global Rules`, `## Workspace Prompt`, `## Context Directories`, `## Session Identity`.
+   Handarbeit daran wird beim nächsten Sessionstart überschrieben. Global Rules bearbeitet man
+   in `~/.config/cipher-mux/global-rules.md`, Workspace-Inhalte im Workspace-Editor.
 
 ## Build & Test
 
 ```bash
 npm install
-npm run build          # TypeScript + Electron Builder
-npm run dev            # Electron dev mit Hot-Reload
-npm run test           # Node.js test runner
-npm run lint           # ESLint
+export PATH="/opt/homebrew/opt/node@22/bin:$PATH"   # Pflicht für test/typecheck
+npm run test           # node --test über alle test/**/*.test.ts
+npm run lint           # ESLint (vorbestehend rot, siehe oben)
+npm start              # App starten — NICHT `electron .`
+npm run dist           # unsignierte DMG nach out/
 ```
+
+`npm run test` rebuildet better-sqlite3 für Node, `npm start` für Electron. Nach einem Testlauf
+nie `electron .` direkt aufrufen — der prestart-Hook garantiert die Electron-ABI, sonst fehlen
+MessageBus-DB und TaskManager.
+
+## Hub
+
+Alle Projekte liegen unter `hubPath/projects/`. Pfadauflösung zentral in
+`src/main/project/hub-paths.ts`. Beim Erststart fragt `HubSetupDialog` danach.
+
+## Aktueller Stand
+
+Version 0.9.104. Multi-Workspace-Sessions (Paket A) ist gemergt: jede Session trägt ihren
+Workspace, Presets laufen parallel in mehreren Workspaces. Die manuelle Abnahme dazu steht
+noch aus — `docs/superpowers/acceptance/2026-09-20-multi-workspace-sessions-manual.md`.
+
+Nächste Richtung laut Strategiepapier: Übergaben als Notes fertig bauen, Rolle → Modell/Adapter,
+Rollengrenzen als Constraint. Offene Entscheidungen stehen dort in Abschnitt 7.
 
 ## Projektstruktur
 
 ```
-cipher-mux-electron/
-├── CLAUDE.md
-├── package.json
-├── tsconfig.json / tsconfig.main.json / tsconfig.renderer.json
-├── electron-builder.yml
-├── docs/
-│   ├── SPEC.md            ← Technische Spezifikation (Phase 2)
-│   ├── requirements.md    ← Anforderungskatalog (Phase 1)
-│   ├── todo.md            ← Task-Liste mit Abhängigkeiten (Phase 4)
-│   └── decisions/         ← ADRs (Phase 3)
-├── .claude/
-│   ├── settings.json
-│   └── skills/            ← Workflow-Skills für jede Phase
-├── src/
-│   ├── main/
-│   │   ├── main.ts, window-manager.ts, ipc-hub.ts, preload.ts
-│   │   ├── tmux/          ← TmuxManager (Control Mode), Parser, Batcher
-│   │   ├── message-bus/   ← SQLite CRUD, Schema
-│   │   ├── mcp/           ← Streamable HTTP Server, Tools, Auth
-│   │   ├── session/       ← SessionManager, OrchestratorTemplate, PersonaResolver
-│   │   ├── project/       ← HubPaths, KickoffOrchestrator, LauncherPrompt, KickoffWatcher
-│   │   ├── config/        ← ConfigStore (JSON-File Store), GlobalRules
-│   │   ├── monitoring/    ← StatusLineMonitor, StatusLineHook
-│   │   ├── bugreport/     ← BugreportManager, BugreportResolve, OllamaClient
-│   │   ├── voice/         ← VoiceManager, ConversationEngine, STT (Whisper), TTS (Piper), VoiceInputRouter
-│   │   ├── agent/         ← AgentAdapter Interface, ClaudeCodeAdapter, AdapterRegistry
-│   │   ├── task/          ← TaskManager, TaskWatcher, TaskHooks, BugreportSource
-│   │   ├── cyber-factory/ ← CyberFactoryManager, Escalation, Monitor, RiskReview, Diagnose, Template
-│   │   ├── mpo/           ← InputRequestWatcher (entity-agnostisch, von Cyber Factory genutzt)
-│   │   ├── companion/     ← MemoryStore (scope-aware), Schema (CF-Tabellen)
-│   │   ├── refinement/    ← RE-Audit, Purpose-Check, REQ-IDs, Handoff-Tools
-│   │   ├── ideation-partner/ ← BrainManager, SkillRegistry, AnforderungspaketGenerator
-│   │   ├── testing-assistant/ ← TestingAssistantManager, TestRunner, QualityAudit, AdversarialProber, OWASP, OffLimits, FindingsReporter, Handoff, Template
-│   │   ├── audit/         ← AuditManager, CodeReview, SecurityAudit, AdrConsistency, CognitiveDebt, ReleaseRecommender, FindingsReporter, Template
-│   │   ├── workspace-memory/ ← SessionScopeCleanup, Archive
-│   │   ├── character/     ← CharacterDefaults (6 Seed-Personas)
-│   │   ├── notes/         ← NoteManager (Filesystem CRUD), NoteTagging (Ollama Auto-Tagging)
-│   │   ├── workspace/     ← WorkspaceManager (Apply, Prompt Resolution, Persona Skill Sync)
-│   │   └── util/          ← exec-util, dependency-check, deep-merge
-│   ├── renderer/
-│   │   ├── app.tsx, index.html
-│   │   ├── components/    ← SessionGrid, SessionCell, LauncherCell, NotesCell, NoteEditor,
-│   │   │                     TerminalPane, PaneHeader, SidebarPanel, SidebarWindow,
-│   │   │                     GridPlacementPopup, StatusBar, GridControls, KickoffDialog,
-│   │   │                     SessionDialog, ProjectCard, ProjectPopup, BugreportDialog,
-│   │   │                     InfoSettingsView, RecoveryDialog, VoiceControl,
-│   │   │                     WorkspacesWindow, WorkspacesTab, PersonasTab, WorkspacePopup
-│   │   ├── hooks/         ← useTerminal, useMessages, useSessions, useContextUsage,
-│   │   │                     useVoiceSession, useGrid, useInputRequests, useProjects,
-│   │   │                     useShortcuts, useTheme, useNotes
-│   │   ├── voice/         ← vad-loader (Silero ONNX), audio-capture-worklet
-│   │   ├── styles/        ← theme.css, layout.css, components.css
-│   │   └── fonts/         ← Rajdhani, Fira Code
-│   └── shared/
-│       ├── ipc-channels.ts ← Typed Channel Constants
-│       ├── types.ts        ← Shared Interfaces
-│       ├── constants.ts    ← App-weite Konstanten
-│       ├── brand.ts        ← Branding-Config (Pfade, Namen)
-│       ├── grid-types.ts   ← Grid-Layout Types
-│       ├── terminal-theme.ts ← xterm.js Farbthema
-│       └── version.ts      ← Auto-generierte Versionsnummer
-└── test/
-    └── main/              ← Unit-Tests für Business-Logik (43 Dateien)
+src/main/     a11y agent audit bluetooth bugreport character companion config cyber-factory
+              debugger entity-content hub mcp message-bus monitoring notes project refinement
+              session setup task testing-assistant tmux updater util voice workspace
+              workspace-memory workshop
+src/renderer/ components/ hooks/ voice/ styles/ fonts/
+src/shared/   types, ipc-channels, constants, brand, grid-types, workspace-key, entity-status,
+              workspace-badge, terminal-theme, version
+test/main/    ~110 Testdateien, Unit-Tests für Main-Logik
+docs/         decisions/ (9 ADRs), superpowers/specs/, superpowers/plans/, superpowers/acceptance/
 ```
 
-## Referenz-Projekte
+**Der Message Bus ist deprecated.** `src/main/message-bus/` existiert noch und wird in
+`ipc-hub.ts` instanziiert, trägt aber praktisch nur noch die SQLite-DB für den TaskManager
+mit. `mux_send`/`mux_read` sind kein Weg, einer Session etwas zu sagen — dafür `tmux send-keys`.
 
-- `/Users/Shared/Nextcloud/Claude/ClaudeCode01/cipher-desktop-electron` — Electron-Patterns, Build-Setup, IPC-Bridge
-- `/Users/Shared/Nextcloud/Claude/ClaudeCode01/cipher-mux` — v1 (Node.js HTTP-Server), Module zur Migration: ConfigStore, WorkspaceLoader
+**Drei tote Komponenten**, nirgends importiert: `TerminalPane.tsx`, `UnifiedSessionDialog.tsx`
+und `PaneHeader.tsx` (nur von TerminalPane importiert). Nicht anfassen, nicht als Vorlage nehmen.
 
-## Infrastruktur
+## Fragile Zone: Keep Working Restore
 
-- **Session-Backend:** tmux (macOS, Homebrew)
-- **Message Bus:** SQLite via better-sqlite3 (WAL-Modus, Single-Writer aus Main Process)
-- **MCP-Server:** localhost HTTP im Main Process (Session-GC nach 30min Inaktivitaet, max 5 MCP-Sessions, `/health` Endpoint)
-- **Persistenz:** ConfigStore (JSON), SQLite (Messages/Sessions)
-- **Keine externe API** — nutzt Claude Code CLI für LLM-Interaktion
+War Gegenstand von drei Bugfix-Runden (v0.9.9–v0.9.10) und wurde vom Multi-Workspace-Paket an
+sieben Stellen berührt. **Wenn du hier arbeitest, gelten drei Regeln:**
 
-## Code-Konventionen
+1. **Jeder Lesezugriff auf ein persistiertes Feld ist defensiv** — `?? null`, nie annehmen,
+   dass ein Feld existiert. `SessionStore.load()` castet `JSON.parse` ungeprüft; die Typen
+   lügen für alles, was vor dem jeweiligen Feature geschrieben wurde.
+2. **Ein geworfener Fehler in der Init-Kette killt den gesamten Session-Restore — still.**
+   Der User verliert seine Sessions ohne Fehlermeldung. Neue Pfade dort gehören in `try`/`catch`.
+3. **Session-IDs überleben keinen Neustart.** `recover()` vergibt neue; `ui.grid` in der Config
+   enthält alte. Slot-IDs werden beim Startup synchron genullt.
 
-- TypeScript strict mode
-- Preact mit JSX (`.tsx` für Renderer-Komponenten)
-- ESLint + Prettier
-- Electron: contextIsolation=true, nodeIntegration=false
-- IPC: typed channels via shared types
-- CSS: 10 Themes via `body[data-theme="<id>"]`, Theme-Picker in Settings, `themes.json` Manifest. Tokens via CSS Custom Properties, ANSI-Farben pro Theme. Default: cipher-ivory (light) / cipher-dark (dark)
-- Naming: camelCase für Variablen/Funktionen, PascalCase für Komponenten/Klassen
+Diagnose: `/tmp/kw-debug.json` wird bei jedem Startup geschrieben (Erfolg **und** Fehler) und
+enthält `phase`, `error`, `recovered`, `orphaned` sowie `workspaceId` pro Session.
+Logs: `/Applications/cipher-mux.app/Contents/MacOS/cipher-mux 2>&1 | tee /tmp/kw-test.log`.
 
-## Architekturentscheidungen
+## Workspaces, Personas, Multi-Workspace
 
-- **ADR-001:** tmux Control Mode (-C) für Streaming — `docs/decisions/ADR-001-tmux-streaming.md`
-- **ADR-002:** Streamable HTTP für MCP Transport — `docs/decisions/ADR-002-mcp-transport.md`
-- **ADR-003:** statusLine-Hook für Context-Usage (real-time) — `docs/decisions/ADR-003-statusline-integration.md`
-- **ADR-004:** Vite als Renderer-Bundler — `docs/decisions/ADR-004-renderer-bundler.md`
-- **ADR-005:** WebGL + Canvas-Fallback für xterm.js — `docs/decisions/ADR-005-xterm-renderer.md`
-- **ADR-006:** ulidx für ULID-Generierung — `docs/decisions/ADR-006-ulid-library.md`
-- **ADR-007:** 7 Tage zeitbasierte Message-Retention — `docs/decisions/ADR-007-message-retention.md`
-- **ADR-008:** Strukturiertes Orchestrator CLAUDE.md Template — `docs/decisions/ADR-008-orchestrator-template.md`
+Personas definieren Rollen (Name, Farbe, Default-Prompt), Workspaces kombinieren sie in einem
+Grid mit Projekt-Zuweisungen. Eigenes Fenster (`index.html?view=workspaces`).
 
-## Workspaces + Personas
+- **Prompt-Auflösung (3 Ebenen):** `cell.prompt` > `workspace.promptOverrides[persona]` > `persona.defaultPrompt`
+- **Injektion:** Workspace-Prompt und Context-Paths gehen als CLAUDE.md-Sektionen in die
+  Projekt-Cells — nicht als CLI-Argument, damit sie `/clear` überleben. Last-Write-Wins bei
+  mehreren Cells auf demselben Projekt.
+- **Multi-Workspace:** Jede Session trägt `SessionInfo.workspaceId`, persistiert in
+  `sessions.json`. Entity-Sessions laufen in `~/.config/cipher-mux/runs/<workspaceId>/<entityId>/`
+  — dort liegen die **generierten** Artefakte (CLAUDE.md, .mcp.json, settings), während
+  `~/.config/cipher-mux/entities/<id>/` die **authored** behält (preset.md, Skills, Guides).
+  Diese Trennung ist es, die zwei Workspaces daran hindert, sich die CLAUDE.md zu überschreiben.
+- `singleInstance` gilt **pro Workspace**. MCP-Aufrufe tragen `X-Mux-Workspace`, beim
+  `initialize` einmalig in den Tool-Kontext gebunden.
+- **Drei-Zustands-Disziplin, durchgängig:** `undefined` = keine Präferenz (→ aktiver Workspace),
+  `null` = ausdrücklich ungebunden, String = dieser Workspace. Ein `??`, wo `=== undefined`
+  nötig wäre, macht aus „starte ungebunden" ein „starte, wo der User gerade hinschaut".
+- Ungebundene Sessions sind aus **jedem** Workspace sichtbar und tragen das Badge
+  „ohne Workspace". Die Main-Seite (`findEntitySessions`) bleibt bewusst strenger.
+- **Noch global, nicht workspace-skopiert:** Notes-Tagging und Companion-Memory (Paket B).
 
-Personas definieren Rollen (Name, Farbe, Default-Prompt). Workspaces kombinieren Personas in einem Grid-Layout mit Projekt-Zuweisungen.
+## Entities, MCP, Voice
 
-- **Personas:** ConfigStore `personas` Key. Builtin-Personas (Orchestrator, Cyber Factory, Worker, empty) sind locked (nur Prompt editierbar). Custom Personas voll editierbar.
-- **Workspaces:** ConfigStore `workspaces` Key. Grid-Editor mit Merge-Handles (vertikale Zell-Verschmelzung), Cell Inspector, Prompt Resolution.
-- **Prompt Resolution (3-Level):** cell.prompt > workspace.promptOverrides[persona] > persona.defaultPrompt
-- **Workspace Prompt Injection:** Workspace-Level `workspacePrompt` Feld auf dem Workspace-Objekt. Wird beim Apply als `## Workspace Prompt` Section in die CLAUDE.md ALLER Projekt-Cells geschrieben (nicht als CLI-Argument — ueberlebt `/clear`). `injectSection()` / `injectWorkspaceSections()` in SessionManager.
-- **Context Directories:** Workspace-Level `contextPaths` auf dem Workspace-Objekt. Werden als `## Context Directories` Section in die CLAUDE.md ALLER Projekt-Cells injiziert. UI im Workspace-Editor (zwischen Tags und Grid) mit Browse-Dialog und Remove-Buttons.
-- **Cell-Level Override:** Cell-Prompt (`cell.prompt`) und Cell-ContextPaths (`cell.contextPaths`) ueberschreiben die Workspace-Level-Werte fuer die jeweilige Cell. UI im Cell Inspector.
-- **Injection-Regeln:** Nur bei Project-Path-Cells (nicht bei Entity/Preset-Cells). Last-Write-Wins bei mehreren Cells auf gleichem Projekt. Kein Cleanup bei Session-Stop — naechster Apply ueberschreibt.
-- **Separates Fenster:** Workspaces + Personas haben ein eigenes BrowserWindow (960x720), erreichbar via Workspace-Popup oder StatusBar. NICHT mehr im Info/Settings-Popup.
-- **URL-Routing:** `index.html?view=workspaces#tab` — main.tsx routet zu WorkspacesWindow oder App basierend auf URL-Parameter.
-- **Workspace Apply:** Grid wird auf Workspace-Dimensionen resized, Merges werden als rowSpans uebertragen, Sessions spawnen fuer non-empty Cells mit zugewiesenen Projekten. Prompt geht via CLAUDE.md-Injection, autoLaunch startet nur `claude --dangerously-skip-permissions` ohne Prompt-Arg.
-- **Grid-Limits:** Max 7 Cols x 3 Rows (konsistent mit MAX_GRID_COLS/MAX_GRID_ROWS in constants.ts)
-- **Persona Skill Sync:** Generiert .claude/skills/personas/ Skills aus Persona-Prompts.
-- **Multi-Workspace-Sessions:** Jede Session traegt ihren Workspace (`SessionInfo.workspaceId`,
-  persistiert in `sessions.json`). Entity-Sessions laufen in `~/.config/cipher-mux/runs/<workspaceId>/<entityId>/`
-  (generierte Artefakte) und lesen aus `~/.config/cipher-mux/entities/<id>/` (preset.md, Skills).
-  `singleInstance` gilt pro Workspace. MCP-Aufrufe tragen `X-Mux-Workspace` und binden den
-  Workspace beim `initialize`. Launcher: ⤳-Button startet ein Preset in einem anderen Workspace.
-  **Workspace-Badge:** `computeWorkspaceBadge()` (`src/shared/workspace-badge.ts`) ist die eine
-  Wahrheitsquelle fuer die Anzeige — kein Badge wenn `session.workspaceId === activeWorkspaceId`;
-  ein ungebundener Session (`workspaceId === null`) zeigt "ohne Workspace"
-  (`unified.workspaceBadgeGlobal`) sobald ein Workspace aktiv ist, sonst kein Badge; eine Session
-  in einem anderen (noch existierenden) Workspace zeigt dessen Namen; eine Session in einem
-  geloeschten Workspace zeigt die ID mit "(gelöscht)"-Marker (`unified.workspaceBadgeDeleted`).
-  Tooltip ueberall `unified.workspaceBadgeTitle`. Gerendert in `SessionCell.tsx` (Grid-Zellen) und
-  `SidebarPanel.tsx` (Background-Session-Karten) — `PaneHeader.tsx`/`TerminalPane.tsx` haben die
-  gleiche Prop, sind aber aktuell in keiner Route gemountet (siehe Lesson zu "Komponenten-Lieferung
-  ohne Mount"). **Run-Dir-Aufraeumung:** `pruneRunDirs()` (`src/main/session/entity-run-dir.ts`)
-  laeuft am Ende der Init-Chain in `ipc-hub.ts`, bewusst NACH dem Keep-Working-Restore (sonst
-  faenden wiederhergestellte Sessions ihr Run-Verzeichnis nicht mehr vor) und in eigenem
-  `try`/`catch` (ein Wurf in der Init-Chain toetet Keep-Working sonst still). Das Keep-Set ist die
-  Union aus konfigurierten Workspace-IDs und den `workspaceId`s aller aktuell gelisteten Sessions
-  (`liveWorkspaceIds()`), damit eine Session eines gerade geloeschten Workspace ihr Verzeichnis
-  nicht unter sich weggezogen bekommt, waehrend sie noch laeuft.
-  **Noch global:** Notes-Tagging und Companion-Memory-Scope (Paket B).
+- **Entities** sind Rollen mit eigenem Verzeichnis, eigener CLAUDE.md und Recovery-Fähigkeit:
+  Workshop, Cyber Factory, Companion, Refinement, Ideation Partner, Debugger,
+  Testing Assistant, Audit, Voice-Relay, Launcher. Registry: `src/main/session/entity-registry.ts`.
+- **MCP-Server** im Main-Prozess, ~52 Tools, **eine `McpServer`-Instanz pro Client**
+  (`mcp-server.ts:createSession`) — deshalb kann Workspace-Kontext pro Verbindung gebunden werden.
+- **Worker-Startup:** Nach `mux_create_session` 8–10s warten, dann `tmux capture-pane` prüfen,
+  dann `tmux send-keys`. `mux_send` ist Inter-Session-Kommunikation, **kein** Prompt-Input.
+- **Voice:** Silero VAD im Renderer → Whisper STT → `VoiceInputRouter` → tmux sendKeys.
+  Whisper-Model unter `~/.config/cipher-mux/models/whisper/`, **nicht** `app.getPath('userData')`.
+  tmux sendKeys nutzt `\r` (0x0d), nicht `\n`.
+- **Piper-Voices** brauchen ONNX-Metadata direkt im Modell, nicht nur in `model.onnx.json` —
+  sonst hängt der Worker bis zum 30s-Timeout und fällt auf macOS `say` zurück.
 
-## MCP-Server: Worker-Session-Handling
+## Konventionen
 
-Der MCP-Server stellt 40+ Tools bereit, die von Orchestrator, Cyber Factory und Worker-Sessions genutzt werden:
-
-**Session-Tools:** `mux_create_session`, `mux_kill_session`, `mux_sessions`, `mux_send`, `mux_read`, `mux_status`, `mux_context_usage`
-**Task-Tools:** `mux_task_create`, `mux_task_update`, `mux_task_list`, `mux_task_get`
-**Notes-Tools:** `mux_notes_create`, `mux_notes_list` — erlauben MCP-Clients Notes in der Sidebar anzulegen
-**UI-Control:** `mux_grid_resize`, `mux_grid_place`, `mux_session_focus`, `mux_session_eject`, `mux_sidebar_toggle`, `mux_ui_highlight`, `mux_ui_open`, `mux_theme_set`
-**Voice/Scroll:** `mux_tts_speak` (TTS mit Priority), `mux_cell_scroll` (up/down/top/bottom/to-marker)
-**Cyber Factory:** `mux_cyber_factory_diagnose`, `mux_cyber_factory_handoff_testing`, `mux_cyber_factory_handoff_debugger`
-**Memory:** `companion_memory_write` (scope-aware), `companion_memory_recall` (scope-filter), `companion_memory_search`, `companion_memory_forget`
-**Sonstige:** `kickoff_complete`, `mux_bugreport_resolve`, `mux_input_request_create`
-
-**Wichtig für Konsumenten (Orchestrator/Clients):**
-
-### Worker-Startup-Protokoll (Pflicht)
-
-`mux_send` schreibt auf den Message Bus, aber Claude-Sessions lesen den Bus **nicht automatisch als Prompt-Input**. Messages die vor Claude-Startup gesendet werden, gehen verloren (Race Condition).
-
-**Korrektes Vorgehen:**
-
-1. `mux_create_session` — Session erstellen
-2. **8-10s warten** — tmux + zsh + Claude CLI muessen starten
-3. `tmux capture-pane -t <tmuxSession> -p | tail -30` — Pruefen ob Claude-Prompt (❯) sichtbar
-4. Falls nicht bereit: weitere 5s warten, erneut pruefen
-5. **`tmux send-keys -t <tmuxSession> "<instruktion>" Enter`** — Instruktion DIREKT in den Pane schicken
-6. **15s warten** — Claude muss Task parsen
-7. `tmux capture-pane` — Pruefen ob Worker tatsaechlich arbeitet
-8. **Monitoring-Loop (alle 2min):** `tmux capture-pane` + `mux_context_usage` bis Worker fertig
-
-### Warum nicht mux_send?
-
-`mux_send` ist fuer Inter-Session-Kommunikation gedacht (z.B. Status-Updates, Bug-Notifications). Es ist **kein Prompt-Input-Mechanismus**. Claude liest den Bus nur wenn es explizit `mux_read` aufruft — was ein idle Worker nicht tut.
-
-## Voice-Pipeline
-
-STT-basierte Spracheingabe in fokussierte Sessions. Architektur:
-
-```
-Renderer (Silero VAD) → IPC → Main (ConversationEngine → Whisper STT → VoiceInputRouter → tmux sendKeys / scroll / gridNav)
-```
-
-- **STT:** Whisper.cpp via `@fugood/whisper.node`, Model unter `~/.config/cipher-mux/models/whisper/ggml-small.bin`
-- **VAD:** Silero ONNX im Renderer, Thresholds: positiveSpeech=0.5, minSpeechFrames=3 (optimiert fuer kurze Befehle)
-- **Routing:** VoiceInputRouter dispatcht Transkription an fokussierte tmux-Session (Pin > Focus)
-- **Voice-Commands:** "abschicken"/"absenden"/"senden" → Enter, "neue zeile" → Newline
-- **Scroll-Commands:** "hoch"/"runter"/"ganz hoch"/"ganz runter"/"zum marker" → Terminal-Scroll via IPC CELL_SCROLL
-- **Grid-Nav-Commands:** "grid rechts/links/hoch/runter" → Grid-Fokus wechseln via IPC GRID_NAV. Fuzzy-Matching fuer Whisper-Varianten (grit/gritt/great etc.)
-- **Voice Submit Mode:** auto (Enter nach STT) oder manual (BT-Clicker). Konfigurierbar in Settings.
-- **TTS:** Piper (lokal) oder macOS say (Fallback/Auswahl). Stoppbar per UI-Toggle oder stopSpeech(). Konfigurierbar: ttsEnabled, ttsVoice (local/macos)
-- **Voice Commands Toggle:** voiceCommandsEnabled Config — deaktiviert Scroll/Grid-Nav Matching
-- **MCP-Tool:** `mux_cell_scroll` (up/down/top/bottom/to-marker) — programmatisches Scrollen durch Entities
-- **Terminal-Registry:** `src/renderer/terminal-registry.ts` — globale Map fuer xterm.js Instanzen + Scroll-Marker per sessionId
-- **tmux sendKeys:** Verwendet `\r` (0x0d, Carriage Return) fuer Enter, nicht `\n` (0x0a)
-- **CODING_BIAS_PROMPT:** Whisper-Prompt mit Coding-Terminologie + Voice-Command-Woertern fuer bessere Erkennung
-- **Piper Voice Deployment:** Neue Custom-Voices brauchen ONNX-Metadata direkt im Modell (nicht nur in model.onnx.json). Sherpa-onnx liest `sample_rate`, `model_type`, `has_espeak` etc. aus den ONNX Custom-Metadata-Feldern — fehlen sie, haengt der Worker bis zum 30s-Timeout und faellt auf macOS say zurueck. Fix: `python3 -c "import onnx; m=onnx.load('model.onnx'); [setattr(m.metadata_props.add(),'key',k) or setattr(m.metadata_props[-1],'value',v) for k,v in {'comment':'piper','language':'German','model_type':'vits','voice':'de','n_speakers':'1','has_espeak':'1','sample_rate':'22050'}.items()]; onnx.save(m,'model.onnx')"`. Pruefen mit `python3 -c "import onnxruntime as rt; print(rt.InferenceSession('model.onnx',providers=['CPUExecutionProvider']).get_modelmeta().custom_metadata_map)"`.
-
-## AgentAdapter Interface (TP-2)
-
-Abstraktion für verschiedene AI-Agent-Backends:
-
-- `AgentAdapter` Interface: `isAvailable()`, `getCapabilities()`, `executeCommand()`, `streamOutput()`
-- `ClaudeCodeAdapter` (Tier-1): Vollständig implementiert, `--dangerously-skip-permissions` konfigurierbar via ConfigStore `agent.skipPermissions`
-- `ReferenceStubAdapter` (Tier-2): Stub für Dokumentation
-- `AdapterRegistry`: Discovery + Registrierung
-
-## Cyber Factory (Multi-Session-Orchestrator, ersetzt MPO)
-
-Eingebaute Funktion von cipher-mux. Empfaengt Detail-Specs vom Refinement, zerlegt sie in Subsysteme (Architekt-Phase), plant Wellen, startet parallele Worker-Sessions und koordiniert deren Arbeit.
-
-- **Managed Dir:** `~/.config/cipher-mux/entities/cyber-factory` (CLAUDE.md + .mcp.json generiert)
-- **Session-Name:** `Cyber Factory` (recovery-faehig)
-- **Template:** `src/main/cyber-factory/cyber-factory-template.ts` (11-Phasen-Lifecycle, 5-Level-Eskalation)
-- **Code-Module:** `src/main/cyber-factory/` (8 Dateien: Manager, Escalation, Monitor, RiskReview, Diagnose, Template, ModelResolver, Types)
-- **DB-Tabellen:** `cyber_factory_runs`, `wellen`, `sub_projekte` in companion.db
-- **MCP-Tools:** `mux_cyber_factory_diagnose`, `mux_cyber_factory_handoff_testing`, `mux_cyber_factory_handoff_debugger`, `mux_input_request_create`
-- **ConfigStore:** `cyber_factory` Sektion mit ModelRouting, Budget-Thresholds, Stuck-Detection
-- **Model-Routing:** haiku/sonnet/opus pro Sub-Projekt-Typ (trivial→haiku, business_logic→sonnet, architecture→opus)
-- **StatusBar:** `cyber-factory`-Button mit Active-State
-- **Kein Auto-Start** — manuell per Button
-- **Grid-Placement:** Naechster freier Slot; bei vollem Grid oeffnet PlacementPopup zur Slot-Auswahl
-
-### Workspace-scoped Memory
-
-Companion-Memory (`companion.db`) unterstuetzt scope-aware Eintraege:
-- `scope_kind`: 'user' (global), 'workspace' (projekt-bezogen), 'session' (ephemer)
-- `scope_id`: Workspace-ID oder Session-ID
-- Cyber Factory schreibt workspace-skopierte Memories (Welle-Plaene, Decisions, Risk-Reviews)
-- `companion_memory_write/recall` MCP-Tools akzeptieren `scope_kind`/`scope_id` Parameter
-
-## Debugger
-
-Spezialisierte Phase nach Build-Run. Empfaengt Findings (Testing Assistant oder User Bug-Reports), klaert mit User, plant Fix, dispatcht Worker Sub-Session, verifiziert Ergebnis.
-
-- **Modul:** `src/main/debugger/` (9 Module: types, manager, findings-parser, clarification-router, fix-planner, worker-launcher, verification-runner, walkthrough-renderer, template)
-- **DB:** 3 Tabellen in companion.db (debugger_runs, clarifications, fix_plans)
-- **Entity:** `debugger` (Builtin, singleInstance, Feature-Flag `debugger.enabled`)
-- **MCP-Tool:** `mux_debugger_findings_intake`
-- **IPC:** DEBUGGER_RUN_START, DEBUGGER_RUN_STATUS, DEBUGGER_RUN_CANCEL, DEBUGGER_CLARIFICATION_NEW, DEBUGGER_CLARIFICATION_RESOLVE, DEBUGGER_FIX_PLAN_CONFIRM, DEBUGGER_WALKTHROUGH_REQUEST
-- **Lifecycle:** 8 Phasen (Intake > Clarify > Plan > Confirm > Worker > Verify > Review > Handoff)
-- **Retries:** Max 2 (konfigurierbar via `debugger.maxRetries`)
-- **Quality Gate:** strict (Test-Pflicht) oder permissive
-- **Parallel zum Launcher:** Feature-Flag default off, bestehender projectlauncher bleibt verfuegbar
-
-## Notes Editor
-
-Minimalistischer Markdown-Editor als dritte Grid-Cell-Option (neben Session und Launcher).
-
-- **Storage:** `~/.config/cipher-mux/notes/` (global) bzw. `~/.config/cipher-mux/notes/workspace-<id>/` (workspace-scoped)
-- **Format:** Markdown mit YAML-Frontmatter (gray-matter), Tags + Title im Frontmatter
-- **Editor:** CodeMirror 6 mit CM6 HighlightStyle (Obsidian-aehnlich), Live-Markdown-Rendering
-- **Auto-Tagging:** Ollama (gemma4:26b) schlaegt bis zu 5 Tags vor bei manuellem Cmd+S. Auto-Save (2s Debounce) schreibt nur die Datei, kein Tagging.
-- **Tag-Repository:** Seed-Tags (27 vordefiniert) + dynamisch wachsend, persistiert in `.tags.json`
-- **Sidebar:** Notes-Tab mit Suchfeld, Tag-Filter-Chips, Doppelklick oeffnet in NotesCell, Delete-Button (hover)
-- **Grid-Integration:** LauncherCell hat dritten "notes"-Button, GridSlot hat `type: 'session' | 'notes'`
-- **IPC:** 7 Channels (NOTES_LIST, NOTES_READ, NOTES_SAVE, NOTES_CREATE, NOTES_DELETE, NOTES_TAGS, NOTES_CHANGED)
-- **MCP:** `mux_notes_create` (mit Tags + Scope) und `mux_notes_list` — MCP-Clients koennen Notes anlegen, UI aktualisiert via NOTES_CHANGED Event
-- **Delete:** Sidebar (hover-reveal Button) + aktiver Tab (Trash-Icon), jeweils mit Confirm-Dialog
-
-## Testcase-Notes schreiben
-
-Testcase-Notes verwenden `noteType: testcase` und ein spezielles Checkbox-Format, das der TestcaseView (Tri-State-Checkboxen, Kommentare, Screenshots) rendert. **Normales Markdown wird NICHT gerendert** — der Parser erkennt nur dieses Format:
-
-```markdown
-## Sektions-Titel
-
-- [ ] **T-ID.1** Beschreibung des Testcases
-- [ ] **T-ID.2** Noch ein Testcase
-- [x] **T-ID.3** Bestandener Test
-- [-] **T-ID.4** Fehlgeschlagener Test // Kommentar zum Fehler
-```
-
-**Regeln:**
-- Sektionen: `## Titel` (H2-Headings)
-- Items: `- [ ] **ID** Beschreibung` (Checkbox + Bold-ID + Text)
-- Status: `[ ]` = offen, `[x]` = PASS, `[-]` = FAIL
-- Kommentare: ` // Kommentartext` nach der Beschreibung
-- Screenshots: `![screenshot](pfad)` im Kommentar
-- IDs muessen eindeutig sein (z.B. `T-BF.1`, `T-VS.3`)
-- Kein anderes Markdown verwenden (keine `###`, keine `**bold**` in Beschreibungen, keine Tabellen)
-
-**Beim Anlegen via MCP:** `mux_notes_create` mit Tag `testcase` — der Tag setzt `noteType: testcase` automatisch.
-
-## BT Shutter / Bluetooth Remote Control
-
-Bluetooth-Fernbedienungen (AB Shutter 3, CamKix, etc.) steuern cipher-mux Sessions. Architektur:
-
-```
-BT Remote → macOS HID → ab-shutter-bridge (Swift) → JSON stdout → BtShutterManager (TS) → ipc-hub → tmux sendKeys
-```
-
-### Komponenten
-
-- **Swift Bridge:** `/Users/Shared/Nextcloud/Claude/ab-shutter-bridge/ABShutterBridge.swift` (Quellcode)
-- **Compiled Binary:** `assets/bin/ab-shutter-bridge` (wird via `extraResources` nach `Contents/Resources/bin/` kopiert)
-- **TS Manager:** `src/main/bluetooth/bt-shutter-manager.ts` — spawnt Binary als Child-Process, parst JSON-Events
-- **Integration:** `src/main/ipc-hub.ts` → `startBtShutter()` / `stopBtShutter()` — Init-Chain, Button→sendKeys Routing
-
-### macOS 26+ HID-Zugriff (WICHTIG)
-
-**`kIOHIDOptionsTypeSeizeDevice` funktioniert NICHT mehr** auf macOS Tahoe (26.x) fuer adhoc-signierte Binaries. Apple hat die Anforderungen verschaerft — `kIOReturnNotPermitted` (-536870207) auch mit korrekten TCC-Eintraegen.
-
-**Loesung (seit v0.9.11):** Zwei-Stufen-Ansatz:
-1. `IOHIDManagerOpen` mit `kIOHIDOptionsTypeNone` (non-exclusive) — funktioniert ohne spezielle Signatur
-2. `CGEventTap` auf `.cgSessionEventTap` suppressed NX_SYSDEFINED Events (Subtype 8 = Media Keys) waehrend der HID-Callback aktiv ist
-
-**CGEvent-Feld-Mapping (macOS 26, verifiziert):**
-- Field 99 = NX_SYSDEFINED Subtype (8 = `NX_SUBTYPE_AUX_CONTROL_BUTTONS`)
-- Field 87 = Media Key Data (keyCode + flags encoded)
-- `.mouseEventNumber` (Field 0) enthaelt NICHT data1 fuer SYSDEFINED Events — das war der urspruengliche Bug
-
-### Binary bauen
-
-```bash
-cd /Users/Shared/Nextcloud/Claude/ab-shutter-bridge
-swiftc ABShutterBridge.swift -o ab-shutter-bridge -framework IOKit -framework Foundation
-cp ab-shutter-bridge /path/to/cipher-mux-electron/assets/bin/
-```
-
-NICHT `codesign -fs -` ausfuehren — das erzeugt explicit adhoc (flags=0x2) statt linker-signed (flags=0x20002). Der Compiler erzeugt automatisch linker-signed, was fuer TCC-Erkennung sauberer ist.
-
-### Button-Mapping
-
-| BT Button | HID Usage | Default Action | Relay JSON |
-|-----------|-----------|---------------|------------|
-| BIG (Vol+) | 0xE9 (Consumer Page 0x0C) | Clear input (Ctrl+U) | `{"button":"big","action":"clear"}` |
-| SMALL (Vol-) | 0xEA (Consumer Page 0x0C) | Submit (Enter) | `{"button":"small","action":"submit"}` |
-
-### Permissions (macOS System Settings)
-
-Benoetigt fuer den User:
-- **Eingabeueberwachung (Input Monitoring):** ab-shutter-bridge Binary UND cipher-mux.app
-- **Bedienungshilfen (Accessibility):** ab-shutter-bridge Binary (fuer CGEventTap)
-
-Bei jedem neuen Binary (Neukompilierung) fragt macOS erneut nach — das ist korrekt, da sich der Code-Hash aendert.
-
-### Erweiterung: Neue BT Remotes
-
-Alle gaengigen BT Camera Shutter Remotes nutzen dasselbe HID Consumer Control Protokoll (Usage Page 0x0C, Volume Up/Down). Die Bridge ist bereits generisch: ohne VID/PID-Filter matched sie JEDES Consumer Control Device. Fuer neue Remote-Typen mit anderen HID Usages: `inputCallback` in `ABShutterBridge.swift` erweitern, neues Usage-Mapping hinzufuegen.
+- TypeScript strict, Preact mit JSX, ESLint + Prettier, typed IPC über `shared/ipc-channels.ts`
+- Electron: `contextIsolation=true`, `nodeIntegration=false`
+- **Tests importieren per ESM `import`** (67 von 71 Dateien); `require()` nutzen vier Ausreißer
+  und erzeugt einen Lintfehler
+- CSS: Tokens mit `--color-*`-Präfix, **nicht** `--accent`/`--text-secondary`. `--radius-*` ist
+  projektweit `0` — keine abgerundeten Ecken. 10 Themes über `body[data-theme]`
+- **Preact-Falle:** kein `stopPropagation()` auf Popup-Containern — bricht Child-Klicks in
+  preact/compat. Stattdessen `e.target === e.currentTarget` auf dem Overlay prüfen
 
 ## Bekannte Constraints
 
-- **macOS-only:** tmux als harte Abhängigkeit, osascript-Integration
-- **tmux als einziges Session-Backend:** Kein Dual-Stack mit node-pty. Sessions überleben Electron-Crashes
-- **Single-Writer SQLite:** Nur Main Process schreibt — kein Concurrent-Write-Problem
-- **xterm.js Streaming:** High-frequency tmux-Output erfordert Batching/Throttling der IPC-Bridge. Terminal-Fit mit 150ms Debounce und Min-Size-Guard
-- **StatusLine 2.x:** Parser unterstuetzt Claude Code 2.x `context_window` nested Format zusaetzlich zum 1.x Flat-Format
-- **Preact statt React:** ~3KB, React-API-kompatibel, aber einige React-Ecosystem-Libs brauchen Aliasing. **Overlay-Dismiss:** KEIN `stopPropagation()` auf Popup-Container verwenden — bricht Child-Klicks in preact/compat. Stattdessen `e.target === e.currentTarget` auf dem Overlay pruefen
-- **Whisper Model-Pfad:** Muss `~/.config/cipher-mux/` sein, NICHT `app.getPath('userData')` (dev/prod Divergenz)
-- **better-sqlite3 ABI-Mismatch:** `npm run test` rebuilt für Node.js, `npm start` rebuilt für Electron. App immer mit `npm start` starten (prestart-Hook garantiert Electron-ABI). Direktes `electron .` nach Tests → MessageBus/TaskManager nicht verfügbar.
+- **macOS-only** (tmux, osascript, Keychain), Apple Silicon
+- **tmux als einziges Session-Backend** — Sessions überleben Electron-Crashes
+- **xterm.js Streaming** braucht Batching; Terminal-Fit mit 150ms Debounce und Min-Size-Guard
+- **DMG ist unsigniert** (`CSC_IDENTITY_AUTO_DISCOVERY=false` im `dist`-Skript, Absicht)
+- `src/shared/version.ts` ist ein Build-Artefakt (`scripts/git-version.sh`) und zählt Commits
+  seit dem letzten Tag — es zu committen erhöht die Zahl und macht die Datei erneut veraltet
 
-## Workflow-Regeln
+## Weiterführend
 
-1. **Spec first:** Kein Code ohne Eintrag in SPEC.md oder todo.md
-2. **Kleine Batches:** Max 5-10 Dateien pro Commit
-3. **Tests bei jeder Änderung:** Unit-Tests für Business-Logik
-4. **ADR vor Implementierung:** Jede technische Entscheidung wird in `docs/decisions/` dokumentiert
-5. **Phasen einhalten:** Skills folgen dem 6-Phasen-Prozess — keine Phase überspringen
+| Thema | Datei |
+|---|---|
+| Zielbild, Strategie, offene Entscheidungen | `docs/superpowers/specs/2026-09-29-prozess-substrat-strategie.md` |
+| Architekturentscheidungen (9 ADRs) | `docs/decisions/` |
+| BT-Shutter / HID auf macOS 26+ | `docs/bt-shutter.md` |
+| Testcase-Note-Format | `docs/testcase-notes.md` |
+| Offene manuelle Abnahme | `docs/superpowers/acceptance/` |
 
 ## Skill-Referenz
 
-| Phase | Skill | Zweck |
-|-------|-------|-------|
-| 1 | `/interview` | Anforderungsinterview durchführen |
-| 2 | `/spec` | Technische Spezifikation aus Requirements erstellen |
-| 3 | `/decide` | ADRs für offene Entscheidungspunkte erstellen |
-| 4 | `/decompose` | SPEC.md in implementierbare Tasks zerlegen |
-| 5 | `/implement` | Nächsten offenen Task implementieren |
-| — | `/doc-review` | Dokumentation mit Code-Stand abgleichen |
+| Skill | Zweck |
+|-------|-------|
+| `/interview` | Anforderungsinterview |
+| `/spec` | Technische Spezifikation aus Requirements |
+| `/decide` | ADRs für offene Entscheidungspunkte |
+| `/decompose` | Spec in implementierbare Tasks zerlegen |
+| `/implement` | Nächsten offenen Task implementieren |
+| `/doc-review` | Dokumentation gegen den Code-Stand abgleichen |
+
+Diese Skills stammen aus dem ursprünglichen 6-Phasen-Prozess und setzen `docs/SPEC.md` und
+`docs/todo.md` voraus. **Beide Dateien existieren nicht (mehr).** Die Planung läuft heute über
+`docs/superpowers/specs/` und `docs/superpowers/plans/`; die Skills sind entsprechend nur
+eingeschränkt brauchbar.
 
 ## Global Rules
 
@@ -543,4 +265,3 @@ In diesem Workspace arbeiten wir am CIPEHR-MUX - Coding Cockpit für Claude Code
 
 ## Context Directories
 
-- `/Users/Shared/Nextcloud/Claude/CIPHER-MUX/projects/cipher-mux-electron`
