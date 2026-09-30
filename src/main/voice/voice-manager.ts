@@ -480,10 +480,14 @@ export class VoiceManager extends EventEmitter {
 
   private playWavViaAfplay(wavBuffer: Buffer): Promise<void> {
     return new Promise((resolve, reject) => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
       const os = require('os')
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
       const fs = require('fs')
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
       const tmpFile = path.join(os.tmpdir(), `cipher-mux-tts-${require('crypto').randomUUID()}.wav`)
       fs.writeFileSync(tmpFile, wavBuffer)
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
       const { execFile } = require('child_process')
       this.afplayProcess = execFile('afplay', [tmpFile], (err: Error | null) => {
         this.afplayProcess = null
@@ -508,6 +512,7 @@ export class VoiceManager extends EventEmitter {
     // Kill any running say process before starting a new one
     this.stopMacosSay()
     return new Promise((resolve, reject) => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
       const { execFile } = require('child_process')
       const macosVoice = configStore.get('macosVoice') as string | undefined
       const args = macosVoice ? ['-v', macosVoice, text] : [text]

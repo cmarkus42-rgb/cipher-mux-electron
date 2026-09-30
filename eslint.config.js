@@ -15,6 +15,13 @@ export default tseslint.config(
   },
   ...tseslint.configs.recommended,
   {
+    // Reine .js-Dateien sind hier CommonJS-Worker (piper-worker.js laeuft als
+    // Kindprozess ohne Build-Schritt). require() ist dort das Modulsystem,
+    // nicht ein Stilfehler.
+    files: ['**/*.js'],
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
+  {
     rules: {
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',

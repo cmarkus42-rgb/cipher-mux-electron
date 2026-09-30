@@ -34,7 +34,7 @@ export function CompanionTab() {
       const gp = await api.characters.getGlobalPersona()
       setGlobalPersonaId(gp)
     } catch { /* older backend without this channel */ }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // absichtlich leer: laeuft einmal beim Mounten
 
   useEffect(() => { loadAll() }, [loadAll])
 

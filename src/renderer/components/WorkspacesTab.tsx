@@ -60,7 +60,7 @@ export function WorkspacesTab() {
       const tags = await api.notes?.tags?.()
       setAllTags(tags ?? [])
     } catch { /* ignore */ }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // absichtlich leer: laeuft einmal beim Mounten
 
   useEffect(() => { loadAll() }, [loadAll])
 

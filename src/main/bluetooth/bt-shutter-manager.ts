@@ -30,6 +30,7 @@ import * as path from 'node:path'
 
 /** Resolve default binary path: packaged app → Resources/bin/, dev → assets/bin/ */
 function getDefaultBinaryPath(): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
   const fs = require('node:fs')
   // In packaged app: process.resourcesPath = <app>/Contents/Resources
   const resourcePath = path.join(process.resourcesPath, 'bin', 'ab-shutter-bridge')
@@ -39,6 +40,7 @@ function getDefaultBinaryPath(): string {
   } catch { /* not packaged */ }
   // Dev mode: use app.getAppPath() which points to the project root
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
     const { app } = require('electron')
     const devPath = path.join(app.getAppPath(), 'assets', 'bin', 'ab-shutter-bridge')
     fs.accessSync(devPath)
@@ -67,6 +69,7 @@ export class BtShutterManager extends EventEmitter {
     // manual starts without --relay). Only one instance can seize the HID device,
     // so stale processes block our exclusive capture → volume keys leak to macOS.
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
       const { execFileSync } = require('child_process')
       const out = execFileSync('pgrep', ['-f', 'ab-shutter-bridge'], { encoding: 'utf-8' }).trim()
       for (const pid of out.split('\n').filter(Boolean)) {

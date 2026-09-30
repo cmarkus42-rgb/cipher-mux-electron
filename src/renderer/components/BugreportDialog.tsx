@@ -95,7 +95,7 @@ export function BugreportDialog({ visible, onClose }: BugreportDialogProps) {
               <p class="bugreport-body__text">{t('bugreport.resultText', { id: result.id })}</p>
               {result.issueUrl && (
                 <p class="bugreport-body__text">
-                  <a href="#" onClick={(e) => { e.preventDefault(); result.issueUrl && api()?.openExternal?.(result.issueUrl) }}
+                  <a href="#" onClick={(e) => { e.preventDefault(); if (result.issueUrl) api()?.openExternal?.(result.issueUrl) }}
                     style={{ color: 'var(--color-accent)', textDecoration: 'underline', cursor: 'pointer' }}>
                     GitHub Issue öffnen
                   </a>

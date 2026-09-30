@@ -331,6 +331,7 @@ export class SessionManager extends EventEmitter {
     }
 
     // Create tmux session (empty projectPath → home dir)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
     const cwd = opts.projectPath || require('os').homedir()
     const tmuxSession = await this.tmux.createSession(tmuxName, {
       cwd,

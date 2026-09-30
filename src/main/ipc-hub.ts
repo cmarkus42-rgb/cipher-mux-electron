@@ -771,9 +771,9 @@ export class IpcHub {
 
   private registerScreenshotChannel(): void {
     ipcMain.handle(IPC.SESSION_SCREENSHOT, async (_e, { sessionId }: { sessionId: string }) => {
-      const { execFileSync } = require('child_process')
-      const fsNode = require('fs')
-      const pathNode = require('path')
+      const { execFileSync } = await import('child_process')
+      const fsNode = await import('fs')
+      const pathNode = await import('path')
 
       // Save to workspace project dir > session projectPath > ~/Pictures fallback
       const session = this.sessionManager.list().find((s: any) => s.id === sessionId)
@@ -1194,6 +1194,7 @@ export class IpcHub {
   private registerVoiceChannels(): void {
     ipcMain.handle(IPC.VOICE_AVAILABLE, () => {
       console.log('[Voice] VOICE_AVAILABLE check starting...')
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchroner Kontext
       const fs = require('fs')
 
       // ── Step 1: Check whisper.node native module ──
@@ -1214,6 +1215,7 @@ export class IpcHub {
 
       // Try actual native load to detect ABI mismatch
       try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
         require('@fugood/whisper.node')
         console.log('[Voice] whisper.node: loaded OK')
       } catch (err) {
@@ -1595,18 +1597,19 @@ export class IpcHub {
 
     // Voice Catalog
     ipcMain.handle(IPC.VOICE_LIST_INSTALLED, () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchroner Kontext
       const { listInstalled } = require('./voice/voice-catalog')
       const piperDir = path.join(os.homedir(), '.config', 'cipher-mux', 'models', 'piper')
       return listInstalled(piperDir)
     })
 
     ipcMain.handle(IPC.VOICE_CATALOG_SEARCH, async (_e, query?: string) => {
-      const { fetchCatalog } = require('./voice/voice-catalog')
+      const { fetchCatalog } = await import('./voice/voice-catalog')
       return fetchCatalog(query)
     })
 
     ipcMain.handle(IPC.VOICE_DOWNLOAD, async (_e, { name }: { name: string }) => {
-      const { downloadVoice } = require('./voice/voice-downloader')
+      const { downloadVoice } = await import('./voice/voice-downloader')
       const piperDir = path.join(os.homedir(), '.config', 'cipher-mux', 'models', 'piper')
       const { emitter, promise } = downloadVoice(name, piperDir)
       const mainWin = this.windowManager.getMainWindow()
@@ -1622,6 +1625,7 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.VOICE_DELETE, (_e, { name }: { name: string }) => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchroner Kontext
       const { deleteVoice } = require('./voice/voice-downloader')
       const piperDir = path.join(os.homedir(), '.config', 'cipher-mux', 'models', 'piper')
       try {
@@ -1648,7 +1652,7 @@ export class IpcHub {
 
     ipcMain.handle(IPC.VOICE_PREVIEW, async (_e, { name }: { name: string }) => {
       try {
-        const { PiperTTS } = require('./voice/tts-piper')
+        const { PiperTTS } = await import('./voice/tts-piper')
         const piperDir = path.join(os.homedir(), '.config', 'cipher-mux', 'models', 'piper')
         const tts = new PiperTTS({ voice: name, modelsDir: piperDir })
         await tts.init()
@@ -1664,6 +1668,7 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.VOICE_RECOMMEND_DOWNLOADS, () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchroner Kontext
       const { getRecommendedDownloads } = require('./setup/voice-bundle')
       return getRecommendedDownloads()
     })
@@ -1811,9 +1816,12 @@ export class IpcHub {
     const active = characters.find(c => c.id === activeId)
     if (!active) return
 
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
     const { syncCharacterSkill } = require('./workspace/persona-skill-sync')
     // Sync to the app-level skills dir
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
     const os = require('os')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
     const path = require('path')
     const skillsDir = path.join(os.homedir(), '.claude', 'skills', 'personas')
     syncCharacterSkill(active, skillsDir)
@@ -2093,9 +2101,9 @@ export class IpcHub {
 
     // Screenshot capture for testcase items (macOS screencapture -i)
     ipcMain.handle(IPC.NOTES_SCREENSHOT, async (_e, { noteId, itemId }: { noteId: string; itemId: string }) => {
-      const { execFileSync } = require('child_process')
-      const fsNode = require('fs')
-      const pathNode = require('path')
+      const { execFileSync } = await import('child_process')
+      const fsNode = await import('fs')
+      const pathNode = await import('path')
       const screenshotDir = pathNode.join(this.noteManager['notesDir'], 'screenshots', noteId)
       fsNode.mkdirSync(screenshotDir, { recursive: true })
       const timestamp = Date.now()
@@ -2117,10 +2125,10 @@ export class IpcHub {
       try {
         const result = await this.noteManager.read(id)
         if (!result || !result.info.tags?.includes('kind:testcase')) return null
-        const { parseTestcase } = require('./notes/testcase-parser')
+        const { parseTestcase } = await import('./notes/testcase-parser')
         // Read raw file to get frontmatter intact for parser
-        const fsNode = require('fs')
-        const pathNode = require('path')
+        const fsNode = await import('fs')
+        const pathNode = await import('path')
         const rawPath = pathNode.join(this.noteManager['notesDir'], `${id}.md`)
         const raw = fsNode.readFileSync(rawPath, 'utf-8')
         return parseTestcase(raw) ?? null
@@ -2171,7 +2179,7 @@ export class IpcHub {
     // Serialize testcase sections back to markdown body (main process)
     ipcMain.handle(IPC.NOTES_SERIALIZE_TESTCASE, async (_e, { sections }: { sections: any[] }) => {
       try {
-        const { serializeTestcaseBody } = require('./notes/testcase-parser')
+        const { serializeTestcaseBody } = await import('./notes/testcase-parser')
         return serializeTestcaseBody(sections)
       } catch (err) {
         console.error('[IpcHub] NOTES_SERIALIZE_TESTCASE failed:', err)
