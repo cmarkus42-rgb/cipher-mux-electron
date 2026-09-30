@@ -4,7 +4,11 @@
  * REQ-HANDOFF-001 through REQ-HANDOFF-006.
  */
 import { z } from 'zod'
+import { promises as fsp } from 'fs'
+import path from 'path'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { BRAND } from '../../shared/brand'
+import { waitForSessionReady } from './session-readiness'
 import type { EntityId, SessionInfo } from '../../shared/types'
 import { IPC } from '../../shared/ipc-channels'
 import type { ToolContext } from './mcp-tools'
@@ -51,17 +55,46 @@ export interface HandoffToolDef {
 // ─── Busy Check (REQ-HANDOFF-003) ──────────────────────────
 
 /**
- * Check if a session is busy (Claude is actively producing output).
- * Uses tmux pane_current_command — 'claude' means active, 'zsh'/'bash' means idle.
+ * Epoch-ms mtime of a session's status-line report, or null when there is none.
+ *
+ * The report is written by Claude Code's own statusLine hook (see
+ * `injectStatusLineHook`), so its presence is the session reporting itself
+ * rather than us reading its screen.
+ */
+export async function statusReportMtime(sessionId: string): Promise<number | null> {
+  try {
+    const stat = await fsp.stat(path.join(BRAND.statusLineDir, `${sessionId}.json`))
+    return stat.mtimeMs
+  } catch {
+    return null
+  }
+}
+
+/** Pane commands that mean "nothing is running here". Login shells carry a '-'. */
+const IDLE_SHELLS = new Set(['zsh', 'bash', 'sh', 'fish', 'dash', 'ksh'])
+
+/**
+ * Check if a session is busy (a CLI is running in the pane).
+ *
+ * Reads tmux pane_current_command and asks whether it is a shell — anything
+ * else counts as a running CLI.
+ *
+ * It used to ask the opposite question, whether the command contained
+ * 'claude'. That broke silently: Claude Code reports its version string as
+ * the pane command (measured: '2.1.284'), so every live CLI read as idle.
+ * executeHandoff's readiness loop then gave up on every freshly started
+ * session after 15s while that session sat at its prompt, ready. Asking
+ * "is this a shell" keeps the documented intent without binding it to a
+ * process name the CLI is free to change.
  */
 export async function isBusy(ctx: ToolContext, session: SessionInfo): Promise<boolean> {
   try {
     const target = session.tmuxPane ?? session.tmuxSession
     const tmux = (ctx.sessionManager as any).tmux
     if (!tmux || !tmux.getPaneCommand) return false
-    const cmd = await tmux.getPaneCommand(target)
-    // If claude process is running in the pane, it's busy
-    return cmd.includes('claude')
+    const cmd: string = (await tmux.getPaneCommand(target))?.trim() ?? ''
+    if (!cmd) return false
+    return !IDLE_SHELLS.has(cmd.replace(/^-/, ''))
   } catch {
     return false
   }
@@ -192,6 +225,10 @@ export async function executeHandoff(
   config: HandoffConfig,
 ): Promise<HandoffResult | HandoffError> {
   try {
+    // Anything the target reports about itself from here on belongs to this
+    // dispatch. An older report is from a previous run of the same session id
+    // and proves nothing.
+    const startedAt = Date.now()
     let targetSession: SessionInfo
     let wasExisting = false
 
@@ -212,36 +249,43 @@ export async function executeHandoff(
         name: config.sessionName,
       })
 
-      // Wait for Claude CLI to be ready. A freshly started session has only
-      // zsh — Claude CLI launches after the renderer calls markReady() or
-      // the 4s fallback timer fires. Without this wait, the payload would
-      // be injected directly into zsh, interpreted as shell commands.
-      //
-      // Two-layer check with exponential backoff (500ms, 1s, 2s, 4s, 4s ≈ 15s total):
-      // 1. isBusy check (claude process running in pane)
-      // 2. tmux capture-pane for Claude prompt (❯ or "Try") — proves CLI
-      //    is actually waiting for input, not just starting up.
-      const backoffDelays = [500, 1000, 2000, 4000, 4000]
-      let ready = false
-      for (const delay of backoffDelays) {
-        await new Promise(r => setTimeout(r, delay))
-        try {
-          // Layer 1: is claude process present?
-          const busy = await isBusy(ctx, targetSession)
-          if (!busy) continue
+    }
 
-          // Layer 2: is the prompt visible? (ready for input)
-          const captured = await ctx.sessionManager.capture(targetSession.id, 15)
-          if (captured.includes('\u276f') || captured.includes('Try')) {
-            ready = true
-            break
-          }
-        } catch { /* ignore — session may not be fully up yet */ }
-      }
-      if (!ready) {
-        return { ok: false, error: 'Claude CLI did not become ready in target session within 15s (no prompt detected)' }
+    // Readiness is a property of the session we are about to type into, not of
+    // how we got hold of it. Guarding only freshly started sessions left the
+    // worse case open: an existing session sitting in a modal dialog swallowed
+    // the payload into a search field while this function reported success,
+    // and callers marked their handoff delivered on the strength of that.
+    //
+    // Two independent signals, neither able to veto the other — see
+    // session-readiness.ts. An existing session answers on the first probe or
+    // not at all, so it gets a much shorter budget than a booting one.
+    const readiness = await waitForSessionReady(
+      {
+        statusReportMtime,
+        capturePane: id => ctx.sessionManager.capture(id, 15),
+      },
+      targetSession.id,
+      {
+        since: startedAt,
+        ...(wasExisting ? { delays: [250, 500, 1000] } : {}),
+      },
+    )
+    if (!readiness.ready) {
+      return {
+        ok: false,
+        error: wasExisting
+          ? `Existing ${config.targetEntityId} session is not accepting input — neither a `
+            + 'status-line report nor a visible prompt appeared. It may be sitting in a '
+            + 'dialog; nothing was sent.'
+          : 'Target session did not become ready within 15s — neither a status-line '
+            + 'report nor a visible prompt appeared.',
       }
     }
+    console.log(
+      `[executeHandoff] ${config.targetEntityId} ready via ${readiness.via}`
+      + ` after ${readiness.attempts} attempt(s), wasExisting=${wasExisting}`,
+    )
 
     // Format and deliver via tmux send-keys (REQ-HANDOFF-005)
     const message = formatPayload(config.senderEntityId, config.payload)
