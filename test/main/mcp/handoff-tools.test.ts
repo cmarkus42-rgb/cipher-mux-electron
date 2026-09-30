@@ -53,6 +53,7 @@ function makeCtx(opts: MockCtxOpts = {}) {
     sendKeys: async (sessionId: string, keys: string) => {
       sendKeysCalls.push([sessionId, keys])
     },
+    sendKey: async () => {},
     startEntity: async (entityId: EntityId, _opts?: any) => {
       if (opts.startEntityResult) return opts.startEntityResult
       return makeSession({ id: `new-${entityId}`, entityId, name: entityId })
@@ -132,7 +133,7 @@ describe('REQ-TOOLS-001: mux_ideation_handoff_refinement', () => {
 
     // Verify delivery contains sender identity
     // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
-    const message = sendKeysCalls[1][1]
+    const message = sendKeysCalls.map(c => c[1]).reduce((a, b) => (b.length > a.length ? b : a), '')
     assert.ok(message.includes('[HANDOFF from ideation-partner]'))
     assert.ok(message.includes('anforderungspaketPath'))
     assert.ok(message.includes('/tmp/paket.md'))
@@ -177,7 +178,7 @@ describe('REQ-TOOLS-002: mux_refinement_handoff_cyber_factory', () => {
     assert.equal(parsed.targetSessionId, session.id)
 
     // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
-    const message = sendKeysCalls[1][1]
+    const message = sendKeysCalls.map(c => c[1]).reduce((a, b) => (b.length > a.length ? b : a), '')
     assert.ok(message.includes('[HANDOFF from refinement]'))
     assert.ok(message.includes('detailSpecPath'))
     assert.ok(message.includes('builder'))
@@ -195,7 +196,7 @@ describe('REQ-TOOLS-002: mux_refinement_handoff_cyber_factory', () => {
     })
 
     // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
-    const message = sendKeysCalls[1][1]
+    const message = sendKeysCalls.map(c => c[1]).reduce((a, b) => (b.length > a.length ? b : a), '')
     assert.ok(message.includes('architect'))
   })
 
@@ -241,7 +242,7 @@ describe('REQ-TOOLS-003: mux_refinement_handoff_ideation', () => {
     assert.equal(parsed.targetSessionId, session.id)
 
     // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
-    const message = sendKeysCalls[1][1]
+    const message = sendKeysCalls.map(c => c[1]).reduce((a, b) => (b.length > a.length ? b : a), '')
     assert.ok(message.includes('[HANDOFF from refinement]'))
     assert.ok(message.includes('NFR gaps'))
     assert.ok(message.includes('No performance spec'))
@@ -276,7 +277,7 @@ describe('REQ-TOOLS-004: mux_cyber_factory_handoff_testing', () => {
     assert.equal(parsed.targetSessionId, session.id)
 
     // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
-    const message = sendKeysCalls[1][1]
+    const message = sendKeysCalls.map(c => c[1]).reduce((a, b) => (b.length > a.length ? b : a), '')
     assert.ok(message.includes('[HANDOFF from cyber-factory]'))
     assert.ok(message.includes('run_id'))
     assert.ok(message.includes('welle-3'))
@@ -343,7 +344,7 @@ describe('REQ-TOOLS-005: mux_cyber_factory_handoff_debugger', () => {
     assert.equal(parsed.targetSessionId, session.id)
 
     // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
-    const message = sendKeysCalls[1][1]
+    const message = sendKeysCalls.map(c => c[1]).reduce((a, b) => (b.length > a.length ? b : a), '')
     assert.ok(message.includes('[HANDOFF from cyber-factory]'))
     assert.ok(message.includes('findings_report'))
     assert.ok(message.includes('severity_summary'))
@@ -412,7 +413,7 @@ describe('REQ-TOOLS-011: mux_audit_handoff_cyber_factory', () => {
     assert.equal(parsed.targetSessionId, session.id)
 
     // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
-    const message = sendKeysCalls[1][1]
+    const message = sendKeysCalls.map(c => c[1]).reduce((a, b) => (b.length > a.length ? b : a), '')
     assert.ok(message.includes('[HANDOFF from audit]'))
     assert.ok(message.includes('verdict'))
     assert.ok(message.includes('release-after-fix'))
@@ -504,9 +505,10 @@ describe('REQ-TOOLS-006: mux_testing_findings_handoff_debugger', () => {
     assert.equal(parsed.targetSessionId, session.id)
 
     // Verify tmux delivery happened: Escape + message + \r (at minimum)
-    assert.ok(sendKeysCalls.length >= 3)
+    // Escape geht ueber sendKey, ueber sendKeys laufen nur noch Payload und Enter
+    assert.ok(sendKeysCalls.length >= 2)
     // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
-    const message = sendKeysCalls[1][1]
+    const message = sendKeysCalls.map(c => c[1]).reduce((a, b) => (b.length > a.length ? b : a), '')
     assert.ok(message.includes('[HANDOFF from testing-assistant]'))
   })
 })

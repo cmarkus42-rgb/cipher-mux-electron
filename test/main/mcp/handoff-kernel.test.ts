@@ -38,9 +38,10 @@ interface MockCtxOpts {
   startEntityError?: string
 }
 
-function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[][]; messageBusCalls: any[]; visibleAddCalls: any[]; noteCreateCalls: any[] } {
+function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[][]; sendKeyCalls: string[][]; messageBusCalls: any[]; visibleAddCalls: any[]; noteCreateCalls: any[] } {
   const sessions = opts.sessions ?? []
   const sendKeysCalls: string[][] = []
+  const sendKeyCalls: string[][] = []
   const messageBusCalls: any[] = []
   const visibleAddCalls: any[] = []
   const noteCreateCalls: any[] = []
@@ -68,6 +69,9 @@ function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[
     getEntityRegistry: () => entityRegistry,
     sendKeys: async (sessionId: string, keys: string) => {
       sendKeysCalls.push([sessionId, keys])
+    },
+    sendKey: async (sessionId: string, keyName: string) => {
+      sendKeyCalls.push([sessionId, keyName])
     },
     startEntity: async (entityId: EntityId, _opts?: any) => {
       if (opts.startEntityError) throw new Error(opts.startEntityError)
@@ -114,6 +118,7 @@ function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[
     noteSearchIndex: null,
     memoryStore: null,
     sendKeysCalls,
+    sendKeyCalls,
     messageBusCalls,
     visibleAddCalls,
     noteCreateCalls,
@@ -222,11 +227,19 @@ describe('handoff-kernel: executeHandoff', () => {
     assert.equal((result as HandoffResult).wasExisting, true)
     assert.equal((result as HandoffResult).targetSessionId, existingSession.id)
 
-    // Verify sendKeys was called: Escape + payload + Enter (at minimum)
-    assert.ok(ctx.sendKeysCalls.length >= 3)
-    // First call is Escape to dismiss any Suggested Prompt
-    assert.equal(ctx.sendKeysCalls[0][1], 'Escape')
-    const fullMessage = ctx.sendKeysCalls[1][1]
+    // Escape goes through the key path — sendKeys only sends literal text, so
+    // 'Escape' there would be typed as the word into the prompt. It was:
+    // a live transcript showed the payload arriving as "Escapeon nie.".
+    assert.deepEqual(ctx.sendKeyCalls.map(c => c[1]), ['Escape'])
+    assert.equal(
+      ctx.sendKeysCalls.some(c => c[1] === 'Escape'),
+      false,
+      'Escape must never be sent as literal text',
+    )
+
+    // Payload + Enter go through the literal path
+    assert.ok(ctx.sendKeysCalls.length >= 2)
+    const fullMessage = ctx.sendKeysCalls[0][1]
     assert.ok(fullMessage.includes('[HANDOFF from ideation-partner]'))
     assert.ok(fullMessage.includes('specPath'))
   })
@@ -403,7 +416,7 @@ describe('handoff-kernel: delivery format', () => {
     await executeHandoff(ctx, config)
 
     // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
-    const delivered = ctx.sendKeysCalls[1][1]
+    const delivered = ctx.sendKeysCalls.map(c => c[1]).reduce((a, b) => (b.length > a.length ? b : a), '')
     assert.ok(delivered.startsWith('[HANDOFF from ideation-partner]'))
     assert.ok(delivered.includes('**specPath:** /tmp/spec.md'))
     assert.ok(delivered.includes('**phase:** architect'))
@@ -423,7 +436,7 @@ describe('handoff-kernel: delivery format', () => {
     await executeHandoff(ctx, config)
 
     // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
-    const delivered = ctx.sendKeysCalls[1][1]
+    const delivered = ctx.sendKeysCalls.map(c => c[1]).reduce((a, b) => (b.length > a.length ? b : a), '')
     assert.ok(delivered.includes('**gaps:**'))
     assert.ok(delivered.includes('- NFR missing'))
     assert.ok(delivered.includes('- No error handling spec'))
