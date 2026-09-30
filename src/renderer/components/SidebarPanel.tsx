@@ -58,7 +58,7 @@ export function SidebarPanel({
   const collapsedLoaded = useRef(false)
 
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api?.config?.get?.('sidebarCollapsed')?.then((saved: Record<string, boolean> | null) => {
       if (saved && typeof saved === 'object') {
         setCollapsed(prev => ({ ...prev, ...saved }))
@@ -70,7 +70,7 @@ export function SidebarPanel({
   const toggleSection = useCallback((key: string) => {
     setCollapsed(prev => {
       const next = { ...prev, [key]: !prev[key] }
-      const api = (window as any).cipherMux
+      const api = window.cipherMux
       api?.config?.set?.('sidebarCollapsed', next).catch(() => {})
       return next
     })
@@ -87,7 +87,7 @@ export function SidebarPanel({
   // create/rename/delete so a deleted workspace still resolves for the badge
   // until its sessions are gone.
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.workspaces?.list) return
     let mounted = true
     const load = () => {
@@ -121,7 +121,7 @@ export function SidebarPanel({
       setWorkspaceName(null)
       return
     }
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api?.config?.get?.('workspaces')?.then((workspaces: any[]) => {
       const ws = workspaces?.find((w: any) => w.id === activeWorkspaceId)
       setWorkspaceName(ws?.name ?? activeWorkspaceId)
@@ -132,7 +132,7 @@ export function SidebarPanel({
   // Orphan detection: listen for periodic events + initial scan
   useEffect(() => {
     let mounted = true
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.sessions?.detectOrphans || !api?.sessions?.onOrphansDetected) return
 
     // Initial scan
@@ -149,13 +149,13 @@ export function SidebarPanel({
   }, [])
 
   const handleOrphanAdopt = useCallback(async (tmuxSession: string) => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     await api.sessions.recoveryAction('adopt', tmuxSession)
     setOrphans(prev => prev.filter(o => o.tmuxSession !== tmuxSession))
   }, [])
 
   const handleOrphanKill = useCallback(async (tmuxSession: string) => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     await api.sessions.recoveryAction('kill', tmuxSession)
     setOrphans(prev => prev.filter(o => o.tmuxSession !== tmuxSession))
   }, [])
@@ -165,7 +165,7 @@ export function SidebarPanel({
       onOpenNoteInGrid(note)
     } else {
       // Fallback: try the first registered NotesCell
-      const reg = (window as any).__notesCellRegistry as Record<number, (n: any) => void> | undefined
+      const reg = window.__notesCellRegistry
       if (reg) {
         const keys = Object.keys(reg)
         if (keys.length > 0) reg[Number(keys[0])]!(note)
@@ -416,7 +416,7 @@ function BackgroundSessionCard({ session, contextUsage, workspaceBadge, workspac
 
   useEffect(() => {
     let mounted = true
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.sessions?.capture) return
 
     const fetchPreview = async () => {

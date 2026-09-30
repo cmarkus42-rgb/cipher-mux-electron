@@ -1,6 +1,6 @@
 import { useCallback } from 'preact/hooks'
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 interface FolderPickerInputProps {
   value: string

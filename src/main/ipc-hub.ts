@@ -2508,8 +2508,8 @@ export class IpcHub {
           fs.writeFileSync(presetMdPath, content, 'utf-8')
         }
         return { ok: true }
-      } catch (err: any) {
-        return { ok: false, error: err.message }
+      } catch (err) {
+        return { ok: false, error: (err instanceof Error ? err.message : String(err)) }
       }
     })
 
@@ -2557,8 +2557,8 @@ ist dieses Entity fokussiert?
         const registry = this.sessionManager.getEntityRegistry()
         scanAndRegisterEntities(registry)
         return { ok: true }
-      } catch (err: any) {
-        return { ok: false, error: err.message }
+      } catch (err) {
+        return { ok: false, error: (err instanceof Error ? err.message : String(err)) }
       }
     })
 
@@ -2570,8 +2570,8 @@ ist dieses Entity fokussiert?
         }
         fs.rmSync(dir, { recursive: true, force: true })
         return { ok: true }
-      } catch (err: any) {
-        return { ok: false, error: err.message }
+      } catch (err) {
+        return { ok: false, error: (err instanceof Error ? err.message : String(err)) }
       }
     })
 
@@ -2616,8 +2616,8 @@ ist dieses Entity fokussiert?
       try {
         const content = getGlobalRules()
         return { ok: true, content }
-      } catch (err: any) {
-        return { ok: false, content: '', error: err.message }
+      } catch (err) {
+        return { ok: false, content: '', error: (err instanceof Error ? err.message : String(err)) }
       }
     })
 
@@ -2626,8 +2626,8 @@ ist dieses Entity fokussiert?
         setGlobalRules(content)
         invalidateGlobalRulesCache()
         return { ok: true }
-      } catch (err: any) {
-        return { ok: false, error: err.message }
+      } catch (err) {
+        return { ok: false, error: (err instanceof Error ? err.message : String(err)) }
       }
     })
   }

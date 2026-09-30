@@ -95,7 +95,7 @@ export function NotesCell({
         setTabs((prev) => prev.filter((t) => t.id !== info.id))
       }
       // Read content
-      const apiObj = (window as any).cipherMux
+      const apiObj = window.cipherMux
       const result = await apiObj.notes.read(info.id)
       if (!result) return
 
@@ -161,7 +161,7 @@ export function NotesCell({
   )
 
   const handleCreateNote = useCallback(async () => {
-    const apiObj = (window as any).cipherMux
+    const apiObj = window.cipherMux
     const note = await apiObj.notes.create('', '# ')
     const tab: NoteTab = {
       id: note.id,
@@ -189,7 +189,7 @@ export function NotesCell({
   const handleAutoSave = useCallback(
     async (content: string) => {
       if (!activeTab) return
-      const apiObj = (window as any).cipherMux
+      const apiObj = window.cipherMux
       // Auto-save writes file but doesn't trigger tagging
       const result = await apiObj.notes.save(activeTab.id, content, undefined, true)
       const title = result?.title || activeTab.title
@@ -203,7 +203,7 @@ export function NotesCell({
   const handleTagsChange = useCallback(
     async (newTags: string[]) => {
       if (!activeTab) return
-      const apiObj = (window as any).cipherMux
+      const apiObj = window.cipherMux
       // Save with current body + new tags
       await apiObj.notes.save(activeTab.id, activeTab.content, newTags, true)
       setTabs((prev) =>
@@ -237,7 +237,7 @@ export function NotesCell({
   const handleTestcaseUpdate = useCallback(
     async (sections: TestcaseSection[]) => {
       if (!activeTab?.testcase) return
-      const apiObj = (window as any).cipherMux
+      const apiObj = window.cipherMux
       const updated: ParsedTestcase = { ...activeTab.testcase, sections }
       const body = await apiObj.notes.serializeTestcaseBody(sections)
       if (!body) { console.error('[NotesCell] serializeTestcaseBody returned null'); return }
@@ -255,7 +255,7 @@ export function NotesCell({
   // Testcase: archive — summarize locally (pure logic), serialize via IPC
   const handleTestcaseArchive = useCallback(async () => {
     if (!activeTab?.testcase) return
-    const apiObj = (window as any).cipherMux
+    const apiObj = window.cipherMux
     // Summarize locally (no Node.js deps needed)
     const sections = activeTab.testcase.sections
     let total = 0, pass = 0, fail = 0
@@ -286,7 +286,7 @@ export function NotesCell({
   // Testcase: screenshot (invokes macOS screencapture)
   const handleTestcaseScreenshot = useCallback(async (itemId: string) => {
     if (!activeTab) return
-    const apiObj = (window as any).cipherMux
+    const apiObj = window.cipherMux
     // Use IPC to trigger screencapture in main process
     if (apiObj?.notes?.screenshot) {
       const result = await apiObj.notes.screenshot(activeTab.id, itemId)
@@ -307,7 +307,7 @@ export function NotesCell({
 
   // Testcase: feature request export
   const handleFeatureRequest = useCallback(async (itemId: string, description: string) => {
-    const apiObj = (window as any).cipherMux
+    const apiObj = window.cipherMux
     await apiObj.notes.create(
       `Feature Request: ${itemId}`,
       `# Feature Request: ${itemId}\n\n${description}\n\nSource: testcase ${activeTab?.id}`,
@@ -327,7 +327,7 @@ export function NotesCell({
   useEffect(() => {
     const ids = initialNoteIdsRef.current
     if (!ids || ids.length === 0) return
-    const apiObj = (window as any).cipherMux
+    const apiObj = window.cipherMux
     if (!apiObj?.notes?.list) return
     apiObj.notes.list().then((allNotes: NoteInfo[]) => {
       for (const id of ids) {
@@ -339,7 +339,7 @@ export function NotesCell({
 
   // Expose openNote for external calls (from sidebar / MCP) — per-slot registry
   useEffect(() => {
-    const reg = ((window as any).__notesCellRegistry ??= {} as Record<number, typeof openNote>)
+    const reg = (window.__notesCellRegistry ??= {})
     reg[slotIndex] = openNote
     return () => {
       delete reg[slotIndex]
@@ -348,7 +348,7 @@ export function NotesCell({
 
   // Listen for external note changes — reload open tabs whose content changed
   useEffect(() => {
-    const apiObj = (window as any).cipherMux
+    const apiObj = window.cipherMux
     if (!apiObj?.notes?.onChanged) return
     const unsub = apiObj.notes.onChanged(async (event: any) => {
       const noteId = event?.id
@@ -477,7 +477,7 @@ export function NotesCell({
                   class="notes-tab__action"
                   onClick={(e) => {
                     e.stopPropagation()
-                    const api = (window as any).cipherMux
+                    const api = window.cipherMux
                     if ((window as any).__cipherMuxTtsSpeaking) {
                       api?.voice?.stopSpeech?.()
                       ;(window as any).__cipherMuxTtsSpeaking = false

@@ -5,7 +5,7 @@ import type { Character } from '../../shared/types'
 import { assignCharacterColor } from '../../shared/character-palette'
 import { PersonaAvatar } from './PersonaAvatar'
 
-const api = (window as any).cipherMux
+const api = window.cipherMux
 
 export function CompanionTab() {
   const { t } = useTranslation()

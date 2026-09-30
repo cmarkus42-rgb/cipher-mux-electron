@@ -81,7 +81,7 @@ export function SessionGrid({
   // workspace still resolves to its last-known name for the "(deleted)" case.
   const [workspaceList, setWorkspaceList] = useState<WorkspaceBadgeLookup[]>([])
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.workspaces?.list) return
     let mounted = true
     const load = () => {
@@ -114,7 +114,7 @@ export function SessionGrid({
 
   // Grid navigation via voice commands
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.terminal?.onGridNav) return
     // Build set of session IDs actually visible in the grid
     const visibleSessionIds = new Set(sessions.map(s => s.id))
@@ -130,7 +130,7 @@ export function SessionGrid({
 
   // Voice clipboard commands (copy/paste)
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.terminal?.onVoiceClipboard) return
     const unsub = api.terminal.onVoiceClipboard((data: { action: 'copy' | 'paste' }) => {
       if (data.action === 'copy') {
@@ -223,7 +223,7 @@ export function SessionGrid({
     if (files && files.length > 0 && !cipherType) {
       const slot = grid.slots[targetIdx]
       if (slot?.sessionId) {
-        const api = (window as any).cipherMux
+        const api = window.cipherMux
         const paths: string[] = []
         for (let i = 0; i < files.length; i++) {
           // Use webUtils.getPathForFile via preload (contextIsolation-safe)

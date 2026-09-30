@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '../shared/ipc-channels'
+import type { Persona, Character, Workspace } from '../shared/types'
 
 /**
  * Preload script — exposes window.cipherMux API via contextBridge.
@@ -12,23 +13,23 @@ const api = {
     start: (opts: unknown) => ipcRenderer.invoke(IPC.SESSIONS_START, opts),
     stop: (sessionId: string) => ipcRenderer.invoke(IPC.SESSIONS_STOP, { sessionId }),
     recover: () => ipcRenderer.invoke(IPC.SESSIONS_RECOVER),
-    onChanged: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onChanged: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.SESSION_CHANGED, handler)
       return () => ipcRenderer.removeListener(IPC.SESSION_CHANGED, handler)
     },
-    onClosing: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onClosing: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.SESSION_CLOSING, handler)
       return () => ipcRenderer.removeListener(IPC.SESSION_CLOSING, handler)
     },
-    onStopped: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onStopped: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.SESSION_STOPPED, handler)
       return () => ipcRenderer.removeListener(IPC.SESSION_STOPPED, handler)
     },
-    onRecoveryResult: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onRecoveryResult: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.SESSIONS_RECOVERY_RESULT, handler)
       return () => ipcRenderer.removeListener(IPC.SESSIONS_RECOVERY_RESULT, handler)
     },
@@ -68,8 +69,8 @@ const api = {
       ipcRenderer.on(IPC.TERMINAL_DATA, handler)
       return () => ipcRenderer.removeListener(IPC.TERMINAL_DATA, handler)
     },
-    onCellScroll: (cb: (data: { sessionId?: string; cell?: string; action: string; lines?: number }) => void) => {
-      const handler = (_e: unknown, data: { sessionId?: string; cell?: string; action: string; lines?: number }) => cb(data)
+    onCellScroll: <T = { sessionId?: string; cell?: string; action: string; lines?: number }>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.CELL_SCROLL, handler)
       return () => ipcRenderer.removeListener(IPC.CELL_SCROLL, handler)
     },
@@ -92,8 +93,8 @@ const api = {
     unread: () => ipcRenderer.invoke(IPC.MESSAGES_UNREAD),
     markRead: (messageIds: string[]) =>
       ipcRenderer.invoke(IPC.MESSAGES_MARK_READ, { messageIds }),
-    onReceived: (cb: (msg: unknown) => void) => {
-      const handler = (_e: unknown, msg: unknown) => cb(msg)
+    onReceived: <T = unknown>(cb: (msg: T) => void) => {
+      const handler = (_e: unknown, msg: unknown) => cb(msg as T)
       ipcRenderer.on(IPC.MESSAGE_RECEIVED, handler)
       return () => ipcRenderer.removeListener(IPC.MESSAGE_RECEIVED, handler)
     },
@@ -102,8 +103,8 @@ const api = {
   // ─── Projects ──────────────────────────────────────────
   projects: {
     kickoff: (opts: unknown) => ipcRenderer.invoke(IPC.PROJECTS_KICKOFF, opts),
-    onCompleted: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onCompleted: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.PROJECT_KICKOFF_COMPLETED, handler)
       return () => ipcRenderer.removeListener(IPC.PROJECT_KICKOFF_COMPLETED, handler)
     },
@@ -113,13 +114,13 @@ const api = {
   context: {
     get: (sessionId: string) => ipcRenderer.invoke(IPC.CONTEXT_GET, { sessionId }),
     all: () => ipcRenderer.invoke(IPC.CONTEXT_ALL),
-    onUpdated: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onUpdated: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.CONTEXT_UPDATED, handler)
       return () => ipcRenderer.removeListener(IPC.CONTEXT_UPDATED, handler)
     },
-    onWarning: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onWarning: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.CONTEXT_WARNING, handler)
       return () => ipcRenderer.removeListener(IPC.CONTEXT_WARNING, handler)
     },
@@ -132,8 +133,8 @@ const api = {
     saveGrid: (grid: unknown) => ipcRenderer.invoke(IPC.CONFIG_SAVE_GRID, grid),
     getSkipPermissions: (): Promise<boolean> => ipcRenderer.invoke('cipher-mux:config:get-skip-permissions'),
     setSkipPermissions: (v: boolean): Promise<{ ok: boolean }> => ipcRenderer.invoke('cipher-mux:config:set-skip-permissions', v),
-    onThemeChanged: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onThemeChanged: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.THEME_CHANGED, handler)
       return () => ipcRenderer.removeListener(IPC.THEME_CHANGED, handler)
     },
@@ -160,8 +161,8 @@ const api = {
     start: () => ipcRenderer.invoke(IPC.WORKSHOP_START),
     stop: () => ipcRenderer.invoke(IPC.WORKSHOP_STOP),
     status: () => ipcRenderer.invoke(IPC.WORKSHOP_STATUS),
-    onStarted: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onStarted: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.WORKSHOP_STARTED, handler)
       return () => ipcRenderer.removeListener(IPC.WORKSHOP_STARTED, handler)
     },
@@ -172,8 +173,8 @@ const api = {
     start: () => ipcRenderer.invoke(IPC.CYBER_FACTORY_START),
     stop: () => ipcRenderer.invoke(IPC.CYBER_FACTORY_STOP),
     status: () => ipcRenderer.invoke(IPC.CYBER_FACTORY_STATUS),
-    onStarted: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onStarted: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.CYBER_FACTORY_STARTED, handler)
       return () => ipcRenderer.removeListener(IPC.CYBER_FACTORY_STARTED, handler)
     },
@@ -228,13 +229,13 @@ const api = {
     get: (id: string) => ipcRenderer.invoke(IPC.TASKS_GET, { id }),
     retry: (id: string) => ipcRenderer.invoke(IPC.TASKS_RETRY, { id }),
     cancel: (id: string) => ipcRenderer.invoke(IPC.TASKS_CANCEL, { id }),
-    onCreated: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onCreated: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.TASK_CREATED, handler)
       return () => ipcRenderer.removeListener(IPC.TASK_CREATED, handler)
     },
-    onStateChanged: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onStateChanged: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.TASK_STATE_CHANGED, handler)
       return () => ipcRenderer.removeListener(IPC.TASK_STATE_CHANGED, handler)
     },
@@ -301,8 +302,8 @@ const api = {
       ipcRenderer.invoke(IPC.NOTES_TAG_SYNONYMS_LIST),
     tagIndex: () => ipcRenderer.invoke(IPC.NOTES_TAG_INDEX),
     tagIndexRefresh: () => ipcRenderer.invoke(IPC.NOTES_TAG_INDEX_REFRESH),
-    onChanged: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onChanged: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.NOTES_CHANGED, handler)
       return () => ipcRenderer.removeListener(IPC.NOTES_CHANGED, handler)
     },
@@ -367,15 +368,15 @@ const api = {
 
   // ─── Personas (legacy) ──────────────────────────────────
   personas: {
-    list: (): Promise<unknown[]> => ipcRenderer.invoke('cipher-mux:personas:list'),
+    list: (): Promise<Persona[]> => ipcRenderer.invoke('cipher-mux:personas:list'),
     save: (p: unknown): Promise<{ ok: boolean }> => ipcRenderer.invoke('cipher-mux:personas:save', p),
     delete: (id: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('cipher-mux:personas:delete', id),
   },
 
   // ─── Characters (Companion Persona) ─────────────────────
   characters: {
-    list: (): Promise<unknown[]> => ipcRenderer.invoke(IPC.CHARACTERS_LIST),
-    active: (): Promise<unknown> => ipcRenderer.invoke(IPC.CHARACTERS_ACTIVE),
+    list: (): Promise<Character[]> => ipcRenderer.invoke(IPC.CHARACTERS_LIST),
+    active: (): Promise<Character> => ipcRenderer.invoke(IPC.CHARACTERS_ACTIVE),
     save: (c: unknown): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.CHARACTERS_SAVE, c),
     delete: (id: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke(IPC.CHARACTERS_DELETE, id),
     switch: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.CHARACTERS_SWITCH, id),
@@ -387,13 +388,13 @@ const api = {
 
   // ─── Workspaces ──────────────────────────────────────────
   workspaces: {
-    list: (): Promise<unknown[]> => ipcRenderer.invoke('cipher-mux:workspaces:list'),
+    list: (): Promise<Workspace[]> => ipcRenderer.invoke('cipher-mux:workspaces:list'),
     save: (ws: unknown): Promise<{ ok: boolean }> => ipcRenderer.invoke('cipher-mux:workspaces:save', ws),
     delete: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('cipher-mux:workspaces:delete', id),
     apply: (id: string): Promise<{ applied: boolean; sessionsStarted?: number; warnings?: string[]; sessions?: Array<{ cellIndex: number; sessionId: string }> }> => ipcRenderer.invoke('cipher-mux:workspaces:apply', id),
     active: (id?: string): Promise<string | null> => ipcRenderer.invoke('cipher-mux:workspaces:active', id),
-    onChanged: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onChanged: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.WORKSPACES_CHANGED, handler)
       return () => { ipcRenderer.removeListener(IPC.WORKSPACES_CHANGED, handler) }
     },
@@ -602,8 +603,8 @@ const api = {
     check: () => ipcRenderer.invoke(IPC.SETUP_CHECK),
     installAll: (opts?: { selectedIds?: string[] }) => ipcRenderer.invoke(IPC.SETUP_INSTALL_ALL, opts),
     skip: () => ipcRenderer.invoke(IPC.SETUP_SKIP),
-    onProgress: (cb: (data: unknown) => void) => {
-      const handler = (_e: unknown, data: unknown) => cb(data)
+    onProgress: <T = unknown>(cb: (data: T) => void) => {
+      const handler = (_e: unknown, data: unknown) => cb(data as T)
       ipcRenderer.on(IPC.SETUP_PROGRESS, handler)
       return () => ipcRenderer.removeListener(IPC.SETUP_PROGRESS, handler)
     },

@@ -33,7 +33,7 @@ interface InfoSettingsViewProps {
   registeredShortcuts?: RegisteredShortcut[]
 }
 
-const api = (window as any).cipherMux
+const api = window.cipherMux
 
 type TabId = 'general' | 'sprache' | 'themes' | 'shortcuts' | 'remote' | 'a11y' | 'about'
 // Legacy alias for external consumers

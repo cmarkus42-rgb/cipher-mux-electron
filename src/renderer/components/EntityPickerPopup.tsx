@@ -9,7 +9,7 @@ import type { EntityId } from '../../shared/types'
 import { isEntityRunningIn } from '../../shared/entity-status'
 import { GLOBAL_WORKSPACE_KEY } from '../../shared/workspace-key'
 
-const cipherApi = () => (window as any).cipherMux
+const cipherApi = () => window.cipherMux
 
 // ─── Types ───────────────────────────────────────────────
 

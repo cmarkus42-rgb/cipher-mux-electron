@@ -25,7 +25,7 @@ function CopyButton({ getText, title }: { getText: () => string; title?: string 
   )
 }
 
-const api = (window as any).cipherMux
+const api = window.cipherMux
 
 function countUsage(personaId: string, workspaces: Workspace[]) {
   let cellCount = 0

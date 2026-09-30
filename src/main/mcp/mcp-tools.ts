@@ -106,14 +106,14 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       projectName: z.string().optional().describe('Name in hub (default: directory name)'),
       excludeBuildArtifacts: z.boolean().optional().describe('Exclude node_modules, dist, .cache etc. (default: true)'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await integrate(args)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await integrate(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   ;(server.registerTool as any)('mux_hub_inventory', {
     description: 'Run a read-only brownfield inventory on a project in the Hub. Detects stack, structure, specs, tests.',
     inputSchema: {
       projectName: z.string().describe('Project name in hub'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await inventory(args.projectName)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await inventory(args.projectName)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   ;(server.registerTool as any)('mux_hub_migration_plan', {
     description: 'Generate a 3-section migration plan based on inventory. Sections: unchanged, extended, new.',
@@ -122,7 +122,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       mode: z.enum(['voll', 'pack-light']).optional().describe('Migration mode (default: voll)'),
       components: z.array(z.string()).optional().describe('Components for pack-light mode'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await migrationPlan(args)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await migrationPlan(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   ;(server.registerTool as any)('mux_hub_apply', {
     description: 'Execute migration plan steps. Idempotent — already-applied steps are skipped.',
@@ -131,7 +131,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       planPath: z.string().optional().describe('Path to plan file (default: latest)'),
       dryRun: z.boolean().optional().describe('Preview only, no changes (default: false)'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubApply(args)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubApply(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   ;(server.registerTool as any)('mux_hub_verify', {
     description: 'Run build and test suite in a hub project. Gate before release — no green verify, no release.',
@@ -141,14 +141,14 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       runBuild: z.boolean().optional().describe('Run build (default: true)'),
       runTests: z.boolean().optional().describe('Run tests (default: true)'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubVerify(args)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubVerify(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   ;(server.registerTool as any)('mux_hub_release', {
     description: 'Mark project as released. Sets push-lock on original, writes MIGRATED.md, updates ARCHIV-VERWEIS.',
     inputSchema: {
       projectName: z.string().describe('Project name in hub'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubRelease(args.projectName)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubRelease(args.projectName)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   ;(server.registerTool as any)('mux_hub_rollback', {
     description: 'Rollback: workspace back to original path, remove push-lock, delete MIGRATED.md.',
@@ -156,7 +156,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       projectName: z.string().describe('Project name in hub'),
       removeHubCopy: z.boolean().optional().describe('Delete hub copy (destructive, requires confirmation)'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubRollback(args)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubRollback(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   // 1. mux_send — Send a message to the message bus (with optional push delivery)
   ;(server.registerTool as any)(

@@ -25,7 +25,7 @@ interface TagValueRow {
   isSeed: boolean
 }
 
-const api = (window as any).cipherMux
+const api = window.cipherMux
 
 const CLASS_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b',

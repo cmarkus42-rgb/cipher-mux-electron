@@ -110,8 +110,8 @@ export async function testOllamaConnection(host?: string, port?: number): Promis
   try {
     await ollamaGet('/api/tags', host, port)
     return { ok: true }
-  } catch (err: any) {
-    return { ok: false, error: err?.message ?? 'Connection failed' }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Connection failed' }
   }
 }
 

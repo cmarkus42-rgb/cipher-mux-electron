@@ -15,13 +15,13 @@ export function HubSetupDialog({ onComplete }: HubSetupDialogProps) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api.hub.defaultPath().then((p: string) => { if (p) setPath(p) })
   }, [])
 
   const handleBrowse = useCallback(async () => {
     try {
-      const api = (window as any).cipherMux
+      const api = window.cipherMux
       const selected = await api.dialog.openDir({
         title: t('hub.setupTitle'),
         defaultPath: path || undefined,
@@ -39,8 +39,8 @@ export function HubSetupDialog({ onComplete }: HubSetupDialogProps) {
     setError(null)
     try {
       await onComplete(target)
-    } catch (err: any) {
-      setError(err?.message || 'Setup failed')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Setup failed')
       setSubmitting(false)
     }
   }, [path, onComplete])
