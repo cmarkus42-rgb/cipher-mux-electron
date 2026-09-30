@@ -1,5 +1,4 @@
 // src/renderer/components/HubSetupDialog.tsx
-import { h } from 'preact'
 import { useState, useCallback, useEffect } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import '../styles/hub-setup.css'

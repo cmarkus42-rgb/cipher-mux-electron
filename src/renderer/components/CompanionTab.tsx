@@ -1,6 +1,5 @@
 // src/renderer/components/CompanionTab.tsx — Companion character editor (replaces PersonasTab)
 import { useCallback, useEffect, useState } from 'preact/hooks'
-import { useTranslation } from 'react-i18next'
 import type { Character } from '../../shared/types'
 import { assignCharacterColor } from '../../shared/character-palette'
 import { PersonaAvatar } from './PersonaAvatar'
@@ -8,7 +7,6 @@ import { PersonaAvatar } from './PersonaAvatar'
 const api = window.cipherMux
 
 export function CompanionTab() {
-  const { t } = useTranslation()
   const [characters, setCharacters] = useState<Character[]>([])
   const [activeId, setActiveId] = useState('')
   const [selectedId, setSelectedId] = useState('')

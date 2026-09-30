@@ -1,4 +1,3 @@
-import { h } from 'preact'
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import { useMessages } from '../hooks/useMessages'
 import { useNotes } from '../hooks/useNotes'
@@ -42,7 +41,7 @@ function displayName(name: string, projectPath?: string | null): string {
 
 export function SidebarPanel({
   visible, workshopActive: _workshopActive, cyberFactoryActive: _cyberFactoryActive, sessions, gridSessionIds, detachedIds,
-  contextUsages, onAddToGrid, onKillSession, onDetach, onReattach, activeWorkspaceId, hasNotesCell,
+  contextUsages, onAddToGrid, onKillSession, onDetach, onReattach, activeWorkspaceId, hasNotesCell: _hasNotesCell,
   onOpenNoteInGrid, voiceComState, topicMap,
 }: SidebarPanelProps) {
   const { t } = useTranslation()

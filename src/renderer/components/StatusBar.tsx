@@ -35,7 +35,7 @@ interface StatusBarProps {
 export function StatusBar({
   theme, sidebarVisible, onToggleSidebar,
   gridCols, gridRows, focusedSessionId, focusedSessionName, sessions,
-  onToggleTheme, onInfo, onThemeSettings,
+  onToggleTheme: _onToggleTheme, onInfo, onThemeSettings,
   onGridResize, workspacesPopupVisible, onToggleWorkspaces,
 }: StatusBarProps) {
   const { t } = useTranslation()

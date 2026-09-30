@@ -1,5 +1,4 @@
 // src/renderer/components/SetupWizard.tsx
-import { h } from 'preact'
 import { useState } from 'preact/hooks'
 import '../styles/setup-wizard.css'
 

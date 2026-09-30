@@ -605,7 +605,7 @@ export class IpcHub {
 
     })
 
-    this.sessionManager.on('entity-stopped', (data: { entityId: string }) => {
+    this.sessionManager.on('entity-stopped', (_data: { entityId: string }) => {
       // (VoiceOutputRouter disabled — voice-relay uses mux_tts_speak directly)
     })
 
@@ -2888,7 +2888,7 @@ ist dieses Entity fokussiert?
       this.windowManager.sendToMainWindow(IPC.BT_SHUTTER_EVENT, action)
     })
 
-    this.btRemoteManager.on('device', (status: DeviceStatus) => {
+    this.btRemoteManager.on('device', (_status: DeviceStatus) => {
       this.windowManager.sendToMainWindow(IPC.BT_REMOTE_DEVICES, this.btRemoteManager!.getConnectedDevices())
     })
 

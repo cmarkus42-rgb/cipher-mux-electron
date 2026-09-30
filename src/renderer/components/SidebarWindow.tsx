@@ -1,4 +1,3 @@
-import { h } from 'preact'
 import { useState, useCallback, useEffect } from 'preact/hooks'
 import { useSessions } from '../hooks/useSessions'
 import { useContextUsage } from '../hooks/useContextUsage'

@@ -227,7 +227,7 @@ export class TmuxManager extends EventEmitter {
 
   disconnect(): void {
     // Kill all output watchers
-    for (const [name, watcher] of this.outputWatchers) {
+    for (const [, watcher] of this.outputWatchers) {
       watcher.process.kill()
     }
     this.outputWatchers.clear()
@@ -333,7 +333,7 @@ export class TmuxManager extends EventEmitter {
         if (!line.trim()) continue
         const parts = line.split(sep)
         if (parts.length < 6) continue // skip malformed lines
-        const [id, name, width, height, created, paneCwd, paneIndex] = parts
+        const [id, name, width, height, created, paneCwd] = parts
         if (!name) continue // skip entries with missing session name
         // Take first pane (index 0) per session for dedup
         if (seen.has(name)) continue

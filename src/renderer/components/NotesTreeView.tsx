@@ -2,7 +2,6 @@
 // Two-level class:value tag tree + filtered note list for the sidebar Notes section.
 // REQ-NOTES-001 (Tag-Baum), REQ-NOTES-003 (Note-List), REQ-NOTES-009 (Alle-Notes-Toggle).
 
-import { h } from 'preact'
 import { useState, useMemo, useCallback, useEffect, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { NoteInfo, TagClassRepository, TagIndexData } from '../../shared/types'
@@ -696,7 +695,6 @@ function BulkNotesBar({
   onDelete,
   onClearSelection,
 }: BulkNotesBarProps) {
-  const { t } = useTranslation()
   const [tagInput, setTagInput] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showRemove, setShowRemove] = useState(false)
