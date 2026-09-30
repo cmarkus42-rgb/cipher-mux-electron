@@ -16,6 +16,7 @@ import type { TagClassRepo } from '../notes/tag-repository'
 import { IPC } from '../../shared/ipc-channels'
 import { registerAllHandoffTools, executeHandoff } from './handoff-kernel'
 import { resolveAnchorCommit } from '../notes/handoff-delta'
+import { mayUseCompanionMemory } from './entity-header'
 import { dispatchHandoffNote } from '../notes/handoff-dispatch'
 import type { EntityId } from '../../shared/types'
 import { integrate, inventory, migrationPlan, hubApply, hubVerify, hubRelease, hubRollback } from '../hub'
@@ -45,6 +46,12 @@ export interface ToolContext {
    * configStore at call time, which is the whole point.
    */
   workspaceId?: string | null
+  /**
+   * Role this connection belongs to, bound once at initialize from the
+   * X-Mux-Entity header. null = no role (the app's own tooling, a plain
+   * session). Decides which tools are registered — see entity-header.ts.
+   */
+  entityId?: string | null
 }
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']
@@ -1318,6 +1325,16 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // ─── Companion Memory Tools ─────────────────────────────
+  //
+  // Registered only for the Companion role (and for connections carrying no
+  // role at all — the app's own tooling). Strategy paper 2.5: role-bound
+  // personal memory belongs to Companion, and every other role writing into
+  // the same store is what turned recall into a barrel.
+  //
+  // This is a registration-time decision on purpose. Dropping the tool from an
+  // entity's permission allowlist would only produce an approval prompt; a tool
+  // that is never registered for a connection cannot be called at all.
+  if (mayUseCompanionMemory(ctx.entityId)) {
 
   // 23. companion_memory_write — Write a memory
   ;(server.registerTool as any)(
@@ -1514,6 +1531,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       }
     }
   )
+
+  } // end companion memory tools
 
   // ─── Cyber Factory Tools ─────────────────────────────────
 

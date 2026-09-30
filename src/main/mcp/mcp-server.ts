@@ -6,6 +6,7 @@ import { APP_NAME, APP_VERSION, MCP_DEFAULT_PORT, MCP_DEFAULT_HOST } from '../..
 import { validateBearer } from './mcp-auth'
 import { registerTools, ToolContext } from './mcp-tools'
 import { parseWorkspaceHeader, resolveWorkspaceId } from './workspace-header'
+import { parseEntityHeader, resolveEntityId } from './entity-header'
 import { configStore } from '../config/config-store'
 
 /** Session timeout: sessions inactive for longer than this are garbage-collected. */
@@ -137,7 +138,10 @@ export class McpServerManager {
   /**
    * Create a new MCP session (McpServer + Transport) for a connecting client.
    */
-  private async createSession(workspaceId: string | null = null): Promise<McpSession> {
+  private async createSession(
+    workspaceId: string | null = null,
+    entityId: string | null = null,
+  ): Promise<McpSession> {
     // Enforce session limit — evict oldest if at capacity
     if (this.sessions.size >= MAX_MCP_SESSIONS) {
       await this.evictOldestSession()
@@ -148,10 +152,13 @@ export class McpServerManager {
       { capabilities: { tools: {} } }
     )
 
-    // Bind the workspace into this session's tool closures. Tools registered
-    // here see one workspace for their whole lifetime — that binding is the
-    // per-session identity the transport cannot otherwise provide.
-    registerTools(mcpServer, { ...this.toolCtx!, workspaceId })
+    // Bind workspace AND role into this session's tool closures. Tools
+    // registered here see one workspace and one role for their whole lifetime
+    // — that binding is the per-session identity the transport cannot
+    // otherwise provide. The role decides which tools get registered at all,
+    // which is the only way to actually withhold one: a missing entry in a
+    // permission list merely produces an approval prompt.
+    registerTools(mcpServer, { ...this.toolCtx!, workspaceId, entityId })
 
     const sessionId = randomUUID()
 
@@ -298,7 +305,11 @@ export class McpServerManager {
             parseWorkspaceHeader(req.headers),
             this.listKnownWorkspaceIds(),
           )
-          const session = await this.createSession(workspaceId)
+          const entityId = resolveEntityId(
+            parseEntityHeader(req.headers),
+            this.listKnownEntityIds(),
+          )
+          const session = await this.createSession(workspaceId, entityId)
           session.lastActivity = Date.now()
           res.on('finish', () => { session.lastActivity = Date.now() })
           session.transport.handleRequest(req, res, body)
@@ -450,6 +461,25 @@ export class McpServerManager {
       // "unknown workspace id ... treating as unbound") unless we name the
       // real cause here.
       console.error(`[McpServer] listKnownWorkspaceIds failed, treating as no known workspaces: ${err instanceof Error ? err.message : String(err)}`)
+      return []
+    }
+  }
+
+  /**
+   * Entities that currently exist. An id outside this list is treated as no
+   * identity, same fail-open rule as for workspaces.
+   */
+  private listKnownEntityIds(): string[] {
+    try {
+      const registry = (this.toolCtx?.sessionManager as unknown as {
+        getEntityRegistry?: () => { list: () => Array<{ id: string }> }
+      })?.getEntityRegistry?.()
+      if (!registry) return []
+      return registry.list().map(e => e.id)
+    } catch (err) {
+      // Fail-open: an unbound session beats a broken initialize. Named here so
+      // a read failure is distinguishable from a genuinely unknown entity.
+      console.error(`[McpServer] listKnownEntityIds failed, treating as no known entities: ${err instanceof Error ? err.message : String(err)}`)
       return []
     }
   }
