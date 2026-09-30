@@ -38,7 +38,7 @@ export function parseMigrationPlan(content: string, projectName: string): Migrat
     // Parse step lines: - [ ] **ID** Description — Action
     const stepMatch = line.match(/^-\s+\[([ x])\]\s+\*\*([^*]+)\*\*\s+(.+?)(?:\s+[—–-]\s+(.+))?$/)
     if (stepMatch) {
-      const [, checkmark, id, description, action] = stepMatch
+      const [, , id, description, action] = stepMatch
       steps.push({
         id: id.trim(),
         section: currentSection,

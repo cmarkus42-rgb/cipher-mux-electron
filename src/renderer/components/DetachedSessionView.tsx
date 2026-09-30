@@ -1,6 +1,5 @@
 // src/renderer/components/DetachedSessionView.tsx
 
-import { h } from 'preact'
 import { useState, useEffect, useCallback } from 'preact/hooks'
 import { useTerminal } from '../hooks/useTerminal'
 import { useTheme } from '../hooks/useTheme'

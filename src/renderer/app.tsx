@@ -69,7 +69,7 @@ export function App() {
   // Uses entityId (known BEFORE the await) instead of sessionId (known only AFTER) — this
   // closes the race window where the IPC event arrives before the await resolves (RT-X2).
   const inFlightEntityStarts = useRef(new Set<string>())
-  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, setSlotOpenNoteIds, toggleExpandSlot, restoreGrid, cleanupDeadSessions, detachedIds, detachFromGrid, dockToGrid, syncDetachedIds } = useGrid(panelWidthRef.current)
+  const { grid, addSession, removeSession, swap, resize, setSessionAtSlot, toggleExpand, applyMerges, setSlotType, clearSlotType, setSlotOpenNoteIds, toggleExpandSlot, restoreGrid, cleanupDeadSessions, detachedIds, detachFromGrid, syncDetachedIds } = useGrid(panelWidthRef.current)
   // Always-current grid ref for placeEntity to check against (avoids stale closure in event handlers)
   const gridRef = useRef(grid)
   gridRef.current = grid

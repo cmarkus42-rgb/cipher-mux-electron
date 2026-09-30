@@ -37,7 +37,6 @@ const api = window.cipherMux
 
 type TabId = 'general' | 'sprache' | 'themes' | 'shortcuts' | 'remote' | 'a11y' | 'about'
 // Legacy alias for external consumers
-type LegacyTabId = 'settings' | 'models' | 'voice' | TabId
 
 // Built-in shortcuts not managed by ShortcutRegistry (OS/browser/editor defaults)
 const BUILTIN_SHORTCUTS = [

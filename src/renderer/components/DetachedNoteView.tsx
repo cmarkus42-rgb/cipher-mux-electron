@@ -1,6 +1,5 @@
 // src/renderer/components/DetachedNoteView.tsx
 
-import { h } from 'preact'
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import { useTheme } from '../hooks/useTheme'
 import { NoteEditor } from './NoteEditor'

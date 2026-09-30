@@ -1,6 +1,5 @@
 import * as http from 'node:http'
 
-const TIMEOUT_MS = 120_000 // 2 minutes — local models can be slow
 
 export interface EnrichedBugreport {
   title: string
@@ -34,42 +33,6 @@ function getLlmConfig() {
  * which can fail for localhost due to system proxy settings.
  * Node's http module bypasses Chromium entirely.
  */
-function ollamaPost(urlPath: string, body: string, host?: string, port?: number): Promise<string> {
-  const cfg = getLlmConfig()
-  return new Promise((resolve, reject) => {
-    const req = http.request(
-      {
-        hostname: host ?? cfg.host,
-        port: port ?? cfg.port,
-        path: urlPath,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body),
-        },
-        timeout: TIMEOUT_MS,
-      },
-      (res) => {
-        const chunks: Buffer[] = []
-        res.on('data', (chunk: Buffer) => chunks.push(chunk))
-        res.on('end', () => {
-          if (res.statusCode !== 200) {
-            reject(new Error(`Ollama HTTP ${res.statusCode}`))
-            return
-          }
-          resolve(Buffer.concat(chunks).toString('utf-8'))
-        })
-      },
-    )
-    req.on('error', reject)
-    req.on('timeout', () => {
-      req.destroy()
-      reject(new Error('Ollama request timed out'))
-    })
-    req.write(body)
-    req.end()
-  })
-}
 
 /**
  * GET request to Ollama via Node's http module.

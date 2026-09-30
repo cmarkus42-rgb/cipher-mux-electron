@@ -2,9 +2,7 @@
 // Specialized view for testcase notes: tri-state checkboxes, comments,
 // status bar, screenshot support, feature-request export.
 
-import { h } from 'preact'
 import { useState, useMemo, useCallback, useEffect, useRef } from 'preact/hooks'
-import { useTranslation } from 'react-i18next'
 import type {
   ParsedTestcase,
   TestcaseItem,
@@ -360,7 +358,6 @@ export function TestcaseView({
   onScreenshot = () => {},
   onFeatureRequest = () => {},
 }: TestcaseViewProps) {
-  const { t } = useTranslation()
   const readOnly = !!testcase.frontmatter.archived
   const containerRef = useRef<HTMLDivElement>(null)
   const [filters, setFilters] = useState<StatusFilters>({ pass: 'neutral', fail: 'neutral', open: 'neutral' })
