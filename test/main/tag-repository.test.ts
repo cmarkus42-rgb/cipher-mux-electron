@@ -4,7 +4,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import { TagClassRepo } from '../../src/main/notes/tag-repository'
-import { AXIS_VALUES, PHASE_VALUES } from '../../src/shared/tag-axes'
+import { AXIS_VALUES, PHASE_VALUES, KIND_VALUES } from '../../src/shared/tag-axes'
 
 describe('TagClassRepo', () => {
   let tmpDir: string
@@ -29,13 +29,16 @@ describe('TagClassRepo', () => {
     assert.ok(data.classes.project, 'should have "project" class')
   })
 
-  it('seed kind class has expected values', () => {
-    const data = repo.getRepository()
-    const kindValues = data.classes.kind.values
-    assert.ok(kindValues.includes('bugreport'))
-    assert.ok(kindValues.includes('feature-request'))
-    assert.ok(kindValues.includes('testcase'))
-    assert.ok(kindValues.includes('handoff'))
+  // Die Seeds sind die Achsen. `feature-request` stand hier, bis der Umzug am
+  // 2026-09-30 es auf `kind:idea` abgebildet hat -- ein Wunsch ist noch keine
+  // Anforderung. Es als Seed zu behalten hiesse, dass die Freitext-Vorschlaege
+  // beim naechsten Start wieder einen Wert anbieten, der auf keiner Note steht.
+  it('seed kind class carries the axis values', () => {
+    const kindValues = repo.getRepository().classes.kind.values
+    for (const v of KIND_VALUES) {
+      assert.ok(kindValues.includes(v), `kind:${v} fehlt im Seed`)
+    }
+    assert.ok(!kindValues.includes('feature-request'), 'abgebildet auf kind:idea')
   })
 
   it('seed classes have colors', () => {
@@ -102,7 +105,7 @@ describe('TagClassRepo', () => {
   })
 
   it('returns false when all tags already known', () => {
-    const changed = repo.ensureTags(['kind:bugreport', 'kind:feature-request'])
+    const changed = repo.ensureTags(['kind:bugreport', 'kind:testcase'])
     assert.equal(changed, false)
   })
 
@@ -165,7 +168,7 @@ describe('TagClassRepo', () => {
   it('getClassValues returns values for a class', () => {
     const values = repo.getClassValues('kind')
     assert.ok(values.includes('bugreport'))
-    assert.ok(values.includes('feature-request'))
+    assert.ok(values.includes('spec'))
   })
 
   it('getClassValues returns empty array for unknown class', () => {
