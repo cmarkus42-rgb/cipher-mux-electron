@@ -617,20 +617,22 @@ export interface MemoryConfig {
 
 // ─── Companion Memory ─────────────────────────────────────
 
+/**
+ * Memory categories.
+ *
+ * These four are the ones that exist: companion_memory_write accepts exactly
+ * them, and the store holds nothing else. The union used to list nine more
+ * (decision, architecture, welle, welle-plan, finding, risk-review, pattern,
+ * convention, off_limit) which no code ever wrote and no view could reach —
+ * they made the type disagree with both the tool and the UI. Widening this
+ * union again means widening the tool's enum and the view's label/colour maps
+ * in the same change; anything less puts the disagreement back.
+ */
 export type MemoryKind =
   | 'fact'
   | 'preference'
   | 'interaction'
   | 'event'
-  | 'decision'
-  | 'architecture'
-  | 'welle'
-  | 'welle-plan'
-  | 'finding'
-  | 'risk-review'
-  | 'pattern'
-  | 'convention'
-  | 'off_limit'
 
 export interface Memory {
   id: string
@@ -646,6 +648,11 @@ export interface Memory {
   scopeId: string | null
   /** FTS5 rank score — only present in search results */
   score?: number
+  /**
+   * Note this memory points at, if any. The note holds the content; this line
+   * holds the pointer.
+   */
+  noteId?: string | null
 }
 
 export interface ProfileField {
