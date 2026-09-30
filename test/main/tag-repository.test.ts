@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
-import { TagClassRepo, SEED_CLASSES } from '../../src/main/notes/tag-repository'
+import { TagClassRepo } from '../../src/main/notes/tag-repository'
+import { AXIS_VALUES, PHASE_VALUES } from '../../src/shared/tag-axes'
 
 describe('TagClassRepo', () => {
   let tmpDir: string
@@ -170,5 +171,51 @@ describe('TagClassRepo', () => {
   it('getClassValues returns empty array for unknown class', () => {
     const values = repo.getClassValues('nonexistent')
     assert.deepEqual(values, [])
+  })
+})
+
+describe('TagClassRepo — Achsen als Quelle', () => {
+  let tmpDir: string
+  let repo: TagClassRepo
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tag-repo-axes-'))
+    repo = new TagClassRepo(tmpDir)
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  // Gemessen am 2026-09-30 gegen die echte .tags.json: `phase:coding`,
+  // `phase:testing`, `kind:research` und `entity:audit` waren der Registry
+  // unbekannt. `mux_notes_create` weist unbekannte Tags hart ab -- eine
+  // Audit-Rolle haette ihre eigene Herkunft nicht mitgeben koennen.
+  //
+  // Die Achsen sind die Quelle; die Registry muss sie kennen, nicht umgekehrt.
+  it('kennt jeden Wert jeder Achse', () => {
+    for (const [axis, values] of Object.entries(AXIS_VALUES)) {
+      for (const value of values ?? []) {
+        assert.ok(repo.isKnownTag(`${axis}:${value}`), `${axis}:${value} wird abgewiesen`)
+      }
+    }
+  })
+
+  it('kennt jede Phase', () => {
+    for (const phase of PHASE_VALUES) {
+      assert.ok(repo.isKnownTag(`phase:${phase}`), `phase:${phase} wird abgewiesen`)
+    }
+  })
+
+  // Bestandswerte sind nicht verhandelbar: was in .tags.json steht, stammt aus
+  // echten Notes. Die Achsen ERGAENZEN, sie ersetzen nicht.
+  it('behaelt Werte, die nur in der Datei stehen', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.tags.json'),
+      JSON.stringify({ classes: { kind: { values: ['abschlussbericht'], color: '#fff' } } }),
+    )
+    const reloaded = new TagClassRepo(tmpDir)
+    assert.ok(reloaded.isKnownTag('kind:abschlussbericht'), 'Bestand darf nicht verschwinden')
+    assert.ok(reloaded.isKnownTag('kind:spec'), 'die Achse kommt trotzdem dazu')
   })
 })
