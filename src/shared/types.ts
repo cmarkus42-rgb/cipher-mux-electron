@@ -550,6 +550,16 @@ export interface NoteInfo {
   anchorCommit?: string
   /** Absolute path of the repository the anchor commit belongs to. */
   anchorRepo?: string
+  /**
+   * Repo-relative path of the file this note mirrors.
+   *
+   * A mirror is information for the human and a surface to write corrections
+   * on — never the truth a role reads. The file in git is. Drift against it is
+   * computed when the note is opened, not stored.
+   */
+  mirrorsFile?: string
+  /** Commit the mirror was taken at — the reference point drift is measured from. */
+  mirrorCommit?: string
 }
 
 export interface NoteContent {

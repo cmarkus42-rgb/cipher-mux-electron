@@ -240,6 +240,8 @@ export class NoteManager {
       handoff_status?: HandoffStatus
       anchor_commit?: string
       anchor_repo?: string
+      mirrors_file?: string
+      mirror_commit?: string
     }
 
     const id = path.basename(filePath, '.md')
@@ -260,6 +262,8 @@ export class NoteManager {
       ...(fm.handoff_status ? { handoffStatus: fm.handoff_status } : {}),
       ...(fm.anchor_commit ? { anchorCommit: fm.anchor_commit } : {}),
       ...(fm.anchor_repo ? { anchorRepo: fm.anchor_repo } : {}),
+      ...(fm.mirrors_file ? { mirrorsFile: fm.mirrors_file } : {}),
+      ...(fm.mirror_commit ? { mirrorCommit: fm.mirror_commit } : {}),
     }
 
     return { info, body }
@@ -272,17 +276,39 @@ export class NoteManager {
 
   // ─── Public API ───────────────────────────────────────────
 
-  async create(title: string, body: string, tags?: string[]): Promise<NoteInfo> {
+  /**
+   * @param opts.type Note type (spec, requirements, research, finding …).
+   *   Drives typed rendering, the way `testcase` already does.
+   * @param opts.mirrorsFile Repo-relative path this note mirrors. The file in
+   *   git stays the truth; the note is what the human reads and corrects.
+   * @param opts.mirrorCommit Commit the mirror was taken at. Without it no
+   *   drift can be computed, and a mirror of unknown age reads as current —
+   *   which is the failure mode mirroring exists to prevent.
+   */
+  async create(
+    title: string,
+    body: string,
+    tags?: string[],
+    opts?: { type?: string; mirrorsFile?: string; mirrorCommit?: string; anchorRepo?: string },
+  ): Promise<NoteInfo> {
     const id = ulid()
     const now = new Date().toISOString()
     await fs.mkdir(this.notesDir, { recursive: true })
 
     const finalTitle = title || this.extractTitle(body)
     const tagList = tags ?? ([] as string[])
+    const type = opts?.type ?? (tagList.includes('kind:testcase') ? 'testcase' : undefined)
+    const mirrorsFile = opts?.mirrorsFile ?? null
+    const mirrorCommit = opts?.mirrorCommit ?? null
+    const anchorRepo = opts?.anchorRepo ?? null
+
     const fm: Record<string, unknown> = {
       title: finalTitle,
-      ...(tagList.includes('kind:testcase') ? { type: 'testcase' } : {}),
+      ...(type ? { type } : {}),
       tags: tagList,
+      ...(mirrorsFile ? { mirrors_file: mirrorsFile } : {}),
+      ...(mirrorCommit ? { mirror_commit: mirrorCommit } : {}),
+      ...(anchorRepo ? { anchor_repo: anchorRepo } : {}),
       created: now,
       modified: now,
     }
@@ -298,6 +324,10 @@ export class NoteManager {
       relativePath: `${id}.md`,
       createdAt: now,
       modifiedAt: now,
+      ...(type ? { noteType: type } : {}),
+      ...(mirrorsFile ? { mirrorsFile } : {}),
+      ...(mirrorCommit ? { mirrorCommit } : {}),
+      ...(anchorRepo ? { anchorRepo } : {}),
     }
   }
 
