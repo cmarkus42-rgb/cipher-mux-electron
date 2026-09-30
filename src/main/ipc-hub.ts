@@ -25,6 +25,7 @@ import { BugreportTaskSource } from './task/sources/bugreport-source'
 import { NoteManager } from './notes/note-manager'
 import { NoteSearchIndex } from './notes/note-search-index'
 import { NoteTagging } from './notes/note-tagging'
+import { preserveTypeTags } from './notes/note-type-tags'
 import { TagClassRepo } from './notes/tag-repository'
 import { TagIndex } from './notes/tag-index'
 import { MemoryStore } from './companion/memory-store'
@@ -1960,12 +1961,11 @@ export class IpcHub {
       if (!tags && !skipTagging) {
         this.noteTagging.autoTag(body).then(async (autoTags) => {
           if (autoTags && autoTags.length > 0) {
-            // Preserve structural tags that auto-tagging must not strip
-            const existing = note.tags ?? []
-            const preserved = existing.filter(t =>
-              t === 'kind:testcase' || t.startsWith('workspace:') || t === 'handoff'
-            )
-            const merged = [...new Set([...preserved, ...autoTags])]
+            // Keep what carries meaning. The list used to name exactly one
+            // type, kind:testcase, which was right while that was the only
+            // typed note — and wrong the moment a second existed. See
+            // note-type-tags.ts.
+            const merged = preserveTypeTags(note.tags ?? [], autoTags)
             await this.noteTagging.updateRepository(autoTags)
             const updated = await this.noteManager.save(id, body, merged)
             this.noteSearchIndex.addOrUpdate({ info: updated, body })
