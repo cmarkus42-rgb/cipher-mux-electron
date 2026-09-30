@@ -127,6 +127,13 @@ gekippt:
   Kodierung ist bereits zwischen CLI-Versionen uneinheitlich
   (`-Users-cipher--config-…` neben `-Users-cipher-config-…`).
 
+Ein vierter Beleg zeigt, dass das Gesetz auch nach innen gilt: Der Mux darf auch keine
+Annahmen über seine *eigene* Filterkomposition machen, wenn zwei Stellen dieselbe Frage
+beantworten. `filterByWorkspace` behandelte eine Note ohne `workspace:`-Tag als global und
+zeigte sie überall; `SidebarPanel` setzte zusätzlich `workspace:<name>` als Include-Filter und
+entfernte genau diese Notes wieder (behoben in `13bb779`, siehe 7.5). Zwei Regeln, die einander
+aufheben, sind derselbe Fehlertyp wie eine Heuristik, die eine Messung überstimmt.
+
 **Umkehrschluss als Entwurfsregel:** Was der Mux über eine Session wissen will, soll die
 Session selbst melden, nicht ihr Bildschirm hergeben. Der statusLine-Hook war die ganze Zeit
 vorhanden und wurde nie als Bereitschaftssignal genutzt.
@@ -142,6 +149,12 @@ vorhanden und wurde nie als Bereitschaftssignal genutzt.
 3. **Bekommen Befunde ein git-Gegenstück?** Siehe 5.
 4. **Löschen und Umbenennen.** Was passiert mit dem Spiegel, wenn die Datei verschwindet oder
    umzieht? Der Drift-Block muss das sagen können, statt stillzuschweigen.
+5. **Wie kommt eine extern entstandene Note im Cockpit an?** Der Normalfall des Konzepts ist,
+   dass eine Rolle Datei und Note anlegt und der Mensch es sieht. Beim ersten Durchlauf
+   (Abschnitt 9) war die Note in der Sidebar nicht auffindbar — kein Aktualisierungsproblem,
+   sondern der Filterwiderspruch aus Abschnitt 6, behoben in `13bb779`. Offen bleibt die
+   Entwurfsfrage: Soll eine gespiegelte Note überhaupt global sein, oder soll sie den Workspace
+   erben, in dem sie entsteht?
 
 ## 8. Was bewusst nicht drinsteht
 
