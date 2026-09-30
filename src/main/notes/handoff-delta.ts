@@ -15,26 +15,7 @@
  * A broken git call must never block a handoff — a handoff delivered without
  * its state block is worth far more than one that never arrives.
  */
-import { execFile } from 'child_process'
-import { promisify } from 'util'
-
-const run = promisify(execFile)
-
-/**
- * A commit hash and nothing else.
- *
- * The anchor reaches git as an argv element, and git accepts options anywhere
- * in argv — an anchor beginning with `-` smuggles a flag in. `git diff
- * --output=<path>` creates and truncates a file of the caller's choosing, so
- * an anchor is an arbitrary file write unless it is constrained. Anchors come
- * from note frontmatter (an editable file) and from an MCP tool argument, so
- * this is reachable input, not a theoretical one.
- *
- * Hex-only is also the honest constraint for the concept: an anchor is the
- * immutable commit a handoff was written against. A branch name would move and
- * defeat the purpose.
- */
-const COMMIT_HASH_PATTERN = /^[0-9a-fA-F]{7,64}$/
+import { gitOrNull, isWorkTree, resolveHeadCommit, isCommitHash } from './git-probe'
 
 /** Cap on how many mentioned paths are fed to git, to bound the command line. */
 const MAX_MENTIONED_FILES = 40
@@ -98,24 +79,6 @@ export function extractMentionedFiles(body: string): string[] {
   return found
 }
 
-// ─── git helpers ────────────────────────────────────────────
-
-async function git(repoPath: string, args: string[]): Promise<string> {
-  const { stdout } = await run('git', ['-C', repoPath, ...args], {
-    maxBuffer: 4 * 1024 * 1024,
-  })
-  return stdout
-}
-
-/** Run a git command, returning null instead of throwing. */
-async function gitOrNull(repoPath: string, args: string[]): Promise<string | null> {
-  try {
-    return await git(repoPath, args)
-  } catch {
-    return null
-  }
-}
-
 // ─── resolveAnchorCommit ────────────────────────────────────
 
 /**
@@ -125,9 +88,7 @@ async function gitOrNull(repoPath: string, args: string[]): Promise<string | nul
  * handoff without an anchor is worth writing, it just cannot carry a delta.
  */
 export async function resolveAnchorCommit(repoPath: string): Promise<string | null> {
-  const head = await gitOrNull(repoPath, ['rev-parse', 'HEAD'])
-  const trimmed = head?.trim()
-  return trimmed && trimmed.length > 0 ? trimmed : null
+  return resolveHeadCommit(repoPath)
 }
 
 // ─── computeHandoffDelta ────────────────────────────────────
@@ -157,8 +118,7 @@ export async function computeHandoffDelta(opts: ComputeDeltaOptions): Promise<Ha
   }
 
   // Is this a repo at all? Everything downstream depends on it.
-  const inside = await gitOrNull(repoPath, ['rev-parse', '--is-inside-work-tree'])
-  if (inside === null || inside.trim() !== 'true') {
+  if (!(await isWorkTree(repoPath))) {
     problems.push(`Kein git-Repository unter ${repoPath} — kein Zustandsblock berechenbar.`)
     return delta
   }
@@ -199,7 +159,7 @@ export async function computeHandoffDelta(opts: ComputeDeltaOptions): Promise<Ha
   }
 
   // Validated before it ever reaches git — see COMMIT_HASH_PATTERN.
-  if (!COMMIT_HASH_PATTERN.test(anchorCommit)) {
+  if (!isCommitHash(anchorCommit)) {
     problems.push(
       'Anker-Commit hat kein gültiges Commit-Hash-Format (7–64 Hex-Zeichen) — '
       + 'Delta nicht berechenbar.',
