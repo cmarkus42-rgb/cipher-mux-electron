@@ -2140,6 +2140,44 @@ export class IpcHub {
       }
     })
 
+    // Mirror status: drift plus history for a note that mirrors a file.
+    // Computed here, never stored — a stored answer goes stale the moment it
+    // is written, which is the whole reason the mirror carries a commit.
+    ipcMain.handle(IPC.NOTES_MIRROR_STATUS, async (_e, { id }: { id: string }) => {
+      try {
+        const note = await this.noteManager.read(id)
+        if (!note?.info.mirrorsFile || !note.info.anchorRepo) return null
+        const { computeMirrorDrift, formatMirrorDrift, mirrorHistory } = await import('./notes/mirror-drift')
+        const [drift, history] = await Promise.all([
+          computeMirrorDrift({
+            repoPath: note.info.anchorRepo,
+            filePath: note.info.mirrorsFile,
+            mirrorCommit: note.info.mirrorCommit ?? null,
+          }),
+          mirrorHistory({ repoPath: note.info.anchorRepo, filePath: note.info.mirrorsFile }),
+        ])
+        return { drift, summary: formatMirrorDrift(drift).split('\n')[0], history }
+      } catch (err) {
+        console.error('[IpcHub] NOTES_MIRROR_STATUS failed:', err)
+        return null
+      }
+    })
+
+    // Pull the mirror back from git. Deliberately an explicit action: the note
+    // is a work surface, and an unincorporated correction would be overwritten.
+    ipcMain.handle(IPC.NOTES_MIRROR_REFRESH, async (_e, { id }: { id: string }) => {
+      try {
+        const result = await this.noteManager.refreshMirror(id)
+        if (result.ok && result.note) {
+          this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'updated', note: result.note })
+        }
+        return result
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        return { ok: false, problems: [message] }
+      }
+    })
+
     // Parse a finding note in main process — same shape as the testcase path
     ipcMain.handle(IPC.NOTES_PARSE_FINDING, async (_e, { id }: { id: string }) => {
       try {

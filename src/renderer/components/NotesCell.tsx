@@ -6,6 +6,7 @@ import { NoteEditor } from './NoteEditor'
 import { TagBar } from './TagBar'
 import { TestcaseView } from './TestcaseView'
 import { FindingView } from './FindingView'
+import { MirrorStatus } from './MirrorStatus'
 import { useNotes } from '../hooks/useNotes'
 import type { NoteInfo } from '../../shared/types'
 import type { ParsedTestcase, TestcaseSection } from '../../main/notes/testcase-parser'
@@ -24,6 +25,8 @@ interface NoteTab {
   testcase?: ParsedTestcase
   /** Parsed finding data — present only if this is a finding note. */
   finding?: ParsedFinding
+  /** Set when the note mirrors a file in git — drives the MirrorStatus header. */
+  mirrorsFile?: string
   /** Raw file content including frontmatter (for testcase serialization). */
   rawContent?: string
 }
@@ -78,6 +81,23 @@ export function NotesCell({
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null
 
+  /**
+   * Re-read an open tab from disk.
+   *
+   * Needed after the mirror was pulled from git: the note's body changed
+   * underneath the editor. openNote() cannot do this — it finds the existing
+   * tab and returns early, which is right for opening and wrong for reloading.
+   */
+  const reloadTab = useCallback(async (id: string) => {
+    const result = await window.cipherMux.notes.read(id)
+    if (!result) return
+    setTabs(prev => prev.map(t =>
+      t.id === id
+        ? { ...t, content: result.body, title: result.info.title, tags: result.info.tags ?? [], dirty: false }
+        : t,
+    ))
+  }, [])
+
   const openNote = useCallback(
     async (info: NoteInfo) => {
       // Check if already open
@@ -129,6 +149,7 @@ export function NotesCell({
         dirty: false,
         testcase,
         finding,
+        ...(info.mirrorsFile ? { mirrorsFile: info.mirrorsFile } : {}),
       }
       setTabs((prev) => [...prev, tab])
       setActiveTabId(info.id)
@@ -529,8 +550,17 @@ export function NotesCell({
         <TagBar tags={activeTab.tags} onTagsChange={handleTagsChange} />
       )}
 
-      {/* Editor or TestcaseView */}
+      {/* Editor or typed view — with the mirror header above it when the note
+          mirrors a file. A stale mirror has to say so where it is read, not
+          only when it is handed on. */}
       <div class="notes-editor-area">
+        {activeTab?.mirrorsFile && (
+          <MirrorStatus
+            key={`mirror-${activeTab.id}`}
+            noteId={activeTab.id}
+            onRefreshed={() => { void reloadTab(activeTab.id) }}
+          />
+        )}
         {activeTab?.testcase ? (
           <TestcaseView
             key={activeTab.id}

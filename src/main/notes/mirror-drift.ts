@@ -221,3 +221,71 @@ export async function readMirrorSource(opts: MirrorSourceOptions): Promise<Mirro
   result.commit = commit
   return result
 }
+
+// ─── mirrorHistory ──────────────────────────────────────────
+
+export interface MirrorHistoryCommit {
+  hash: string
+  subject: string
+  /** ISO date, yyyy-mm-dd — the time of day adds noise to a change list. */
+  date: string
+  author: string
+}
+
+export interface MirrorHistory {
+  ok: boolean
+  commits: MirrorHistoryCommit[]
+  /** True when more commits exist than were returned. */
+  truncated: boolean
+  problems: string[]
+}
+
+/** Default number of commits shown. Enough to see the shape, short enough to read. */
+const DEFAULT_HISTORY_LIMIT = 30
+
+/**
+ * The commits that touched a mirrored file, newest first.
+ *
+ * "History of a spec" is git log on the file, rendered in the Mux — not a
+ * notes history somebody has to maintain, which would be one more thing that
+ * can go stale. The line the project draws: a list of commits is following
+ * along; a diff viewer, a branch view or blame would be version control, and
+ * there are better tools for that.
+ *
+ * Deliberately without `--follow`. A rename surfaces as "the original is no
+ * longer in the repository" and the human decides what to do; following it
+ * automatically would be the first step into the territory this stays out of.
+ */
+export async function mirrorHistory(opts: {
+  repoPath: string
+  filePath: string
+  limit?: number
+}): Promise<MirrorHistory> {
+  const { repoPath, filePath } = opts
+  const limit = opts.limit ?? DEFAULT_HISTORY_LIMIT
+  const problems: string[] = []
+  const result: MirrorHistory = { ok: false, commits: [], truncated: false, problems }
+
+  if (!(await isWorkTree(repoPath))) {
+    problems.push(`Kein git-Repository unter ${repoPath} — keine Historie lesbar.`)
+    return result
+  }
+
+  // One more than asked for, so "there is more" is knowable without a second call.
+  const raw = await gitOrNull(repoPath, [
+    'log', `--max-count=${limit + 1}`, '--format=%h\t%ad\t%an\t%s', '--date=short', '--', filePath,
+  ])
+  if (raw === null) {
+    problems.push('Historie der gespiegelten Datei nicht lesbar.')
+    return result
+  }
+
+  result.ok = true
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean)
+  result.truncated = lines.length > limit
+  result.commits = lines.slice(0, limit).map(line => {
+    const [hash = '', date = '', author = '', ...rest] = line.split('\t')
+    return { hash, date, author, subject: rest.join('\t') }
+  })
+  return result
+}
