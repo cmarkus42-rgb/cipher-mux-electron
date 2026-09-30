@@ -386,8 +386,11 @@ export class TmuxManager extends EventEmitter {
       this.sendRaw(`send-keys -H -t ${target} ${hex}`)
       return
     }
-    // Fallback when control mode isn't available
-    await runCommand('tmux', ['send-keys', '-l', '-t', target, keys])
+    // Fallback when control mode isn't available.
+    // '--' ends option parsing: a chunk boundary can leave a piece starting
+    // with '-' ("cipher-mux" split after "cipher" yields "-mux"), and tmux
+    // would read that as a flag and reject the whole send.
+    await runCommand('tmux', ['send-keys', '-l', '-t', target, '--', keys])
   }
 
   /**
