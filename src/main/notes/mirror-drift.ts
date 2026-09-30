@@ -17,7 +17,7 @@
  * problem, because a mirror whose state is unknown must not silently read as
  * current.
  */
-import { gitOrNull, isWorkTree, isCommitHash } from './git-probe'
+import { gitOrNull, isWorkTree, isCommitHash, resolveHeadCommit } from './git-probe'
 
 /** Cap on listed commits, so a long-neglected mirror cannot flood the view. */
 const MAX_COMMITS = 20
@@ -152,4 +152,72 @@ export function formatMirrorDrift(drift: MirrorDrift): string {
   ]
   for (const c of drift.commits) lines.push(`- \`${c.hash}\` ${c.subject}`)
   return lines.join('\n')
+}
+
+
+// ─── readMirrorSource ───────────────────────────────────────
+
+export interface MirrorSource {
+  ok: boolean
+  /** File content at the resolved revision, or null on failure. */
+  content: string | null
+  /** The revision the content came from. */
+  commit: string | null
+  problems: string[]
+}
+
+export interface MirrorSourceOptions {
+  repoPath: string
+  /** Repo-relative path of the file to mirror. */
+  filePath: string
+  /** Revision to read. Defaults to HEAD. */
+  atCommit?: string
+}
+
+/**
+ * Read the content a mirror should carry, from git rather than from disk.
+ *
+ * Deliberately `git show <commit>:<path>` and not a filesystem read: a mirror
+ * names the commit it reflects, and an uncommitted edit in the working tree
+ * has no commit to name. Mirroring a dirty tree would produce a note that
+ * claims a provenance it does not have — the exact failure the mirror commit
+ * exists to prevent.
+ */
+export async function readMirrorSource(opts: MirrorSourceOptions): Promise<MirrorSource> {
+  const { repoPath, filePath } = opts
+  const problems: string[] = []
+  const result: MirrorSource = { ok: false, content: null, commit: null, problems }
+
+  if (!(await isWorkTree(repoPath))) {
+    problems.push(`Kein git-Repository unter ${repoPath} — Spiegelinhalt nicht lesbar.`)
+    return result
+  }
+
+  let commit = opts.atCommit ?? null
+  if (commit !== null && !isCommitHash(commit)) {
+    problems.push(
+      'Revision hat kein gültiges Commit-Hash-Format (7–64 Hex-Zeichen) — nicht gelesen.',
+    )
+    return result
+  }
+  if (commit === null) {
+    commit = await resolveHeadCommit(repoPath)
+    if (!commit) {
+      problems.push('HEAD nicht auflösbar — Spiegelinhalt nicht lesbar.')
+      return result
+    }
+  }
+
+  const content = await gitOrNull(repoPath, ['show', `${commit}:${filePath}`])
+  if (content === null) {
+    problems.push(
+      `\`${filePath}\` existiert in ${commit.slice(0, 7)} nicht — nichts zu spiegeln.`,
+    )
+    return result
+  }
+
+  result.ok = true
+  result.content = content
+  result.commit = commit
+  return result
 }

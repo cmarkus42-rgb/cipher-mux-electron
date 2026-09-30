@@ -156,6 +156,26 @@ vorhanden und wurde nie als Bereitschaftssignal genutzt.
    Entwurfsfrage: Soll eine gespiegelte Note überhaupt global sein, oder soll sie den Workspace
    erben, in dem sie entsteht?
 
+## 7a. Nachziehen des Spiegels — gebaut
+
+Der Kreislauf hatte eine offene Stelle: nachdem eine Rolle die Korrektur in die Datei
+eingearbeitet hat, trug die Note weiterhin den alten Text und den alten Spiegelpunkt.
+
+`NoteManager.refreshMirror()` schließt das. Drei Entscheidungen dabei:
+
+- **Gespiegelt wird der committete Stand** (`git show <commit>:<pfad>`), nie der Arbeitsbaum.
+  Ein Spiegel nennt einen Commit; eine uncommittete Änderung hat keinen zu nennen.
+- **Nicht automatisch.** Der Spiegel ist Arbeitsfläche. Eine noch nicht eingearbeitete
+  Korrektur würde von einem Nachziehen überschrieben.
+- **Der ersetzte Text kommt zurück** (`replacedBody`), damit ein Aufrufer ihn behalten kann,
+  statt seinen Verlust hinterher zu bemerken.
+
+Ein Fehlschlag lässt die Note unangetastet.
+
+Durchgeführt am 2026-09-30 an dieser Datei: Spiegelpunkt von `9485cef` auf `deb6019`, Typ
+erhalten, Drift danach „aktuell". Der vom Menschen geschriebene Korrektur-Block verschwand
+dabei aus der Note — richtig, denn sein Inhalt steht seit `f3fec45` in der Datei.
+
 ## 8. Was bewusst nicht drinsteht
 
 Kein Datenmodell, keine Dateiliste, kein Task-Zuschnitt. Das ist Zielbild plus Begründung.

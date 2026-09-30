@@ -4,6 +4,7 @@ import path from 'path'
 import matter from 'gray-matter'
 import { ulid } from 'ulidx'
 import type { NoteInfo, NoteContent, HandoffStatus } from '../../shared/types'
+import { readMirrorSource } from './mirror-drift'
 
 // ─── NoteManager ────────────────────────────────────────────
 // All notes stored in a flat directory: {notesDir}/{id}.md
@@ -516,6 +517,72 @@ export class NoteManager {
       handoffStatus: 'pending',
       ...(anchorCommit ? { anchorCommit } : {}),
       ...(anchorRepo ? { anchorRepo } : {}),
+    }
+  }
+
+  /**
+   * Pull a mirrored note's content back from git and move its mirror point.
+   *
+   * This is the last step of the round trip: the human writes a correction
+   * into the mirror, a role incorporates it into the file, and the mirror is
+   * then behind. Refreshing reads the committed content — never the working
+   * tree, see readMirrorSource — and records the commit it now reflects.
+   *
+   * Deliberately NOT automatic. The mirror is a work surface; a correction
+   * that has not been incorporated yet would be overwritten by a refresh. The
+   * previous body therefore comes back in `replacedBody`, so a caller can
+   * keep it rather than discover its loss afterwards.
+   *
+   * Any failure leaves the note untouched.
+   */
+  async refreshMirror(
+    id: string,
+    opts?: { atCommit?: string },
+  ): Promise<{ ok: boolean; note?: NoteInfo; replacedBody?: string; problems: string[] }> {
+    const existing = await this.read(id)
+    if (!existing) {
+      return { ok: false, problems: [`Note nicht gefunden: ${id}`] }
+    }
+
+    const filePath = existing.info.mirrorsFile ?? null
+    const repoPath = existing.info.anchorRepo ?? null
+    if (!filePath || !repoPath) {
+      return {
+        ok: false,
+        problems: [`Note ${id} spiegelt keine Datei (mirrors_file/anchor_repo fehlen).`],
+      }
+    }
+
+    const source = await readMirrorSource({
+      repoPath,
+      filePath,
+      ...(opts?.atCommit ? { atCommit: opts.atCommit } : {}),
+    })
+    if (!source.ok || source.content === null || source.commit === null) {
+      return { ok: false, problems: source.problems }
+    }
+
+    const replacedBody = existing.body
+    await this.save(id, source.content, existing.info.tags)
+
+    // Move the mirror point. save() preserves unknown frontmatter but cannot
+    // know that this particular key should change.
+    const notePath = this.filePath(id)
+    try {
+      const parsed = matter(await fs.readFile(notePath, 'utf-8'))
+      parsed.data.mirror_commit = source.commit
+      await fs.writeFile(notePath, matter.stringify(parsed.content, parsed.data), 'utf-8')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { ok: false, problems: [`Spiegelpunkt nicht aktualisierbar: ${message}`] }
+    }
+
+    const updated = await this.parseFile(notePath)
+    return {
+      ok: true,
+      ...(updated ? { note: updated.info } : {}),
+      replacedBody,
+      problems: [],
     }
   }
 

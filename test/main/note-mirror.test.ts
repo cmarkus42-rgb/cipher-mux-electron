@@ -159,3 +159,101 @@ describe('NoteManager.save — keeps what the frontmatter carries', () => {
     assert.equal(saved.anchorCommit, 'abc1234')
   })
 })
+
+// ─── Refreshing a mirror ────────────────────────────────────
+//
+// The loop was open at its last step: after a role incorporated a correction
+// into the file, the note still carried the old body and the old mirror
+// commit. Refreshing pulls the committed content back in and moves the
+// mirror point — and hands back what it replaced, because a human correction
+// that has not been incorporated yet would otherwise vanish silently.
+
+describe('NoteManager.refreshMirror', () => {
+  let tmpDir: string
+  let repo: string
+  let mgr: NoteManager
+  let firstCommit: string
+
+  before(async () => {
+    tmpDir = await makeTempDir()
+    repo = await fs.mkdtemp(path.join(os.tmpdir(), 'note-mirror-repo-'))
+    const { execFile } = await import('child_process')
+    const { promisify } = await import('util')
+    const run = promisify(execFile)
+    const git = async (args: string[]) => (await run('git', ['-C', repo, ...args])).stdout.trim()
+
+    await git(['init', '-b', 'main'])
+    await fs.mkdir(path.join(repo, 'docs'), { recursive: true })
+    await fs.writeFile(path.join(repo, 'docs', 'spec.md'), '# Spec\n\nerste Fassung\n')
+    await git(['add', '-A'])
+    await git(['-c', 'user.email=t@e.com', '-c', 'user.name=T', 'commit', '-m', 'erste'])
+    firstCommit = await git(['rev-parse', 'HEAD'])
+
+    await fs.writeFile(path.join(repo, 'docs', 'spec.md'), '# Spec\n\nzweite Fassung\n')
+    await git(['add', '-A'])
+    await git(['-c', 'user.email=t@e.com', '-c', 'user.name=T', 'commit', '-m', 'zweite'])
+  })
+
+  after(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true })
+    await fs.rm(repo, { recursive: true, force: true })
+  })
+
+  beforeEach(() => {
+    mgr = new NoteManager(tmpDir)
+  })
+
+  it('pulls the committed content in and moves the mirror point', async () => {
+    const note = await mgr.create('Spec', '# Spec\n\nerste Fassung\n', ['spec'], {
+      type: 'spec', mirrorsFile: 'docs/spec.md', mirrorCommit: firstCommit, anchorRepo: repo,
+    })
+
+    const result = await mgr.refreshMirror(note.id)
+
+    assert.equal(result.ok, true)
+    assert.ok(result.note?.mirrorCommit)
+    assert.notEqual(result.note!.mirrorCommit, firstCommit, 'the mirror point must move')
+
+    const read = await mgr.read(note.id)
+    assert.ok(read!.body.includes('zweite Fassung'))
+    assert.equal(read!.info.noteType, 'spec', 'type must survive a refresh')
+    assert.equal(read!.info.mirrorsFile, 'docs/spec.md')
+  })
+
+  it('hands back the body it replaced', async () => {
+    const note = await mgr.create('Spec2', '# Spec2\n\nmit Korrektur vom Menschen\n', [], {
+      type: 'spec', mirrorsFile: 'docs/spec.md', mirrorCommit: firstCommit, anchorRepo: repo,
+    })
+
+    const result = await mgr.refreshMirror(note.id)
+    assert.ok(
+      result.replacedBody?.includes('mit Korrektur vom Menschen'),
+      'what was overwritten must be recoverable, not silently dropped',
+    )
+  })
+
+  it('refuses a note that mirrors nothing', async () => {
+    const note = await mgr.create('Schlicht', '# Schlicht\n\nX.')
+    const result = await mgr.refreshMirror(note.id)
+    assert.equal(result.ok, false)
+    assert.ok(result.problems.length > 0)
+  })
+
+  it('refuses an unknown note instead of throwing', async () => {
+    const result = await mgr.refreshMirror('01NOSUCHNOTE0000000000000')
+    assert.equal(result.ok, false)
+  })
+
+  it('reports a broken repository instead of destroying the note', async () => {
+    const note = await mgr.create('Kaputt', '# Kaputt\n\nInhalt bleibt.\n', [], {
+      type: 'spec', mirrorsFile: 'docs/spec.md', mirrorCommit: firstCommit,
+      anchorRepo: '/definitely/not/here',
+    })
+
+    const result = await mgr.refreshMirror(note.id)
+    assert.equal(result.ok, false)
+
+    const read = await mgr.read(note.id)
+    assert.ok(read!.body.includes('Inhalt bleibt.'), 'a failed refresh must not empty the note')
+  })
+})
