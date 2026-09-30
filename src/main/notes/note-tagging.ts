@@ -3,6 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { TagRepository, TagEntry } from '../../shared/types'
 import type { TagClassRepo } from './tag-repository'
+import { filterToAxes, KIND_VALUES, PHASE_VALUES, STATUS_VALUES } from './tag-axes'
 
 const TIMEOUT_MS = 60_000
 
@@ -88,16 +89,35 @@ const TAGS_FILENAME = '.tags.json'
 
 // ─── Prompt ───────────────────────────────────────────────
 
-function buildTaggingPrompt(content: string, tagRepo: TagRepository): string {
-  const existingTags = Object.keys(tagRepo.tags).join(', ')
-  return `Du bist ein erfahrener Wissensorganisator. Lies die folgende Notiz sorgfältig und vergib bis zu 5 passende Tags.
+/**
+ * Die Frage ans Modell.
+ *
+ * Nennt genau die drei Achsen, die es einschaetzen kann, mit ihren erlaubten
+ * Werten. Der Workspace fehlt absichtlich: er ist eine Tatsache ueber die
+ * Herkunft einer Note und keine Einschaetzung ihres Inhalts — ein Modell, das
+ * ihn erraet, haengt eine Note in den falschen Workspace.
+ *
+ * Der Prompt ist die Bitte, filterToAxes ist die Garantie. Die frueheren
+ * "Klassen" im Prompt waren offen formuliert ("erfinde nur dann neue, wenn
+ * wirklich keiner passt"), und das Ergebnis waren 14 Klassen und 29 kind-Werte.
+ */
+function buildTaggingPrompt(content: string, _tagRepo: TagRepository): string {
+  return `Du bist ein erfahrener Wissensorganisator. Lies die folgende Notiz und vergib bis zu 4 Tags.
 
-Tags folgen dem klasse:wert Schema. Bekannte Klassen: kind (Zweck), domain (Fachgebiet), tech (Technologie), project (Projekt), phase (Workflow-Phase).
-Beispiele: "domain:trading", "tech:typescript", "phase:debugging", "kind:reference".
+Es gibt genau drei Achsen. Andere Tags werden verworfen — erfinde keine Klassen.
 
-Vorhandene Tags im Repository: ${existingTags}
+kind (der Typ der Notiz, hoechstens einer):
+${KIND_VALUES.join(', ')}
 
-Bevorzuge bestehende Tags — erfinde nur dann neue, wenn wirklich keiner passt. Neue Tags muessen dem klasse:wert Format folgen. Gib ausschliesslich ein JSON-Array zurück, z.B. ["domain:trading", "tech:typescript"].
+phase (die Arbeitsphase, mehrere moeglich):
+${PHASE_VALUES.join(', ')}
+
+status (der Zustand, hoechstens einer):
+${STATUS_VALUES.join(', ')}
+
+Vergib nur, was die Notiz wirklich hergibt. Lieber zwei treffende Tags als vier geratene.
+
+Gib ausschliesslich ein JSON-Array zurueck, zum Beispiel: ["kind:spec", "phase:architecture", "status:open"]
 
 Notiz:
 ${content.slice(0, 3000)}`
@@ -512,7 +532,11 @@ export class NoteTagging {
       const text = (data.response as string | undefined)?.trim()
       if (!text) return null
 
-      return parseTagResponse(text)
+      // Auf die vier Achsen zurechtstutzen: Workspace, Typ, Phase, Status.
+      // Als Filter auf dem Ergebnis und nicht als Bitte im Prompt -- eine
+      // Bitte kann ein Modell ueberhoeren, und genau das ist passiert:
+      // 14 Klassen, 29 kind-Werte, Wellennummern als Phase. Siehe tag-axes.ts.
+      return filterToAxes(parseTagResponse(text))
     } catch {
       // Ollama not available or request failed — return null for fallback
       return null
