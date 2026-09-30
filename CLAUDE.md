@@ -5,21 +5,28 @@ Electron-Kommandozentrale für Coding-CLIs: ein Fenster mit eingebetteten Termin
 MCP-Server und Projekt-Kick-off. Zielbild und Begründung:
 `docs/superpowers/specs/2026-09-29-prozess-substrat-strategie.md`.
 
-## Bevor du hier arbeitest — die vier Fallen
+## Bevor du hier arbeitest — die fünf Fallen
 
 1. **Tests brauchen Node 22.** Vor jedem Test-/Typecheck-Befehl:
    `export PATH="/opt/homebrew/opt/node@22/bin:$PATH"`. Unter dem System-Node 26 kompiliert
    `better-sqlite3` nicht, `rebuild:node` bricht ab, und die `&&`-Kette in `npm run test`
    führt **null** Tests aus — sieht aus wie ein sauberer Lauf. Keine Testausgabe heißt:
    PATH vergessen. `.nvmrc` und `engines.node` sind gesetzt, npm wertet beides nicht aus.
-2. **Vier Test-Suites sind vorbestehend rot** und gehören niemandem: `migrate-to-cyber-factory`,
-   `task-hooks` (wird als `TaskHooks` gedruckt), `voice-catalog`, `voice-downloader`.
-   Stand: **1633 Tests, 1628 pass, 3 fail, 2 cancelled.** `node:test` druckt vier `not ok`-Zeilen,
-   zählt aber `fail 3` + `cancelled 2` — das ist normal, kein Widerspruch.
-3. **`npm run lint` ist projektweit rot** (827 Probleme, 478 Fehler) und war es vorher schon.
+2. **`node --test` direkt aufzurufen ist nicht dasselbe wie `npm run test`.** Ohne den
+   vorgeschalteten `rebuild:node` fehlt die better-sqlite3-ABI, und es fallen schlagartig über
+   150 Tests um — alle in SQLite-gestützten Suiten (TaskManager, MessageBus, MemoryStore,
+   CyberFactory, Debugger, Audit). Das Fehlerbild ist eindeutig: viele Fehler, alle dort.
+3. **Die Suite ist grün und soll grün bleiben.** Stand: **1742 Tests, 1742 pass, 0 fail,
+   0 cancelled** (seit 4f12f22). Ältere Dokumente nennen „vier vorbestehend rote Suiten" —
+   das galt bis zum 2026-09-30 und ist erledigt; keiner der Fälle war ein Flake. Ein roter
+   Lauf ist ab jetzt eine echte Regression.
+4. **`npm run lint` ist projektweit rot** (830 Probleme, 478 Fehler) und war es vorher schon.
    Ein grüner Lauf ist kein erreichbares Abnahmekriterium. Das Gate lautet: *keine neuen
    Probleme in den geänderten Dateien*, geprüft per `npx eslint <dateien>` gegen `git blame`.
-4. **Vier Sektionen dieser Datei werden von Mux injiziert**, nicht von Hand gepflegt:
+   Der **Typecheck** dagegen ist grün — `tsconfig.main.json` und `tsconfig.renderer.json`
+   beide null Fehler. Der Root-`tsconfig.json` zieht `conserved/` mit und rauscht; nimm die
+   beiden spezifischen.
+5. **Vier Sektionen dieser Datei werden von Mux injiziert**, nicht von Hand gepflegt:
    `## Global Rules`, `## Workspace Prompt`, `## Context Directories`, `## Session Identity`.
    Handarbeit daran wird beim nächsten Sessionstart überschrieben. Global Rules bearbeitet man
    in `~/.config/cipher-mux/global-rules.md`, Workspace-Inhalte im Workspace-Editor.
@@ -39,6 +46,12 @@ npm run dist           # unsignierte DMG nach out/
 nie `electron .` direkt aufrufen — der prestart-Hook garantiert die Electron-ABI, sonst fehlen
 MessageBus-DB und TaskManager.
 
+**`npm start` baut nicht.** Es ist `electron .` plus `prestart` (nur App-Deps). Electron führt
+`dist/` aus. Wer am Main-Prozess arbeitet und die Änderung in der App sehen will, braucht
+vorher `npm run build:main`, bei Renderer-Änderungen zusätzlich `npm run build:renderer`.
+Nimm nicht `npm run build` — das ruft `version:generate` und schreibt `src/shared/version.ts`
+neu, das laut Konvention nicht committet werden soll.
+
 ## Hub
 
 Alle Projekte liegen unter `hubPath/projects/`. Pfadauflösung zentral in
@@ -50,8 +63,17 @@ Version 0.9.104. Multi-Workspace-Sessions (Paket A) ist gemergt: jede Session tr
 Workspace, Presets laufen parallel in mehreren Workspaces. Die manuelle Abnahme dazu steht
 noch aus — `docs/superpowers/acceptance/2026-09-20-multi-workspace-sessions-manual.md`.
 
-Nächste Richtung laut Strategiepapier: Übergaben als Notes fertig bauen, Rolle → Modell/Adapter,
-Rollengrenzen als Constraint. Offene Entscheidungen stehen dort in Abschnitt 7.
+**Übergaben (2026-09-30, Branch `handoff-notes-delta`):** Eine Handoff-Note trägt einen
+Anker-Commit; der Weltzustand wird beim Dispatch berechnet statt gespeichert
+(`notes/handoff-delta.ts`, `notes/handoff-dispatch.ts`, Tool
+`mux_notes_handoff_dispatch`). Notes können typisiert sein und eine Datei in git spiegeln,
+mit sichtbarer Drift statt behaupteter Nicht-Autorität (`notes/mirror-drift.ts`). Beides ist
+end-to-end gegen eine echte Session belegt. Zielbild:
+`docs/superpowers/specs/2026-09-30-notes-als-projektgedaechtnis.md`.
+
+Nächste Richtung laut Strategiepapier: Rolle → Modell/Adapter, Rollengrenzen als Constraint,
+Memory auf Companion begrenzen. Offene Entscheidungen stehen dort in Abschnitt 7, die zur
+Spiegelung im Papier vom 2026-09-30.
 
 ## Projektstruktur
 

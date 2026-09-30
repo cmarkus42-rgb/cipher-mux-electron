@@ -2,6 +2,20 @@ import { describe, it, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'events'
 
+import * as fsSyncIso from 'fs'
+import pathIso from 'path'
+import osIso from 'os'
+
+// Point every SessionStore in this process at a throwaway file. Without this,
+// constructing a real SessionManager wrote test fixtures into the user's live
+// ~/.config/cipher-mux/sessions.json, wiping their sessions and grid layout.
+// SessionStore now refuses the live path in a test process, so this is also
+// what keeps these tests runnable.
+process.env.CIPHER_MUX_SESSION_STORE = pathIso.join(
+  fsSyncIso.mkdtempSync(pathIso.join(osIso.tmpdir(), 'cmux-session-store-test-')),
+  'sessions.json',
+)
+
 /**
  * SP-5: Session Resume, Fork, and Orphan Detection tests.
  */

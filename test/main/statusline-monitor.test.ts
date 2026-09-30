@@ -71,6 +71,71 @@ describe('StatusLineMonitor', () => {
     assert.equal(result!.usage.usedPercentage, 55)
   })
 
+  // A freshly started session reports session_id but has used_percentage:
+  // null, because it has made no API call yet. The claude-session-id emit sat
+  // behind the usage guard, so exactly that session's id was dropped — and a
+  // fresh session is precisely the one a Keep Working restore needs the id for,
+  // to resume a named conversation instead of opening the interactive picker.
+  it('emits claude-session-id even when there is no usage yet', () => {
+    monitor.start()
+
+    let seen: { sessionId: string; claudeSessionId: string } | null = null
+    monitor.on('claude-session-id', (sessionId, claudeSessionId) => {
+      seen = { sessionId, claudeSessionId }
+    })
+    let usageSeen = false
+    monitor.on('usage-updated', () => { usageSeen = true })
+
+    fs.writeFileSync(path.join(tmpDir, 'fresh-session.json'), JSON.stringify({
+      session_id: '05230966-b7e7-4fd3-9e97-321f5c467d00',
+      context_window: {
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+        context_window_size: 1000000,
+        current_usage: null,
+        used_percentage: null,
+        remaining_percentage: null,
+      },
+    }))
+    ;(monitor as any).handleFileChange('fresh-session.json')
+
+    assert.ok(seen, 'the session id must be reported')
+    assert.equal(seen!.sessionId, 'fresh-session')
+    assert.equal(seen!.claudeSessionId, '05230966-b7e7-4fd3-9e97-321f5c467d00')
+    assert.equal(usageSeen, false, 'no usage may be invented from a null reading')
+  })
+
+  it('still emits claude-session-id alongside usage when both are present', () => {
+    monitor.start()
+
+    let claudeId: string | null = null
+    let usagePct: number | null = null
+    monitor.on('claude-session-id', (_s, id) => { claudeId = id })
+    monitor.on('usage-updated', (_s, u) => { usagePct = u.usedPercentage })
+
+    fs.writeFileSync(path.join(tmpDir, 'both.json'), JSON.stringify({
+      session_id: 'abc-123',
+      usedPercentage: 42,
+    }))
+    ;(monitor as any).handleFileChange('both.json')
+
+    assert.equal(claudeId, 'abc-123')
+    assert.equal(usagePct, 42)
+  })
+
+  it('emits nothing for a file without session id or usage', () => {
+    monitor.start()
+
+    let any = false
+    monitor.on('claude-session-id', () => { any = true })
+    monitor.on('usage-updated', () => { any = true })
+
+    fs.writeFileSync(path.join(tmpDir, 'empty.json'), JSON.stringify({ cwd: '/tmp' }))
+    ;(monitor as any).handleFileChange('empty.json')
+
+    assert.equal(any, false)
+  })
+
   it('emits usage-warning when threshold exceeded', () => {
     fs.writeFileSync(path.join(tmpDir, 'warn.json'), JSON.stringify({ usedPercentage: 85 }))
 
@@ -214,5 +279,39 @@ describe('StatusLineMonitor', () => {
     fs.writeFileSync(path.join(tmpDir, '.json'), JSON.stringify({ context_window: { used_percentage: 50 } }))
     monitor.start()
     assert.equal(monitor.getAll().size, 0, 'bare .json should be skipped')
+  })
+})
+
+describe('StatusLineMonitor.rescan', () => {
+  let tmpDir: string
+  let monitor: StatusLineMonitor
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'statusline-rescan-'))
+    monitor = new StatusLineMonitor(tmpDir)
+  })
+
+  afterEach(() => {
+    monitor.stop()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  // start() scans during construction, while session recovery is still
+  // pending — the ids it emits then belong to sessions nobody knows yet and
+  // are dropped. Only sessions that later updated their file got recorded.
+  it('re-emits ids for files that already existed at start', () => {
+    fs.writeFileSync(path.join(tmpDir, 'restored.json'), JSON.stringify({
+      session_id: 'conv-from-before',
+      context_window: { used_percentage: null },
+    }))
+
+    monitor.start() // scans, but nothing is listening yet
+
+    let seen: string | null = null
+    monitor.on('claude-session-id', (_s, id) => { seen = id })
+    assert.equal(seen, null, 'no event before the rescan')
+
+    monitor.rescan()
+    assert.equal(seen, 'conv-from-before')
   })
 })

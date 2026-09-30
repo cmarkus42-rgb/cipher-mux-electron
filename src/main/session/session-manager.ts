@@ -24,6 +24,7 @@ import {
 import { EntityRegistry } from './entity-registry'
 import { SessionStore, toPersistedSession } from './session-store'
 import { runCommand } from '../util/exec-util'
+import { injectStatusLineHook } from '../monitoring/statusline-hook'
 import type { PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
@@ -106,6 +107,7 @@ const BASE_PERMISSIONS = [
   `${MCP_PREFIX}mux_notes_delete`,
   `${MCP_PREFIX}mux_notes_handoff_create`,
   `${MCP_PREFIX}mux_notes_handoff_search`,
+  `${MCP_PREFIX}mux_notes_handoff_dispatch`,
   `${MCP_PREFIX}mux_bugreport_resolve`,
   `${MCP_PREFIX}mux_grid_resize`,
   `${MCP_PREFIX}mux_grid_place`,
@@ -567,6 +569,8 @@ export class SessionManager extends EventEmitter {
             updatedAt: Date.now(),
             entityId: ps.entityId ?? undefined,
             workspaceId: ps.workspaceId ?? null,
+            // Defensive: absent in stores written before this field existed.
+            ...(ps.claudeSessionId ? { claudeSessionId: ps.claudeSessionId } : {}),
           }
           this.sessions.set(session.id, session)
           this.tmux.watchSession(ps.tmuxSession, session.id)
@@ -720,6 +724,18 @@ export class SessionManager extends EventEmitter {
     session.interactionCount = (session.interactionCount ?? 0) + 1
     const target = session.tmuxPane ?? session.tmuxSession
     await this.tmux.sendKeys(target, keys)
+  }
+
+  /**
+   * Send a named key (Escape, Enter, C-c ...) rather than literal text.
+   * sendKeys types its argument character by character — 'Escape' there ends
+   * up as the word, not the key.
+   */
+  async sendKey(sessionId: string, keyName: string): Promise<void> {
+    const session = this.sessions.get(sessionId)
+    if (!session) throw new Error(`Session ${sessionId} not found`)
+    const target = session.tmuxPane ?? session.tmuxSession
+    await this.tmux.sendKey(target, keyName)
   }
 
   /**
@@ -1135,6 +1151,20 @@ export class SessionManager extends EventEmitter {
           fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
         }
       }
+
+      // Status-line hook into the RUN dir — the session's actual cwd, which is
+      // where Claude Code reads settings from. It was only ever written to the
+      // authored entity dir, so for entity sessions the hook never fired: no
+      // report in statusLineDir, so no claude-session-id event, so
+      // claudeSessionId stayed null, so a Keep Working restore had no
+      // conversation to name and fell back to the interactive picker — where an
+      // unattended session then sat instead of reaching a prompt.
+      // Merges into the settings written above rather than replacing them.
+      try {
+        injectStatusLineHook(runDir)
+      } catch (err) {
+        console.warn(`[SessionManager] status-line hook for ${config.id} failed:`, err)
+      }
     }
 
     // Write .mcp.json for MCP auto-discovery (if entity uses MCP)
@@ -1309,10 +1339,16 @@ export class SessionManager extends EventEmitter {
     // stopEntity(entityId): both are app-wide and would tear down instances in
     // other workspaces. singleInstance means "once per workspace" here, same
     // rule as the singleton check in startEntity.
+    // Remember which conversation the outgoing instance was holding, before
+    // it is gone. Knowing it lets the replacement resume that exact one
+    // instead of falling back to "whatever is newest in this directory".
+    let priorClaudeSessionId: string | undefined
     if (targetSessionId) {
+      priorClaudeSessionId = this.sessions.get(targetSessionId)?.claudeSessionId ?? undefined
       await this.stopEntity(entityId, targetSessionId)
     } else if (config.singleInstance) {
       for (const s of findEntitySessions(this.list(), entityId, effectiveWorkspaceId)) {
+        priorClaudeSessionId ??= s.claudeSessionId ?? undefined
         await this.stopEntity(entityId, s.id)
       }
     }
@@ -1321,7 +1357,7 @@ export class SessionManager extends EventEmitter {
     // Start fresh session — in the same workspace the stop above was scoped to
     const session = await this.startEntity(entityId, { workspaceId: effectiveWorkspaceId })
 
-    // Queue Claude launch with --resume flag
+    // Queue Claude launch resuming the prior conversation
     const adapter = this.adapterRegistry.getDefault()
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: config.projectPath,
@@ -1329,6 +1365,7 @@ export class SessionManager extends EventEmitter {
       isWorkshop: entityId === 'workshop',
       isCyberFactory: entityId === 'cyber-factory',
       resume: true,
+      ...(priorClaudeSessionId ? { resumeClaudeSessionId: priorClaudeSessionId } : {}),
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
     this.autoLaunchedSessions.add(session.id)
@@ -1462,10 +1499,13 @@ export class SessionManager extends EventEmitter {
    */
   updateClaudeSessionId(sessionId: string, claudeSessionId: string): void {
     const session = this.sessions.get(sessionId)
-    if (session) {
-      session.claudeSessionId = claudeSessionId
-      session.updatedAt = Date.now()
-    }
+    if (!session) return
+    if (session.claudeSessionId === claudeSessionId) return
+    session.claudeSessionId = claudeSessionId
+    session.updatedAt = Date.now()
+    // Persist it: the id is needed after a restart, which is exactly when the
+    // in-memory copy is gone. Without this the whole chain ends here.
+    this.persistSession(session)
   }
 
   /**

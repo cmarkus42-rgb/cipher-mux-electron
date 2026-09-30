@@ -54,7 +54,18 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     if (this.configReader.getSkipPermissions()) {
       args.push('--dangerously-skip-permissions')
     }
-    if (opts.resume) {
+    // Resuming is what Keep Working is built on, so it stays. Naming the
+    // conversation is the part that matters: `--resume <id>` continues exactly
+    // that one, while a bare `--resume` opens the interactive picker — fine
+    // for a human, useless for an unattended entity session, which then sits
+    // in that picker instead of reaching a prompt.
+    //
+    // The id comes from the statusLine report a running session writes about
+    // itself. Keeping it known is what lets a restore start the right
+    // conversation instead of asking which one.
+    if (opts.resumeClaudeSessionId) {
+      args.push('--resume', opts.resumeClaudeSessionId)
+    } else if (opts.resume) {
       args.push('--resume')
     }
     if (opts.forkFromClaudeSessionId) {

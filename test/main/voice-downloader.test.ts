@@ -47,13 +47,13 @@ describe('voice-downloader', () => {
       assert.strictEqual(fs.existsSync(voiceDir), false)
     })
 
-    it('throws when trying to delete bundled cipher_adult voice', async () => {
-      const voiceDir = path.join(piperDir, 'vits-piper-de_DE-cipher_adult-medium')
+    it('throws when trying to delete bundled cipher_reachy3 voice', async () => {
+      const voiceDir = path.join(piperDir, 'vits-piper-de_DE-cipher_reachy3-medium')
       fs.mkdirSync(voiceDir, { recursive: true })
 
       const { deleteVoice } = await import('../../src/main/voice/voice-downloader')
       assert.throws(
-        () => deleteVoice('de_DE-cipher_adult-medium', piperDir),
+        () => deleteVoice('de_DE-cipher_reachy3-medium', piperDir),
         /bundled/i
       )
     })

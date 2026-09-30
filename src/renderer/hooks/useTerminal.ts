@@ -6,6 +6,7 @@ import { CanvasAddon } from '@xterm/addon-canvas'
 import '@xterm/xterm/css/xterm.css'
 import { getTerminalTheme as getGeneratedTerminalTheme } from './useTheme'
 import type { ThemeName } from '../../shared/grid-types'
+import type { TerminalThemeColors } from '../../shared/terminal-theme'
 import { registerTerminal, unregisterTerminal, setMarker } from '../terminal-registry'
 import { getTerminalFontSize } from '../a11y/terminal-font-size'
 
@@ -16,7 +17,9 @@ const api = () => (window as any).cipherMux
  * Variables are defined on body[data-theme="..."], so we must read from body, not :root.
  * Falls back to the generated theme map if CSS variables are not yet defined.
  */
-function getCssTerminalTheme(fallbackTheme?: ThemeName): Record<string, string | undefined> {
+// Rueckgabe ist der generierte Theme-Typ oder eine daraus gebaute Variante —
+// ein loser Record<string, string|undefined> passte auf keinen von beiden.
+function getCssTerminalTheme(fallbackTheme?: ThemeName): TerminalThemeColors | Record<string, string | undefined> {
   const style = getComputedStyle(document.body)
   const get = (name: string) => style.getPropertyValue(name).trim() || undefined
   const bg = get('--terminal-bg')

@@ -30,6 +30,52 @@ export interface TmuxManagerEvents {
  * commands back through stdin. All terminal output is batched
  * at 16ms intervals before being emitted.
  */
+/**
+ * Bytes per piece when feeding text to a pty, and the pause between pieces.
+ *
+ * A TUI reading a pty in raw mode cannot drain a large burst fast enough — it
+ * keeps whatever is still buffered at the end and silently drops the rest.
+ * Measured against a live Claude CLI: of 5714 characters sent in one call,
+ * 604 arrived, beginning lost. The identical payload reached a canonical-mode
+ * reader intact over the same tmux path, so the loss is the consumer, not the
+ * transport. Split into 400-byte pieces 40ms apart, all 5696 characters of the
+ * same text arrived.
+ */
+export const PTY_CHUNK_BYTES = 400
+export const PTY_CHUNK_PAUSE_MS = 40
+
+/**
+ * Split text into pieces of at most `maxBytes`, never cutting a character.
+ *
+ * Slicing the string by index would break surrogate pairs; slicing the buffer
+ * by byte would break UTF-8 continuation bytes. Both corrupt the payload
+ * instead of merely delaying it, so the boundary is walked back to a
+ * character edge. A single character larger than the budget is emitted whole
+ * rather than mangled.
+ */
+export function chunkForPty(text: string, maxBytes: number = PTY_CHUNK_BYTES): string[] {
+  if (!text) return []
+  if (Buffer.byteLength(text, 'utf-8') <= maxBytes) return [text]
+
+  const chunks: string[] = []
+  let current = ''
+  let currentBytes = 0
+
+  // Iterating the string yields whole code points, so surrogate pairs stay together.
+  for (const char of text) {
+    const charBytes = Buffer.byteLength(char, 'utf-8')
+    if (currentBytes > 0 && currentBytes + charBytes > maxBytes) {
+      chunks.push(current)
+      current = ''
+      currentBytes = 0
+    }
+    current += char
+    currentBytes += charBytes
+  }
+  if (current) chunks.push(current)
+  return chunks
+}
+
 export class TmuxManager extends EventEmitter {
   private controlProcess: ChildProcess | null = null
   private parser: TmuxParser
@@ -319,6 +365,19 @@ export class TmuxManager extends EventEmitter {
    */
   async sendKeys(target: string, keys: string): Promise<void> {
     if (!keys) return
+    // Paced delivery: a TUI on the other end drops a burst it cannot drain.
+    // See PTY_CHUNK_BYTES for the measurement this is based on.
+    const chunks = chunkForPty(keys)
+    for (let i = 0; i < chunks.length; i++) {
+      await this.sendLiteral(target, chunks[i])
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, PTY_CHUNK_PAUSE_MS))
+      }
+    }
+  }
+
+  /** Send one piece of literal text, control mode if available. */
+  private async sendLiteral(target: string, keys: string): Promise<void> {
     if (this.connected && this.controlProcess?.stdin?.writable) {
       const bytes = Buffer.from(keys, 'utf-8')
       if (bytes.length === 0) return
@@ -327,8 +386,27 @@ export class TmuxManager extends EventEmitter {
       this.sendRaw(`send-keys -H -t ${target} ${hex}`)
       return
     }
-    // Fallback when control mode isn't available
-    await runCommand('tmux', ['send-keys', '-l', '-t', target, keys])
+    // Fallback when control mode isn't available.
+    // '--' ends option parsing: a chunk boundary can leave a piece starting
+    // with '-' ("cipher-mux" split after "cipher" yields "-mux"), and tmux
+    // would read that as a flag and reject the whole send.
+    await runCommand('tmux', ['send-keys', '-l', '-t', target, '--', keys])
+  }
+
+  /**
+   * Send a named key (Escape, Enter, C-c ...) rather than literal text.
+   *
+   * sendKeys only ever sends literal bytes, so passing it 'Escape' types the
+   * six letters E-s-c-a-p-e into whatever is listening. This is the path for
+   * actual keys.
+   */
+  async sendKey(target: string, keyName: string): Promise<void> {
+    if (!keyName) return
+    if (this.connected && this.controlProcess?.stdin?.writable) {
+      this.sendRaw(`send-keys -t ${target} ${keyName}`)
+      return
+    }
+    await runCommand('tmux', ['send-keys', '-t', target, keyName])
   }
 
   /**

@@ -40,7 +40,7 @@ export class TaskHooks {
     }
 
     return new Promise((resolve) => {
-      const child = exec(cmd, { cwd, timeout }, (error, stdout, stderr) => {
+      exec(cmd, { cwd, timeout }, (error, stdout, stderr) => {
         const timedOut = error?.killed === true
         const exitCode = timedOut ? -1 : (error?.code ?? 0)
         resolve({
@@ -51,7 +51,11 @@ export class TaskHooks {
           timedOut,
         })
       })
-      child.unref?.()
+      // Deliberately NOT unref'd. unref() takes the child out of the event
+      // loop's reference count, so the loop may drain while the process is
+      // still running — the callback then never fires and this Promise never
+      // settles. Awaiting a process whose handle you just declared unimportant
+      // cannot work. The `timeout` option above is what bounds the wait.
     })
   }
 }

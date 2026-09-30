@@ -14,7 +14,10 @@ import type { NoteSearchIndex } from '../notes/note-search-index'
 import type { MemoryStore } from '../companion/memory-store'
 import type { TagClassRepo } from '../notes/tag-repository'
 import { IPC } from '../../shared/ipc-channels'
-import { registerAllHandoffTools } from './handoff-kernel'
+import { registerAllHandoffTools, executeHandoff } from './handoff-kernel'
+import { resolveAnchorCommit } from '../notes/handoff-delta'
+import { dispatchHandoffNote } from '../notes/handoff-dispatch'
+import type { EntityId } from '../../shared/types'
 import { integrate, inventory, migrationPlan, hubApply, hubVerify, hubRelease, hubRollback } from '../hub'
 
 /**
@@ -1089,25 +1092,53 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     'mux_notes_handoff_create',
     {
       description:
-        'Create a handoff note for session-to-session knowledge transfer. Handoff notes have extended frontmatter '
-        + '(from_session, to_entity, handoff_status) and are always global scope. Tag: "handoff".',
+        'Create a handoff note for session-to-session knowledge transfer. Handoff notes carry extended frontmatter '
+        + '(from_session, to_entity, handoff_status) and are tagged "handoff". '
+        + 'Pass anchor_repo to stamp the handoff with the commit it was written against — that anchor is what '
+        + 'mux_notes_handoff_dispatch later computes the delta from. '
+        + 'Write only the DURABLE part into the body: assignment, decisions, rejected alternatives, pointers. '
+        + 'Anything derivable from the repo (current file contents, line numbers, what changed recently) does NOT '
+        + 'belong in a handoff — it is computed fresh at dispatch and a stored copy only goes stale.',
       inputSchema: {
         title: z.string().describe('Handoff title, e.g. "Handoff: Auth refactor context"'),
-        body: z.string().describe('Markdown body with context, findings, next steps'),
+        body: z.string().describe('Markdown body: assignment, decisions, rejected alternatives, pointers'),
         from_session: z.string().describe('Name of the session creating this handoff'),
         to_entity: z.string().optional().describe('Target entity ID or "any" (default)'),
+        anchor_repo: z.string().optional().describe('Absolute path of the repository this handoff is written against'),
+        anchor_commit: z.string().optional().describe('Base commit (default: current HEAD of anchor_repo)'),
       },
     },
-    async (args: { title: string; body: string; from_session: string; to_entity?: string }) => {
+    async (args: {
+      title: string
+      body: string
+      from_session: string
+      to_entity?: string
+      anchor_repo?: string
+      anchor_commit?: string
+    }) => {
       if (!ctx.noteManager) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
       }
       try {
+        // Stamp the anchor: explicit commit wins, otherwise HEAD of the given
+        // repo. A repo that cannot be read yields no anchor — the handoff is
+        // still worth writing, it just cannot carry a delta later.
+        const anchorRepo = args.anchor_repo ?? null
+        let anchorCommit = args.anchor_commit ?? null
+        if (!anchorCommit && anchorRepo) {
+          anchorCommit = await resolveAnchorCommit(anchorRepo)
+        }
+
         const note = await ctx.noteManager.createHandoff(
           args.title,
           `# ${args.title}\n\n${args.body}`,
           args.from_session,
           args.to_entity || 'any',
+          {
+            ...(anchorCommit ? { anchorCommit } : {}),
+            ...(anchorRepo ? { anchorRepo } : {}),
+            workspaceId: ctx.workspaceId ?? null,
+          },
         )
 
         // Notify UI
@@ -1116,7 +1147,79 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         }
 
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: note.id }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({
+            ok: true,
+            id: note.id,
+            anchorCommit: note.anchorCommit ?? null,
+            anchorRepo: note.anchorRepo ?? null,
+            tags: note.tags,
+          }) }],
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: errMsg }) }], isError: true }
+      }
+    }
+  )
+
+  // 21b. mux_notes_handoff_dispatch — Deliver a handoff note into a session
+  ;(server.registerTool as any)(
+    'mux_notes_handoff_dispatch',
+    {
+      description:
+        'Deliver a handoff note into a target entity session, with the current world state computed and prepended. '
+        + 'Finds or starts the target session, sends the state block plus the note body, and marks the note consumed. '
+        + 'The state block (branch, commits and diff since the note\'s anchor commit, uncommitted third-party changes) '
+        + 'is computed fresh at dispatch — this is what spares the receiving session from orienting itself, and what '
+        + 'prevents it from acting on a stale description of the tree. '
+        + 'Use mux_notes_handoff_create first; use mux_notes_handoff_search to find pending handoffs.',
+      inputSchema: {
+        note_id: z.string().describe('ID of the handoff note to deliver'),
+        to_entity: z.string().optional().describe('Target entity ID — overrides the note\'s to_entity (required if that is "any")'),
+        project_path: z.string().optional().describe('Repository the delta is computed against — overrides the note\'s anchor_repo'),
+        force: z.boolean().optional().describe('Deliver again even if the note is already marked consumed (default false)'),
+      },
+    },
+    async (args: { note_id: string; to_entity?: string; project_path?: string; force?: boolean }) => {
+      if (!ctx.noteManager) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
+      }
+      try {
+        const outcome = await dispatchHandoffNote(
+          {
+            noteManager: ctx.noteManager,
+            deliver: async (config) => {
+              const result = await executeHandoff(ctx, {
+                targetEntityId: config.targetEntityId as EntityId,
+                senderEntityId: config.senderEntityId,
+                sessionName: config.sessionName,
+                ...(config.projectPath ? { projectPath: config.projectPath } : {}),
+                payload: config.payload,
+              })
+              return result.ok
+                ? { ok: true, targetSessionId: result.targetSessionId, wasExisting: result.wasExisting }
+                : { ok: false, error: result.error }
+            },
+          },
+          {
+            noteId: args.note_id,
+            ...(args.to_entity ? { toEntity: args.to_entity } : {}),
+            ...(args.project_path ? { projectPath: args.project_path } : {}),
+            ...(args.force ? { force: true } : {}),
+          },
+        )
+
+        // Status changed on success — let the sidebar follow along.
+        if (outcome.ok && ctx.windowManager) {
+          const updated = await ctx.noteManager.read(outcome.noteId)
+          if (updated) {
+            ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', note: updated.info })
+          }
+        }
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(outcome) }],
+          ...(!outcome.ok ? { isError: true } : {}),
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)

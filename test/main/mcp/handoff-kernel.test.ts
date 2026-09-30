@@ -38,9 +38,10 @@ interface MockCtxOpts {
   startEntityError?: string
 }
 
-function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[][]; messageBusCalls: any[]; visibleAddCalls: any[]; noteCreateCalls: any[] } {
+function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[][]; sendKeyCalls: string[][]; messageBusCalls: any[]; visibleAddCalls: any[]; noteCreateCalls: any[] } {
   const sessions = opts.sessions ?? []
   const sendKeysCalls: string[][] = []
+  const sendKeyCalls: string[][] = []
   const messageBusCalls: any[] = []
   const visibleAddCalls: any[] = []
   const noteCreateCalls: any[] = []
@@ -68,6 +69,9 @@ function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[
     getEntityRegistry: () => entityRegistry,
     sendKeys: async (sessionId: string, keys: string) => {
       sendKeysCalls.push([sessionId, keys])
+    },
+    sendKey: async (sessionId: string, keyName: string) => {
+      sendKeyCalls.push([sessionId, keyName])
     },
     startEntity: async (entityId: EntityId, _opts?: any) => {
       if (opts.startEntityError) throw new Error(opts.startEntityError)
@@ -114,6 +118,7 @@ function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[
     noteSearchIndex: null,
     memoryStore: null,
     sendKeysCalls,
+    sendKeyCalls,
     messageBusCalls,
     visibleAddCalls,
     noteCreateCalls,
@@ -121,6 +126,49 @@ function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[
 }
 
 // ─── Tests ─────────────────────────────────────────────────
+
+// An existing session used to be assumed ready — the readiness wait only
+// guarded newly started ones. A session sitting in a modal dialog swallowed
+// the keystrokes into a search field while executeHandoff reported success,
+// and the handoff note was marked consumed on the strength of that report.
+// Silent loss with a receipt is worse than an honest failure.
+describe('handoff-kernel: existing sessions are not assumed ready', () => {
+  it('refuses to send into an existing session that shows no sign of readiness', async () => {
+    const existing = makeSession({ id: 'sess-existing', entityId: 'debugger', name: 'debugger' })
+    const ctx = makeCtx({
+      sessions: [existing],
+      captureOutput: 'Resume session\n  Search…\n  No conversations found',
+    })
+
+    const result = await executeHandoff(ctx, {
+      targetEntityId: 'debugger',
+      senderEntityId: 'test',
+      sessionName: 'debugger',
+      payload: { text: 'hallo' },
+    })
+
+    assert.equal(result.ok, false)
+    assert.equal(ctx.sendKeysCalls.length, 0, 'nothing may be typed into a session that is not ready')
+  })
+
+  it('sends into an existing session that is at its prompt', async () => {
+    const existing = makeSession({ id: 'sess-existing', entityId: 'debugger', name: 'debugger' })
+    const ctx = makeCtx({
+      sessions: [existing],
+      captureOutput: '❯ ',
+    })
+
+    const result = await executeHandoff(ctx, {
+      targetEntityId: 'debugger',
+      senderEntityId: 'test',
+      sessionName: 'debugger',
+      payload: { text: 'hallo' },
+    })
+
+    assert.equal(result.ok, true)
+    assert.ok(ctx.sendKeysCalls.length > 0, 'a ready session must receive the payload')
+  })
+})
 
 describe('handoff-kernel: isBusy', () => {
   it('returns false when pane runs zsh (idle)', async () => {
@@ -133,6 +181,24 @@ describe('handoff-kernel: isBusy', () => {
     const ctx = makeCtx({ paneCommand: 'claude' })
     const session = makeSession()
     assert.equal(await isBusy(ctx, session), true)
+  })
+
+  // Claude Code reports its version string as pane_current_command, not
+  // "claude" — measured against v2.1.284. A check bound to the process name
+  // read every live CLI as idle, which made executeHandoff give up on every
+  // freshly started session after 15s while that session sat there ready.
+  it('returns true when the pane runs a Claude CLI that reports its version', async () => {
+    const ctx = makeCtx({ paneCommand: '2.1.284' })
+    const session = makeSession()
+    assert.equal(await isBusy(ctx, session), true)
+  })
+
+  it('treats every known shell as idle', async () => {
+    for (const shell of ['zsh', 'bash', 'sh', 'fish', '-zsh', '']) {
+      const ctx = makeCtx({ paneCommand: shell })
+      const session = makeSession()
+      assert.equal(await isBusy(ctx, session), false, `"${shell}" must read as idle`)
+    }
   })
 
   it('returns false on error', async () => {
@@ -161,11 +227,19 @@ describe('handoff-kernel: executeHandoff', () => {
     assert.equal((result as HandoffResult).wasExisting, true)
     assert.equal((result as HandoffResult).targetSessionId, existingSession.id)
 
-    // Verify sendKeys was called: Escape + payload + Enter (at minimum)
-    assert.ok(ctx.sendKeysCalls.length >= 3)
-    // First call is Escape to dismiss any Suggested Prompt
-    assert.equal(ctx.sendKeysCalls[0][1], 'Escape')
-    const fullMessage = ctx.sendKeysCalls[1][1]
+    // Escape goes through the key path — sendKeys only sends literal text, so
+    // 'Escape' there would be typed as the word into the prompt. It was:
+    // a live transcript showed the payload arriving as "Escapeon nie.".
+    assert.deepEqual(ctx.sendKeyCalls.map(c => c[1]), ['Escape'])
+    assert.equal(
+      ctx.sendKeysCalls.some(c => c[1] === 'Escape'),
+      false,
+      'Escape must never be sent as literal text',
+    )
+
+    // Payload + Enter go through the literal path
+    assert.ok(ctx.sendKeysCalls.length >= 2)
+    const fullMessage = ctx.sendKeysCalls[0][1]
     assert.ok(fullMessage.includes('[HANDOFF from ideation-partner]'))
     assert.ok(fullMessage.includes('specPath'))
   })
@@ -342,7 +416,7 @@ describe('handoff-kernel: delivery format', () => {
     await executeHandoff(ctx, config)
 
     // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
-    const delivered = ctx.sendKeysCalls[1][1]
+    const delivered = ctx.sendKeysCalls.map(c => c[1]).reduce((a, b) => (b.length > a.length ? b : a), '')
     assert.ok(delivered.startsWith('[HANDOFF from ideation-partner]'))
     assert.ok(delivered.includes('**specPath:** /tmp/spec.md'))
     assert.ok(delivered.includes('**phase:** architect'))
@@ -362,7 +436,7 @@ describe('handoff-kernel: delivery format', () => {
     await executeHandoff(ctx, config)
 
     // Index 1: payload (index 0 is Escape to dismiss Suggested Prompt)
-    const delivered = ctx.sendKeysCalls[1][1]
+    const delivered = ctx.sendKeysCalls.map(c => c[1]).reduce((a, b) => (b.length > a.length ? b : a), '')
     assert.ok(delivered.includes('**gaps:**'))
     assert.ok(delivered.includes('- NFR missing'))
     assert.ok(delivered.includes('- No error handling spec'))
