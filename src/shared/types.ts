@@ -542,6 +542,14 @@ export interface NoteInfo {
   toEntity?: string
   /** Handoff lifecycle status */
   handoffStatus?: HandoffStatus
+  /**
+   * Commit the handoff was written against. The one piece of world state that
+   * is stored rather than computed — it is the reference point the delta is
+   * measured from, not a fact derived from the repo.
+   */
+  anchorCommit?: string
+  /** Absolute path of the repository the anchor commit belongs to. */
+  anchorRepo?: string
 }
 
 export interface NoteContent {
