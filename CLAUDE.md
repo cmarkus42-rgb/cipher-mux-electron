@@ -136,6 +136,38 @@ Grid mit Projekt-Zuweisungen. Eigenes Fenster (`index.html?view=workspaces`).
   „ohne Workspace". Die Main-Seite (`findEntitySessions`) bleibt bewusst strenger.
 - **Noch global, nicht workspace-skopiert:** Notes-Tagging und Companion-Memory (Paket B).
 
+## Rollen als Constraint — und was die CLI dabei wirklich tut
+
+Rollengrenzen sind nicht mehr nur Prompt-Text. Pro Entity mit Grenze erzeugt der Mux ein
+abhängigkeitsfreies Node-Skript im Run-Verzeichnis und verdrahtet es als **PreToolUse-Hook**.
+Die Grenzen samt Begründung stehen in `src/main/session/entity-boundaries.ts`; eine Rolle ohne
+Eintrag ist bewusst unbeschränkt.
+
+**Drei gemessene Eigenschaften der Claude-CLI, die den Weg bestimmen** (2026-09-30, v2.1.284):
+
+1. **`--dangerously-skip-permissions` umgeht `permissions.deny` vollständig.** Entity-Sessions
+   starten mit diesem Flag. Eine Deny-Regel dort wäre geschrieben und wirkungslos — und damit
+   auch die `permissions.allow`-Liste, solange das Flag gesetzt ist.
+2. **Ein PreToolUse-Hook feuert unter dem Flag weiterhin** und kann den Aufruf ablehnen. Das ist
+   der einzige gemessene Weg, eine Rollengrenze durchzusetzen.
+3. **Nur `Edit(glob)` greift bei Dateiedits.** Eine `Write(glob)`-Regel weist die CLI
+   ausdrücklich zurück: *„only Edit(path) rules are. Use Edit(src/**) instead (Edit rules cover
+   all file-editing tools)."*
+
+Jede dieser drei ist eine Annahme über das Innenleben der CLI. Sie stehen hier, weil sie in
+keinem Diff stehen — und sie können mit der nächsten CLI-Version kippen. Wer hier arbeitet,
+misst nach, statt sie zu glauben.
+
+**Rolle → Modell/Adapter:** `EntityConfig.model` und `.adapterId`, aufgelöst in
+`entity-runtime.ts` als User-Override (configStore `entityModels` / `entityAdapters`) >
+Rollen-Default > CLI-Default. Keine Rolle trägt einen Modell-Default; das ist eine
+Kostenentscheidung und keine Vermutung.
+
+**Companion Memory nur für Companion:** Der MCP-Server bindet die Rolle über `X-Mux-Entity` an
+die Verbindung (`src/main/mcp/entity-header.ts`) und registriert die vier `companion_memory_*`
+nur für Companion — oder für Verbindungen ohne Rolle, das ist die App selbst. Eine Permission
+zu entfernen hätte nicht gereicht: sie erzeugt eine Rückfrage, sie hält kein Werkzeug zurück.
+
 ## Entities, MCP, Voice
 
 - **Entities** sind Rollen mit eigenem Verzeichnis, eigener CLAUDE.md und Recovery-Fähigkeit:

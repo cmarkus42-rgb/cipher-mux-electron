@@ -221,6 +221,27 @@ Notes-System nach Abschnitt 5.
    - *Rollengrenzen über `settings.local.json`* — die Mechanik schreibt Mux bereits pro
      Entity (`getMcpPermissionsForEntity`), bisher nur für MCP-Tools
 
+## 7a. Stand der Reihenfolge (2026-09-30)
+
+Alle fünf Kandidaten aus Abschnitt 7.5 sind umgesetzt. Was dabei anders lief als geplant:
+
+| Posten | Stand | Abweichung vom Plan |
+|---|---|---|
+| Delta beim Dispatch | gebaut, live belegt | `executeHandoff` existierte bereits — hier unerwähnt |
+| Handoff-Note um Anker und Scope | gebaut | Scope war gegenstandslos: `NoteInfo.scope` ist deprecated, Bindung läuft über Tags |
+| Memory auf Companion, Zeiger-Semantik | gebaut | Begrenzung brauchte eine Rollen-Identität auf der MCP-Verbindung; eine Permission zu entfernen genügt nicht |
+| Rolle → Modell/Adapter | gebaut | Adapterseite war fertig, nur die Rollenseite fehlte |
+| Rollengrenzen über `settings.local.json` | **Weg verworfen**, Ziel erreicht | `--dangerously-skip-permissions` umgeht `deny`; durchgesetzt wird über PreToolUse-Hook |
+
+Der letzte Punkt ist der lehrreiche: Der Plan nannte `settings.local.json`, weil der Mux dort
+schon eine Allowlist pro Entity schreibt. Gemessen stellte sich heraus, dass diese Allowlist
+für Entity-Sessions gar nichts tut, solange sie mit `--dangerously-skip-permissions` starten —
+und eine Deny-Regel ebenso wenig. Der Plan baute auf einer Mechanik, die er für wirksam hielt.
+
+Offen bleibt Abschnitt 7.1 nicht mehr in der ursprünglichen Form: Befunde als
+`noteType: finding` sind die Antwort, siehe `2026-09-30-notes-als-projektgedaechtnis.md`
+Abschnitt 5. Gebaut ist die Typisierung, nicht die eigene Ansicht dafür.
+
 ## 8. Was bewusst nicht drinsteht
 
 Kein Task-Zuschnitt, keine Dateilisten. Das ist Zielgebung plus Gesprächsstand, kein
