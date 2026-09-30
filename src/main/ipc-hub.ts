@@ -2191,6 +2191,40 @@ export class IpcHub {
       }
     })
 
+    // Anforderungen lesen und zurueckschreiben — gleiche Form wie Befunde
+    ipcMain.handle(IPC.NOTES_PARSE_REQUIREMENTS, async (_e, { id }: { id: string }) => {
+      try {
+        const result = await this.noteManager.read(id)
+        if (!result || !result.info.tags?.includes('kind:requirements')) return null
+        const { parseRequirements } = await import('./notes/requirements-parser')
+        const fsNode = await import('fs')
+        const pathNode = await import('path')
+        const raw = fsNode.readFileSync(
+          pathNode.join(this.noteManager.getNotesDir(), `${id}.md`), 'utf-8',
+        )
+        return parseRequirements(raw) ?? null
+      } catch (err) {
+        console.error('[IpcHub] NOTES_PARSE_REQUIREMENTS failed:', err)
+        return null
+      }
+    })
+
+    ipcMain.handle(IPC.NOTES_SERIALIZE_REQUIREMENTS, async (_e, { sections }: { sections: Array<{ title: string; items: unknown[] }> }) => {
+      try {
+        const { serializeRequirementItem } = await import('./notes/requirements-parser')
+        const lines: string[] = []
+        for (const section of sections) {
+          if (section.title && section.title !== 'Allgemein') lines.push(`## ${section.title}`, '')
+          for (const item of section.items) lines.push(serializeRequirementItem(item as never))
+          lines.push('')
+        }
+        return lines.join('\n').trimEnd() + '\n'
+      } catch (err) {
+        console.error('[IpcHub] NOTES_SERIALIZE_REQUIREMENTS failed:', err)
+        return null
+      }
+    })
+
     // Parse a finding note in main process — same shape as the testcase path
     ipcMain.handle(IPC.NOTES_PARSE_FINDING, async (_e, { id }: { id: string }) => {
       try {

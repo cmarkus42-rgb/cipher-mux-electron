@@ -4130,3 +4130,68 @@
 .outline__item--l4 > .outline__link { padding-left: calc(var(--space-md) + 2.7em); }
 .outline__item--l5 > .outline__link,
 .outline__item--l6 > .outline__link { padding-left: calc(var(--space-md) + 3.6em); }
+
+/* ─── RequirementsView ─────────────────────────────────────
+   Gleiche Familie wie .fv (Befunde) und .tc-view (Testcases). Der einzige
+   auffällige Unterschied: offene Muss-Anforderungen bekommen die Warnfarbe,
+   weil an ihnen Fertigsein hängt. */
+
+.rq { display: flex; flex-direction: column; height: 100%; overflow: hidden; font-size: var(--font-size-sm); }
+
+.rq__header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-md); padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border); flex: 0 0 auto;
+}
+
+.rq__title { font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rq__summary { display: flex; gap: var(--space-sm); flex: 0 0 auto; white-space: nowrap; }
+.rq__count { color: var(--color-text-muted); font-size: var(--font-size-xs); }
+.rq__count--blocking { color: var(--color-neon-red, #ff2d55); font-weight: 600; }
+.rq__count--clear { color: var(--color-success); font-weight: 600; }
+.rq__count--done { color: var(--color-success); }
+
+.rq__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--space-sm) 0; }
+
+.rq__section-title {
+  padding: var(--space-sm) var(--space-md) var(--space-xs);
+  font-weight: 600; color: var(--color-text-secondary);
+  font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+.rq-row { border-bottom: 1px solid var(--color-border-subtle); }
+.rq-row--closed { opacity: 0.55; }
+
+.rq-row__main {
+  display: flex; align-items: flex-start; gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+}
+
+.rq-row__status {
+  flex: 0 0 auto; min-width: 6em; padding: 1px var(--space-xs);
+  border: 1px solid var(--color-border); background: var(--color-bg-elev-1);
+  color: var(--color-text-muted); font-family: inherit; font-size: var(--font-size-xs); cursor: pointer;
+}
+
+.rq-row__status:hover { border-color: var(--color-border-focus); }
+.rq-row__status--offen { color: var(--color-warning); border-color: var(--color-warning); }
+.rq-row__status--teilweise { color: var(--color-neon-orange, #ff9f45); }
+.rq-row__status--erfuellt { color: var(--color-success); }
+.rq-row__status--verworfen { color: var(--color-text-muted); }
+
+.rq-row__id { flex: 0 0 auto; font-weight: 600; color: var(--color-text-accent); }
+.rq-row__prio { flex: 0 0 auto; min-width: 3.2em; font-size: var(--font-size-xs); }
+.rq-row__prio--none { color: var(--color-text-dim); }
+.rq-row__text { flex: 1 1 auto; min-width: 0; color: var(--color-text); }
+.rq-row__comment { color: var(--color-text-muted); }
+
+.rq-row__why {
+  flex: 0 0 auto; border: none; background: none; padding: 0;
+  color: var(--color-text-dim); font-family: inherit; font-size: var(--font-size-xs); cursor: pointer;
+}
+.rq-row__why:hover { color: var(--color-text-accent); }
+
+.rq-row__detail {
+  padding: 0 var(--space-md) var(--space-xs) calc(var(--space-md) + 7em);
+  color: var(--color-text-muted); font-size: var(--font-size-xs);
+}

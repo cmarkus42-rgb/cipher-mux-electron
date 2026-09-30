@@ -8,10 +8,12 @@ import { TestcaseView } from './TestcaseView'
 import { FindingView } from './FindingView'
 import { MirrorStatus } from './MirrorStatus'
 import { SpecOutline } from './SpecOutline'
+import { RequirementsView } from './RequirementsView'
 import { useNotes } from '../hooks/useNotes'
 import type { NoteInfo } from '../../shared/types'
 import type { ParsedTestcase, TestcaseSection } from '../../main/notes/testcase-parser'
 import type { ParsedFinding, FindingSection } from '../../main/notes/finding-parser'
+import type { ParsedRequirements, RequirementSection } from '../../main/notes/requirements-parser'
 import { ExternalLink, Scan, ChevronDown, ChevronUp, X } from 'lucide-preact'
 
 const ICON_SIZE = 14
@@ -28,6 +30,8 @@ interface NoteTab {
   finding?: ParsedFinding
   /** Set when the note mirrors a file in git — drives the MirrorStatus header. */
   mirrorsFile?: string
+  /** Parsed requirements — present only if this is a requirements note. */
+  requirements?: ParsedRequirements
   /** Raw file content including frontmatter (for testcase serialization). */
   rawContent?: string
 }
@@ -109,8 +113,9 @@ export function NotesCell({
       if (existing) {
         // Detect noteType change: a kind: tag added or removed means the tab
         // needs a different view, so it has to be rebuilt rather than focused.
-        const wasTyped = !!existing.testcase || !!existing.finding
-        const isTyped = !!info.tags?.includes('kind:testcase') || !!info.tags?.includes('kind:finding')
+        const wasTyped = !!existing.testcase || !!existing.finding || !!existing.requirements
+        const isTyped = ['kind:testcase', 'kind:finding', 'kind:requirements']
+          .some(t => info.tags?.includes(t))
         if (wasTyped === isTyped) {
           setActiveTabId(info.id)
           return
@@ -134,6 +139,17 @@ export function NotesCell({
         }
       }
 
+      // Detect requirements note — same IPC shape as the testcase path
+      let requirements: ParsedRequirements | undefined
+      if (info.tags?.includes('kind:requirements')) {
+        try {
+          const parsed = await apiObj.notes.parseRequirements(info.id)
+          requirements = parsed ?? undefined
+        } catch (err) {
+          console.error('[NotesCell] Failed to parse requirements:', err)
+        }
+      }
+
       // Detect finding note — same IPC shape as the testcase path
       let finding: ParsedFinding | undefined
       if (info.tags?.includes('kind:finding')) {
@@ -153,6 +169,7 @@ export function NotesCell({
         dirty: false,
         testcase,
         finding,
+        requirements,
         ...(info.mirrorsFile ? { mirrorsFile: info.mirrorsFile } : {}),
       }
       setTabs((prev) => [...prev, tab])
@@ -239,6 +256,22 @@ export function NotesCell({
   )
 
   // Testcase: update sections → serialize via IPC → save
+  const handleRequirementsUpdate = useCallback(
+    async (sections: RequirementSection[]) => {
+      if (!activeTab?.requirements) return
+      const apiObj = window.cipherMux
+      const updated: ParsedRequirements = { ...activeTab.requirements, sections }
+      const body = await apiObj.notes.serializeRequirementsBody(sections)
+      if (!body) { console.error('[NotesCell] serializeRequirementsBody returned null'); return }
+      const result = await apiObj.notes.save(activeTab.id, body, undefined, true)
+      const title = result?.title || activeTab.title
+      setTabs(prev => prev.map(t =>
+        t.id === activeTab.id ? { ...t, content: body, title, requirements: updated, dirty: false } : t,
+      ))
+    },
+    [activeTab],
+  )
+
   const handleFindingUpdate = useCallback(
     async (sections: FindingSection[]) => {
       if (!activeTab?.finding) return
@@ -565,7 +598,7 @@ export function NotesCell({
             onRefreshed={() => { void reloadTab(activeTab.id) }}
           />
         )}
-        {activeTab && !activeTab.testcase && !activeTab.finding && (
+        {activeTab && !activeTab.testcase && !activeTab.finding && !activeTab.requirements && (
           <SpecOutline
             key={`outline-${activeTab.id}`}
             noteId={activeTab.id}
@@ -580,6 +613,12 @@ export function NotesCell({
             onArchive={handleTestcaseArchive}
             onScreenshot={handleTestcaseScreenshot}
             onFeatureRequest={handleFeatureRequest}
+          />
+        ) : activeTab?.requirements ? (
+          <RequirementsView
+            key={activeTab.id}
+            requirements={activeTab.requirements}
+            onUpdate={handleRequirementsUpdate}
           />
         ) : activeTab?.finding ? (
           <FindingView
