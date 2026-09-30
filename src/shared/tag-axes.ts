@@ -45,6 +45,13 @@ export type TagAxis = (typeof TAG_AXES)[number]
 export const KIND_VALUES: readonly string[] = [
   'testcase', 'finding', 'spec', 'requirements', 'research',
   'bugreport', 'handoff', 'journal', 'reference', 'todo', 'idea',
+  // Aus der Messung des Bestands am 2026-09-30 nachgetragen. Diese drei Typen
+  // waren da, bevor es die Achse gab, und zwar in Mengen, die sich nicht in
+  // einen benachbarten Wert pressen lassen: 63 Wellenplaene und 36 Fix-Plaene
+  // sind Plaene, 59 Abschlussberichte sind Berichte, 24 Walkthroughs und 7
+  // Guides sind Anleitungen. Eine geschlossene Liste soll knapp sein, nicht
+  // unvollständig.
+  'plan', 'report', 'guide',
 ]
 
 /** Phase des Arbeitsablaufs. Mehrere sind erlaubt — eine Note darf zwei berühren. */
