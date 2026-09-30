@@ -46,6 +46,18 @@ export interface EntityConfig {
   sortOrder?: number
   /** If true, only one session of this entity can run at a time. Default: false (multi-instance). */
   singleInstance?: boolean
+  /**
+   * Model this role runs on (e.g. 'haiku', 'sonnet', 'opus'). Absent = let the
+   * CLI decide. A user override in config wins over this — see
+   * entity-runtime.ts for the resolution order.
+   */
+  model?: string
+  /**
+   * Agent adapter driving this role. Absent = the registry default
+   * (claude-code). This is where a role naming a different agent first forces
+   * the AgentAdapter interface to carry its weight.
+   */
+  adapterId?: string
 }
 
 // ─── Session ───────────────────────────────────────────────
