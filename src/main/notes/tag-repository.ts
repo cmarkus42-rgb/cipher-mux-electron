@@ -27,10 +27,13 @@ function axisSeed(axis: TagAxis, color: string, extra: readonly string[] = []): 
 }
 
 export const SEED_CLASSES: Record<string, TagClass> = {
-  // `feature-request` ist kein Achsenwert, stammt aber aus dem Bestand.
-  kind: axisSeed('kind', '#6366f1', ['feature-request']),
-  // `archived` ebenso.
-  status: axisSeed('status', '#f59e0b', ['archived']),
+  // Genau die Achsenwerte, nichts daneben. `feature-request` und `archived`
+  // standen hier, bis der Umzug am 2026-09-30 sie abgebildet hat
+  // (-> kind:idea, -> status:superseded). Sie als Seed zu behalten haette
+  // bedeutet, dass sie beim naechsten Start zurueckkommen und die
+  // Freitext-Vorschlaege wieder Werte anbieten, die auf keiner Note stehen.
+  kind: axisSeed('kind', '#6366f1'),
+  status: axisSeed('status', '#f59e0b'),
   phase: axisSeed('phase', '#a78bfa'),
   entity: axisSeed('entity', '#22d3ee'),
   domain: {
