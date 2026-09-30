@@ -281,3 +281,37 @@ describe('StatusLineMonitor', () => {
     assert.equal(monitor.getAll().size, 0, 'bare .json should be skipped')
   })
 })
+
+describe('StatusLineMonitor.rescan', () => {
+  let tmpDir: string
+  let monitor: StatusLineMonitor
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'statusline-rescan-'))
+    monitor = new StatusLineMonitor(tmpDir)
+  })
+
+  afterEach(() => {
+    monitor.stop()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  // start() scans during construction, while session recovery is still
+  // pending — the ids it emits then belong to sessions nobody knows yet and
+  // are dropped. Only sessions that later updated their file got recorded.
+  it('re-emits ids for files that already existed at start', () => {
+    fs.writeFileSync(path.join(tmpDir, 'restored.json'), JSON.stringify({
+      session_id: 'conv-from-before',
+      context_window: { used_percentage: null },
+    }))
+
+    monitor.start() // scans, but nothing is listening yet
+
+    let seen: string | null = null
+    monitor.on('claude-session-id', (_s, id) => { seen = id })
+    assert.equal(seen, null, 'no event before the rescan')
+
+    monitor.rescan()
+    assert.equal(seen, 'conv-from-before')
+  })
+})

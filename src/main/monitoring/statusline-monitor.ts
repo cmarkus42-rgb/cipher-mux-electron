@@ -107,6 +107,21 @@ export class StatusLineMonitor extends EventEmitter {
     this.removedIds.delete(sessionId)
   }
 
+  /**
+   * Re-read every status file and re-emit what they say.
+   *
+   * start() already scans once, but it runs synchronously during construction
+   * while session recovery is still pending in a promise chain. At that point
+   * the SessionManager knows no sessions, so a claude-session-id event has
+   * nobody to attach itself to and is dropped. Only sessions that happened to
+   * update their status file afterwards got their id recorded.
+   *
+   * Call this once recovery has completed.
+   */
+  rescan(): void {
+    this.scanExisting()
+  }
+
   private scanExisting(): void {
     try {
       const files = fs.readdirSync(this.watchDir)
