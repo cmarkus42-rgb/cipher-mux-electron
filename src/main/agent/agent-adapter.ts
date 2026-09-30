@@ -40,8 +40,17 @@ export interface LaunchOpts {
   isCyberFactory?: boolean
   /** Fork from an existing Claude session (--fork-session <id>) */
   forkFromClaudeSessionId?: string
-  /** Resume the most recent conversation (--resume) */
+  /**
+   * Resume this directory's conversation. Maps to `--continue`, not to a bare
+   * `--resume`: the latter opens an interactive picker, and entity sessions
+   * run unattended with nobody to pick.
+   */
   resume?: boolean
+  /**
+   * Resume one specific conversation by id (`--resume <id>`). Skips the picker
+   * outright. Takes precedence over `resume` when known.
+   */
+  resumeClaudeSessionId?: string
   /** Model override (e.g. 'haiku', 'sonnet', 'opus') — passed as --model <id> */
   model?: string
 }
