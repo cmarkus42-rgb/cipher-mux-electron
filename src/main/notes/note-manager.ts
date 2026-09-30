@@ -407,6 +407,15 @@ export class NoteManager {
     const content = this.stringify(fm, body)
     await fs.writeFile(filePath, content, 'utf-8')
 
+    // Read the result back rather than assembling a second NoteInfo here.
+    // The hand-built version listed only the fields it happened to know about,
+    // so a save silently returned a note stripped of its type, its mirror and
+    // its handoff identity — the frontmatter on disk was fine, but a caller
+    // that renders what it gets back showed a different note than the one it
+    // had just written.
+    const reread = await this.parseFile(filePath)
+    if (reread) return reread.info
+
     return {
       id,
       title,

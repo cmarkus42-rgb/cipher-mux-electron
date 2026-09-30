@@ -103,3 +103,59 @@ describe('NoteManager.create — type and mirror', () => {
     assert.equal(read.info.title, 'Alte Notiz')
   })
 })
+
+describe('NoteManager.save — keeps what the frontmatter carries', () => {
+  let tmpDir: string
+  let mgr: NoteManager
+
+  before(async () => {
+    tmpDir = await makeTempDir()
+  })
+
+  after(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true })
+  })
+
+  beforeEach(() => {
+    mgr = new NoteManager(tmpDir)
+  })
+
+  // save() preserved these fields on disk but dropped them from its return
+  // value. A caller that renders what it gets back — the UI does — showed a
+  // note that had just lost its type and its mirror, until something reloaded.
+  it('returns type and mirror fields after saving', async () => {
+    const created = await mgr.create('Spec', '# Spec\n\nerst.', ['a'], {
+      type: 'spec', mirrorsFile: 'docs/x.md', mirrorCommit: 'abc1234', anchorRepo: '/repo',
+    })
+
+    const saved = await mgr.save(created.id, '# Spec\n\nzweite Fassung.', ['a'])
+
+    assert.equal(saved.noteType, 'spec', 'type must survive the save in the return value')
+    assert.equal(saved.mirrorsFile, 'docs/x.md')
+    assert.equal(saved.mirrorCommit, 'abc1234')
+    assert.equal(saved.anchorRepo, '/repo')
+  })
+
+  it('keeps them on disk too', async () => {
+    const created = await mgr.create('Spec2', '# Spec2\n\nerst.', [], {
+      type: 'spec', mirrorsFile: 'docs/y.md', mirrorCommit: 'deadbee',
+    })
+    await mgr.save(created.id, '# Spec2\n\nneu.', [])
+
+    const read = await mgr.read(created.id)
+    assert.equal(read?.info.noteType, 'spec')
+    assert.equal(read?.info.mirrorsFile, 'docs/y.md')
+  })
+
+  it('keeps handoff fields across a save', async () => {
+    const h = await mgr.createHandoff('Übergabe', 'Body.', 'Session A', 'debugger', {
+      anchorCommit: 'abc1234', anchorRepo: '/repo',
+    })
+    const saved = await mgr.save(h.id, '# Übergabe\n\nkorrigiert.', h.tags)
+
+    assert.equal(saved.handoffStatus, 'pending')
+    assert.equal(saved.fromSession, 'Session A')
+    assert.equal(saved.toEntity, 'debugger')
+    assert.equal(saved.anchorCommit, 'abc1234')
+  })
+})
