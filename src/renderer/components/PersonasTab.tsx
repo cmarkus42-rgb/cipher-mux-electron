@@ -25,7 +25,7 @@ function CopyButton({ getText, title }: { getText: () => string; title?: string 
   )
 }
 
-const api = (window as any).cipherMux
+const api = window.cipherMux
 
 function countUsage(personaId: string, workspaces: Workspace[]) {
   let cellCount = 0
@@ -61,7 +61,7 @@ export function PersonasTab() {
     }
     const wsList: Workspace[] = await api.workspaces.list()
     setWorkspaces(wsList)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // absichtlich leer: laeuft einmal beim Mounten
 
   useEffect(() => {
     loadAll()

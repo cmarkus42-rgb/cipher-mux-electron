@@ -38,7 +38,7 @@ export function TagBar({ tags, onTagsChange, quickTags = DEFAULT_QUICK_TAGS }: T
 
   // Load available tags + class data
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.notes?.tags) return
     api.notes.tags().then((repo: { tags: Record<string, { count: number }> }) => {
       setAllTags(Object.keys(repo.tags))
@@ -46,7 +46,7 @@ export function TagBar({ tags, onTagsChange, quickTags = DEFAULT_QUICK_TAGS }: T
   }, [])
 
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.notes?.tagClassRepo) return
     api.notes.tagClassRepo().then((repo: { classes: Record<string, TagClass> }) => {
       const cv: Record<string, string[]> = {}

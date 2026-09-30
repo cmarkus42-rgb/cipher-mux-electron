@@ -19,7 +19,6 @@ export interface A11ySettings {
   /** Note editor font size in px (10-32). Separate from UI font size. */
   noteEditorFontSize: number
   /** Focus Mode */
-  focusModeEnabled: boolean
 }
 
 const DEFAULTS: A11ySettings = {
@@ -33,10 +32,9 @@ const DEFAULTS: A11ySettings = {
   fontFamily: '',
   terminalFontSize: 13,
   noteEditorFontSize: 14,
-  focusModeEnabled: false,
 }
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 /** Base font sizes (px) from theme.css — used for proportional scaling. */
 const BASE_FONT_SIZES = {
@@ -139,9 +137,6 @@ export function useA11ySettings(onThemeChange?: (theme: string | null) => void) 
     })
   }, [])
 
-  const toggleFocusMode = useCallback(() => {
-    update({ focusModeEnabled: !settings.focusModeEnabled })
-  }, [settings.focusModeEnabled, update])
 
-  return { settings, loaded, update, toggleFocusMode }
+  return { settings, loaded, update }
 }

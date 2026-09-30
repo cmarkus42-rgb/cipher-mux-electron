@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import type { SessionInfo, StartSessionOpts } from '../../shared/types'
 
-const api = (window as any).cipherMux
+const api = window.cipherMux
 
 export interface UseSessionsResult {
   sessions: SessionInfo[]

@@ -10,7 +10,7 @@ interface ActiveHighlight {
   rect: DOMRect | null
 }
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 export function HighlightOverlay() {
   const [highlights, setHighlights] = useState<ActiveHighlight[]>([])

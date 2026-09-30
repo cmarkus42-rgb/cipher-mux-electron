@@ -12,7 +12,7 @@ interface KickoffDialogProps {
   }) => void
 }
 
-const api = (window as any).cipherMux
+const api = window.cipherMux
 
 export function KickoffDialog({ visible, onClose, onKickoff }: KickoffDialogProps) {
   const { t } = useTranslation()

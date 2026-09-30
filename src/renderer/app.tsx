@@ -83,7 +83,7 @@ export function App() {
 
   // Listen for voice state changes (FSM + COM)
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     const unsubs: Array<() => void> = []
     if (api?.voice?.onState) {
       unsubs.push(api.voice.onState((state: string) => setVoiceState(state)))
@@ -96,7 +96,7 @@ export function App() {
 
   // Listen for voice target / pin changes (for session-header indicators)
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     const unsubs: Array<() => void> = []
     if (api?.voice?.onActiveSession) {
       unsubs.push(api.voice.onActiveSession((data: { sessionId: string | null }) => {
@@ -113,7 +113,7 @@ export function App() {
 
   // Listen for update availability notifications
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.update?.onAvailable) return
     const unsub = api.update.onAvailable((info: any) => setUpdateInfo(info))
     return unsub
@@ -134,7 +134,7 @@ export function App() {
     }
     // Deselect case is handled in InfoSettingsView where the base theme is tracked
   }, [setTheme])
-  const { settings: a11ySettings, toggleFocusMode } = useA11ySettings(handleA11yThemeChange)
+  useA11ySettings(handleA11yThemeChange)
   const modalFocusTrapRef = useFocusTrap<HTMLDivElement>(infoVisible)
 
   // Focus Mode: track which slots are in focus mode (empty Set = off)
@@ -217,7 +217,7 @@ export function App() {
       combo: 'Cmd+B',
       label: t('app.shortcut.bugreport'),
       category: 'Aktionen' as const,
-      action: () => { setInfoInitialTab('settings'); setInfoVisible(true); setBugreportVisible(true); (window as any).cipherMux?.voice?.stop?.() },
+      action: () => { setInfoInitialTab('settings'); setInfoVisible(true); setBugreportVisible(true); window.cipherMux?.voice?.stop?.() },
     },
     {
       combo: 'Cmd+Shift+?',
@@ -339,7 +339,7 @@ export function App() {
       // rendered yet when we reach cleanupDeadSessions below.
       let activeIds: Set<string>
       try {
-        const list = await (window as any).cipherMux?.sessions?.list()
+        const list = await window.cipherMux?.sessions?.list()
         activeIds = new Set((list || []).map((s: any) => s.id))
         refreshSessions()
       } catch {
@@ -369,7 +369,7 @@ export function App() {
 
   useEffect(() => {
     const pw = sidebarVisible && !sidebarDetached ? 280 : 0
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api.window.fitGrid(grid.config.cols, grid.config.rows, pw)
   }, [sidebarVisible, sidebarDetached, grid.config.cols, grid.config.rows])
 
@@ -424,7 +424,7 @@ export function App() {
   // Check workshop status on mount
   useEffect(() => {
     let mounted = true
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api.workshop.status().then((s: { running: boolean; sessionId?: string }) => {
       if (!mounted) return
       if (s.running && s.sessionId) placeWorkshop(s.sessionId)
@@ -443,7 +443,7 @@ export function App() {
   // Check Cyber Factory status on mount
   useEffect(() => {
     let mounted = true
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api.cyberFactory.status().then((s: { running: boolean; sessionId?: string }) => {
       if (!mounted) return
       if (s.running && s.sessionId) placeCyberFactory(s.sessionId)
@@ -460,7 +460,7 @@ export function App() {
   }, [placeCyberFactory])
 
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     const unsub = api.projects.onCompleted((data: any) => {
       if (data?.status === 'complete' && data.event?.followupSessionId) {
         addSession(data.event.followupSessionId)
@@ -475,7 +475,7 @@ export function App() {
   }, [addSession])
 
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api.sessions?.onVisibleAdd) return
     const unsub = api.sessions.onVisibleAdd(async (data: { sessionId: string; slotIndex?: number }) => {
       let retries = 0
@@ -550,7 +550,7 @@ export function App() {
   // registered, and a single pull may return null if the main process init chain
   // hasn't completed yet. Poll until we get data or timeout.
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api.gridControl?.pullKeepWorkingRestore) return
     if (keepWorkingApplied.current) return // already restored (push beat us)
     let cancelled = false
@@ -581,7 +581,7 @@ export function App() {
 
   // ── Grid Control (MCP App-Control) ──
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api.gridControl) return
     const unsubs: Array<() => void> = []
 
@@ -675,7 +675,7 @@ export function App() {
   }, [removeSession, focusedSessionId, grid.slots])
 
   const handleDetachSession = useCallback(async (sessionId: string) => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     // Find the slot to determine if it's a notes cell
     const slot = grid.slots.find(s => s.sessionId === sessionId)
     if (slot?.type === 'notes' && slot.notesId) {
@@ -695,7 +695,7 @@ export function App() {
     const slot = grid.slots[slotIndex]
     if (!slot || slot.type !== 'notes') return
     const noteIds = slot.openNoteIds ?? []
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     // Detach the first open note (or the notesId)
     const noteId = noteIds[0] ?? slot.notesId
     if (noteId) {
@@ -725,13 +725,13 @@ export function App() {
   }, [startSession, addSession])
 
   const handleFork = useCallback(async (sessionId: string) => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     try {
       const newSession = await api.sessions.fork(sessionId)
       setPlacementPopup({ sessionId: newSession.id })
       setFocusedSessionId(newSession.id)
-    } catch (err: any) {
-      console.error('[App] Fork failed:', err?.message || err)
+    } catch (err) {
+      console.error('[App] Fork failed:', err instanceof Error ? err.message : err)
     }
   }, [grid.slots, addSession])
 
@@ -764,7 +764,7 @@ export function App() {
       setPlacementPopup(null)
       let attempts = 0
       const tryOpen = () => {
-        const reg = (window as any).__notesCellRegistry as Record<number, (n: any) => void> | undefined
+        const reg = window.__notesCellRegistry
         const openFn = reg?.[slotIndex]
         if (openFn) {
           openFn(noteToOpen)
@@ -788,14 +788,14 @@ export function App() {
   }, [resize])
 
   const handleSidebarDetach = useCallback(async () => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     await api.sidebar.detach()
     setSidebarDetached(true)
   }, [])
 
   useEffect(() => {
     let mounted = true
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api.sidebar?.isDetached?.().then((detached: boolean) => {
       if (!mounted) return
       if (detached) { setSidebarDetached(true); api.sidebar.detach() }
@@ -804,7 +804,7 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api.sidebar?.onReattached) return
     const unsub = api.sidebar.onReattached(() => { setSidebarDetached(false); setSidebarVisible(true) })
     return () => unsub()
@@ -814,7 +814,7 @@ export function App() {
   const detachedIdsRef = useRef(detachedIds)
   detachedIdsRef.current = detachedIds
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api.detach) return
     // Initial sync
     api.detach.list().then((entries: Array<{ type: string; entityId: string }>) => {
@@ -845,7 +845,7 @@ export function App() {
 
   // Sidebar window X-button = close completely (sidebar hidden, not docked)
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api.sidebar?.onClosed) return
     const unsub = api.sidebar.onClosed(() => {
       setSidebarDetached(false)
@@ -856,7 +856,7 @@ export function App() {
 
   useEffect(() => {
     let mounted = true
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api.workspaces.active().then((id: string | null) => {
       if (!mounted) return
       setActiveWorkspaceId(id)
@@ -876,7 +876,7 @@ export function App() {
     }
     setWorkspaceLoading(true)
     try {
-      const api = (window as any).cipherMux
+      const api = window.cipherMux
       const workspaces = await api.workspaces.list()
       const ws = workspaces.find((w: any) => w.id === workspaceId)
       if (ws) {
@@ -929,7 +929,7 @@ export function App() {
       }
 
       // Race-guard: keepWorking poll may not have fired yet — check pull API directly
-      const api = (window as any).cipherMux
+      const api = window.cipherMux
       if (api.gridControl?.pullKeepWorkingRestore) {
         const kwData = await api.gridControl.pullKeepWorkingRestore()
         if (kwData) {
@@ -958,12 +958,12 @@ export function App() {
       console.warn('[App] Failed to auto-load active workspace:', err)
       setWorkspaceLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Abhaengigkeiten absichtlich unvollstaendig -- soll nicht bei jeder Aenderung neu laufen
   }, [handleWorkspaceApply, applyKeepWorkingRestore])
 
   const handleWorkspaceOpenSettings = useCallback((tab: 'personas' | 'workspaces') => {
     setWorkspacesPopupVisible(false)
-    ;(window as any).cipherMux.window.openWorkspaces(tab)
+    ;window.cipherMux.window.openWorkspaces(tab)
   }, [])
 
   // ─── Unified Dialog: Entity Start/Focus ─────────────────
@@ -974,7 +974,7 @@ export function App() {
     slotIndex: number,
     workspaceId?: string | null,
   ) => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     // Mark entity as in-flight BEFORE the await — closes the race window where
     // the onStarted IPC event arrives before the await resolves (RT-X2 fix).
     inFlightEntityStarts.current.add(entityId)
@@ -996,7 +996,7 @@ export function App() {
   }, [setSessionAtSlot])
 
   const handleResumeEntity = useCallback(async (entityId: EntityId, slotIndex: number) => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     inFlightEntityStarts.current.add(entityId)
     try {
       // Resume the instance the user is actually looking at, in the workspace
@@ -1064,7 +1064,7 @@ export function App() {
     // Retry until NotesCell mounts and registers in the per-slot registry
     let attempts = 0
     const tryOpen = () => {
-      const reg = (window as any).__notesCellRegistry as Record<number, (n: any) => void> | undefined
+      const reg = window.__notesCellRegistry
       const openFn = reg?.[slotIndex]
       if (openFn) {
         openFn(note)
@@ -1080,7 +1080,7 @@ export function App() {
     // Find first existing NotesCell slot
     const existingIdx = grid.slots.findIndex(s => s.type === 'notes')
     if (existingIdx >= 0) {
-      const reg = (window as any).__notesCellRegistry as Record<number, (n: any) => void> | undefined
+      const reg = window.__notesCellRegistry
       const openFn = reg?.[existingIdx]
       if (openFn) openFn(note)
     } else {
@@ -1109,7 +1109,7 @@ export function App() {
     // Retry until NotesCell mounts and registers in the per-slot registry
     let attempts = 0
     const tryOpen = () => {
-      const reg = (window as any).__notesCellRegistry as Record<number, (n: any) => void> | undefined
+      const reg = window.__notesCellRegistry
       const openFn = reg?.[slotIndex]
       if (openFn) {
         openFn(note)
@@ -1122,12 +1122,12 @@ export function App() {
   }, [setSlotType])
 
   const handleToggleVoicePin = useCallback((sessionId: string) => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api.voice?.pinSession?.(sessionId)
   }, [])
 
   const handleDropNoteOnSession = useCallback(async (note: any, sessionId: string) => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     // Fetch full note content (drag data only has NoteInfo, no body)
     let body = ''
     try {
@@ -1140,7 +1140,7 @@ export function App() {
 
   // Listen for entity-started events
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api.entity?.onStarted) return
     const unsub = api.entity.onStarted((data: { entityId: string; session: any }) => {
       const sid = data.session?.id
@@ -1187,7 +1187,7 @@ export function App() {
 
   // Listen for MCP UI_OPEN events
   useEffect(() => {
-    const a = (window as any).cipherMux
+    const a = window.cipherMux
     if (!a?.ui?.onOpen) return
     const unsub = a.ui.onOpen((data: { target: string; action?: string; context?: Record<string, unknown> }) => {
       const action = (data.action as 'open' | 'close' | 'toggle') ?? 'toggle'
@@ -1248,7 +1248,7 @@ export function App() {
 
   // Listen for MCP THEME_SET events
   useEffect(() => {
-    const a = (window as any).cipherMux
+    const a = window.cipherMux
     if (!a?.ui?.onThemeSet) return
     const unsub = a.ui.onThemeSet((data: { theme: string }) => {
       if (data.theme) {
@@ -1372,7 +1372,7 @@ export function App() {
         sidebarVisible={sidebarVisible}
         onToggleSidebar={() => {
           if (sidebarDetached) {
-            const api = (window as any).cipherMux
+            const api = window.cipherMux
             api.sidebar.dock()
             setSidebarDetached(false)
             setSidebarVisible(true)
@@ -1462,7 +1462,7 @@ export function App() {
               onSelectCustomTheme={selectCustomTheme}
               onSaveCustomTheme={saveCustomTheme}
               onDeleteCustomTheme={deleteCustomTheme}
-              onOpenBugreport={() => { setBugreportVisible(true); (window as any).cipherMux?.voice?.stop?.() }}
+              onOpenBugreport={() => { setBugreportVisible(true); window.cipherMux?.voice?.stop?.() }}
               registeredShortcuts={shortcutEntries}
             />
           </div>

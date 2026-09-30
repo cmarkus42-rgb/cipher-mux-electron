@@ -36,7 +36,7 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (dirtyRef.current) {
-        const api = (window as any).cipherMux
+        const api = window.cipherMux
         api?.notes?.save?.(noteId, latestContentRef.current!, undefined, true)
         e.preventDefault()
       }
@@ -54,7 +54,7 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
 
   // Voice state tracking for STT indicator
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.voice?.onState) return
     const unsub = api.voice.onState((state: string) => setVoiceState(state))
     return () => unsub()
@@ -62,7 +62,7 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
 
   useEffect(() => {
     if (loadedRef.current) return
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.notes?.read) {
       setError('Notes API not available')
       return
@@ -94,13 +94,13 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
     latestContentRef.current = body
     dirtyRef.current = true
     try {
-      const api = (window as any).cipherMux
+      const api = window.cipherMux
       const result = await api.notes.save(noteId, body)
       if (result?.title) setTitle(result.title)
       dirtyRef.current = false
       setSaveError(null)
-    } catch (err: any) {
-      setSaveError(err?.message ?? 'Save failed')
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed')
     }
   }, [noteId])
 
@@ -108,35 +108,35 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
     latestContentRef.current = body
     dirtyRef.current = true
     try {
-      const api = (window as any).cipherMux
+      const api = window.cipherMux
       const result = await api.notes.save(noteId, body, undefined, true)
       if (result?.title) setTitle(result.title)
       dirtyRef.current = false
       setSaveError(null)
-    } catch (err: any) {
-      setSaveError(err?.message ?? 'Auto-save failed')
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Auto-save failed')
     }
   }, [noteId])
 
   const handleTagsChange = useCallback(async (newTags: string[]) => {
     try {
-      const api = (window as any).cipherMux
+      const api = window.cipherMux
       await api.notes.save(noteId, content ?? '', newTags, true)
       setTags(newTags)
-    } catch (err: any) {
-      setSaveError(err?.message ?? 'Tag save failed')
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Tag save failed')
     }
   }, [noteId, content])
 
   const handleDock = useCallback(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api?.detach?.dock?.(noteId)
   }, [noteId])
 
   const handleTestcaseUpdate = useCallback(async (sections: TestcaseSection[]) => {
     if (!testcase) return
     try {
-      const api = (window as any).cipherMux
+      const api = window.cipherMux
       const updated: ParsedTestcase = { ...testcase, sections }
       const body = await api.notes.serializeTestcaseBody(sections)
       if (!body) { console.error('[DetachedNoteView] serializeTestcaseBody returned null'); return }
@@ -147,8 +147,8 @@ export function DetachedNoteView({ noteId }: DetachedNoteViewProps) {
       dirtyRef.current = false
       setContent(body)
       setTestcase(updated)
-    } catch (err: any) {
-      setSaveError(err?.message ?? 'Testcase save failed')
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Testcase save failed')
     }
   }, [noteId, testcase])
 

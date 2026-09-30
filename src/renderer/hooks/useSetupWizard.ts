@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks'
 import type { SetupDependency } from '../components/SetupWizard'
 
-const api = (window as any).cipherMux
+const api = window.cipherMux
 
 interface ProgressPayload {
   stepId: string | null

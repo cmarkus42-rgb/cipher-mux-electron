@@ -12,7 +12,7 @@ import {
 } from '../../shared/grid-types'
 import { GRID_SAVE_DEBOUNCE_MS } from '../../shared/constants'
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 export function useGrid(panelWidth = 0) {
   const [grid, setGrid] = useState<GridState>(createEmptyGrid())

@@ -6,7 +6,7 @@ import { useEffect } from 'preact/hooks'
 import { getTerminal, getMarker } from '../terminal-registry'
 import type { GridState } from '../../shared/grid-types'
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 interface ScrollPayload {
   sessionId?: string

@@ -18,7 +18,7 @@ export function DetachedSessionView({ sessionId }: DetachedSessionViewProps) {
 
   // Fetch initial session info
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.sessions?.list) {
       setError('API not available')
       return
@@ -49,7 +49,7 @@ export function DetachedSessionView({ sessionId }: DetachedSessionViewProps) {
   }, [session?.name, sessionId])
 
   const handleDock = useCallback(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api?.detach?.dock?.(sessionId)
   }, [sessionId])
 

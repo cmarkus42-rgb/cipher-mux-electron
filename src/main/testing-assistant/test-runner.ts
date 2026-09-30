@@ -69,8 +69,13 @@ export function runTestSuite(opts: TestRunnerOpts, runId: string): TestRunnerRes
       suiteResult: { runId, ...counts, rawOutput: raw.slice(0, 50_000) },
       error: null,
     }
-  } catch (err: any) {
-    const raw = (err.stdout || '') + '\n' + (err.stderr || '')
+  } catch (err) {
+    // Ein fehlgeschlagener Testlauf kommt als exec-Fehler an, der stdout und
+    // stderr mitfuehrt -- genau die tragen das Ergebnis. Das frueher hier
+    // stehende `any` war also nicht Bequemlichkeit, sondern eine ungeschriebene
+    // Erwartung an die Fehlerform. Jetzt steht sie da.
+    const execErr = err as { stdout?: string; stderr?: string; message?: string }
+    const raw = (execErr.stdout || '') + '\n' + (execErr.stderr || '')
     const counts = parseTestOutput(raw)
     if (counts.total > 0) {
       return {
@@ -79,6 +84,6 @@ export function runTestSuite(opts: TestRunnerOpts, runId: string): TestRunnerRes
         error: null,
       }
     }
-    return { success: false, suiteResult: null, error: raw.slice(0, 5000) || err.message }
+    return { success: false, suiteResult: null, error: raw.slice(0, 5000) || execErr.message || 'Testlauf fehlgeschlagen' }
   }
 }
