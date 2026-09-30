@@ -3,6 +3,10 @@
 **Datum:** 2026-09-30
 **Zweck:** Zusammenstellung für den Menschen. Was an Zielsetzung, Anforderungen und Bedienung
 offen ist — nicht, was an Code offen ist.
+**Stand:** Am 2026-09-30 durchgesprochen. Die Kommentare kamen als Korrekturen in der
+gespiegelten Note und wurden von hier aus eingearbeitet — der Weg aus
+`2026-09-30-notes-als-projektgedaechtnis.md` Abschnitt 3.2, zum zweiten Mal gegangen und
+diesmal von dem, für den er gedacht ist.
 **Grundlage:** die beiden Strategiepapiere, die Befund-Note, die Abnahme-Dokumente und was
 sich beim Bauen am 2026-09-29/30 gezeigt hat.
 
@@ -29,12 +33,13 @@ Rolle einen Vorgabewert, weil das eine Kostenentscheidung ist.
 
 Solange nichts gesetzt ist, läuft jede Rolle auf dem CLI-Standard — also alle gleich teuer.
 
-**Zu entscheiden:** Welche Rollen rechtfertigen das größte Modell, welche kommen mit einem
-kleinen aus? Kandidaten für „klein": Voice-Relay (leitet weiter), Launcher (startet),
-Testing Assistant (führt aus und meldet). Kandidaten für „groß": Refinement, Cyber Factory,
-Debugger.
+**Entschieden (2026-09-30):** Vorerst läuft alles auf Claude Opus latest; die Zuordnung
+passiert bei Bedarf von Hand. Der Grund, warum das kein dringender Hebel ist, steht unter
+1.2: das Abo hat keine Grenzkosten, also ist die Modellwahl eine Frage von Tempo und
+Qualität, nicht von Geld.
 
-**Ohne Entscheidung:** funktioniert alles, kostet aber überall dasselbe.
+Die Mechanik bleibt und wartet — `entityModels` in der Config, sobald eine Rolle erkennbar
+mit weniger auskommt.
 
 ### 1.2 Was aus keel geholt wird
 
@@ -45,9 +50,12 @@ Das Strategiepapier listet unter 6 als „graph-frei, also mitnehmbar": `budget.
 Von diesen ist bisher **nichts** portiert. Die Rolle-→-Modell-Mechanik ist eigenständig
 entstanden, nicht aus keel übernommen.
 
-**Zu entscheiden:** Lohnt die Ökonomie-Schiene (Budget, Preise) überhaupt, oder reicht die
-Kostenkontrolle über 1.1? `pfadwache`/`netzwache` überschneiden sich inzwischen mit den
-Rollengrenzen von heute — das wäre vor einer Portierung zu prüfen.
+**Entschieden (2026-09-30): wird nicht geholt.** Kostenkontrolle läuft über das Abo — dort
+sind die Grenzkosten null — und ansonsten über die CLI selbst. keels Ökonomie-Schiene
+existierte, um Vergleichsstrecken zu fahren; das ist hier kein Zweck. Der Mux soll an dieser
+Stelle schlank bleiben.
+
+`pfadwache`/`netzwache` sind mit den Rollengrenzen vom 2026-09-30 ohnehin abgedeckt.
 
 ---
 
@@ -60,38 +68,44 @@ ersten Durchlauf gezeigt hat.
 
 Heute: von Hand. Eine Rolle, die eine Spec schreibt, legt die Datei an — die Note nicht.
 
-**Zwei Wege:** Die Rolle legt beides an (einfach, aber vergessbar), oder der Mux erkennt neue
-Dateien in bestimmten Verzeichnissen und spiegelt sie (robust, braucht eine Zuordnung
-Datei → Note).
+**Entschieden (2026-09-30): der Mux spiegelt, deterministisch.** Nicht die Rolle, weil eine
+Rolle es vergessen kann und die Spiegelung dann davon abhängt, ob jemand daran gedacht hat.
+Der Mux erkennt Dateien in den dafür vorgesehenen Verzeichnissen und legt die Note an.
 
-**Ohne Entscheidung:** Spiegel entstehen nur, wenn jemand daran denkt.
+Offen bleibt damit nur das Wie: welche Verzeichnisse, und wie die Zuordnung Datei → Note
+gehalten wird, damit eine zweite Spiegelung keine zweite Note erzeugt.
 
 ### 2.2 Erbt ein Spiegel den Workspace?
 
 Heute wird eine gespiegelte Note **global**. Das ist der Grund, warum sie beim ersten Versuch
 in der Sidebar nicht auffindbar war (inzwischen behoben).
 
-**Zu entscheiden:** Soll eine Spec-Note zum Workspace gehören, in dem sie entsteht, oder
-überall sichtbar sein? Für global spricht, dass eine Spec oft mehrere Workspaces betrifft;
-dagegen, dass die Sidebar dann in jedem Workspace alles zeigt.
+**Entschieden (2026-09-30): die Note erbt den Workspace.** Der Workspace ist der Idee nach
+die Heimat eines Projekts und damit die höchste Filterebene — eine Spec, die zu einem Projekt
+gehört, gehört in dessen Workspace. Global bleibt der Sonderfall, nicht der Normalfall.
 
 ### 2.3 Umbenennen und Löschen
 
 Wenn die gespiegelte Datei verschwindet, sagt der Drift-Block das („das Original ist nicht
 mehr im Repository"). Bei **Umbenennung** sagt er dasselbe, obwohl die Datei nur umgezogen ist.
 
-**Zu entscheiden:** Reicht die ehrliche Warnung, oder soll der Mux einer Umbenennung folgen?
-Letzteres hieße `git log --follow` auswerten — machbar, aber ein Schritt Richtung
-Versionsverwaltung.
+**Entschieden (2026-09-30): die Warnung reicht.** Einer Umbenennung zu folgen hieße
+`git log --follow` auszuwerten, und das ist ein Schritt Richtung Versionsverwaltung, den der
+Nutzen nicht trägt. Der Mensch sieht die Warnung und entscheidet.
 
 ### 2.4 Historie einer Spec
 
 Idee aus dem Papier: „Historie" ist `git log --follow` auf die Datei, im Mux gerendert, statt
 einer gepflegten Notes-Historie.
 
-**Zu entscheiden:** Wie weit darf das Rendern gehen? Eine Liste von Commits mit Betreff ist
-Nachvollziehen. Ein Diff-Betrachter wäre Versionsverwaltung — und damit laut eigener Regel
-außerhalb.
+**Entschieden (2026-09-30):** Die Grenze liegt bei mir, mit einer klaren Leitplanke — kein
+git-Nachbau, es soll sich nicht selbst im Weg stehen, funktionieren, und im Mux eine
+intuitive Bedienung ergeben.
+
+**Auslegung:** Eine Liste von Commits mit Betreff, Datum und Kurz-Hash, die zur Datei gehören.
+Das ist Nachvollziehen und beantwortet „wer hat wann was an dieser Spec geändert". Kein
+Diff-Betrachter, keine Branch-Ansicht, kein Blame — dafür gibt es bessere Werkzeuge, und es
+wäre dieselbe Falle wie die nachgebaute Orchestrierung.
 
 ---
 
@@ -102,29 +116,41 @@ außerhalb.
 Es gibt jetzt drei typisierte Notes: `testcase` (bewährt), `finding` (neu), `spec` (gespiegelt,
 aber ohne eigene Ansicht — wird als Text gerendert).
 
-**Zu entscheiden:** Verdient `spec` eine eigene Ansicht, etwa mit dem Drift-Block als Kopfzeile
-und einem Sprung zur Datei? Und `requirements` / `research`, die es als Typ gibt, aber noch
-nirgends?
+**Entschieden (2026-09-30):**
 
-**Anmerkung:** Der Drift-Block wird heute nur beim Dispatch berechnet. In der Oberfläche ist er
-nicht zu sehen — eine gespiegelte Note zeigt nicht an, dass sie veraltet ist. Das ist die
-größte Lücke zwischen Konzept und Bedienung.
+- **Die Lücke wird geschlossen.** Der Drift-Block gehört in die Oberfläche: eine gespiegelte
+  Note muss zeigen, dass sie veraltet ist, ohne dass jemand sie weiterreicht. Heute entsteht
+  er nur beim Dispatch — das ist die größte Lücke zwischen Konzept und Bedienung.
+- **`spec` bekommt eine eigene Ansicht**, mit dem Drift-Block als Kopfzeile.
+- **`requirements` bekommt einen Typ mit Struktur.** Anforderungen dürfen nach RE-Methoden
+  mit Schema erfasst werden statt als Fließtext. Zwei Bedingungen: gut lesbar und gut
+  kommentierbar. Requirements sind das interne Dokument, aus dem die offiziellen Specs
+  hervorgehen — die Spec ist das Ergebnis, nicht die Quelle.
+- **`research` braucht keinen eigenen Typ.** Es ist allgemeines Futter für Entscheidungen und
+  kommt als gewöhnliche Note aus.
 
 ### 3.2 Die 102 offenen Testcases
 
 Die Testcase-Note führt 490 Positionen, davon 102 offen. Ein Teil davon stammt aus Wellen, die
 Monate zurückliegen.
 
-**Zu entscheiden:** Welche davon sind noch echte Abnahme-Absichten und welche Karteileichen?
-Das kann nur jemand beurteilen, der weiß, was die App heute können soll.
+**Entschieden (2026-09-30):** Aus alten Wellen: **abhaken.** Was aus dem laufenden Durchgang
+stammt: **sammeln.**
+
+Die Frage „welche Testcases" war berechtigt — die Note nennt Wellen, keine Gegenstände, und
+aus „Welle F3" geht nicht hervor, was jemand ausprobieren soll. Das ist zugleich die
+Begründung für die Regel in `docs/testcase-notes.md`, Abschnitte nach dem Abnahmegegenstand
+zu benennen.
 
 ### 3.3 Die 47 fragwürdigen pass-Einträge
 
 Gemessen: 47 der 380 abgehakten Testcases begründen sich selbst mit „Code verifiziert" statt
 mit Benutzung. Die Regel dagegen steht jetzt in `docs/testcase-notes.md` und den Global Rules.
 
-**Zu entscheiden:** Altbestand zurücksetzen (ehrlich, aber 47 Einträge wieder offen) oder
-stehen lassen und nur für Neues die Regel anwenden?
+**Entschieden (2026-09-30): Altbestand abhaken, Regel gilt ab jetzt.** Dieselbe Linie wie
+3.2. Einträge aus Wellen, die Monate zurückliegen, wieder zu öffnen erzeugt eine Liste, die
+niemand abarbeitet — und eine Liste, die niemand abarbeitet, ist genau das Problem, das hier
+behoben werden soll.
 
 ---
 
@@ -140,27 +166,37 @@ stehen lassen und nur für Neues die Regel anwenden?
 Das erste ist das wichtigste — es berührt Session-Wiederherstellung, Workspace-Zuordnung und
 Entity-Run-Verzeichnisse, also genau die Stellen, an denen am 2026-09-30 drei Defekte saßen.
 
+**Terminiert (2026-09-30): alles ab Freitag.** Bis dahin wird gebaut, nicht abgenommen.
+
 ---
 
 ## 5. Befunde, die eine Entscheidung brauchen
 
 Aus der Befund-Note „Befunde 2026-09-30":
 
-- **F-3 (high):** Bereitschaft einer Session wird am Prompt-Marker im Terminal erkannt — eine
-  Heuristik gegen eine Oberfläche, die sich ändern darf. Die Selbstmeldung über den
-  statusLine-Hook ist inzwischen der bevorzugte Weg, der Marker nur noch Rückfall. **Zu
-  entscheiden:** reicht das, oder soll der Rückfall ganz weg?
-- **F-10 (low):** Zwei Focus-Mode-Konzepte lagen nebeneinander; das tote ist entfernt. Bleibt
-  die Frage, ob der Grid-Mechanismus so bleiben soll, wie er ist.
-- **F-5 (geparkt):** siehe 3.3.
+- **F-3 (high) — entschieden: der Rückfall bleibt, aber er wird messbar.** Der Prompt-Marker
+  hat bisher funktioniert; die Selbstmeldung ist neu und muss sich erst beweisen. Solange das
+  nicht belegt ist, ist es falsch, den funktionierenden Weg abzuschalten. **Auftrag:**
+  nachvollziehbar machen, welches Signal eine Session bereit gemeldet hat — dann lässt sich
+  nach einigen Wochen sehen, ob die Selbstmeldung trägt, statt es zu vermuten.
+- **F-10 — geklärt, mit einer wichtigen Berichtigung.** Es gibt **zwei** Focus-Konzepte, und
+  **beide müssen bleiben**: der Sprach-Fokus für die STT-Eingabe (welche Session bekommt das
+  Gesprochene, `VoiceInputRouter` mit Fokus und Pinning) und der Grid-Focus-Mode, der eine
+  Session auf mehrere Fenstergrößen aufzieht. Was am 2026-09-30 entfernt wurde, war ein
+  **drittes**, totes: eine A11y-Einstellung, die niemand auslas. Beide echten Wege sind
+  nachgeprüft und intakt.
+- **F-5 (geparkt):** siehe 3.3, erledigt.
 
 ---
 
 ## 6. Was ich nicht auf die Liste gesetzt habe
 
-Technische Schulden ohne Produktfrage: 135 Lint-Warnungen, die verbliebenen `any` mit echter
-Typentscheidung, die Initialisierungsreihenfolge einzelner Manager. Das entscheide ich, nicht
-du — es steht hier nur, damit klar ist, dass es nicht vergessen wurde.
+Technische Schulden ohne Produktfrage: Lint-Warnungen, die verbliebenen `any` mit echter
+Typentscheidung, Initialisierungsreihenfolgen.
 
-Ebenso nicht hier: Voice, Bluetooth, Updater. Die waren am 2026-09-29/30 nicht Gegenstand und
-haben keine offene Frage produziert.
+**Festgelegt (2026-09-30):** Das ist nicht vorzulegen. Nach bester Praxis behandeln und nicht
+mehr danach fragen. Maßstab ist, dass es funktioniert.
+
+Voice, Bluetooth und Updater waren am 2026-09-29/30 nicht Gegenstand. **Stillschweigende
+Anforderung:** Sie sollen weiterhin funktionieren. Wer hier arbeitet, prüft das mit, statt es
+anzunehmen — die 88 Tests des VoiceInputRouter sind der billigste Teil davon.
