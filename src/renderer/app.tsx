@@ -364,10 +364,6 @@ export function App() {
     .filter((s, idx) => s.sessionId && !focusModeOverlapped.has(idx))
     .map(s => s.sessionId!)
 
-  const sidebarHasContent = !!getEntitySessionId('workshop') || !!getEntitySessionId('cyber-factory') ||
-    sessions.some(s => s.status === 'active' && !gridSessionIds.includes(s.id) && !detachedIds.has(s.id)) ||
-    grid.slots.some(s => s.type === 'notes')
-
   const computedPanelWidth = sidebarVisible && !sidebarDetached ? 280 : 0
   panelWidthRef.current = computedPanelWidth
 

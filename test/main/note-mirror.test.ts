@@ -257,3 +257,45 @@ describe('NoteManager.refreshMirror', () => {
     assert.ok(read!.body.includes('Inhalt bleibt.'), 'a failed refresh must not empty the note')
   })
 })
+
+// ─── kind:<type> tags derive the note type ──────────────────
+//
+// Testcases established the convention: the tag `kind:testcase` sets
+// `type: testcase`, which is what makes the TestcaseView pick the note up.
+// Findings need the same, and hard-coding a second special case would mean a
+// third one for the type after that.
+
+describe('NoteManager.create — type from kind: tag', () => {
+  let tmpDir: string
+  let mgr: NoteManager
+
+  before(async () => {
+    tmpDir = await makeTempDir()
+  })
+
+  after(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true })
+  })
+
+  beforeEach(() => {
+    mgr = new NoteManager(tmpDir)
+  })
+
+  it('derives the type from a kind: tag for every known type', async () => {
+    for (const type of ['testcase', 'finding', 'spec', 'requirements', 'research']) {
+      const note = await mgr.create(`N-${type}`, `# N-${type}\n\nX.`, [`kind:${type}`])
+      assert.equal(note.noteType, type, `kind:${type} should set the type`)
+    }
+  })
+
+  it('does not invent a type from an unknown kind tag', async () => {
+    const note = await mgr.create('Fremd', '# Fremd\n\nX.', ['kind:irgendwas'])
+    assert.equal(note.noteType, undefined, 'an unknown kind must not become a type')
+    assert.deepEqual(note.tags, ['kind:irgendwas'], 'the tag itself is kept')
+  })
+
+  it('an explicit type wins over the tag', async () => {
+    const note = await mgr.create('Explizit', '# Explizit\n\nX.', ['kind:testcase'], { type: 'spec' })
+    assert.equal(note.noteType, 'spec')
+  })
+})

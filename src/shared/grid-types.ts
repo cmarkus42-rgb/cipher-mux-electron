@@ -279,7 +279,6 @@ export function findNavigationTarget(
   return null
 }
 
-import { SESSION_CELL_HEIGHT } from './constants'
 
 /** Minimum cell width in pixels — prevents grid compression when window is narrow */
 export const SESSION_CELL_MIN_WIDTH = 640
