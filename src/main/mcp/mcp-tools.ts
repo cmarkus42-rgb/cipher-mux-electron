@@ -20,6 +20,7 @@ import { mayUseCompanionMemory } from './entity-header'
 import { dispatchHandoffNote } from '../notes/handoff-dispatch'
 import type { EntityId } from '../../shared/types'
 import { integrate, inventory, migrationPlan, hubApply, hubVerify, hubRelease, hubRollback } from '../hub'
+import { registerMuxTool } from './register-tool'
 
 /**
  * Context passed to tool handlers — references to core services.
@@ -99,7 +100,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   registerAllHandoffTools(server, ctx)
 
   // === Hub-MCP-Tools (REQ-HUB-001 through 007) ===
-  ;(server.registerTool as any)('mux_hub_integrate', {
+  registerMuxTool(server, 'mux_hub_integrate', {
     description: 'Copy an existing project into the CIPHER-MUX Hub. Excludes build artifacts. Original stays untouched.',
     inputSchema: {
       sourcePath: z.string().describe('Absolute path to source project'),
@@ -108,14 +109,14 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
   }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await integrate(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
-  ;(server.registerTool as any)('mux_hub_inventory', {
+  registerMuxTool(server, 'mux_hub_inventory', {
     description: 'Run a read-only brownfield inventory on a project in the Hub. Detects stack, structure, specs, tests.',
     inputSchema: {
       projectName: z.string().describe('Project name in hub'),
     },
   }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await inventory(args.projectName)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
-  ;(server.registerTool as any)('mux_hub_migration_plan', {
+  registerMuxTool(server, 'mux_hub_migration_plan', {
     description: 'Generate a 3-section migration plan based on inventory. Sections: unchanged, extended, new.',
     inputSchema: {
       projectName: z.string().describe('Project name in hub'),
@@ -124,7 +125,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
   }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await migrationPlan(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
-  ;(server.registerTool as any)('mux_hub_apply', {
+  registerMuxTool(server, 'mux_hub_apply', {
     description: 'Execute migration plan steps. Idempotent — already-applied steps are skipped.',
     inputSchema: {
       projectName: z.string().describe('Project name in hub'),
@@ -133,7 +134,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
   }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubApply(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
-  ;(server.registerTool as any)('mux_hub_verify', {
+  registerMuxTool(server, 'mux_hub_verify', {
     description: 'Run build and test suite in a hub project. Gate before release — no green verify, no release.',
     inputSchema: {
       projectName: z.string().describe('Project name in hub'),
@@ -143,14 +144,14 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
   }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubVerify(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
-  ;(server.registerTool as any)('mux_hub_release', {
+  registerMuxTool(server, 'mux_hub_release', {
     description: 'Mark project as released. Sets push-lock on original, writes MIGRATED.md, updates ARCHIV-VERWEIS.',
     inputSchema: {
       projectName: z.string().describe('Project name in hub'),
     },
   }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubRelease(args.projectName)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
-  ;(server.registerTool as any)('mux_hub_rollback', {
+  registerMuxTool(server, 'mux_hub_rollback', {
     description: 'Rollback: workspace back to original path, remove push-lock, delete MIGRATED.md.',
     inputSchema: {
       projectName: z.string().describe('Project name in hub'),
@@ -159,7 +160,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubRollback(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   // 1. mux_send — Send a message to the message bus (with optional push delivery)
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_send',
     {
       description: 'Send a message to the cipher-mux message bus. Optionally push-deliver to a target session via tmux send-keys.',
@@ -217,7 +218,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 2. mux_read — Read messages from the bus
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_read',
     {
       description: 'Read messages from the cipher-mux message bus',
@@ -247,7 +248,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 3. mux_status — Get cipher-mux status
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_status',
     {
       description: 'Get cipher-mux system status',
@@ -269,7 +270,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 4. mux_sessions — List all sessions
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_sessions',
     {
       description: 'List all cipher-mux sessions',
@@ -284,7 +285,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 5. mux_create_session — Create a new session
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_create_session',
     {
       description:
@@ -352,7 +353,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 6. mux_kill_session — Kill a session (graceful by default for Claude sessions)
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_kill_session',
     {
       description: 'Kill a cipher-mux session. Graceful shutdown sends a cleanup prompt to Claude sessions before killing.',
@@ -383,7 +384,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 7. mux_context_usage — Get context usage
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_context_usage',
     {
       description: 'Get context usage for sessions (from statusLine monitor)',
@@ -419,7 +420,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 8. kickoff_complete — Signal that /launch finished its work
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'kickoff_complete',
     {
       description:
@@ -461,7 +462,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 9. mux_bugreport_resolve — Resolve a bugreport (outbox → inbox)
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_bugreport_resolve',
     {
       description:
@@ -511,7 +512,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 10. mux_task_create — Create a task in the queue
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_task_create',
     {
       description: 'Create a task in the cipher-mux task queue',
@@ -575,7 +576,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 11. mux_task_update — Update task state/progress
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_task_update',
     {
       description: 'Update a task state or progress in the cipher-mux task queue',
@@ -629,7 +630,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 12. mux_task_list — List tasks with filters
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_task_list',
     {
       description: 'List tasks in the cipher-mux task queue with optional filters',
@@ -663,7 +664,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 13. mux_task_get — Get task by ID with children
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_task_get',
     {
       description: 'Get a task by ID including its children',
@@ -691,7 +692,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
 
   // 15. mux_notes_create — Create a note in cipher-mux
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_notes_create',
     {
       description:
@@ -770,7 +771,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 16. mux_notes_list — List notes
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_notes_list',
     {
       description: 'List notes in the cipher-mux Notes system. Returns title, tags, and timestamps. Optionally filter by tags.',
@@ -799,7 +800,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 17. mux_notes_read — Read a note by ID
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_notes_read',
     {
       description: 'Read a note by ID from the cipher-mux Notes system. Returns full content including body and frontmatter.',
@@ -827,7 +828,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 18. mux_notes_update — Partial update of a note
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_notes_update',
     {
       description:
@@ -903,7 +904,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 18b. mux_testcase_update — Structured update for testcase notes
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_testcase_update',
     {
       description:
@@ -1021,7 +1022,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 19. mux_notes_search — Full-text search over notes
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_notes_search',
     {
       description:
@@ -1061,7 +1062,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 20. mux_notes_delete — Delete a note by ID
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_notes_delete',
     {
       description: 'Delete a note from the cipher-mux Notes system.',
@@ -1095,7 +1096,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 21. mux_notes_handoff_create — Create a handoff note
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_notes_handoff_create',
     {
       description:
@@ -1170,7 +1171,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 21b. mux_notes_handoff_dispatch — Deliver a handoff note into a session
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_notes_handoff_dispatch',
     {
       description:
@@ -1236,7 +1237,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 22. mux_notes_handoff_search — Search handoff notes
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_notes_handoff_search',
     {
       description:
@@ -1281,7 +1282,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 22b. mux_notes_open — Open a note in the grid
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_notes_open',
     {
       description:
@@ -1337,7 +1338,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   if (mayUseCompanionMemory(ctx.entityId)) {
 
   // 23. companion_memory_write — Write a memory
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'companion_memory_write',
     {
       description:
@@ -1395,7 +1396,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 24. companion_memory_recall — Recall recent memories
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'companion_memory_recall',
     {
       description:
@@ -1461,7 +1462,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 25. companion_memory_search — FTS5 search
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'companion_memory_search',
     {
       description:
@@ -1505,7 +1506,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 26. companion_memory_forget — Delete a memory
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'companion_memory_forget',
     {
       description: 'Delete a memory from the companion store by ID.',
@@ -1537,7 +1538,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   // ─── Cyber Factory Tools ─────────────────────────────────
 
   // CF-1. mux_cyber_factory_diagnose — Health report for a CF run
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_cyber_factory_diagnose',
     {
       description:
@@ -1588,7 +1589,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   // ─── App-Control Tools ─────────────────────────────────
 
   // 27. mux_grid_resize — Resize the grid
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_grid_resize',
     {
       description:
@@ -1611,7 +1612,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 28. mux_grid_place — Place a session in a specific grid cell
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_grid_place',
     {
       description:
@@ -1639,7 +1640,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 29. mux_session_focus — Focus a session in the grid
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_session_focus',
     {
       description:
@@ -1661,7 +1662,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 30. mux_session_eject — Eject a session to background
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_session_eject',
     {
       description:
@@ -1683,7 +1684,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 31. mux_sidebar_toggle — Toggle sidebar visibility
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_sidebar_toggle',
     {
       description:
@@ -1706,7 +1707,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   // ─── Companion Demo Mode Tools ─────────────────────────
 
   // 32. mux_ui_highlight — Highlight a UI element
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_ui_highlight',
     {
       description:
@@ -1779,7 +1780,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 33. mux_ui_open — Open/close/toggle a popup/dialog
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_ui_open',
     {
       description:
@@ -1828,7 +1829,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 34. mux_theme_set — Set the active theme
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_theme_set',
     {
       description:
@@ -1862,7 +1863,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 35a. mux_ui_choreography — Client-side UI timeline
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_ui_choreography',
     {
       description:
@@ -1938,7 +1939,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 35. mux_tts_speak — Speak text via TTS
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_tts_speak',
     {
       description:
@@ -2015,7 +2016,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 36. mux_cell_scroll — Scroll a terminal cell
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_cell_scroll',
     {
       description:
@@ -2041,7 +2042,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // D-1. mux_debugger_findings_intake — Submit structured bug findings to the Debugger
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_debugger_findings_intake',
     {
       description: 'Submit structured bug findings to the Debugger. Creates a new debugger run and identifies clarification gaps.',
@@ -2102,7 +2103,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // 40. mux_ideation_skill_run — Run an ideation skill with brain context
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_ideation_skill_run',
     {
       description:
@@ -2172,7 +2173,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   // --- Testing Assistant Tools ---
 
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_testing_run_start',
     {
       description: 'Start a testing assistant run against a project/welle.',
@@ -2199,7 +2200,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     }
   )
 
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_testing_run_complete',
     {
       description: 'Mark a testing run as complete and get the handoff recommendation.',
@@ -2221,7 +2222,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   // --- Audit Tools ---
 
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_audit_run_start',
     {
       description: 'Start an audit run with a scope parameter.',
@@ -2246,7 +2247,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     }
   )
 
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_audit_run_complete',
     {
       description: 'Complete an audit run and generate the release recommendation.',

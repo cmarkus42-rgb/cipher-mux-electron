@@ -253,6 +253,44 @@ export const configStore = {
     saveConfig(config)
   },
 
+  /**
+   * Remove a setting so the default takes over again.
+   *
+   * The call sites did this with `set(key, undefined as any)`, which claims
+   * the value is of the field's type when it is the absence of one. Saying
+   * "clear" says what actually happens.
+   */
+  clear<K extends keyof AppConfig>(key: K): void {
+    const config = getConfig()
+    delete config[key]
+    cached = config
+    saveConfig(config)
+  },
+
+  /**
+   * Read a key that is no longer part of AppConfig.
+   *
+   * Only for migrations: a setting that was renamed or dropped still sits in
+   * the user's file, and something has to read it once to carry it over. The
+   * return type is `unknown` on purpose — nothing here knows the shape of a
+   * schema that no longer exists, and pretending otherwise is what
+   * `get('orchestrator' as any)` did.
+   */
+  getLegacy(key: string): unknown {
+    return (getConfig() as unknown as Record<string, unknown>)[key]
+  },
+
+  /**
+   * Remove a key that is no longer part of AppConfig. Counterpart to
+   * getLegacy, for finishing a migration.
+   */
+  clearLegacy(key: string): void {
+    const config = getConfig() as unknown as Record<string, unknown>
+    delete config[key]
+    cached = config as unknown as AppConfig
+    saveConfig(cached)
+  },
+
   getAll(): AppConfig {
     return { ...getConfig() }
   },
