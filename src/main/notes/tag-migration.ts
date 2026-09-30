@@ -1,0 +1,392 @@
+/**
+ * Umzug der Bestands-Tags auf die Achsen.
+ *
+ * Gemessen am 2026-09-30 über alle 958 Notes: 14 Tag-Klassen, `kind` mit 29
+ * Werten, `workspace` als Anzeigename in 13 Schreibweisen, 269 Tags ganz ohne
+ * Klasse. Entstanden ist das, weil das Auto-Tagging ein Modell fragte und
+ * übernahm, was zurückkam — jede erfundene Klasse ist eine Filterebene, die es
+ * nur einmal gibt.
+ *
+ * **Grundsatz: nichts verschwindet stillschweigend.** Was sich nicht auf eine
+ * Achse abbilden lässt, bleibt stehen und wird im Bericht genannt. Ein Umzug,
+ * der Information vernichtet, die nirgends sonst steht, wäre kein Umzug.
+ *
+ * Zwei Befunde aus der Messung haben die Abbildung geprägt:
+ *
+ *  - **Unter `scope` lagen echte Phasen**: `scope:testing` 46×,
+ *    `scope:debugging` 21×, `scope:audit` 19×. Das ist Information, die kein
+ *    anderes Tag trägt — sie wird gehoben.
+ *  - **Unter `phase` lagen Wellennummern**: `phase:4`, `phase:1`, `phase:0`,
+ *    `phase:2`. Die gehören in die Klasse, die Wellen bedeutet: `welle`, mit 89
+ *    Vergaben längst im Bestand.
+ *
+ * Die Funktionen hier sind rein. Sie lesen keine Datei und schreiben keine —
+ * das tut der Aufrufer, und das macht die Abbildung prüfbar.
+ */
+import {
+  AXIS_VALUES,
+  ENTITY_PHASE_DEFAULT,
+  ENTITY_VALUES,
+  EXCLUSIVE_AXES,
+  KIND_VALUES,
+  PHASE_VALUES,
+  STATUS_VALUES,
+  type TagAxis,
+} from '../../shared/tag-axes'
+
+/**
+ * Bestands-Typ → Achsen-Typ.
+ *
+ * Die Zahlen in Klammern sind die gemessenen Vergaben. Wo deutsch und englisch
+ * nebeneinander standen, fasst die Abbildung zusammen.
+ */
+export const KIND_MAP: Readonly<Record<string, string>> = {
+  // Unverändert, nur bestätigt
+  spec: 'spec',                     // 109
+  handoff: 'handoff',               // 94
+  testcase: 'testcase',             // 85
+  bugreport: 'bugreport',           // 72
+  reference: 'reference',           // 32
+  todo: 'todo',                     // 4
+  finding: 'finding',               // 1
+  requirements: 'requirements',     // 1
+
+  // Pläne
+  wellenplan: 'plan',               // 63
+  'fix-plan': 'plan',               // 36
+  backlog: 'todo',                  // 3
+
+  // Berichte über etwas Abgeschlossenes
+  abschlussbericht: 'report',       // 59
+  'workshop-run': 'report',         // 30 — die Mitschrift eines Laufs
+  'findings-report': 'finding',     // 50 — trägt die FindingView
+
+  // Architektur ist eine Spezifikation
+  architektur: 'spec',              // 38
+  architecture: 'spec',             // 3
+  'detail-spec': 'spec',            // aus den klassenlosen Tags
+
+  // Anleitungen
+  walkthrough: 'guide',             // 24
+  guide: 'guide',                   // 7
+  doku: 'reference',                // 2
+  overview: 'reference',            // 1
+  guardrail: 'reference',           // 1
+  brain: 'reference',               // 30 — abgelegtes Wissen, kein Vorgang
+
+  // Anforderungen und Wünsche
+  anforderungspaket: 'requirements', // 18
+  'feature-request': 'idea',        // 23 — ein Wunsch, noch keine Anforderung
+  'ideation-request': 'idea',       // 5
+
+  // Untersuchungen
+  analysis: 'research',             // 2
+  lueckenanalyse: 'research',       // 1
+
+  // Listen
+  checklist: 'todo',                // 9
+
+  // Schreibvarianten
+  handover: 'handoff',              // 1
+  journal: 'journal',
+  idea: 'idea',
+  research: 'research',
+  plan: 'plan',
+  report: 'report',
+}
+
+/** Bestands-Zustand → Achsen-Zustand. */
+export const STATUS_MAP: Readonly<Record<string, string>> = {
+  done: 'done',                     // 146
+  open: 'open',                     // 118
+  fixed: 'done',                    // 41 — behoben ist erledigt
+  'in-progress': 'in-progress',     // 11
+  active: 'in-progress',            // 3
+  superseded: 'superseded',         // 2
+  verify: 'verify',                 // 1
+  archived: 'superseded',           // aus den Seed-Klassen
+  resolved: 'done',                 // aus den klassenlosen Tags
+  blocked: 'blocked',
+}
+
+/**
+ * `scope` → Phase, für die Werte, die tatsächlich eine Phase benennen.
+ *
+ * Die übrigen scope-Werte (`voice`, `notes`, `mcp`, `renderer` …) benennen
+ * Bauteile, keine Phasen. Sie bleiben unangetastet.
+ */
+export const SCOPE_TO_PHASE: Readonly<Record<string, string>> = {
+  testing: 'testing',               // 46
+  debugging: 'debugging',           // 21
+  audit: 'monitoring',              // 19 — Audit beobachtet, es baut nicht
+  refinement: 'architecture',       // 2
+  architecture: 'architecture',     // 1
+}
+
+export interface MigrationContext {
+  /** Workspace-Anzeigename (kleingeschrieben) → ID. */
+  workspaceNameToId: ReadonlyMap<string, string>
+}
+
+export interface MigrationResult {
+  tags: string[]
+  /** Tags, die keine Abbildung hatten und deshalb stehen geblieben sind. */
+  unmapped: string[]
+  /** Ob sich überhaupt etwas geändert hat — entscheidet über das Schreiben. */
+  changed: boolean
+}
+
+function splitTag(tag: string): { axis: string; value: string } | null {
+  const i = tag.indexOf(':')
+  if (i <= 0 || i === tag.length - 1) return null
+  return { axis: tag.slice(0, i).toLowerCase(), value: tag.slice(i + 1).trim() }
+}
+
+/**
+ * Einen klassenlosen Tag der Achse zuordnen, die seinen Wert kennt.
+ *
+ * 269 Vergaben trugen keine Klasse, und die häufigsten benennen einen
+ * Achsenwert: `handoff` 46×, `done` 39×, `bugreport` 9×, `open` 9×,
+ * `cyber-factory` 7×. Die Reihenfolge entscheidet bei Mehrdeutigkeit —
+ * `testing` wäre Phase und nichts anderes, `audit` wäre Entity und Phase.
+ */
+function axisForBareValue(value: string): TagAxis | null {
+  if (ENTITY_VALUES.includes(value)) return 'entity'
+  if (KIND_MAP[value] !== undefined) return 'kind'
+  if (STATUS_MAP[value] !== undefined) return 'status'
+  if (PHASE_VALUES.includes(value)) return 'phase'
+  return null
+}
+
+/**
+ * Die Tags einer Note umziehen.
+ *
+ * Rein: keine Datei, kein Zustand, kein Seiteneffekt. Die Eingabe wird nicht
+ * verändert.
+ */
+export function migrateTags(tags: readonly string[], ctx: MigrationContext): MigrationResult {
+  const out: string[] = []
+  const unmapped: string[] = []
+
+  const push = (tag: string): void => {
+    const lower = tag.toLowerCase()
+    if (!out.some(t => t.toLowerCase() === lower)) out.push(tag)
+  }
+
+  for (const raw of tags) {
+    const tag = raw.trim()
+    if (!tag) continue
+
+    const parts = splitTag(tag)
+
+    // ── Ohne Klasse: in die Achse heben, die den Wert kennt ──
+    if (!parts) {
+      if (tag.includes(':')) { push(tag); continue }   // ':' oder 'kind:' — Unsinn, unverändert
+      const axis = axisForBareValue(tag.toLowerCase())
+      if (!axis) { push(tag); continue }
+      const value = axis === 'kind'
+        ? KIND_MAP[tag.toLowerCase()]
+        : axis === 'status'
+          ? STATUS_MAP[tag.toLowerCase()]
+          : tag.toLowerCase()
+      push(`${axis}:${value}`)
+      continue
+    }
+
+    const { axis, value } = parts
+    const lowerValue = value.toLowerCase()
+
+    switch (axis) {
+      case 'workspace': {
+        // Die ID ist der stabile Bezug. Der Anzeigename war die Quelle der
+        // Schreibweisen-Dubletten.
+        if (/^ws-\d+$/.test(lowerValue)) { push(`workspace:${lowerValue}`); break }
+        const id = ctx.workspaceNameToId.get(lowerValue)
+        if (id) { push(`workspace:${id}`); break }
+        // Ein Workspace, den die Konfiguration nicht mehr kennt. Den Tag zu
+        // löschen würde die Note in JEDEN Workspace heben — schlimmer als ein
+        // Tag, der auf nichts zeigt.
+        push(tag)
+        unmapped.push(tag)
+        break
+      }
+
+      case 'kind': {
+        const target = KIND_MAP[lowerValue]
+        if (target) { push(`kind:${target}`); break }
+        if (KIND_VALUES.includes(lowerValue)) { push(`kind:${lowerValue}`); break }
+        push(tag)
+        unmapped.push(tag)
+        break
+      }
+
+      case 'status': {
+        const target = STATUS_MAP[lowerValue]
+        if (target) { push(`status:${target}`); break }
+        if (STATUS_VALUES.includes(lowerValue)) { push(`status:${lowerValue}`); break }
+        push(tag)
+        unmapped.push(tag)
+        break
+      }
+
+      case 'phase': {
+        if (PHASE_VALUES.includes(lowerValue)) { push(`phase:${lowerValue}`); break }
+        // Eine Wellennummer ist keine Phase. `welle` bedeutet genau das.
+        if (/^\d+[a-z]?$/.test(lowerValue)) { push(`welle:${lowerValue}`); break }
+        push(tag)
+        unmapped.push(tag)
+        break
+      }
+
+      case 'entity': {
+        if (ENTITY_VALUES.includes(lowerValue)) { push(`entity:${lowerValue}`); break }
+        // `orchestrator` etwa gibt es als Rolle nicht mehr.
+        push(tag)
+        unmapped.push(tag)
+        break
+      }
+
+      case 'scope': {
+        const phase = SCOPE_TO_PHASE[lowerValue]
+        if (phase) { push(`phase:${phase}`); break }
+        push(tag)   // Bauteil, keine Phase — bleibt
+        break
+      }
+
+      default:
+        push(tag)
+    }
+  }
+
+  // ── project: entfällt, wo der Workspace dasselbe sagt ──
+  const hasWorkspace = out.some(t => t.toLowerCase().startsWith('workspace:'))
+  let result = hasWorkspace ? out.filter(t => !t.toLowerCase().startsWith('project:')) : out
+
+  // ── Ausschliessende Achsen: der erste Wert gewinnt ──
+  // Nach dem Zusammenfassen können zwei Bestandswerte auf denselben Achsenwert
+  // fallen (status:done und status:fixed) oder auf zwei verschiedene
+  // (kind:spec und kind:testcase). Beides ist hier zu entscheiden.
+  const seenExclusive = new Set<string>()
+  result = result.filter(t => {
+    const parts = splitTag(t)
+    if (!parts) return true
+    if (!(EXCLUSIVE_AXES as readonly string[]).includes(parts.axis)) return true
+    if (seenExclusive.has(parts.axis)) return false
+    seenExclusive.add(parts.axis)
+    return true
+  })
+
+  // ── Phase aus der Entity ableiten, wenn keine da ist ──
+  // Dieselbe Ableitung, die processTagsFor beim Anlegen vornimmt, rückwirkend:
+  // 557 Notes tragen eine Entity und fast keine eine Phase. Das Vorhandene
+  // gewinnt immer gegen die Ableitung.
+  if (!result.some(t => t.toLowerCase().startsWith('phase:'))) {
+    const entityTag = result.find(t => t.toLowerCase().startsWith('entity:'))
+    const entityId = entityTag ? entityTag.slice('entity:'.length).toLowerCase() : null
+    const derived = entityId ? ENTITY_PHASE_DEFAULT[entityId] : undefined
+    if (derived) result.push(`phase:${derived}`)
+  }
+
+  const changed = result.length !== tags.length
+    || result.some((t, i) => t !== tags[i])
+
+  return { tags: result, unmapped, changed }
+}
+
+/** Alle Achsenwerte, die nach dem Umzug vorkommen dürfen — für den Bericht. */
+export function axisValueCount(): number {
+  return Object.values(AXIS_VALUES).reduce((n, v) => n + (v?.length ?? 0), 0)
+}
+
+// ─── Anwendung auf ein Notes-Verzeichnis ────────────────────
+
+export interface MigrationRunOptions {
+  notesDir: string
+  ctx: MigrationContext
+  /** Ohne `apply` wird nichts geschrieben — der Trockenlauf ist die Voreinstellung. */
+  apply?: boolean
+}
+
+export interface MigrationRunReport {
+  /** Notes mit lesbarem Frontmatter. */
+  examined: number
+  /** Notes, deren Tags sich ändern. */
+  changed: number
+  /** Notes, die geschrieben wurden (0 im Trockenlauf). */
+  written: number
+  /** Tags ohne Abbildung, mit Anzahl. */
+  unmapped: Record<string, number>
+  /** Verteilung nach dem Umzug: Klasse → Wert → Anzahl. */
+  after: Record<string, Record<string, number>>
+  problems: string[]
+}
+
+/**
+ * Den Umzug auf ein Verzeichnis anwenden.
+ *
+ * Voreinstellung ist der Trockenlauf: ohne `apply` wird gelesen und gerechnet,
+ * aber nichts geschrieben. Bei 958 echten Notes ist der Bericht vor dem
+ * Schreiben kein Luxus.
+ *
+ * Eine Note, die sich nicht lesen lässt, wird gemeldet und übersprungen —
+ * sie darf den Lauf nicht abbrechen und die übrigen Notes nicht halb
+ * umgezogen zurücklassen.
+ */
+export async function migrateNotesDir(opts: MigrationRunOptions): Promise<MigrationRunReport> {
+  const fs = await import('fs')
+  const path = await import('path')
+  const matter = (await import('gray-matter')).default
+
+  const report: MigrationRunReport = {
+    examined: 0, changed: 0, written: 0, unmapped: {}, after: {}, problems: [],
+  }
+
+  let files: string[]
+  try {
+    files = fs.readdirSync(opts.notesDir).filter(f => f.endsWith('.md')).sort()
+  } catch {
+    report.problems.push(`${opts.notesDir} nicht lesbar.`)
+    return report
+  }
+
+  for (const file of files) {
+    const full = path.join(opts.notesDir, file)
+    let parsed: ReturnType<typeof matter>
+    try {
+      parsed = matter(fs.readFileSync(full, 'utf-8'))
+    } catch {
+      report.problems.push(`${file}: Frontmatter nicht lesbar — übersprungen.`)
+      continue
+    }
+
+    const before: unknown = parsed.data.tags
+    if (!Array.isArray(before)) continue
+    const beforeTags = before.filter((t): t is string => typeof t === 'string')
+    report.examined++
+
+    const result = migrateTags(beforeTags, opts.ctx)
+
+    for (const u of result.unmapped) report.unmapped[u] = (report.unmapped[u] ?? 0) + 1
+    for (const t of result.tags) {
+      const i = t.indexOf(':')
+      const cls = i > 0 ? t.slice(0, i) : '(ohne Klasse)'
+      const val = i > 0 ? t.slice(i + 1) : t
+      report.after[cls] = report.after[cls] ?? {}
+      report.after[cls][val] = (report.after[cls][val] ?? 0) + 1
+    }
+
+    if (!result.changed) continue
+    report.changed++
+    if (!opts.apply) continue
+
+    try {
+      parsed.data.tags = result.tags
+      fs.writeFileSync(full, matter.stringify(parsed.content, parsed.data), 'utf-8')
+      report.written++
+    } catch (err) {
+      report.problems.push(`${file}: nicht schreibbar — ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  return report
+}
