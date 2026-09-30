@@ -26,6 +26,7 @@ import { SessionStore, toPersistedSession } from './session-store'
 import { runCommand } from '../util/exec-util'
 import { injectStatusLineHook } from '../monitoring/statusline-hook'
 import { COMPANION_ENTITY_ID } from '../mcp/entity-header'
+import { getEntityBoundary, buildBoundaryHookScript, buildBoundaryHookSettings } from './entity-boundaries'
 import type { PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
@@ -1165,6 +1166,48 @@ export class SessionManager extends EventEmitter {
           settings.permissions = { ...((settings.permissions as any) ?? {}), allow: union }
           fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
         }
+      }
+
+      // Role boundary as a PreToolUse hook. Measured before choosing this
+      // route: entity sessions run with --dangerously-skip-permissions, which
+      // bypasses permissions.deny entirely, while a PreToolUse hook still
+      // fires. A deny rule here would have looked enforced and done nothing.
+      // See entity-boundaries.ts.
+      try {
+        const boundary = getEntityBoundary(config.id)
+        const claudeDir = path.join(runDir, '.claude')
+        const hookPath = path.join(claudeDir, 'role-boundary.js')
+        const settingsPath = path.join(claudeDir, 'settings.local.json')
+        fs.mkdirSync(claudeDir, { recursive: true })
+
+        let settings: Record<string, unknown> = {}
+        try {
+          settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
+        } catch { /* doesn't exist yet */ }
+
+        if (boundary) {
+          fs.writeFileSync(
+            hookPath,
+            buildBoundaryHookScript(boundary.denyPathPatterns, boundary.reason),
+            { encoding: 'utf-8', mode: 0o755 },
+          )
+          settings.hooks = {
+            ...((settings.hooks as Record<string, unknown>) ?? {}),
+            ...buildBoundaryHookSettings(hookPath),
+          }
+          fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
+        } else if ((settings.hooks as { PreToolUse?: unknown })?.PreToolUse) {
+          // A role that lost its boundary must lose the hook too — otherwise a
+          // stale generated script keeps enforcing a rule nobody declares.
+          const hooks = { ...(settings.hooks as Record<string, unknown>) }
+          delete hooks.PreToolUse
+          settings.hooks = hooks
+          if (Object.keys(hooks).length === 0) delete settings.hooks
+          fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
+          try { fs.unlinkSync(hookPath) } catch { /* already gone */ }
+        }
+      } catch (err) {
+        console.warn(`[SessionManager] role boundary for ${config.id} failed:`, err)
       }
 
       // Status-line hook into the RUN dir — the session's actual cwd, which is
