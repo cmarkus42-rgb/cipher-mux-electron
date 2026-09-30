@@ -15,6 +15,7 @@ export interface EnrichedBugreport {
 /** Read current LLM config from config-store (lazy import to avoid electron dep in tests). */
 function getLlmConfig() {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
     const { configStore } = require('../config/config-store')
     const llm = configStore.get('llm')
     return {

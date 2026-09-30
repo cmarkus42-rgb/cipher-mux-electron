@@ -9,6 +9,7 @@ const TIMEOUT_MS = 60_000
 /** Read LLM config lazily (avoids electron dep in test context). */
 function getLlmConfig() {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
     const { configStore } = require('../config/config-store')
     const llm = configStore.get('llm')
     return {
@@ -321,6 +322,7 @@ export class NoteTagging {
     if (!normSources.includes(normTarget)) return { affected: 0, error: 'target must be one of the source tags' }
 
     const toReplace = normSources.filter(s => s !== normTarget)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
     const matter = require('gray-matter')
     let affected = 0
 
@@ -403,6 +405,7 @@ export class NoteTagging {
    */
   private propagateTagChange(oldTag: string, newTag: string | null): string[] {
     const affected: string[] = []
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
     const matter = require('gray-matter')
 
     // Scan flat notes directory
@@ -454,6 +457,7 @@ export class NoteTagging {
       return
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
     const matter = require('gray-matter')
     for (const file of files) {
       try {

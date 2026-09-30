@@ -335,7 +335,7 @@ export function NotesCell({
         if (info) openNote(info)
       }
     }).catch(() => {})
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // absichtlich leer: laeuft einmal beim Mounten
 
   // Expose openNote for external calls (from sidebar / MCP) — per-slot registry
   useEffect(() => {

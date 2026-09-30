@@ -383,7 +383,7 @@ export function TestcaseView({
     let filtered = applyStatusFilters(testcase.sections, filters)
     filtered = applyResolutionFilters(filtered, resolutionFilters)
     return new Set(filtered.flatMap(s => s.items.map(i => i.id)))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Abhaengigkeiten absichtlich unvollstaendig -- soll nicht bei jeder Aenderung neu laufen
   }, [filters, resolutionFilters, snapshotGeneration])
 
   const handleFilterToggle = useCallback((status: TestcaseStatus) => {

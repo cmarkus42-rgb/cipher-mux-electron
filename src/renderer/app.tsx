@@ -958,7 +958,7 @@ export function App() {
       console.warn('[App] Failed to auto-load active workspace:', err)
       setWorkspaceLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Abhaengigkeiten absichtlich unvollstaendig -- soll nicht bei jeder Aenderung neu laufen
   }, [handleWorkspaceApply, applyKeepWorkingRestore])
 
   const handleWorkspaceOpenSettings = useCallback((tab: 'personas' | 'workspaces') => {
