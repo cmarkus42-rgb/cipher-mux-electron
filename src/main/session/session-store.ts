@@ -16,6 +16,13 @@ export interface PersistedSession {
   status: 'active' | 'background'
   /** Workspace binding. null = unbound. Absent in stores written before v0.9.12. */
   workspaceId: string | null
+  /**
+   * Claude Code's own conversation id, as the session reported it via its
+   * statusLine. Lets a restore resume that exact conversation
+   * (`--resume <id>`) instead of opening the interactive picker, where an
+   * unattended entity session would sit forever. Absent in older stores.
+   */
+  claudeSessionId?: string | null
 }
 
 export interface PersistedGridState {
@@ -172,6 +179,7 @@ export function toPersistedSession(
     entityId?: string | null
     projectPath: string | null
     workspaceId?: string | null
+    claudeSessionId?: string | null
   },
   gridSlot: number | null,
 ): PersistedSession {
@@ -181,6 +189,7 @@ export function toPersistedSession(
     tmuxSession: session.tmuxSession,
     entityId: (session.entityId as EntityId) ?? null,
     projectPath: session.projectPath,
+    ...(session.claudeSessionId ? { claudeSessionId: session.claudeSessionId } : {}),
     gridSlot,
     status: gridSlot === null ? 'background' : 'active',
     workspaceId: session.workspaceId ?? null,

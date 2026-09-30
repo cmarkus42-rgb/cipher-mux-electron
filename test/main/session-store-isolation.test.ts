@@ -4,7 +4,7 @@ import { promises as fs } from 'fs'
 import * as fsSync from 'fs'
 import path from 'path'
 import os from 'os'
-import { SessionStore } from '../../src/main/session/session-store'
+import { SessionStore, toPersistedSession } from '../../src/main/session/session-store'
 
 // ─── Store isolation ────────────────────────────────────────
 //
@@ -124,5 +124,68 @@ describe('SessionStore — path isolation', () => {
       ? fsSync.readFileSync(LIVE_PATH, 'utf-8')
       : null
     assert.equal(after, before, 'the live registry must be byte-identical')
+  })
+})
+
+// ─── claudeSessionId survives a restart ─────────────────────
+//
+// Claude Code's own conversation id is what lets a restore resume that exact
+// conversation instead of opening the interactive picker. It was kept in
+// memory only, so it was gone precisely when a restart needed it — and the
+// persisted shape had no field for it at all.
+
+describe('SessionStore — claudeSessionId', () => {
+  let dir: string
+
+  before(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'session-store-claudeid-'))
+  })
+
+  after(async () => {
+    await fs.rm(dir, { recursive: true, force: true })
+  })
+
+  it('round-trips the conversation id through disk', () => {
+    const storePath = path.join(dir, 'ids.json')
+    const store = new SessionStore(storePath)
+    store.upsertSession({ ...sample('s1'), claudeSessionId: 'abc-123-def' })
+
+    const fresh = new SessionStore(storePath)
+    fresh.load()
+    assert.equal(fresh.getSessions()[0].claudeSessionId, 'abc-123-def')
+  })
+
+  it('reads a store written before the field existed', () => {
+    const storePath = path.join(dir, 'legacy.json')
+    fsSync.writeFileSync(storePath, JSON.stringify({
+      sessions: [{
+        id: 'old', name: 'Alt', tmuxSession: 'cmux-old', entityId: null,
+        projectPath: '/tmp', gridSlot: 0, status: 'active', workspaceId: null,
+      }],
+      gridState: null,
+      savedAt: 1,
+    }), 'utf-8')
+
+    const store = new SessionStore(storePath)
+    assert.equal(store.load(), true)
+    assert.equal(store.getSessions()[0].claudeSessionId, undefined)
+    assert.equal(store.getSessions()[0].id, 'old')
+  })
+})
+
+describe('toPersistedSession — conversation id', () => {
+  it('carries the id when the session has one', () => {
+    const ps = toPersistedSession({
+      id: 's1', name: 'S', tmuxSession: 'cmux-s', projectPath: null,
+      claudeSessionId: 'conv-1',
+    }, 0)
+    assert.equal(ps.claudeSessionId, 'conv-1')
+  })
+
+  it('writes no empty key when there is none', () => {
+    const ps = toPersistedSession({
+      id: 's2', name: 'S', tmuxSession: 'cmux-s', projectPath: null,
+    }, 0)
+    assert.ok(!('claudeSessionId' in ps), 'an absent id must not become a null key')
   })
 })
