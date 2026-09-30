@@ -80,21 +80,24 @@ function FindingRow({ item, onCycle, onOpenFile }: FindingRowProps) {
         </span>
       )}
 
+      {/* Description, file reference and comment share one text flow. Keeping
+          the file as a separate flex item pinned it to the first line while a
+          long description wrapped beneath it, which read as if it belonged to
+          something else. */}
       <span class="fv-row__text">
         {item.description}
+        {item.file && (
+          <button
+            class="fv-row__file"
+            title={onOpenFile ? 'Im Editor oeffnen' : item.file}
+            onClick={() => onOpenFile?.(item.file!, item.line)}
+            disabled={!onOpenFile}
+          >
+            {item.file}{item.line !== null ? `:${item.line}` : ''}
+          </button>
+        )}
         {item.comment && <span class="fv-row__comment"> // {item.comment}</span>}
       </span>
-
-      {item.file && (
-        <button
-          class="fv-row__file"
-          title={onOpenFile ? 'Im Editor oeffnen' : item.file}
-          onClick={() => onOpenFile?.(item.file!, item.line)}
-          disabled={!onOpenFile}
-        >
-          {item.file}{item.line !== null ? `:${item.line}` : ''}
-        </button>
-      )}
     </div>
   )
 }
