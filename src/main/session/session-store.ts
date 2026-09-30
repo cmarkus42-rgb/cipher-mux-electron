@@ -29,8 +29,33 @@ export interface SessionStoreData {
   savedAt: number
 }
 
-const STORE_DIR = path.join(os.homedir(), '.config', 'cipher-mux')
-const STORE_PATH = path.join(STORE_DIR, 'sessions.json')
+const LIVE_STORE_PATH = path.join(os.homedir(), '.config', 'cipher-mux', 'sessions.json')
+
+/**
+ * Where a store with no explicit path writes. `CIPHER_MUX_SESSION_STORE` lets a
+ * test point every SessionStore in the process at a throwaway file without
+ * touching constructor signatures all the way down through SessionManager.
+ */
+function defaultStorePath(): string {
+  return process.env.CIPHER_MUX_SESSION_STORE || LIVE_STORE_PATH
+}
+
+/**
+ * True when this process is a test runner.
+ *
+ * Guards the live registry: SessionStore's path used to be a module constant,
+ * so any test that built a real SessionManager wrote test fixtures straight
+ * into the user's sessions.json — wiping their sessions and grid layout, which
+ * a Keep Working restore would then read back as the truth. Tests must pass an
+ * explicit path; defaulting to the live one inside a test process is refused
+ * rather than merely discouraged.
+ */
+function isTestProcess(): boolean {
+  return process.env.NODE_ENV === 'test'
+    || process.env.CIPHER_MUX_TEST === '1'
+    || Boolean(process.env.NODE_TEST_CONTEXT)
+    || process.argv.some(a => a === '--test' || a.endsWith('.test.ts') || a.endsWith('.test.js'))
+}
 
 /**
  * SessionStore — persists session-to-entity and session-to-grid mappings
@@ -38,11 +63,27 @@ const STORE_PATH = path.join(STORE_DIR, 'sessions.json')
  */
 export class SessionStore {
   private data: SessionStoreData = { sessions: [], gridState: null, savedAt: 0 }
+  private readonly storePath: string
+
+  /**
+   * @param storePath Where to persist. Defaults to the live registry; tests
+   *   must pass a path of their own (see isTestProcess).
+   */
+  constructor(storePath?: string) {
+    const resolved = storePath ?? defaultStorePath()
+    if (resolved === LIVE_STORE_PATH && isTestProcess()) {
+      throw new Error(
+        `SessionStore: refusing to use the live registry (${LIVE_STORE_PATH}) from a `
+        + 'test process — pass an explicit path or set CIPHER_MUX_SESSION_STORE.',
+      )
+    }
+    this.storePath = resolved
+  }
 
   /** Load sessions.json from disk. Returns true if file existed. */
   load(): boolean {
     try {
-      const raw = fs.readFileSync(STORE_PATH, 'utf-8')
+      const raw = fs.readFileSync(this.storePath, 'utf-8')
       const parsed = JSON.parse(raw) as SessionStoreData
       if (parsed && Array.isArray(parsed.sessions)) {
         this.data = parsed
@@ -103,16 +144,16 @@ export class SessionStore {
   /** Clear all persisted data and remove the file. */
   clear(): void {
     this.data = { sessions: [], gridState: null, savedAt: 0 }
-    try { fs.unlinkSync(STORE_PATH) } catch { /* ok */ }
+    try { fs.unlinkSync(this.storePath) } catch { /* ok */ }
   }
 
   /** Write data to disk atomically (write tmp + rename). */
   private flush(): void {
     try {
-      fs.mkdirSync(STORE_DIR, { recursive: true })
-      const tmp = STORE_PATH + '.tmp'
+      fs.mkdirSync(path.dirname(this.storePath), { recursive: true })
+      const tmp = this.storePath + '.tmp'
       fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2), 'utf-8')
-      fs.renameSync(tmp, STORE_PATH)
+      fs.renameSync(tmp, this.storePath)
     } catch (err) {
       console.error('[SessionStore] flush failed:', err)
     }
