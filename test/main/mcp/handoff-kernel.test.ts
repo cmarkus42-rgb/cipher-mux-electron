@@ -122,6 +122,49 @@ function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[
 
 // ─── Tests ─────────────────────────────────────────────────
 
+// An existing session used to be assumed ready — the readiness wait only
+// guarded newly started ones. A session sitting in a modal dialog swallowed
+// the keystrokes into a search field while executeHandoff reported success,
+// and the handoff note was marked consumed on the strength of that report.
+// Silent loss with a receipt is worse than an honest failure.
+describe('handoff-kernel: existing sessions are not assumed ready', () => {
+  it('refuses to send into an existing session that shows no sign of readiness', async () => {
+    const existing = makeSession({ id: 'sess-existing', entityId: 'debugger', name: 'debugger' })
+    const ctx = makeCtx({
+      sessions: [existing],
+      captureOutput: 'Resume session\n  Search…\n  No conversations found',
+    })
+
+    const result = await executeHandoff(ctx, {
+      targetEntityId: 'debugger',
+      senderEntityId: 'test',
+      sessionName: 'debugger',
+      payload: { text: 'hallo' },
+    })
+
+    assert.equal(result.ok, false)
+    assert.equal(ctx.sendKeysCalls.length, 0, 'nothing may be typed into a session that is not ready')
+  })
+
+  it('sends into an existing session that is at its prompt', async () => {
+    const existing = makeSession({ id: 'sess-existing', entityId: 'debugger', name: 'debugger' })
+    const ctx = makeCtx({
+      sessions: [existing],
+      captureOutput: '❯ ',
+    })
+
+    const result = await executeHandoff(ctx, {
+      targetEntityId: 'debugger',
+      senderEntityId: 'test',
+      sessionName: 'debugger',
+      payload: { text: 'hallo' },
+    })
+
+    assert.equal(result.ok, true)
+    assert.ok(ctx.sendKeysCalls.length > 0, 'a ready session must receive the payload')
+  })
+})
+
 describe('handoff-kernel: isBusy', () => {
   it('returns false when pane runs zsh (idle)', async () => {
     const ctx = makeCtx({ paneCommand: 'zsh' })
@@ -133,6 +176,24 @@ describe('handoff-kernel: isBusy', () => {
     const ctx = makeCtx({ paneCommand: 'claude' })
     const session = makeSession()
     assert.equal(await isBusy(ctx, session), true)
+  })
+
+  // Claude Code reports its version string as pane_current_command, not
+  // "claude" — measured against v2.1.284. A check bound to the process name
+  // read every live CLI as idle, which made executeHandoff give up on every
+  // freshly started session after 15s while that session sat there ready.
+  it('returns true when the pane runs a Claude CLI that reports its version', async () => {
+    const ctx = makeCtx({ paneCommand: '2.1.284' })
+    const session = makeSession()
+    assert.equal(await isBusy(ctx, session), true)
+  })
+
+  it('treats every known shell as idle', async () => {
+    for (const shell of ['zsh', 'bash', 'sh', 'fish', '-zsh', '']) {
+      const ctx = makeCtx({ paneCommand: shell })
+      const session = makeSession()
+      assert.equal(await isBusy(ctx, session), false, `"${shell}" must read as idle`)
+    }
   })
 
   it('returns false on error', async () => {
