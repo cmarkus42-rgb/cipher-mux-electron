@@ -569,6 +569,8 @@ export class SessionManager extends EventEmitter {
             updatedAt: Date.now(),
             entityId: ps.entityId ?? undefined,
             workspaceId: ps.workspaceId ?? null,
+            // Defensive: absent in stores written before this field existed.
+            ...(ps.claudeSessionId ? { claudeSessionId: ps.claudeSessionId } : {}),
           }
           this.sessions.set(session.id, session)
           this.tmux.watchSession(ps.tmuxSession, session.id)
@@ -1497,10 +1499,13 @@ export class SessionManager extends EventEmitter {
    */
   updateClaudeSessionId(sessionId: string, claudeSessionId: string): void {
     const session = this.sessions.get(sessionId)
-    if (session) {
-      session.claudeSessionId = claudeSessionId
-      session.updatedAt = Date.now()
-    }
+    if (!session) return
+    if (session.claudeSessionId === claudeSessionId) return
+    session.claudeSessionId = claudeSessionId
+    session.updatedAt = Date.now()
+    // Persist it: the id is needed after a restart, which is exactly when the
+    // in-memory copy is gone. Without this the whole chain ends here.
+    this.persistSession(session)
   }
 
   /**
