@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'preact/hooks'
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 export interface GlobalTtsState {
   isSpeaking: boolean

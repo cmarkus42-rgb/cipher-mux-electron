@@ -215,23 +215,8 @@ export function A11ySettingsPage({ settings, onUpdate }: A11ySettingsPageProps) 
         <p class="a11y-section__desc">
           Maximiert eine einzelne Session auf das gesamte Fenster.
           Grid, Sidebar und andere Zellen werden ausgeblendet.
-          Aktivieren per Button in der Zelle oder mit Cmd+Shift+F. Escape zum Deaktivieren.
+          Aktivieren per Button in der Zellen-Kopfzeile, Escape zum Deaktivieren.
         </p>
-        <div class="a11y-pref-row">
-          <div class="a11y-pref-label">
-            <span>Focus Mode</span>
-            <span class="a11y-pref-hint">Cmd+Shift+F oder Button in der Zellen-Kopfzeile</span>
-          </div>
-          <label class="a11y-toggle">
-            <input
-              type="checkbox"
-              checked={settings.focusModeEnabled}
-              onChange={() => onUpdate({ focusModeEnabled: !settings.focusModeEnabled })}
-              aria-label="Focus Mode aktivieren"
-            />
-            <span class="a11y-toggle__slider" />
-          </label>
-        </div>
       </section>
     </div>
   )

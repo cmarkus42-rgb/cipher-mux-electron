@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'preact/hooks'
 import type { ContextUsage } from '../../shared/types'
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 export function useContextUsage() {
   const [usages, setUsages] = useState<Record<string, ContextUsage>>({})

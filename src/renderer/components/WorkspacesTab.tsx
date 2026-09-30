@@ -7,7 +7,7 @@ import { useEntityPresets } from '../hooks/useEntityPresets'
 import { EntityPickerPopup } from './EntityPickerPopup'
 import type { EntityId } from '../../shared/types'
 
-const api = (window as any).cipherMux
+const api = window.cipherMux
 
 /** Clipboard copy button with checkmark feedback. */
 function CopyButton({ getText, title }: { getText: () => string; title?: string }) {
@@ -60,7 +60,7 @@ export function WorkspacesTab() {
       const tags = await api.notes?.tags?.()
       setAllTags(tags ?? [])
     } catch { /* ignore */ }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // absichtlich leer: laeuft einmal beim Mounten
 
   useEffect(() => { loadAll() }, [loadAll])
 

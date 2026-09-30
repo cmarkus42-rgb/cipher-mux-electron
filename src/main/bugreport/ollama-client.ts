@@ -15,6 +15,7 @@ export interface EnrichedBugreport {
 /** Read current LLM config from config-store (lazy import to avoid electron dep in tests). */
 function getLlmConfig() {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
     const { configStore } = require('../config/config-store')
     const llm = configStore.get('llm')
     return {
@@ -110,8 +111,8 @@ export async function testOllamaConnection(host?: string, port?: number): Promis
   try {
     await ollamaGet('/api/tags', host, port)
     return { ok: true }
-  } catch (err: any) {
-    return { ok: false, error: err?.message ?? 'Connection failed' }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Connection failed' }
   }
 }
 

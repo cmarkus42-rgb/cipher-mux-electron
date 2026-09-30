@@ -31,7 +31,7 @@ export function CompanionMemoryView({ expanded, onToggle }: CompanionMemoryViewP
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const api = (window as any).cipherMux?.companion
+  const api = window.cipherMux?.companion
 
   const loadMemories = useCallback(async () => {
     if (!api) return

@@ -119,7 +119,7 @@ export function SessionCell({
   }, [session.id, onFocusMode])
   const handleScreenshot = useCallback(async (e: Event) => {
     e.stopPropagation()
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     const result = await api?.sessions?.screenshot?.(session.id)
     if (result?.path) {
       await navigator.clipboard.writeText(result.path).catch(() => {})

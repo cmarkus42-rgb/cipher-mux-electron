@@ -49,7 +49,7 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
   // Push focused session to main process whenever it changes.
   // Always sent (not just STT mode) so BT Shutter can route to the focused session.
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api.voice.setSessionTarget(focusedSessionId)
   }, [focusedSessionId])
 
@@ -75,7 +75,7 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
 
   /** Initialize VAD + mic stream for STT pipeline */
   const initVAD = useCallback(async () => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
 
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 16000 },
@@ -119,7 +119,7 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
   /** Switch to a new voice mode */
   const switchMode = useCallback(async (newMode: VoiceMode) => {
     if (newMode === mode) return
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
 
     // Deactivate current mode
     if (mode === 'stt') {
@@ -200,7 +200,7 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
   useEffect(() => {
     if (!active) return
 
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     const unsubs: (() => void)[] = []
 
     unsubs.push(api.voice.onState((state: string) => {
@@ -250,7 +250,7 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
   useEffect(() => {
     if (!active) return
 
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api.btShutter?.onEvent) return
 
     const unsub = api.btShutter.onEvent((event: { button: string; action: string }) => {
@@ -264,7 +264,7 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
   useEffect(() => {
     if (!active) return
 
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     let pttDown = false
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -292,7 +292,7 @@ export function useVoiceSession(focusedSessionId: string | null, _focusedSession
   }, [active])
 
   const togglePin = useCallback((sessionId: string) => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api.voice.pinSession?.(sessionId)
   }, [])
 

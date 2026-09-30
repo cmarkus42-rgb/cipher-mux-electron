@@ -383,7 +383,7 @@ export function TestcaseView({
     let filtered = applyStatusFilters(testcase.sections, filters)
     filtered = applyResolutionFilters(filtered, resolutionFilters)
     return new Set(filtered.flatMap(s => s.items.map(i => i.id)))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Abhaengigkeiten absichtlich unvollstaendig -- soll nicht bei jeder Aenderung neu laufen
   }, [filters, resolutionFilters, snapshotGeneration])
 
   const handleFilterToggle = useCallback((status: TestcaseStatus) => {
@@ -403,7 +403,7 @@ export function TestcaseView({
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     const onFocusIn = (e: FocusEvent) => {
       if ((e.target as HTMLElement)?.tagName === 'TEXTAREA' && (e.target as HTMLElement)?.classList?.contains('tc-item__comment-input')) {
         api?.voice?.setNotesFocus?.(true)
@@ -425,7 +425,7 @@ export function TestcaseView({
 
   // Handle STT text insertion into focused comment input
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.voice?.onNotesInsert) return
     const unsub = api.voice.onNotesInsert((data: { text: string }) => {
       const active = document.activeElement

@@ -292,6 +292,7 @@ export class TagClassRepo {
 
   /** Propagate class rename across all notes in the directory. */
   private propagateClassRename(oldClass: string, newClass: string): void {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
     const matter = require('gray-matter')
     const dir = path.dirname(this.filePath)
     let files: string[]

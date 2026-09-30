@@ -287,7 +287,6 @@
   "info.shortcut.newSession": "neue session in erster freier zelle",
   "info.shortcut.openBugreport": "bugreport dialog öffnen",
   "info.shortcut.saveNote": "notiz speichern (im notes editor)",
-  "info.shortcut.focusMode": "fokus-modus umschalten",
   "info.shortcut.gridUp": "zelle oben fokussieren",
   "info.shortcut.gridLeft": "zelle links fokussieren",
   "info.shortcut.gridDown": "zelle unten fokussieren",

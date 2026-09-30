@@ -5,7 +5,7 @@ import type { Character } from '../../shared/types'
 import { assignCharacterColor } from '../../shared/character-palette'
 import { PersonaAvatar } from './PersonaAvatar'
 
-const api = (window as any).cipherMux
+const api = window.cipherMux
 
 export function CompanionTab() {
   const { t } = useTranslation()
@@ -34,7 +34,7 @@ export function CompanionTab() {
       const gp = await api.characters.getGlobalPersona()
       setGlobalPersonaId(gp)
     } catch { /* older backend without this channel */ }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // absichtlich leer: laeuft einmal beim Mounten
 
   useEffect(() => { loadAll() }, [loadAll])
 

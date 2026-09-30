@@ -242,6 +242,7 @@ export class BtRemoteManager extends EventEmitter {
 
   private killStaleProcesses(): void {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
       const { execFileSync } = require('child_process')
       const out = execFileSync('pgrep', ['-f', 'bt-remote-bridge|ab-shutter-bridge'], {
         encoding: 'utf-8',
@@ -266,6 +267,7 @@ function getDefaultBinaryPath(): string {
 
   // Dev mode
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
     const { app } = require('electron')
     for (const name of names) {
       const p = path.join(app.getAppPath(), 'assets', 'bin', name)

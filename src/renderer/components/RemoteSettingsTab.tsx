@@ -1,7 +1,7 @@
 // src/renderer/components/RemoteSettingsTab.tsx
 import { useState, useEffect, useCallback } from 'preact/hooks'
 
-const api = (window as any).cipherMux
+const api = window.cipherMux
 
 interface ButtonDef {
   id: string

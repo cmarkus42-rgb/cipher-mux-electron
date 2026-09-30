@@ -4,7 +4,7 @@ import type { ThemeName } from '../../shared/grid-types'
 import { LEGACY_THEME_ALIASES, DEFAULT_THEME } from '../../shared/grid-types'
 export { getTerminalTheme } from '../../shared/terminal-theme'
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 const ALL_THEMES: ThemeName[] = [
   'cipher-ivory', 'cipher-dark',

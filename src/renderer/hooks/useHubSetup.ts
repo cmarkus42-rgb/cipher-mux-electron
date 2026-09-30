@@ -1,7 +1,7 @@
 // src/renderer/hooks/useHubSetup.ts
 import { useState, useEffect, useCallback } from 'preact/hooks'
 
-const api = (window as any).cipherMux
+const api = window.cipherMux
 
 export function useHubSetup() {
   const [needsSetup, setNeedsSetup] = useState(false)

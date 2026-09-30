@@ -106,14 +106,14 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       projectName: z.string().optional().describe('Name in hub (default: directory name)'),
       excludeBuildArtifacts: z.boolean().optional().describe('Exclude node_modules, dist, .cache etc. (default: true)'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await integrate(args)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await integrate(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   ;(server.registerTool as any)('mux_hub_inventory', {
     description: 'Run a read-only brownfield inventory on a project in the Hub. Detects stack, structure, specs, tests.',
     inputSchema: {
       projectName: z.string().describe('Project name in hub'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await inventory(args.projectName)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await inventory(args.projectName)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   ;(server.registerTool as any)('mux_hub_migration_plan', {
     description: 'Generate a 3-section migration plan based on inventory. Sections: unchanged, extended, new.',
@@ -122,7 +122,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       mode: z.enum(['voll', 'pack-light']).optional().describe('Migration mode (default: voll)'),
       components: z.array(z.string()).optional().describe('Components for pack-light mode'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await migrationPlan(args)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await migrationPlan(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   ;(server.registerTool as any)('mux_hub_apply', {
     description: 'Execute migration plan steps. Idempotent — already-applied steps are skipped.',
@@ -131,7 +131,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       planPath: z.string().optional().describe('Path to plan file (default: latest)'),
       dryRun: z.boolean().optional().describe('Preview only, no changes (default: false)'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubApply(args)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubApply(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   ;(server.registerTool as any)('mux_hub_verify', {
     description: 'Run build and test suite in a hub project. Gate before release — no green verify, no release.',
@@ -141,14 +141,14 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       runBuild: z.boolean().optional().describe('Run build (default: true)'),
       runTests: z.boolean().optional().describe('Run tests (default: true)'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubVerify(args)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubVerify(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   ;(server.registerTool as any)('mux_hub_release', {
     description: 'Mark project as released. Sets push-lock on original, writes MIGRATED.md, updates ARCHIV-VERWEIS.',
     inputSchema: {
       projectName: z.string().describe('Project name in hub'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubRelease(args.projectName)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubRelease(args.projectName)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   ;(server.registerTool as any)('mux_hub_rollback', {
     description: 'Rollback: workspace back to original path, remove push-lock, delete MIGRATED.md.',
@@ -156,7 +156,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       projectName: z.string().describe('Project name in hub'),
       removeHubCopy: z.boolean().optional().describe('Delete hub copy (destructive, requires confirmation)'),
     },
-  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubRollback(args)) }] } } catch (e: any) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e.message }) }] } } })
+  }, async (args: any) => { try { return { content: [{ type: 'text', text: JSON.stringify(await hubRollback(args)) }] } } catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }) }] } } })
 
   // 1. mux_send — Send a message to the message bus (with optional push delivery)
   ;(server.registerTool as any)(
@@ -306,7 +306,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         // Resolve model from SubProjekt if not explicitly provided
         let effectiveModel = args.model
         if (!effectiveModel && args.subProjektId && ctx.memoryStore) {
-          const { CyberFactoryManager } = require('../cyber-factory/cyber-factory-manager')
+          const { CyberFactoryManager } = await import('../cyber-factory/cyber-factory-manager')
           const cfm = new CyberFactoryManager(ctx.memoryStore)
           const sp = cfm.getSubProjekt(args.subProjektId)
           if (sp?.model) {
@@ -318,7 +318,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         let autoLaunch: string | undefined
         if (!args.command && !args.shellOnly) {
           const escaped = args.projectPath.replace(/'/g, "'\\''")
-          const { configStore: cs } = require('../config/config-store')
+          const { configStore: cs } = await import('../config/config-store')
           const skipPerms = cs.get('agent')?.skipPermissions === true
           const parts = [`cd '${escaped}' && clear; claude`]
           if (skipPerms) parts.push('--dangerously-skip-permissions')
@@ -728,7 +728,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
         // P.2: auto-apply workspace scope tag + workspace defaultTags
         try {
-          const { getActiveWorkspace } = require('../workspace/workspace-utils')
+          const { getActiveWorkspace } = await import('../workspace/workspace-utils')
           const ws = getActiveWorkspace()
           if (ws) {
             // notesGlobal: skip workspace scope tag so note is visible in all workspaces
@@ -1366,7 +1366,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         let scopeId = args.scope_id
         if (!scopeKind) {
           try {
-            const { configStore } = require('../config/config-store')
+            const { configStore } = await import('../config/config-store')
             const activeWsId = configStore.get('activeWorkspaceId')
             if (activeWsId) {
               scopeKind = 'workspace'
@@ -1427,7 +1427,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         if (!args.scope_kind) {
           let activeWsId: string | null = null
           try {
-            const { configStore } = require('../config/config-store')
+            const { configStore } = await import('../config/config-store')
             activeWsId = configStore.get('activeWorkspaceId') ?? null
           } catch { /* configStore not available */ }
 
@@ -1480,7 +1480,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         // Search with extra headroom, then post-filter to user + active workspace scope
         let activeWsId: string | null = null
         try {
-          const { configStore } = require('../config/config-store')
+          const { configStore } = await import('../config/config-store')
           activeWsId = configStore.get('activeWorkspaceId') ?? null
         } catch { /* configStore not available */ }
 
@@ -1961,7 +1961,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         }
       }
       // Check TTS toggle
-      const { configStore: ttsConfigStore } = require('../config/config-store')
+      const { configStore: ttsConfigStore } = await import('../config/config-store')
       if (ttsConfigStore.get('ttsEnabled') === false) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, skipped: 'tts disabled' }) }] }
       }
@@ -1985,7 +1985,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       // If voiceManager is null (voice mode never activated), create a TTS-only instance.
       if (ttsConfigStore.get('ttsVoice') !== 'macos') {
         if (!voiceManager) {
-          const { VoiceManager } = require('../voice/voice-manager')
+          const { VoiceManager } = await import('../voice/voice-manager')
           voiceManager = new VoiceManager() as import('../voice/voice-manager').VoiceManager
           // Store the lazy VoiceManager so subsequent calls reuse it
           if (!ttsSingleton) ttsSingleton = voiceManager
@@ -2000,6 +2000,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       }
       // Fallback: macOS say (works without voice mode being active)
       try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
         const { execFile } = require('child_process')
         const macosVoice = ttsConfigStore.get('macosVoice') as string | undefined
         const sayArgs = macosVoice ? ['-v', macosVoice, args.text] : [args.text]
@@ -2121,9 +2122,12 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
             isError: true,
           }
         }
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
         const skillsDir = args.skillsDir || `${require('os').homedir()}/.config/cipher-mux/skills/ideation`
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchroner Kontext
         const skillPath = require('path').resolve(skillsDir, `${args.skillId}.md`)
         // Defense-in-depth: ensure resolved path stays within skillsDir
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
         if (!skillPath.startsWith(require('path').resolve(skillsDir))) {
           return {
             content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: 'Path traversal blocked' }) }],
@@ -2133,10 +2137,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         let skillContent: string
 
         try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports -- synchrones Lazy-Load, CommonJS-Ziel
           skillContent = require('fs').readFileSync(skillPath, 'utf-8')
         } catch {
           // Return known skill description as fallback
-          const { KNOWN_SKILLS } = require('../ideation-partner/skill-registry')
+          const { KNOWN_SKILLS } = await import('../ideation-partner/skill-registry')
           const known = KNOWN_SKILLS.find((s: { id: string }) => s.id === args.skillId)
           if (known) {
             skillContent = `# ${known.name}\n\n${known.description}\n\n**Wann einsetzen:** ${known.suggestWhen}`
