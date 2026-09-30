@@ -7,6 +7,7 @@ import { TagBar } from './TagBar'
 import { TestcaseView } from './TestcaseView'
 import { FindingView } from './FindingView'
 import { MirrorStatus } from './MirrorStatus'
+import { SpecOutline } from './SpecOutline'
 import { useNotes } from '../hooks/useNotes'
 import type { NoteInfo } from '../../shared/types'
 import type { ParsedTestcase, TestcaseSection } from '../../main/notes/testcase-parser'
@@ -80,6 +81,9 @@ export function NotesCell({
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null
+  // Sprungziel der Gliederung. Der Zaehler sorgt dafuer, dass zweimal
+  // dieselbe Zeile auch zweimal springt.
+  const [jumpTo, setJumpTo] = useState<{ line: number; nonce: number } | undefined>(undefined)
 
   /**
    * Re-read an open tab from disk.
@@ -561,6 +565,13 @@ export function NotesCell({
             onRefreshed={() => { void reloadTab(activeTab.id) }}
           />
         )}
+        {activeTab && !activeTab.testcase && !activeTab.finding && (
+          <SpecOutline
+            key={`outline-${activeTab.id}`}
+            noteId={activeTab.id}
+            onJump={(line) => setJumpTo({ line, nonce: Date.now() })}
+          />
+        )}
         {activeTab?.testcase ? (
           <TestcaseView
             key={activeTab.id}
@@ -582,6 +593,7 @@ export function NotesCell({
             content={activeTab.content}
             onSave={handleSave}
             onAutoSave={handleAutoSave}
+            jumpTo={jumpTo}
           />
         ) : (
           <div class="notes-empty">

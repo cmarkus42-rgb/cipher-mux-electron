@@ -2178,6 +2178,19 @@ export class IpcHub {
       }
     })
 
+    // Outline of a spec note: its headings, derived not maintained.
+    ipcMain.handle(IPC.NOTES_SPEC_OUTLINE, async (_e, { id }: { id: string }) => {
+      try {
+        const note = await this.noteManager.read(id)
+        if (!note) return []
+        const { buildSpecOutline } = await import('./notes/spec-outline')
+        return buildSpecOutline(note.body)
+      } catch (err) {
+        console.error('[IpcHub] NOTES_SPEC_OUTLINE failed:', err)
+        return []
+      }
+    })
+
     // Parse a finding note in main process — same shape as the testcase path
     ipcMain.handle(IPC.NOTES_PARSE_FINDING, async (_e, { id }: { id: string }) => {
       try {

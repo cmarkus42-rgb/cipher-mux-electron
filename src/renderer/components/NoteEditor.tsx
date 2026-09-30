@@ -13,6 +13,12 @@ interface NoteEditorProps {
   content: string
   onSave: (content: string) => void
   onAutoSave: (content: string) => void
+  /**
+   * Zero-based line to scroll to. Declarative on purpose: the outline sets a
+   * number and this reacts, instead of reaching into the editor from outside.
+   * Carries a nonce so jumping to the same line twice still works.
+   */
+  jumpTo?: { line: number; nonce: number }
 }
 
 /** CodeMirror 6 theme — editor chrome (bg, cursor, gutter) */
@@ -68,7 +74,7 @@ function createCipherHighlighting() {
   return syntaxHighlighting(style)
 }
 
-export function NoteEditor({ content, onSave, onAutoSave }: NoteEditorProps) {
+export function NoteEditor({ content, onSave, onAutoSave, jumpTo }: NoteEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -166,6 +172,22 @@ export function NoteEditor({ content, onSave, onAutoSave }: NoteEditorProps) {
     el.addEventListener('keydown', onKeyDown, true)
     return () => el.removeEventListener('keydown', onKeyDown, true)
   }, [])
+
+  // Jump to a line — used by the spec outline. Guarded against a line number
+  // that no longer exists: the document may have been edited since the outline
+  // was built, and CodeMirror throws on an out-of-range line.
+  useEffect(() => {
+    if (!jumpTo) return
+    const view = viewRef.current
+    if (!view) return
+    const lineNumber = Math.min(jumpTo.line + 1, view.state.doc.lines)
+    const line = view.state.doc.line(lineNumber)
+    view.dispatch({
+      selection: { anchor: line.from },
+      effects: EditorView.scrollIntoView(line.from, { y: 'start' }),
+    })
+    view.focus()
+  }, [jumpTo])
 
   // Voice STT: notify main when editor gains/loses focus
   useEffect(() => {

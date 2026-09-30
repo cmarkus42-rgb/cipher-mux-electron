@@ -200,6 +200,7 @@ export const IPC = {
   NOTES_SERIALIZE_FINDING: 'cipher-mux:notes:serialize-finding',
   NOTES_MIRROR_STATUS: 'cipher-mux:notes:mirror-status',
   NOTES_MIRROR_REFRESH: 'cipher-mux:notes:mirror-refresh',
+  NOTES_SPEC_OUTLINE: 'cipher-mux:notes:spec-outline',
   NOTES_SEARCH: 'cipher-mux:notes:search',
   NOTES_TAG_CLASS_REPO: 'cipher-mux:notes:tag-class-repo',
   NOTES_TAG_CLASS_CREATE: 'cipher-mux:notes:tag-class-create',
