@@ -1,20 +1,38 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { TagClassRepository, TagClass } from '../../shared/types'
+import { AXIS_VALUES, type TagAxis } from '../../shared/tag-axes'
 
 const TAGS_FILENAME = '.tags.json'
 
 // ─── Seed Classes ────────────────────────────────────────
 
+/**
+ * Die Achsenwerte gehoeren in die Registry, weil `isKnownTag` sie prueft und
+ * `mux_notes_create` unbekannte Tags hart abweist.
+ *
+ * Gemessen am 2026-09-30 gegen die echte .tags.json fehlten `phase:coding`,
+ * `phase:testing`, `phase:debugging`, `phase:monitoring`, `phase:research`,
+ * `kind:research`, `kind:idea` sowie `entity:audit`, `entity:launcher` und
+ * `entity:voice-relay`. Eine Audit-Rolle haette ihre eigene Herkunft nicht
+ * mitgeben koennen: die Achse bot den Wert an, die Registry wies ihn ab.
+ *
+ * Die Achsen sind die Quelle (shared/tag-axes.ts) und werden hier eingespeist,
+ * damit dieselbe Tatsache nicht zweimal aufgeschrieben wird. Ergaenzend, nicht
+ * ersetzend — `load()` bildet die Vereinigung mit dem Bestand, und was in
+ * .tags.json steht, stammt aus echten Notes.
+ */
+function axisSeed(axis: TagAxis, color: string, extra: readonly string[] = []): TagClass {
+  return { values: [...new Set([...(AXIS_VALUES[axis] ?? []), ...extra])], color }
+}
+
 export const SEED_CLASSES: Record<string, TagClass> = {
-  kind: {
-    values: ['bugreport', 'feature-request', 'reference', 'testcase', 'handoff', 'spec', 'todo'],
-    color: '#6366f1',
-  },
-  status: {
-    values: ['open', 'in-progress', 'done', 'blocked', 'archived'],
-    color: '#f59e0b',
-  },
+  // `feature-request` ist kein Achsenwert, stammt aber aus dem Bestand.
+  kind: axisSeed('kind', '#6366f1', ['feature-request']),
+  // `archived` ebenso.
+  status: axisSeed('status', '#f59e0b', ['archived']),
+  phase: axisSeed('phase', '#a78bfa'),
+  entity: axisSeed('entity', '#22d3ee'),
   domain: {
     values: ['ui'],
     color: '#10b981',
