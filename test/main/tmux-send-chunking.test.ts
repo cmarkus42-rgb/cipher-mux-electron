@@ -58,6 +58,21 @@ describe('chunkForPty', () => {
     assert.equal(chunks.join(''), '🙂', 'a character that cannot fit must still be delivered whole')
   })
 
+  // Chunking introduced a failure the unsplit payload could not have: a piece
+  // beginning with '-' is read as a flag by tmux. Real text is full of such
+  // boundaries — "cipher-mux" yields a chunk starting "-mux", and tmux answered
+  // `unknown flag -m`. The argument list must therefore end option parsing
+  // with '--' rather than hope no chunk starts with a dash.
+  it('produces pieces that may legitimately start with a dash', () => {
+    const text = 'cipher-mux '.repeat(200)
+    const chunks = chunkForPty(text, 7)
+    assert.equal(chunks.join(''), text)
+    assert.ok(
+      chunks.some(c => c.startsWith('-')),
+      'the hazard this guards against must actually occur in the fixture',
+    )
+  })
+
   it('splits realistic handoff-sized text into a sane number of pieces', () => {
     const text = 'x'.repeat(5658)
     const chunks = chunkForPty(text, PTY_CHUNK_BYTES)
