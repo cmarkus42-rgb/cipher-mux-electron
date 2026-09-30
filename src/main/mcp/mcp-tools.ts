@@ -1325,6 +1325,33 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     }
   )
 
+  // mux_readiness_stats — hat sich die Selbstmeldung bewaehrt?
+  registerMuxTool(server, 'mux_readiness_stats', {
+    description:
+      'Welches Signal hat Sessions bereit gemeldet? Die Bereitschaftspruefung hat zwei: die '
+      + 'Selbstmeldung der Session ueber ihren statusLine-Hook, und als Rueckfall den sichtbaren '
+      + 'Prompt. Der Rueckfall bleibt, bis belegt ist dass die Selbstmeldung traegt -- diese '
+      + 'Statistik ist der Beleg. Ein hoher Anteil der Selbstmeldung ueber mehrere Wochen heisst: '
+      + 'der Rueckfall kann weg.',
+    inputSchema: {
+      limit: z.number().optional().describe('Wie viele juengste Eintraege zusaetzlich zeigen (default 0)'),
+    },
+  }, async (args: { limit?: number }) => {
+    try {
+      const { ReadinessLog } = await import('./readiness-log')
+      const log = new ReadinessLog()
+      const summary = log.summarize()
+      const limit = args?.limit ?? 0
+      const recent = limit > 0 ? log.read().slice(-limit) : undefined
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ summary, recent }, null, 2) }],
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ error: message }) }], isError: true }
+    }
+  })
+
   // ─── Companion Memory Tools ─────────────────────────────
   //
   // Registered only for the Companion role (and for connections carrying no

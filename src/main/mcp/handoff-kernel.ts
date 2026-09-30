@@ -9,6 +9,7 @@ import path from 'path'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { BRAND } from '../../shared/brand'
 import { waitForSessionReady } from './session-readiness'
+import { ReadinessLog } from './readiness-log'
 import type { EntityId, SessionInfo } from '../../shared/types'
 import { IPC } from '../../shared/ipc-channels'
 import type { ToolContext } from './mcp-tools'
@@ -70,6 +71,9 @@ export async function statusReportMtime(sessionId: string): Promise<number | nul
     return null
   }
 }
+
+/** Eine Instanz fuer den Prozess — die Datei ist die eigentliche Ablage. */
+const readinessLog = new ReadinessLog()
 
 /** Pane commands that mean "nothing is running here". Login shells carry a '-'. */
 const IDLE_SHELLS = new Set(['zsh', 'bash', 'sh', 'fish', 'dash', 'ksh'])
@@ -273,6 +277,12 @@ export async function executeHandoff(
       },
     )
     if (!readiness.ready) {
+      readinessLog.record({
+        entityId: config.targetEntityId,
+        via: null,
+        attempts: readiness.attempts,
+        wasExisting,
+      })
       return {
         ok: false,
         error: wasExisting
@@ -287,6 +297,15 @@ export async function executeHandoff(
       `[executeHandoff] ${config.targetEntityId} ready via ${readiness.via}`
       + ` after ${readiness.attempts} attempt(s), wasExisting=${wasExisting}`,
     )
+    // Mitschreiben, welches Signal gegriffen hat. Der Prompt-Rueckfall bleibt,
+    // solange nicht belegt ist, dass die Selbstmeldung traegt -- und belegen
+    // laesst sich das nur, wenn es jemand mitzaehlt. Siehe readiness-log.ts.
+    readinessLog.record({
+      entityId: config.targetEntityId,
+      via: readiness.via,
+      attempts: readiness.attempts,
+      wasExisting,
+    })
 
     // Format and deliver via tmux send-keys (REQ-HANDOFF-005)
     const message = formatPayload(config.senderEntityId, config.payload)
