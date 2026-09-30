@@ -70,6 +70,45 @@ describe('ClaudeCodeAdapter', () => {
       assert.ok(!cmd.args.includes('--dangerously-skip-permissions'))
     })
 
+    // Resuming is the point of Keep Working, so `--resume` stays. What broke
+    // was that nothing named WHICH conversation: a bare `--resume` opens the
+    // interactive picker, and an unattended entity session sits in it instead
+    // of reaching a prompt. The id comes from the statusLine report a running
+    // session writes about itself.
+    it('resume with a known session id resumes that one directly, no picker', () => {
+      const a = new ClaudeCodeAdapter(mockConfigReader(true))
+      const cmd = a.buildLaunchCommand({
+        projectPath: '/tmp/project',
+        sessionName: 'Debugger',
+        resume: true,
+        resumeClaudeSessionId: 'abc-123',
+      })
+      const i = cmd.args.indexOf('--resume')
+      assert.ok(i >= 0, '--resume missing')
+      assert.equal(cmd.args[i + 1], 'abc-123', 'session id must follow --resume')
+    })
+
+    it('resume without a known id falls back to the picker form', () => {
+      const a = new ClaudeCodeAdapter(mockConfigReader(true))
+      const cmd = a.buildLaunchCommand({
+        projectPath: '/tmp/project',
+        sessionName: 'Debugger',
+        resume: true,
+      })
+      assert.ok(cmd.args.includes('--resume'))
+      assert.equal(cmd.args[cmd.args.indexOf('--resume') + 1], undefined)
+    })
+
+    it('no resume flags at all when resume is not requested', () => {
+      const a = new ClaudeCodeAdapter(mockConfigReader(true))
+      const cmd = a.buildLaunchCommand({
+        projectPath: '/tmp/project',
+        sessionName: 'Worker-1',
+      })
+      assert.ok(!cmd.args.includes('--continue'))
+      assert.ok(!cmd.args.includes('--resume'))
+    })
+
     it('does not include shell metacharacters', () => {
       const a = new ClaudeCodeAdapter(mockConfigReader(true))
       const cmd = a.buildLaunchCommand({
