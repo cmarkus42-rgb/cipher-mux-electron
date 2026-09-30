@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { RecoveryResult, SessionInfo } from '../../shared/types'
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 /** Max time (ms) to poll for recovery result before giving up. */
 const POLL_TIMEOUT_MS = 15_000

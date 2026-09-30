@@ -10,7 +10,7 @@ export interface EntityPresetItem {
   singleInstance?: boolean
 }
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 /**
  * Hook to load entity presets dynamically from the entity registry.

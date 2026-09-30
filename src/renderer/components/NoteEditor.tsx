@@ -171,7 +171,7 @@ export function NoteEditor({ content, onSave, onAutoSave }: NoteEditorProps) {
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
 
     const onFocusIn = () => api?.voice?.setNotesFocus?.(true)
     const onFocusOut = () => api?.voice?.setNotesFocus?.(false)
@@ -188,7 +188,7 @@ export function NoteEditor({ content, onSave, onAutoSave }: NoteEditorProps) {
 
   // Voice STT: insert transcribed text at cursor
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.voice?.onNotesInsert) return
 
     const unsub = api.voice.onNotesInsert((data: { text: string }) => {

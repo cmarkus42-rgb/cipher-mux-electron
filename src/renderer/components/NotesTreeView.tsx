@@ -270,7 +270,7 @@ export function NotesTreeView({
 
   // Load persisted expand state, showAll, extendedMode
   useEffect(() => {
-    const cfgApi = (window as any).cipherMux?.config
+    const cfgApi = window.cipherMux?.config
     if (!cfgApi?.get) return
     Promise.all([
       cfgApi.get('notesTreeExpanded').catch(() => null),
@@ -285,7 +285,7 @@ export function NotesTreeView({
 
   // Persist expand state
   const persistExpanded = useCallback((next: Set<string>) => {
-    const cfgApi = (window as any).cipherMux?.config
+    const cfgApi = window.cipherMux?.config
     cfgApi?.set?.('notesTreeExpanded', [...next]).catch(() => {})
   }, [])
 
@@ -511,7 +511,7 @@ export function NotesTreeView({
   const toggleShowAll = useCallback(() => {
     setShowAll(prev => {
       const next = !prev
-      const cfgApi = (window as any).cipherMux?.config
+      const cfgApi = window.cipherMux?.config
       cfgApi?.set?.('notesShowAll', next).catch(() => {})
       return next
     })
@@ -520,7 +520,7 @@ export function NotesTreeView({
   const toggleExtended = useCallback(() => {
     setExtendedMode(prev => {
       const next = !prev
-      const cfgApi = (window as any).cipherMux?.config
+      const cfgApi = window.cipherMux?.config
       cfgApi?.set?.('notesExtendedMode', next).catch(() => {})
       return next
     })

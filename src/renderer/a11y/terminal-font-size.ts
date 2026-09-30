@@ -9,7 +9,7 @@
 const DEFAULT_TERMINAL_FONT_SIZE = 13
 let currentSize = DEFAULT_TERMINAL_FONT_SIZE
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 /** Load terminal font size from config (call once at app startup). */
 export async function initTerminalFontSize(): Promise<void> {

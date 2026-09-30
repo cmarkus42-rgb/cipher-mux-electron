@@ -5,7 +5,7 @@ import { FolderPickerInput } from './FolderPickerInput'
 import { useEntityPresets } from '../hooks/useEntityPresets'
 import type { EntityId } from '../../shared/types'
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 // ─── Component ───────────────────────────────────────────
 

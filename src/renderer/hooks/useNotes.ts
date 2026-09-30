@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks'
 import type { NoteInfo, NoteContent, TagRepository, TagClassRepository, TagIndexData } from '../../shared/types'
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 export function useNotes() {
   const [notes, setNotes] = useState<NoteInfo[]>([])

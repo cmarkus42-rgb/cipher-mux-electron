@@ -24,7 +24,7 @@ function CopyButton({ getText }: { getText: () => string }) {
   )
 }
 
-const api = (window as any).cipherMux
+const api = window.cipherMux
 
 const GLOBAL_ID = '__global__'
 

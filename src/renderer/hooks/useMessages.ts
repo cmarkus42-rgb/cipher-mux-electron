@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import type { Message, SendMessage } from '../../shared/types'
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 /**
  * Hook for chatroom messages — loads history, subscribes to live updates,

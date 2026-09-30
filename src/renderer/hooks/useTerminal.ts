@@ -10,7 +10,7 @@ import type { TerminalThemeColors } from '../../shared/terminal-theme'
 import { registerTerminal, unregisterTerminal, setMarker } from '../terminal-registry'
 import { getTerminalFontSize } from '../a11y/terminal-font-size'
 
-const api = () => (window as any).cipherMux
+const api = () => window.cipherMux
 
 /**
  * Reads terminal color CSS variables from body and returns an xterm.js theme object.

@@ -6,7 +6,7 @@ import de from './locales/de.json'
 /** Load persisted language from config, default to 'en'. */
 async function getPersistedLanguage(): Promise<string> {
   try {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.config?.get) return 'en'
     const ui = await api.config.get('ui')
     return ui?.language ?? 'en'

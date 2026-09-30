@@ -82,7 +82,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
 
   useEffect(() => {
     let mounted = true
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     api.workspaces.list().then((wsList: Workspace[]) => {
       if (!mounted) return
       setWorkspaces(wsList ?? [])
@@ -163,7 +163,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     if (!ws) return
     setSaving(true)
     try {
-      const api = (window as any).cipherMux
+      const api = window.cipherMux
       const sessionMap: Record<string, { name: string; projectPath?: string | null }> = {}
       for (const s of currentSessions ?? []) {
         sessionMap[s.id] = s
@@ -209,7 +209,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
   }, [])
 
   const handleSaveContextPathAdd = useCallback(async () => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     const result = await api.dialog.openDir({ title: t('workspacesTab.addDirectory') })
     if (!result) return
     setSaveContextPaths(prev => prev.includes(result) ? prev : [...prev, result])
@@ -223,7 +223,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     if (!currentGrid || !saveName.trim()) return
     setSaving(true)
     try {
-      const api = (window as any).cipherMux
+      const api = window.cipherMux
       const sessionMap: Record<string, { name: string; projectPath?: string | null }> = {}
       for (const s of currentSessions ?? []) {
         sessionMap[s.id] = s

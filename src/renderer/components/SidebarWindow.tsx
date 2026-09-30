@@ -25,7 +25,7 @@ export function SidebarWindow() {
   // is the inverse of the intended "deviation signal only" rule.
   // Resubscribe pattern copied from SidebarPanel's workspace-list loader.
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.workspaces?.active) return
     let mounted = true
     const load = () => {
@@ -39,7 +39,7 @@ export function SidebarWindow() {
   }, [])
 
   useEffect(() => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     if (!api?.voice?.onComState) return
     const unsub = api.voice.onComState((state: string) => setVoiceComState(state))
     return () => unsub()
@@ -54,12 +54,12 @@ export function SidebarWindow() {
   }, [])
 
   const handleKillSession = useCallback(async (sessionId: string) => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     await api.sessions.stop(sessionId)
   }, [])
 
   const handleDock = useCallback(async () => {
-    const api = (window as any).cipherMux
+    const api = window.cipherMux
     await api.sidebar.dock()
   }, [])
 
