@@ -4070,3 +4070,63 @@
 .mirror__subject { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mirror__author { flex: 0 0 auto; color: var(--color-text-dim); }
 .mirror__more { color: var(--color-text-dim); font-style: italic; }
+
+/* ─── SpecOutline ──────────────────────────────────────────
+   Gliederung langer Notes. Eingeklappt der Normalfall — sie ist Navigation,
+   nicht Inhalt, und soll den Text nicht verdrängen. */
+
+.outline {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elev-1);
+  font-size: var(--font-size-xs);
+}
+
+.outline__toggle {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: var(--space-xs) var(--space-md);
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+
+.outline__toggle:hover { color: var(--color-text); }
+
+.outline__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 var(--space-xs);
+  max-height: 14em;
+  overflow-y: auto;
+}
+
+.outline__link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 1px var(--space-md);
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline__link:hover:not(:disabled) { color: var(--color-text-accent); background: var(--color-bg-secondary); }
+.outline__link:disabled { cursor: default; }
+
+/* Einrückung nach Überschriftenebene — die Struktur soll ohne Lesen sichtbar sein. */
+.outline__item--l1 > .outline__link { padding-left: var(--space-md); color: var(--color-text); }
+.outline__item--l2 > .outline__link { padding-left: calc(var(--space-md) + 0.9em); }
+.outline__item--l3 > .outline__link { padding-left: calc(var(--space-md) + 1.8em); }
+.outline__item--l4 > .outline__link { padding-left: calc(var(--space-md) + 2.7em); }
+.outline__item--l5 > .outline__link,
+.outline__item--l6 > .outline__link { padding-left: calc(var(--space-md) + 3.6em); }
