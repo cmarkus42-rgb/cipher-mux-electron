@@ -227,7 +227,12 @@ export function SessionGrid({
         const paths: string[] = []
         for (let i = 0; i < files.length; i++) {
           // Use webUtils.getPathForFile via preload (contextIsolation-safe)
-          const p = api.getFilePath ? api.getFilePath(files[i]) : files[i].path
+          // Electron ergaenzt File um .path; die DOM-Typen kennen das nicht.
+          // Der bevorzugte Weg ist webUtils.getPathForFile ueber den Preload,
+          // .path ist nur der Rueckfall fuer aeltere Builds.
+          const p = api.getFilePath
+            ? api.getFilePath(files[i])
+            : (files[i] as File & { path?: string }).path
           if (p) paths.push(p)
         }
         if (paths.length > 0 && paths[0]) {

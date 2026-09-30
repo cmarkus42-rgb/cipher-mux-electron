@@ -12,7 +12,7 @@ interface SidebarPanelProps {
   visible: boolean
   workshopActive: boolean
   cyberFactoryActive: boolean
-  sessions: Array<{ id: string; name: string; status: string; projectPath?: string; workspaceId?: string | null }>
+  sessions: Array<{ id: string; name: string; status: string; projectPath?: string | null; workspaceId?: string | null }>
   gridSessionIds: string[]
   detachedIds?: Set<string>
   contextUsages: Record<string, { usedPercentage: number; used?: number; total?: number }>
@@ -105,21 +105,26 @@ export function SidebarPanel({
   // Undo toast state (REQ-NOTES-006)
   const [undoState, setUndoState] = useState<{ ids: string[]; timer: ReturnType<typeof setTimeout> } | null>(null)
 
-  // Pre-select workspace scope tag as include-filter when workspace changes
+  // Resolve the workspace name — NotesTreeView scopes by it via
+  // filterByWorkspace, which deliberately treats a note without any
+  // workspace: tag as global and shows it in every workspace.
+  //
+  // This used to additionally pre-set `workspace:<name>` as an include-filter.
+  // An include-filter keeps only notes that carry the tag, so it removed
+  // exactly the global notes that the scoping had just let through — the two
+  // rules cancelled each other, and no global note was reachable while a
+  // workspace was active. Scoping happens once, in filterByWorkspace.
   useEffect(() => {
+    setTagFilter({})
     if (!activeWorkspaceId) {
-      setTagFilter({})
       setWorkspaceDefaultTags([])
       setWorkspaceName(null)
       return
     }
-    // Look up workspace name, then filter by workspace:<name> scope tag
     const api = (window as any).cipherMux
     api?.config?.get?.('workspaces')?.then((workspaces: any[]) => {
       const ws = workspaces?.find((w: any) => w.id === activeWorkspaceId)
-      const name = ws?.name ?? activeWorkspaceId
-      setWorkspaceName(name)
-      setTagFilter({ [`workspace:${name}`]: 'include' })
+      setWorkspaceName(ws?.name ?? activeWorkspaceId)
       setWorkspaceDefaultTags(ws?.defaultTags?.length ? ws.defaultTags : [])
     }).catch(() => {})
   }, [activeWorkspaceId])
@@ -392,7 +397,7 @@ export function SidebarPanel({
 }
 
 interface BackgroundSessionCardProps {
-  session: { id: string; name: string; projectPath?: string }
+  session: { id: string; name: string; projectPath?: string | null }
   contextUsage?: { usedPercentage: number; used?: number; total?: number }
   /** Precomputed, already-localized badge text; null hides the badge. */
   workspaceBadge?: string | null

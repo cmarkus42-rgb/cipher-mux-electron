@@ -26,14 +26,14 @@ describe('voice-catalog', () => {
 
     it('detects voice with model.onnx and model.onnx.json', async () => {
       // Create a fake voice directory
-      const voiceDir = path.join(piperDir, 'vits-piper-de_DE-cipher_adult-medium')
+      const voiceDir = path.join(piperDir, 'vits-piper-de_DE-cipher_reachy3-medium')
       fs.mkdirSync(voiceDir, { recursive: true })
       fs.writeFileSync(path.join(voiceDir, 'model.onnx'), 'fake-model-data')
       fs.writeFileSync(path.join(voiceDir, 'model.onnx.json'), JSON.stringify({
         audio: { sample_rate: 22050 },
         language: { code: 'de_DE', name_english: 'German' },
         piper_version: '1.0.0',
-        dataset: 'cipher_adult',
+        dataset: 'cipher_reachy3',
         quality: 'medium',
       }))
 
@@ -41,13 +41,13 @@ describe('voice-catalog', () => {
       const result = listInstalled(piperDir)
 
       assert.strictEqual(result.length, 1)
-      assert.strictEqual(result[0].name, 'de_DE-cipher_adult-medium')
+      assert.strictEqual(result[0].name, 'de_DE-cipher_reachy3-medium')
       assert.strictEqual(result[0].locale, 'de_DE')
       assert.strictEqual(result[0].language, 'de')
       assert.strictEqual(result[0].quality, 'medium')
       assert.strictEqual(result[0].sampleRate, 22050)
       assert.strictEqual(result[0].modelPath, path.join(voiceDir, 'model.onnx'))
-      assert.strictEqual(result[0].isBundled, true) // cipher_adult is bundled
+      assert.strictEqual(result[0].isBundled, true) // cipher_reachy3 is the bundled default since 71dc3ff
     })
 
     it('detects non-bundled voice', async () => {

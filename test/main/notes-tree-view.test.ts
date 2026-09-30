@@ -222,3 +222,44 @@ describe('isGlobalNote', () => {
     assert.equal(isGlobalNote(makeNote('n1', [])), true)
   })
 })
+
+// ─── Workspace scoping vs. tag filtering ────────────────────
+//
+// These two filters used to contradict each other in SidebarPanel:
+// filterByWorkspace deliberately treats a note without any workspace: tag as
+// global and shows it everywhere, and then a pre-set include-filter on
+// workspace:<name> removed exactly those notes again. The result was that no
+// global note was visible while a workspace was active — a note created
+// without a workspace tag simply could not be found.
+
+describe('workspace scoping composed with tag filtering', () => {
+  const globalNote = makeNote('g1', ['spec', 'notes'], 'Globale Spec')
+  const wsNote = makeNote('w1', ['spec', 'workspace:CIPHER-MUX'], 'Workspace-Spec')
+  const otherWsNote = makeNote('o1', ['spec', 'workspace:Anderes'], 'Fremde Spec')
+  const all = [globalNote, wsNote, otherWsNote]
+
+  it('workspace scoping alone keeps global notes', () => {
+    const scoped = filterByWorkspace(all, 'ws-1', 'CIPHER-MUX')
+    assert.deepEqual(scoped.map(n => n.id).sort(), ['g1', 'w1'])
+  })
+
+  it('an include-filter on the workspace tag drops exactly those global notes', () => {
+    const scoped = filterByWorkspace(all, 'ws-1', 'CIPHER-MUX')
+    const filtered = applyTagFilter(scoped, { 'workspace:CIPHER-MUX': 'include' })
+
+    assert.deepEqual(
+      filtered.map(n => n.id),
+      ['w1'],
+      'this is the contradiction: scoping keeps the global note, the filter removes it',
+    )
+    assert.ok(!filtered.some(isGlobalNote), 'no global note survives the combination')
+  })
+
+  it('without the redundant filter both scoping rules agree', () => {
+    const scoped = filterByWorkspace(all, 'ws-1', 'CIPHER-MUX')
+    const filtered = applyTagFilter(scoped, {})
+
+    assert.deepEqual(filtered.map(n => n.id).sort(), ['g1', 'w1'])
+    assert.ok(filtered.some(isGlobalNote), 'the global note must stay reachable')
+  })
+})

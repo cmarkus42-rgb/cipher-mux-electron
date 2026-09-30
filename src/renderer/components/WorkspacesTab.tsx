@@ -174,7 +174,9 @@ export function WorkspacesTab() {
     updateWs({ merges: next })
   }
 
-  const handleCellUpdate = (field: keyof WorkspaceCell, value: string) => {
+  // value darf undefined sein: den Zelltyp auf "Session" zu stellen heisst,
+  // das Feld zu entfernen, nicht einen Leerstring zu setzen.
+  const handleCellUpdate = (field: keyof WorkspaceCell, value: string | undefined) => {
     if (!ws) return
     const cells = [...ws.cells]
     cells[selectedCell] = { ...cells[selectedCell], [field]: value }

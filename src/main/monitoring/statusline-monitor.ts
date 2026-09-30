@@ -107,6 +107,21 @@ export class StatusLineMonitor extends EventEmitter {
     this.removedIds.delete(sessionId)
   }
 
+  /**
+   * Re-read every status file and re-emit what they say.
+   *
+   * start() already scans once, but it runs synchronously during construction
+   * while session recovery is still pending in a promise chain. At that point
+   * the SessionManager knows no sessions, so a claude-session-id event has
+   * nobody to attach itself to and is dropped. Only sessions that happened to
+   * update their status file afterwards got their id recorded.
+   *
+   * Call this once recovery has completed.
+   */
+  rescan(): void {
+    this.scanExisting()
+  }
+
   private scanExisting(): void {
     try {
       const files = fs.readdirSync(this.watchDir)
@@ -130,18 +145,24 @@ export class StatusLineMonitor extends EventEmitter {
     try {
       const content = fs.readFileSync(filePath, 'utf-8')
       const data = JSON.parse(content)
-      const usage = this.parseUsage(data)
 
-      if (!usage) return
-
-      this.cache.set(sessionId, usage)
-      this.emit('usage-updated', sessionId, usage)
-
-      // Extract Claude session ID if present
+      // The session id is read first and independently of the usage numbers.
+      // It used to sit behind `if (!usage) return`, and a freshly started
+      // session reports `used_percentage: null` — no API call has happened
+      // yet — so its id was thrown away along with the empty reading. That is
+      // the one session whose id actually matters: a Keep Working restore
+      // needs it to resume a named conversation instead of opening the
+      // interactive picker, and a restored session is by definition fresh.
       const claudeSessionId = this.extractClaudeSessionId(data)
       if (claudeSessionId) {
         this.emit('claude-session-id', sessionId, claudeSessionId)
       }
+
+      const usage = this.parseUsage(data)
+      if (!usage) return
+
+      this.cache.set(sessionId, usage)
+      this.emit('usage-updated', sessionId, usage)
 
       // Warning threshold
       if (usage.usedPercentage >= CONTEXT_WARNING_THRESHOLD && !this.warningEmitted.has(sessionId)) {

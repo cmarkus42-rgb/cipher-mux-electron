@@ -4,6 +4,7 @@ import path from 'path'
 import matter from 'gray-matter'
 import { ulid } from 'ulidx'
 import type { NoteInfo, NoteContent, HandoffStatus } from '../../shared/types'
+import { readMirrorSource } from './mirror-drift'
 
 // ─── NoteManager ────────────────────────────────────────────
 // All notes stored in a flat directory: {notesDir}/{id}.md
@@ -238,6 +239,10 @@ export class NoteManager {
       from_session?: string
       to_entity?: string
       handoff_status?: HandoffStatus
+      anchor_commit?: string
+      anchor_repo?: string
+      mirrors_file?: string
+      mirror_commit?: string
     }
 
     const id = path.basename(filePath, '.md')
@@ -256,6 +261,10 @@ export class NoteManager {
       ...(fm.from_session ? { fromSession: fm.from_session } : {}),
       ...(fm.to_entity ? { toEntity: fm.to_entity } : {}),
       ...(fm.handoff_status ? { handoffStatus: fm.handoff_status } : {}),
+      ...(fm.anchor_commit ? { anchorCommit: fm.anchor_commit } : {}),
+      ...(fm.anchor_repo ? { anchorRepo: fm.anchor_repo } : {}),
+      ...(fm.mirrors_file ? { mirrorsFile: fm.mirrors_file } : {}),
+      ...(fm.mirror_commit ? { mirrorCommit: fm.mirror_commit } : {}),
     }
 
     return { info, body }
@@ -268,17 +277,39 @@ export class NoteManager {
 
   // ─── Public API ───────────────────────────────────────────
 
-  async create(title: string, body: string, tags?: string[]): Promise<NoteInfo> {
+  /**
+   * @param opts.type Note type (spec, requirements, research, finding …).
+   *   Drives typed rendering, the way `testcase` already does.
+   * @param opts.mirrorsFile Repo-relative path this note mirrors. The file in
+   *   git stays the truth; the note is what the human reads and corrects.
+   * @param opts.mirrorCommit Commit the mirror was taken at. Without it no
+   *   drift can be computed, and a mirror of unknown age reads as current —
+   *   which is the failure mode mirroring exists to prevent.
+   */
+  async create(
+    title: string,
+    body: string,
+    tags?: string[],
+    opts?: { type?: string; mirrorsFile?: string; mirrorCommit?: string; anchorRepo?: string },
+  ): Promise<NoteInfo> {
     const id = ulid()
     const now = new Date().toISOString()
     await fs.mkdir(this.notesDir, { recursive: true })
 
     const finalTitle = title || this.extractTitle(body)
     const tagList = tags ?? ([] as string[])
+    const type = opts?.type ?? (tagList.includes('kind:testcase') ? 'testcase' : undefined)
+    const mirrorsFile = opts?.mirrorsFile ?? null
+    const mirrorCommit = opts?.mirrorCommit ?? null
+    const anchorRepo = opts?.anchorRepo ?? null
+
     const fm: Record<string, unknown> = {
       title: finalTitle,
-      ...(tagList.includes('kind:testcase') ? { type: 'testcase' } : {}),
+      ...(type ? { type } : {}),
       tags: tagList,
+      ...(mirrorsFile ? { mirrors_file: mirrorsFile } : {}),
+      ...(mirrorCommit ? { mirror_commit: mirrorCommit } : {}),
+      ...(anchorRepo ? { anchor_repo: anchorRepo } : {}),
       created: now,
       modified: now,
     }
@@ -294,6 +325,10 @@ export class NoteManager {
       relativePath: `${id}.md`,
       createdAt: now,
       modifiedAt: now,
+      ...(type ? { noteType: type } : {}),
+      ...(mirrorsFile ? { mirrorsFile } : {}),
+      ...(mirrorCommit ? { mirrorCommit } : {}),
+      ...(anchorRepo ? { anchorRepo } : {}),
     }
   }
 
@@ -373,6 +408,15 @@ export class NoteManager {
     const content = this.stringify(fm, body)
     await fs.writeFile(filePath, content, 'utf-8')
 
+    // Read the result back rather than assembling a second NoteInfo here.
+    // The hand-built version listed only the fields it happened to know about,
+    // so a save silently returned a note stripped of its type, its mirror and
+    // its handoff identity — the frontmatter on disk was fine, but a caller
+    // that renders what it gets back showed a different note than the one it
+    // had just written.
+    const reread = await this.parseFile(filePath)
+    if (reread) return reread.info
+
     return {
       id,
       title,
@@ -413,23 +457,46 @@ export class NoteManager {
     return updated
   }
 
-  /** Create a handoff note with extended frontmatter fields. */
+  /**
+   * Create a handoff note with extended frontmatter fields.
+   *
+   * The optional anchor is the commit the handoff was written against. It is
+   * deliberately the only world state that gets stored: the delta between
+   * anchor and HEAD is computed at dispatch time, never persisted, because a
+   * stored delta goes stale while asserting itself as confidently as a true one.
+   *
+   * Workspace binding is a tag (`workspace:<id>`), not a scope — notes live in
+   * a flat directory and categorize purely by tag.
+   */
   async createHandoff(
     title: string,
     body: string,
     fromSession: string,
     toEntity: string = 'any',
+    opts?: { anchorCommit?: string; anchorRepo?: string; workspaceId?: string | null },
   ): Promise<NoteInfo> {
     const id = ulid()
     const now = new Date().toISOString()
     await fs.mkdir(this.notesDir, { recursive: true })
 
+    const tags = ['handoff']
+    const workspaceId = opts?.workspaceId ?? null
+    if (workspaceId) {
+      const wsTag = `workspace:${workspaceId}`
+      if (!tags.includes(wsTag)) tags.push(wsTag)
+    }
+
+    const anchorCommit = opts?.anchorCommit ?? null
+    const anchorRepo = opts?.anchorRepo ?? null
+
     const fm = {
       title,
-      tags: ['handoff'] as string[],
+      tags,
       from_session: fromSession,
       to_entity: toEntity,
       handoff_status: 'pending' as const,
+      ...(anchorCommit ? { anchor_commit: anchorCommit } : {}),
+      ...(anchorRepo ? { anchor_repo: anchorRepo } : {}),
       created: now,
       modified: now,
     }
@@ -440,7 +507,7 @@ export class NoteManager {
     return {
       id,
       title,
-      tags: ['handoff'],
+      tags,
       scope: 'global',
       relativePath: `${id}.md`,
       createdAt: now,
@@ -448,7 +515,112 @@ export class NoteManager {
       fromSession,
       toEntity,
       handoffStatus: 'pending',
+      ...(anchorCommit ? { anchorCommit } : {}),
+      ...(anchorRepo ? { anchorRepo } : {}),
     }
+  }
+
+  /**
+   * Pull a mirrored note's content back from git and move its mirror point.
+   *
+   * This is the last step of the round trip: the human writes a correction
+   * into the mirror, a role incorporates it into the file, and the mirror is
+   * then behind. Refreshing reads the committed content — never the working
+   * tree, see readMirrorSource — and records the commit it now reflects.
+   *
+   * Deliberately NOT automatic. The mirror is a work surface; a correction
+   * that has not been incorporated yet would be overwritten by a refresh. The
+   * previous body therefore comes back in `replacedBody`, so a caller can
+   * keep it rather than discover its loss afterwards.
+   *
+   * Any failure leaves the note untouched.
+   */
+  async refreshMirror(
+    id: string,
+    opts?: { atCommit?: string },
+  ): Promise<{ ok: boolean; note?: NoteInfo; replacedBody?: string; problems: string[] }> {
+    const existing = await this.read(id)
+    if (!existing) {
+      return { ok: false, problems: [`Note nicht gefunden: ${id}`] }
+    }
+
+    const filePath = existing.info.mirrorsFile ?? null
+    const repoPath = existing.info.anchorRepo ?? null
+    if (!filePath || !repoPath) {
+      return {
+        ok: false,
+        problems: [`Note ${id} spiegelt keine Datei (mirrors_file/anchor_repo fehlen).`],
+      }
+    }
+
+    const source = await readMirrorSource({
+      repoPath,
+      filePath,
+      ...(opts?.atCommit ? { atCommit: opts.atCommit } : {}),
+    })
+    if (!source.ok || source.content === null || source.commit === null) {
+      return { ok: false, problems: source.problems }
+    }
+
+    const replacedBody = existing.body
+    await this.save(id, source.content, existing.info.tags)
+
+    // Move the mirror point. save() preserves unknown frontmatter but cannot
+    // know that this particular key should change.
+    const notePath = this.filePath(id)
+    try {
+      const parsed = matter(await fs.readFile(notePath, 'utf-8'))
+      parsed.data.mirror_commit = source.commit
+      await fs.writeFile(notePath, matter.stringify(parsed.content, parsed.data), 'utf-8')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { ok: false, problems: [`Spiegelpunkt nicht aktualisierbar: ${message}`] }
+    }
+
+    const updated = await this.parseFile(notePath)
+    return {
+      ok: true,
+      ...(updated ? { note: updated.info } : {}),
+      replacedBody,
+      problems: [],
+    }
+  }
+
+  /**
+   * Flip a handoff note to `consumed` and record who received it.
+   *
+   * Called after a handoff has actually been delivered into a session —
+   * never before. A handoff that failed to arrive stays `pending`, because
+   * `pending` means "still waiting for someone" and that is exactly what it
+   * is then. Whether the receiving session does anything useful with it is a
+   * question for the human looking at the sidebar, not for a state machine.
+   */
+  async markHandoffConsumed(id: string, consumedBy: string): Promise<NoteInfo | null> {
+    const filePath = this.filePath(id)
+    let raw: string
+    try {
+      raw = await fs.readFile(filePath, 'utf-8')
+    } catch {
+      return null
+    }
+
+    let parsed: matter.GrayMatterFile<string>
+    try {
+      parsed = matter(raw)
+    } catch {
+      return null
+    }
+
+    const now = new Date().toISOString()
+    parsed.data.handoff_status = 'consumed'
+    parsed.data.consumed_by = consumedBy
+    parsed.data.consumed_at = now
+    parsed.data.modified = now
+
+    await fs.writeFile(filePath, matter.stringify(parsed.content, parsed.data), 'utf-8')
+
+    const updated = await this.parseFile(filePath)
+    return updated?.info ?? null
   }
 
   /**

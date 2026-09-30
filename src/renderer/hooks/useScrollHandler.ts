@@ -24,7 +24,10 @@ function resolveCell(cell: string, grid: GridState): string | undefined {
   if (!match) return undefined
   const col = parseInt(match[1], 10)
   const row = parseInt(match[2], 10)
-  const idx = row * grid.cols + col
+  // grid.config.cols, nicht grid.cols: das Feld liegt eine Ebene tiefer.
+  // Vorher ergab row * undefined + col NaN, slots[NaN] war immer undefined —
+  // resolveCell lieferte also nie eine Session.
+  const idx = row * grid.config.cols + col
   return grid.slots[idx]?.sessionId ?? undefined
 }
 
