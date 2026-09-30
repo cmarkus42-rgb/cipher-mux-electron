@@ -5,9 +5,11 @@ import { useTranslation } from 'react-i18next'
 import { NoteEditor } from './NoteEditor'
 import { TagBar } from './TagBar'
 import { TestcaseView } from './TestcaseView'
+import { FindingView } from './FindingView'
 import { useNotes } from '../hooks/useNotes'
 import type { NoteInfo } from '../../shared/types'
 import type { ParsedTestcase, TestcaseSection } from '../../main/notes/testcase-parser'
+import type { ParsedFinding, FindingSection } from '../../main/notes/finding-parser'
 import { ExternalLink, Scan, ChevronDown, ChevronUp, X } from 'lucide-preact'
 
 const ICON_SIZE = 14
@@ -20,6 +22,8 @@ interface NoteTab {
   dirty: boolean
   /** Parsed testcase data — present only if this is a testcase note. */
   testcase?: ParsedTestcase
+  /** Parsed finding data — present only if this is a finding note. */
+  finding?: ParsedFinding
   /** Raw file content including frontmatter (for testcase serialization). */
   rawContent?: string
 }
@@ -79,10 +83,11 @@ export function NotesCell({
       // Check if already open
       const existing = tabs.find((t) => t.id === info.id)
       if (existing) {
-        // Detect noteType change: if testcase tag was added or removed, reload the tab
-        const wasTestcase = !!existing.testcase
-        const isTestcase = !!info.tags?.includes('kind:testcase')
-        if (wasTestcase === isTestcase) {
+        // Detect noteType change: a kind: tag added or removed means the tab
+        // needs a different view, so it has to be rebuilt rather than focused.
+        const wasTyped = !!existing.testcase || !!existing.finding
+        const isTyped = !!info.tags?.includes('kind:testcase') || !!info.tags?.includes('kind:finding')
+        if (wasTyped === isTyped) {
           setActiveTabId(info.id)
           return
         }
@@ -105,6 +110,17 @@ export function NotesCell({
         }
       }
 
+      // Detect finding note — same IPC shape as the testcase path
+      let finding: ParsedFinding | undefined
+      if (info.tags?.includes('kind:finding')) {
+        try {
+          const parsed = await apiObj.notes.parseFinding(info.id)
+          finding = parsed ?? undefined
+        } catch (err) {
+          console.error('[NotesCell] Failed to parse finding:', err)
+        }
+      }
+
       const tab: NoteTab = {
         id: info.id,
         title: info.title,
@@ -112,6 +128,7 @@ export function NotesCell({
         tags: info.tags ?? [],
         dirty: false,
         testcase,
+        finding,
       }
       setTabs((prev) => [...prev, tab])
       setActiveTabId(info.id)
@@ -197,6 +214,26 @@ export function NotesCell({
   )
 
   // Testcase: update sections → serialize via IPC → save
+  const handleFindingUpdate = useCallback(
+    async (sections: FindingSection[]) => {
+      if (!activeTab?.finding) return
+      // window.cipherMux is declared globally (renderer/global.d.ts) — no cast
+      // needed, and the cast would hide a typo in a method name.
+      const apiObj = window.cipherMux
+      const updated: ParsedFinding = { ...activeTab.finding, sections }
+      const body = await apiObj.notes.serializeFindingBody(sections)
+      if (!body) { console.error('[NotesCell] serializeFindingBody returned null'); return }
+      const result = await apiObj.notes.save(activeTab.id, body, undefined, true)
+      const title = result?.title || activeTab.title
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === activeTab.id ? { ...t, content: body, title, finding: updated, dirty: false } : t
+        ),
+      )
+    },
+    [activeTab],
+  )
+
   const handleTestcaseUpdate = useCallback(
     async (sections: TestcaseSection[]) => {
       if (!activeTab?.testcase) return
@@ -502,6 +539,12 @@ export function NotesCell({
             onArchive={handleTestcaseArchive}
             onScreenshot={handleTestcaseScreenshot}
             onFeatureRequest={handleFeatureRequest}
+          />
+        ) : activeTab?.finding ? (
+          <FindingView
+            key={activeTab.id}
+            finding={activeTab.finding}
+            onUpdate={handleFindingUpdate}
           />
         ) : activeTab ? (
           <NoteEditor

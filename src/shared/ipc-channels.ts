@@ -196,6 +196,8 @@ export const IPC = {
   NOTES_SCREENSHOT: 'cipher-mux:notes:screenshot',
   NOTES_PARSE_TESTCASE: 'cipher-mux:notes:parse-testcase',
   NOTES_SERIALIZE_TESTCASE: 'cipher-mux:notes:serialize-testcase',
+  NOTES_PARSE_FINDING: 'cipher-mux:notes:parse-finding',
+  NOTES_SERIALIZE_FINDING: 'cipher-mux:notes:serialize-finding',
   NOTES_SEARCH: 'cipher-mux:notes:search',
   NOTES_TAG_CLASS_REPO: 'cipher-mux:notes:tag-class-repo',
   NOTES_TAG_CLASS_CREATE: 'cipher-mux:notes:tag-class-create',
