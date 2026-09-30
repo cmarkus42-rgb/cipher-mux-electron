@@ -2,7 +2,6 @@
 // Renders highlight overlays on data-highlight elements, driven by IPC from MCP tools.
 
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
-import { IPC } from '../../shared/ipc-channels'
 
 interface ActiveHighlight {
   id: string

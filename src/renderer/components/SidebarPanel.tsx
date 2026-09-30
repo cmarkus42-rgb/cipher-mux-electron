@@ -41,7 +41,7 @@ function displayName(name: string, projectPath?: string | null): string {
 }
 
 export function SidebarPanel({
-  visible, workshopActive, cyberFactoryActive, sessions, gridSessionIds, detachedIds,
+  visible, workshopActive: _workshopActive, cyberFactoryActive: _cyberFactoryActive, sessions, gridSessionIds, detachedIds,
   contextUsages, onAddToGrid, onKillSession, onDetach, onReattach, activeWorkspaceId, hasNotesCell,
   onOpenNoteInGrid, voiceComState, topicMap,
 }: SidebarPanelProps) {

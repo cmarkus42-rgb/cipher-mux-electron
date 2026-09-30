@@ -2,7 +2,7 @@ import { app } from 'electron'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import type { AppConfig, Character } from '../../shared/types'
+import type { AppConfig } from '../../shared/types'
 import { createEmptyGrid } from '../../shared/grid-types'
 import { deepMerge } from '../util/deep-merge'
 import { BRAND } from '../../shared/brand'
@@ -10,7 +10,6 @@ import { A11Y_DEFAULTS } from '../a11y/a11y-config'
 import { BUILTIN_PERSONAS, SEED_CUSTOM_PERSONAS, SEED_WORKSPACES } from '../../shared/persona-types'
 import { SEED_CHARACTERS, DEFAULT_CHARACTER_ID, assignCharacterColor } from '../character/character-defaults'
 import { DEBUGGER_DEFAULTS } from '../debugger/types'
-import { TESTING_ASSISTANT_DEFAULTS } from '../testing-assistant/types'
 import {
   MAX_SESSIONS,
   MESSAGE_RETENTION_DAYS,

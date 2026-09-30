@@ -205,7 +205,7 @@ export async function hubApply(
   }
 
   // Process each step
-  let stepsFailed = 0
+  const stepsFailed = 0
   for (const step of steps) {
     if (step.applied) continue // idempotent skip
 

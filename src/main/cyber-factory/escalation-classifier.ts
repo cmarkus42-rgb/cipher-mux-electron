@@ -89,12 +89,8 @@ export function classifyEscalation(input: EscalationInput): EscalationResult {
   }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Tokenize a string into lowercase words of 3+ chars, returned as a Set. */
-function tokenize(text: string): Set<string> {
-  return new Set(tokenizeArray(text))
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Tokenize a string into lowercase words of 2+ chars, returned as an Array. */
 function tokenizeArray(text: string): string[] {

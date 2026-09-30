@@ -6,7 +6,7 @@
 //   companionTasks — companion-specific tasks → only used by Companion entity
 
 import type { Character } from '../../shared/types'
-import { CHARACTER_PALETTE, assignCharacterColor } from '../../shared/character-palette'
+import { CHARACTER_PALETTE } from '../../shared/character-palette'
 
 export const DEFAULT_CHARACTER_ID = 'relay'
 

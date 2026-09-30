@@ -67,17 +67,6 @@ const PATTERNS: Record<string, number[][]> = {
   ],
 }
 
-function buildBoxShadow(pattern: number[][], color: string): string {
-  const shadows: string[] = []
-  for (let y = 0; y < pattern.length; y++) {
-    for (let x = 0; x < pattern[y].length; x++) {
-      if (pattern[y][x]) {
-        shadows.push(`${x * PIXEL}px ${y * PIXEL}px 0 ${color}`)
-      }
-    }
-  }
-  return shadows.join(',')
-}
 
 interface PersonaAvatarProps {
   characterId: string
