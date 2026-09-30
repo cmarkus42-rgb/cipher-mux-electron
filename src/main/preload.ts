@@ -276,6 +276,10 @@ const api = {
       ipcRenderer.invoke(IPC.NOTES_MIRROR_REFRESH, { id }),
     specOutline: (id: string) =>
       ipcRenderer.invoke(IPC.NOTES_SPEC_OUTLINE, { id }),
+    parseRequirements: (id: string) =>
+      ipcRenderer.invoke(IPC.NOTES_PARSE_REQUIREMENTS, { id }),
+    serializeRequirementsBody: (sections: any[]) =>
+      ipcRenderer.invoke(IPC.NOTES_SERIALIZE_REQUIREMENTS, { sections }),
     parseFinding: (id: string) =>
       ipcRenderer.invoke(IPC.NOTES_PARSE_FINDING, { id }),
     serializeFindingBody: (sections: any[]) =>
