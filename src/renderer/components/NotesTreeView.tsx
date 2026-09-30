@@ -122,16 +122,25 @@ export function applyTagFilter(notes: NoteInfo[], filter: TagFilterState): NoteI
 }
 
 /** Filter notes by workspace tag (workspace:<name> or workspace:<id>).
- *  Global notes (no workspace: tag at all) are included in every workspace. */
+ *  Global notes (no workspace: tag at all) are included in every workspace.
+ *
+ *  Der Vergleich ignoriert die Schreibweise. Gemessen am 2026-09-30 standen
+ *  unter den Workspace-Werten „Cipher Grow KIT" und „cipher grow kit"
+ *  nebeneinander — der Tag wurde früher aus dem Anzeigenamen gebildet. Ein
+ *  buchstabengenauer Vergleich lässt eine der beiden Notes lautlos aus ihrem
+ *  Workspace fallen, und lautlos ist hier das Schlimme: eine fehlende Note
+ *  sieht niemand. */
 export function filterByWorkspace(notes: NoteInfo[], workspaceId: string, workspaceName?: string): NoteInfo[] {
   // Match by name (preferred) or by ID (fallback for old tags)
-  const candidates = [`workspace:${workspaceName ?? workspaceId}`, `workspace:${workspaceId}`]
+  const candidates = new Set(
+    [`workspace:${workspaceName ?? workspaceId}`, `workspace:${workspaceId}`].map(c => c.toLowerCase()),
+  )
   return notes.filter(n => {
     const hasAnyWsTag = n.tags.some(t => t.startsWith('workspace:'))
     // Global note (no workspace: tag) → visible everywhere
     if (!hasAnyWsTag) return true
     // Workspace-scoped note → only if it matches this workspace
-    return n.tags.some(t => candidates.includes(t))
+    return n.tags.some(t => candidates.has(t.toLowerCase()))
   })
 }
 

@@ -2361,10 +2361,45 @@
   background: var(--color-accent-soft);
 }
 
-.tag-bar__quick {
+/* Achsen-Auswahl: drei Reihen unter dem Eingabefeld, je eine pro Achse.
+   Früher sass hier eine Reihe von vier Schnellwahl-Knoepfen rechts neben der
+   Eingabe (margin-left: auto). Die Achsen tragen Beschriftungen und brauchen
+   die ganze Breite. */
+.tag-bar__axes {
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.tag-bar__axis {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.tag-bar__axis-label {
+  color: var(--color-text-dim);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  /* Feste Breite, damit die Wertereihen untereinander ausgerichtet bleiben. */
+  min-width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.tag-bar__axis-values {
+  display: flex;
+  flex-wrap: wrap;
   gap: 3px;
-  margin-left: auto;
+}
+
+/* Herkunft statt Wahl: gestrichelt, damit eine gesetzte Tatsache nicht wie
+   ein getroffener Knopf aussieht. */
+.tag-bar__chip--process {
+  border-style: dashed;
+  opacity: 0.85;
 }
 
 .tag-bar__quick-btn {

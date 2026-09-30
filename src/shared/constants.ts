@@ -7,6 +7,9 @@
  * via brand.ts directly — constants.ts stays Renderer-safe.
  */
 
+// tag-axes.ts ist reine Datenhaltung ohne Node-APIs und damit Renderer-tauglich.
+import { EXCLUSIVE_AXES } from './tag-axes'
+
 /** WHY appName stays "cipher-mux": IPC channels, preload API, and package identity
  *  use this name. Changing it would break all existing configs and integrations.
  *  The profile system controls paths and defaults, not the brand name. */
@@ -67,7 +70,13 @@ export const KICKOFF_TIMEOUT_MIN_DEFAULT = 15
 export const MAX_MANUAL_TAGS = 5
 
 /** Tag classes where only one value is allowed per note. Adding a second replaces the first. */
-export const EXCLUSIVE_TAG_CLASSES = ['status', 'kind']
+/**
+ * Ausschliessende Tag-Klassen — abgeleitet, nicht zweitgeschrieben.
+ *
+ * Dieselbe Tatsache zweimal aufzuschreiben heisst, dass eine der beiden
+ * Stellen irgendwann falsch ist. Die Achsen sind die Quelle.
+ */
+export const EXCLUSIVE_TAG_CLASSES: readonly string[] = EXCLUSIVE_AXES
 
 /** Default persona assignment per preset (from Pack spec 16-persona-presets.md). */
 export const PRESET_PERSONA_DEFAULTS: Record<string, string> = {

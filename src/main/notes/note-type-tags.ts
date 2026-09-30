@@ -1,3 +1,5 @@
+import { PROCESS_SET_AXES } from '../../shared/tag-axes'
+
 /**
  * Tags that carry a note's type — and survive auto-tagging.
  *
@@ -42,10 +44,17 @@ export function deriveTypeFromTags(tags: readonly string[]): string | undefined 
  * Merge auto-generated tags into a note's existing ones without losing what
  * carries meaning.
  *
- * Kept from the existing tags: the type, the workspace binding, the handoff
- * marker. Dropped from the auto tags: any `kind:` tag, when the note already
- * has a type — two kind tags would make the type ambiguous, and the one the
- * note was created with wins over one a model guessed.
+ * Kept from the existing tags: the type, every axis the process sets (workspace
+ * and entity — the note's origin), the handoff marker. Dropped from the auto
+ * tags: any `kind:` tag, when the note already has a type — two kind tags would
+ * make the type ambiguous, and the one the note was created with wins over one
+ * a model guessed.
+ *
+ * Die Prozess-Achsen werden **abgeleitet**, nicht aufgezählt. Vorher stand hier
+ * `t.startsWith('workspace:')`, und als am 2026-09-30 `entity` als Achse dazukam,
+ * war die Liste sofort unvollständig — das Auto-Tagging hätte die Herkunft
+ * überschrieben. Eine Liste, die beim Hinzufügen einer Achse gepflegt werden
+ * muss, ist beim nächsten Mal wieder unvollständig.
  *
  * Preserved tags come first so a downstream tag limit truncates the
  * replaceable ones rather than the structural ones.
@@ -55,7 +64,9 @@ export function preserveTypeTags(
   autoTags: readonly string[],
 ): string[] {
   const preserved = existing.filter(t =>
-    isTypeCarryingTag(t) || t.startsWith('workspace:') || t === 'handoff',
+    isTypeCarryingTag(t)
+    || PROCESS_SET_AXES.some(axis => t.toLowerCase().startsWith(`${axis}:`))
+    || t === 'handoff',
   )
   const hasType = preserved.some(isTypeCarryingTag)
   const incoming = hasType

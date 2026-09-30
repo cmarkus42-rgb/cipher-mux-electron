@@ -19,6 +19,7 @@ import { resolveAnchorCommit } from '../notes/handoff-delta'
 import { mayUseCompanionMemory } from './entity-header'
 import { dispatchHandoffNote } from '../notes/handoff-dispatch'
 import type { EntityId } from '../../shared/types'
+import { processTagsFor } from '../../shared/tag-axes'
 import { integrate, inventory, migrationPlan, hubApply, hubVerify, hubRelease, hubRollback } from '../hub'
 import { registerMuxTool } from './register-tool'
 
@@ -727,14 +728,26 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           }
         }
 
-        // P.2: auto-apply workspace scope tag + workspace defaultTags
+        // Was der Prozess weiss, muss niemand eingeben: Workspace und Entity
+        // sind Tatsachen ueber die Herkunft dieser Note, die Phase leitet sich
+        // aus der Entity ab (Vorschlag, korrigierbar). Siehe shared/tag-axes.ts.
         try {
           const { getActiveWorkspace } = await import('../workspace/workspace-utils')
           const ws = getActiveWorkspace()
+
+          // Die Entity kommt aus dem Verbindungskopf X-Mux-Entity und wird
+          // einmal beim initialize gebunden — sie ist nicht zu erraten.
+          for (const t of processTagsFor({ entityId: ctx.entityId })) {
+            if (!tags.includes(t)) tags.push(t)
+          }
+
           if (ws) {
             // notesGlobal: skip workspace scope tag so note is visible in all workspaces
             if (!ws.notesGlobal) {
-              tags.push(`workspace:${ws.name ?? ws.id}`)
+              // Die ID, nicht der Anzeigename. Aus `ws.name` sind die
+              // Schreibweisen-Dubletten entstanden ("Cipher Grow KIT" neben
+              // "cipher grow kit"); die Leseseite akzeptiert beide Formen.
+              tags.push(`workspace:${ws.id}`)
             }
             // User-configured cross-workspace tags
             if (ws.defaultTags?.length) {

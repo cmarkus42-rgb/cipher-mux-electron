@@ -7,7 +7,12 @@ import {
   STATUS_VALUES,
   isAxisTag,
   filterToAxes,
-} from '../../src/main/notes/tag-axes'
+  PROCESS_SET_AXES,
+  ENTITY_VALUES,
+  ENTITY_PHASE_DEFAULT,
+  processTagsFor,
+} from '../../src/shared/tag-axes'
+import { EntityRegistry, registerBuiltinEntities } from '../../src/main/session/entity-registry'
 
 // ─── Vier Achsen, nicht vierzehn ────────────────────────────
 //
@@ -28,8 +33,81 @@ import {
 // er selbst vergeben hat.
 
 describe('TAG_AXES', () => {
-  it('sind genau die vier genannten', () => {
-    assert.deepEqual([...TAG_AXES].sort(), ['kind', 'phase', 'status', 'workspace'])
+  // Vier waren es am Anfang des Tages. Die fuenfte, `entity`, kam auf den
+  // Einwand hin, dass Phase und Status ebenfalls den Prozess widerspiegeln --
+  // "ideation refinement audit und testing tragen es ja quasi im namen".
+  // Das macht die Rolle zur Tatsache statt zur Vermutung: der Mux kennt sie
+  // aus der Verbindung.
+  it('sind die fuenf genannten', () => {
+    assert.deepEqual(
+      [...TAG_AXES].sort(),
+      ['entity', 'kind', 'phase', 'status', 'workspace'],
+    )
+  })
+
+  it('haelt Entity und Workspace als Tatsachen auseinander von Phase und Status', () => {
+    // Die Trennlinie der Oberflaeche: Tatsachen werden angezeigt, Entscheidungen
+    // zur Auswahl gestellt.
+    assert.deepEqual([...PROCESS_SET_AXES].sort(), ['entity', 'workspace'])
+  })
+})
+
+describe('Entity-Achse', () => {
+  // Deckungsgleich mit der Registry -- sonst faellt eine neue Rolle
+  // stillschweigend aus der Achse und ihre Notes tragen keine Herkunft.
+  it('kennt genau die Rollen der Entity-Registry', () => {
+    const registry = new EntityRegistry()
+    registerBuiltinEntities(registry)
+    const registryIds = registry.list().map(e => e.id).sort()
+    assert.deepEqual([...ENTITY_VALUES].sort(), registryIds)
+  })
+
+  it('schlaegt fuer die Rollen mit klarer Phase eine vor', () => {
+    assert.equal(ENTITY_PHASE_DEFAULT['testing-assistant'], 'testing')
+    assert.equal(ENTITY_PHASE_DEFAULT['refinement'], 'architecture')
+    assert.equal(ENTITY_PHASE_DEFAULT['cyber-factory'], 'coding')
+  })
+
+  it('schweigt, wo die Phase nicht eindeutig ist', () => {
+    // Eine falsche Phase ist schlechter als keine. Launcher und Companion
+    // arbeiten quer zu den Phasen, Voice-Relay ueberhaupt nicht in einer.
+    for (const id of ['launcher', 'companion', 'voice-relay']) {
+      assert.equal(ENTITY_PHASE_DEFAULT[id], undefined, id)
+    }
+  })
+
+  it('schlaegt nur Phasen vor, die es gibt', () => {
+    for (const [id, phase] of Object.entries(ENTITY_PHASE_DEFAULT)) {
+      assert.ok(PHASE_VALUES.includes(phase), `${id} -> ${phase} ist keine Phase`)
+    }
+  })
+})
+
+describe('processTagsFor', () => {
+  // Was der Prozess weiss, muss niemand eingeben.
+  it('setzt Workspace, Entity, abgeleitete Phase und Typ', () => {
+    const tags = processTagsFor({
+      workspaceId: 'ws-mux', entityId: 'refinement', noteType: 'spec',
+    })
+    assert.ok(tags.includes('workspace:ws-mux'))
+    assert.ok(tags.includes('entity:refinement'))
+    assert.ok(tags.includes('phase:architecture'), 'die Phase kommt aus der Rolle')
+    assert.ok(tags.includes('kind:spec'))
+  })
+
+  it('laesst weg, was es nicht weiss', () => {
+    assert.deepEqual(processTagsFor({}), [])
+  })
+
+  it('uebernimmt keine erfundene Rolle und keinen erfundenen Typ', () => {
+    const tags = processTagsFor({ entityId: 'gibtsnicht', noteType: 'abschlussbericht' })
+    assert.deepEqual(tags, [])
+  })
+
+  it('setzt fuer eine Rolle ohne klare Phase keine', () => {
+    const tags = processTagsFor({ entityId: 'companion' })
+    assert.ok(tags.includes('entity:companion'))
+    assert.ok(!tags.some(t => t.startsWith('phase:')))
   })
 })
 
