@@ -292,7 +292,7 @@ export async function executeHandoff(
     // Escape first: dismiss any Suggested Prompt the idle CLI may be showing.
     // Without this, the subsequent Enter could confirm "push it" or similar
     // destructive suggestions instead of submitting the handoff payload.
-    await ctx.sessionManager.sendKeys(targetSession.id, 'Escape')
+    await ctx.sessionManager.sendKey(targetSession.id, 'Escape')
     await new Promise(resolve => setTimeout(resolve, 200))
     await ctx.sessionManager.sendKeys(targetSession.id, message)
     // Claude CLI needs time to render the text before recognizing Enter as submit.
@@ -308,7 +308,7 @@ export async function executeHandoff(
     try {
       const captured = await ctx.sessionManager.capture(targetSession.id, 10)
       if (captured.includes('[Pasted text')) {
-        await ctx.sessionManager.sendKeys(targetSession.id, 'Escape')
+        await ctx.sessionManager.sendKey(targetSession.id, 'Escape')
         await new Promise(resolve => setTimeout(resolve, 100))
         await ctx.sessionManager.sendKeys(targetSession.id, '\r')
       }

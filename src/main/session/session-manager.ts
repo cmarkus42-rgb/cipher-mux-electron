@@ -725,6 +725,18 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
+   * Send a named key (Escape, Enter, C-c ...) rather than literal text.
+   * sendKeys types its argument character by character — 'Escape' there ends
+   * up as the word, not the key.
+   */
+  async sendKey(sessionId: string, keyName: string): Promise<void> {
+    const session = this.sessions.get(sessionId)
+    if (!session) throw new Error(`Session ${sessionId} not found`)
+    const target = session.tmuxPane ?? session.tmuxSession
+    await this.tmux.sendKey(target, keyName)
+  }
+
+  /**
    * Resize a session's tmux pane.
    */
   async resize(sessionId: string, cols: number, rows: number): Promise<void> {
