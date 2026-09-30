@@ -238,6 +238,8 @@ export class NoteManager {
       from_session?: string
       to_entity?: string
       handoff_status?: HandoffStatus
+      anchor_commit?: string
+      anchor_repo?: string
     }
 
     const id = path.basename(filePath, '.md')
@@ -256,6 +258,8 @@ export class NoteManager {
       ...(fm.from_session ? { fromSession: fm.from_session } : {}),
       ...(fm.to_entity ? { toEntity: fm.to_entity } : {}),
       ...(fm.handoff_status ? { handoffStatus: fm.handoff_status } : {}),
+      ...(fm.anchor_commit ? { anchorCommit: fm.anchor_commit } : {}),
+      ...(fm.anchor_repo ? { anchorRepo: fm.anchor_repo } : {}),
     }
 
     return { info, body }
@@ -413,23 +417,46 @@ export class NoteManager {
     return updated
   }
 
-  /** Create a handoff note with extended frontmatter fields. */
+  /**
+   * Create a handoff note with extended frontmatter fields.
+   *
+   * The optional anchor is the commit the handoff was written against. It is
+   * deliberately the only world state that gets stored: the delta between
+   * anchor and HEAD is computed at dispatch time, never persisted, because a
+   * stored delta goes stale while asserting itself as confidently as a true one.
+   *
+   * Workspace binding is a tag (`workspace:<id>`), not a scope — notes live in
+   * a flat directory and categorize purely by tag.
+   */
   async createHandoff(
     title: string,
     body: string,
     fromSession: string,
     toEntity: string = 'any',
+    opts?: { anchorCommit?: string; anchorRepo?: string; workspaceId?: string | null },
   ): Promise<NoteInfo> {
     const id = ulid()
     const now = new Date().toISOString()
     await fs.mkdir(this.notesDir, { recursive: true })
 
+    const tags = ['handoff']
+    const workspaceId = opts?.workspaceId ?? null
+    if (workspaceId) {
+      const wsTag = `workspace:${workspaceId}`
+      if (!tags.includes(wsTag)) tags.push(wsTag)
+    }
+
+    const anchorCommit = opts?.anchorCommit ?? null
+    const anchorRepo = opts?.anchorRepo ?? null
+
     const fm = {
       title,
-      tags: ['handoff'] as string[],
+      tags,
       from_session: fromSession,
       to_entity: toEntity,
       handoff_status: 'pending' as const,
+      ...(anchorCommit ? { anchor_commit: anchorCommit } : {}),
+      ...(anchorRepo ? { anchor_repo: anchorRepo } : {}),
       created: now,
       modified: now,
     }
@@ -440,7 +467,7 @@ export class NoteManager {
     return {
       id,
       title,
-      tags: ['handoff'],
+      tags,
       scope: 'global',
       relativePath: `${id}.md`,
       createdAt: now,
@@ -448,7 +475,46 @@ export class NoteManager {
       fromSession,
       toEntity,
       handoffStatus: 'pending',
+      ...(anchorCommit ? { anchorCommit } : {}),
+      ...(anchorRepo ? { anchorRepo } : {}),
     }
+  }
+
+  /**
+   * Flip a handoff note to `consumed` and record who received it.
+   *
+   * Called after a handoff has actually been delivered into a session —
+   * never before. A handoff that failed to arrive stays `pending`, because
+   * `pending` means "still waiting for someone" and that is exactly what it
+   * is then. Whether the receiving session does anything useful with it is a
+   * question for the human looking at the sidebar, not for a state machine.
+   */
+  async markHandoffConsumed(id: string, consumedBy: string): Promise<NoteInfo | null> {
+    const filePath = this.filePath(id)
+    let raw: string
+    try {
+      raw = await fs.readFile(filePath, 'utf-8')
+    } catch {
+      return null
+    }
+
+    let parsed: matter.GrayMatterFile<string>
+    try {
+      parsed = matter(raw)
+    } catch {
+      return null
+    }
+
+    const now = new Date().toISOString()
+    parsed.data.handoff_status = 'consumed'
+    parsed.data.consumed_by = consumedBy
+    parsed.data.consumed_at = now
+    parsed.data.modified = now
+
+    await fs.writeFile(filePath, matter.stringify(parsed.content, parsed.data), 'utf-8')
+
+    const updated = await this.parseFile(filePath)
+    return updated?.info ?? null
   }
 
   /**
