@@ -269,6 +269,10 @@ const api = {
       ipcRenderer.invoke(IPC.NOTES_PARSE_TESTCASE, { id }),
     serializeTestcaseBody: (sections: any[]) =>
       ipcRenderer.invoke(IPC.NOTES_SERIALIZE_TESTCASE, { sections }),
+    parseFinding: (id: string) =>
+      ipcRenderer.invoke(IPC.NOTES_PARSE_FINDING, { id }),
+    serializeFindingBody: (sections: any[]) =>
+      ipcRenderer.invoke(IPC.NOTES_SERIALIZE_FINDING, { sections }),
     tags: () => ipcRenderer.invoke(IPC.NOTES_TAGS),
     tagList: (): Promise<Array<{ name: string; count: number; description: string; isSeed: boolean }>> =>
       ipcRenderer.invoke(IPC.NOTES_TAG_LIST),

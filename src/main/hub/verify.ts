@@ -11,7 +11,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { execFile } from 'child_process'
 import { projectDir, projectMigrationsDir, dateSuffix } from './hub-paths'
-import { updateStatus, getEntry } from './archiv-verweis'
+import { updateStatus } from './archiv-verweis'
 import { getEnhancedPath } from '../util/exec-util'
 import type { VerifyOptions, VerifyResult, StackInfo, RuntimeKind } from './types'
 

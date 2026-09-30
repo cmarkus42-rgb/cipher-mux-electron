@@ -2130,6 +2130,44 @@ export class IpcHub {
       }
     })
 
+    // Parse a finding note in main process — same shape as the testcase path
+    ipcMain.handle(IPC.NOTES_PARSE_FINDING, async (_e, { id }: { id: string }) => {
+      try {
+        const result = await this.noteManager.read(id)
+        if (!result || !result.info.tags?.includes('kind:finding')) return null
+        const { parseFinding } = await import('./notes/finding-parser')
+        const fsNode = await import('fs')
+        const pathNode = await import('path')
+        const rawPath = pathNode.join(this.noteManager.getNotesDir(), `${id}.md`)
+        const raw = fsNode.readFileSync(rawPath, 'utf-8')
+        return parseFinding(raw) ?? null
+      } catch (err) {
+        console.error('[IpcHub] NOTES_PARSE_FINDING failed:', err)
+        return null
+      }
+    })
+
+    // Serialize finding sections back to a markdown body
+    ipcMain.handle(IPC.NOTES_SERIALIZE_FINDING, async (_e, { sections }: { sections: Array<{ title: string; items: unknown[] }> }) => {
+      try {
+        const { serializeFindingItem } = await import('./notes/finding-parser')
+        const lines: string[] = []
+        for (const section of sections) {
+          if (section.title && section.title !== 'Allgemein') {
+            lines.push(`## ${section.title}`, '')
+          }
+          for (const item of section.items) {
+            lines.push(serializeFindingItem(item as never))
+          }
+          lines.push('')
+        }
+        return lines.join('\n').trimEnd() + '\n'
+      } catch (err) {
+        console.error('[IpcHub] NOTES_SERIALIZE_FINDING failed:', err)
+        return null
+      }
+    })
+
     // Serialize testcase sections back to markdown body (main process)
     ipcMain.handle(IPC.NOTES_SERIALIZE_TESTCASE, async (_e, { sections }: { sections: any[] }) => {
       try {

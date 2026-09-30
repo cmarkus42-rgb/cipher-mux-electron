@@ -1,5 +1,3 @@
-import * as fs from 'fs';
-import * as path from 'path';
 
 const CONTENT = `<!-- refinement-v2 -->
 # Refinement — Requirements-Engineering mit Disziplin

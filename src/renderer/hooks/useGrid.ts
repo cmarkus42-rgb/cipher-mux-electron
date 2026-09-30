@@ -10,7 +10,6 @@ import {
   findFirstEmptySlot,
   nextRowSpan,
 } from '../../shared/grid-types'
-import { MAX_GRID_COLS } from '../../shared/constants'
 import { GRID_SAVE_DEBOUNCE_MS } from '../../shared/constants'
 
 const api = () => (window as any).cipherMux

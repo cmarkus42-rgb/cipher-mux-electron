@@ -8,7 +8,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { z } from 'zod'
 import { projectDir, projectMigrationsDir, dateSuffix } from './hub-paths'
-import type { RuntimeKind, StackInfo } from './types'
+import type { RuntimeKind } from './types'
 
 export const InventoryInputSchema = z.object({
   projectName: z.string().describe('Name of the project in the hub'),

@@ -14,6 +14,30 @@ Testcase-Notes verwenden `noteType: testcase` und ein spezielles Checkbox-Format
 - [-] **T-ID.4** Fehlgeschlagener Test // Kommentar zum Fehler
 ````
 
+## Wofür Testcases da sind — und wofür nicht
+
+**Testcases sind die manuelle Abnahme: ein Mensch benutzt die App und hakt ab.** Das ist der
+Grund, warum die `TestcaseView` existiert und warum sie sich bewährt hat.
+
+**Nicht hierher gehören automatisierte Tests.** Ein Eintrag, der beim Anlegen schon auf `[x]`
+steht, hat keine Abnahme durchlaufen — er behauptet eine. Dasselbe gilt für ein `pass`, das mit
+`// Code: <datei> verifiziert` begründet wird: das ist Code gelesen, nicht Software benutzt.
+Beides nimmt der Liste genau die Eigenschaft, für die sie gebaut wurde.
+
+Gemessen am 2026-09-30 in der Testcase-Note: 380 Einträge auf `pass`, davon **47 mit einer
+Code-Begründung** im Kommentar. Bei den übrigen lässt sich von außen nicht unterscheiden, ob
+jemand die App benutzt hat.
+
+**Also:**
+
+- Neue Einträge entstehen **offen** (`- [ ]`). Wer sie anlegt, hakt sie nicht selbst ab.
+- Was ein automatisierter Test prüft, gehört in `test/`, nicht hierher. Wenn ein Testlauf
+  etwas findet, ist das ein **Befund** (`noteType: finding`), kein Testcase.
+- `// Kommentar` beschreibt, **was beim Benutzen passiert ist** — nicht, welche Datei man
+  gelesen hat.
+- Abschnitte nach dem Abnahmegegenstand benennen, nicht nach der Entwicklungswelle. Eine
+  Sektion „Welle F3" sagt nichts darüber, was der Mensch ausprobieren soll.
+
 ## Regeln
 
 - Sektionen: `## Titel` (H2-Headings)
