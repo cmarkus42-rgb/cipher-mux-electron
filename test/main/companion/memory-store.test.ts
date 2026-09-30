@@ -80,12 +80,14 @@ describe('MemoryStore (SP-4)', () => {
   })
 
   // T2: recall() default — last 20, newest first
-  it('T2: recall() returns last 20 memories, newest first', () => {
+  // recall() ordnet seit der Zeiger-Umstellung nach Relevanz (salience, dann
+  // ts). Der hier gepruefte Vertrag ist der reine Recency-Modus.
+  it('T2: recall({ rank: "recent" }) returns last 20 memories, newest first', () => {
     // Write enough memories
     for (let i = 0; i < 5; i++) {
       store.write({ text: `Memory entry ${i}`, kind: 'fact' })
     }
-    const all = store.recall()
+    const all = store.recall({ rank: 'recent' })
     assert.ok(all.length <= 20, 'respects default limit')
     assert.ok(all.length >= 5, 'returns all written memories')
     // Newest first

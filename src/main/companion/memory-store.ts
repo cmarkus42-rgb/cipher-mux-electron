@@ -13,6 +13,12 @@ export interface WriteMemoryOpts {
   sourceExcerpt?: string
   scopeKind?: 'user' | 'workspace' | 'session'
   scopeId?: string
+  /**
+   * Note this memory points at. The note carries the content; the memory line
+   * carries title, one-liner and this id. Keeps recall a card index instead of
+   * a second copy of the text that can drift from the note.
+   */
+  noteId?: string
 }
 
 export interface RecallOpts {
@@ -21,6 +27,15 @@ export interface RecallOpts {
   since?: number
   scopeKind?: 'user' | 'workspace' | 'session'
   scopeId?: string
+  /**
+   * 'relevance' (default) sorts by salience, then recency. 'recent' is the old
+   * behaviour, pure `ts DESC`.
+   *
+   * Recency alone scaled against the user: salience was written on every
+   * memory and never read, so the fuller the store, the more irrelevant
+   * material each session start had to wade through.
+   */
+  rank?: 'relevance' | 'recent'
 }
 
 interface RawMemoryRow {
@@ -35,6 +50,8 @@ interface RawMemoryRow {
   source_excerpt: string | null
   scope_kind: string
   scope_id: string | null
+  /** Absent in rows read from a store written before the column existed. */
+  note_id?: string | null
 }
 
 interface RawFtsRow extends RawMemoryRow {
@@ -149,14 +166,23 @@ export class MemoryStore {
       this.db.exec("CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories(scope_kind, scope_id)")
     }
 
+    // note_id column migration — idempotent, same pattern as scope_kind above
+    const hasNoteId = this.db.prepare(
+      "SELECT COUNT(*) as cnt FROM pragma_table_info('memories') WHERE name='note_id'"
+    ).get() as { cnt: number }
+    if (hasNoteId.cnt === 0) {
+      this.db.exec('ALTER TABLE memories ADD COLUMN note_id TEXT')
+      this.db.exec('CREATE INDEX IF NOT EXISTS idx_memories_note ON memories(note_id)')
+    }
+
     // Prepare statements
     this.stmtInsert = this.db.prepare(
-      `INSERT INTO memories (id, ts, session_id, persona, kind, text, salience, ttl_days, source_excerpt, scope_kind, scope_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO memories (id, ts, session_id, persona, kind, text, salience, ttl_days, source_excerpt, scope_kind, scope_id, note_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
 
     this.stmtSearch = this.db.prepare(
-      `SELECT m.id, m.ts, m.session_id, m.persona, m.kind, m.text, m.salience, m.ttl_days, m.source_excerpt, m.scope_kind, m.scope_id, fts.rank
+      `SELECT m.id, m.ts, m.session_id, m.persona, m.kind, m.text, m.salience, m.ttl_days, m.source_excerpt, m.scope_kind, m.scope_id, m.note_id, fts.rank
        FROM memories_fts fts
        JOIN memories m ON m.rowid = fts.rowid
        WHERE memories_fts MATCH ?
@@ -233,6 +259,7 @@ export class MemoryStore {
       opts.sourceExcerpt ?? null,
       opts.scopeKind ?? 'user',
       opts.scopeId ?? null,
+      opts.noteId ?? null,
     )
     return {
       id, ts,
@@ -245,6 +272,7 @@ export class MemoryStore {
       sourceExcerpt: opts.sourceExcerpt ?? null,
       scopeKind: opts.scopeKind ?? 'user',
       scopeId: opts.scopeId ?? null,
+      noteId: opts.noteId ?? null,
     }
   }
 
@@ -262,8 +290,11 @@ export class MemoryStore {
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-    const sql = `SELECT id, ts, session_id, persona, kind, text, salience, ttl_days, source_excerpt, scope_kind, scope_id
-                 FROM memories ${where} ORDER BY ts DESC LIMIT ?`
+    const order = (opts?.rank ?? 'relevance') === 'recent'
+      ? 'ts DESC'
+      : 'salience DESC, ts DESC'
+    const sql = `SELECT id, ts, session_id, persona, kind, text, salience, ttl_days, source_excerpt, scope_kind, scope_id, note_id
+                 FROM memories ${where} ORDER BY ${order} LIMIT ?`
     params.push(limit)
 
     const rows = this.db.prepare(sql).all(...params) as RawMemoryRow[]
@@ -402,6 +433,7 @@ function rowToMemory(row: RawMemoryRow): Memory {
     sourceExcerpt: row.source_excerpt,
     scopeKind: (row.scope_kind ?? 'user') as 'user' | 'workspace' | 'session',
     scopeId: row.scope_id ?? null,
+    noteId: row.note_id ?? null,
   }
 }
 
