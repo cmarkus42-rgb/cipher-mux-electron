@@ -2,15 +2,40 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'preact/hooks'
 import { EXCLUSIVE_TAG_CLASSES } from '../../shared/constants'
+import {
+  AXIS_VALUES,
+  PROCESS_SET_AXES,
+  toggleAxisTag,
+  type TagAxis,
+} from '../../shared/tag-axes'
 import type { TagClass } from '../../shared/types'
 
-const MAX_TAGS = 5
+/**
+ * Acht, nicht fünf.
+ *
+ * Fünf Achsen füllen bei zwei Phasen schon sechs Plätze — bei einer Grenze von
+ * fünf wäre die Auswahl blockiert, bevor sie vollständig ist, und eine Note mit
+ * Altlast-Tags liesse sich gar nicht mehr einordnen.
+ */
+const MAX_TAGS = 8
 
-const DEFAULT_QUICK_TAGS = [
-  'status:open',
-  'status:done',
-  'kind:bugreport',
-  'kind:spec',
+/**
+ * Die Achsen, die zur Auswahl stehen, in der Reihenfolge des Arbeitsablaufs.
+ *
+ * Anforderung vom 2026-09-30: „tags müssen glaub ich schlicht hart zur auswahl
+ * angeboten werden bzw aus dem prozess kommen". Ein Freitextfeld kann das
+ * nicht — es lädt zum Erfinden ein, und genau dabei sind 14 Klassen und 29
+ * kind-Werte entstanden.
+ *
+ * `workspace` und `entity` fehlen hier absichtlich: die setzt der Prozess (aus
+ * der Verbindung), und ein Auswahlknopf dafür wäre eine Einladung, eine Note in
+ * ein fremdes Projekt oder unter eine fremde Rolle zu hängen. Sie erscheinen
+ * als Chip, nicht als Knopf.
+ */
+const CHOOSABLE_AXES: ReadonlyArray<{ axis: TagAxis; label: string }> = [
+  { axis: 'kind', label: 'Typ' },
+  { axis: 'phase', label: 'Phase' },
+  { axis: 'status', label: 'Zustand' },
 ]
 
 /** Validate tag format: must be klasse:wert */
@@ -21,10 +46,9 @@ function isValidTag(tag: string): boolean {
 interface TagBarProps {
   tags: string[]
   onTagsChange: (tags: string[]) => void
-  quickTags?: string[]
 }
 
-export function TagBar({ tags, onTagsChange, quickTags = DEFAULT_QUICK_TAGS }: TagBarProps) {
+export function TagBar({ tags, onTagsChange }: TagBarProps) {
   const [input, setInput] = useState('')
   const [suggestions, setSuggestions] = useState<Array<{ tag: string; className?: string; color?: string }>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -197,13 +221,22 @@ export function TagBar({ tags, onTagsChange, quickTags = DEFAULT_QUICK_TAGS }: T
     }
   }, [input, suggestions, showSuggestions, addTag, highlightIdx, classPrefix])
 
-  const toggleQuickTag = useCallback((tag: string) => {
-    if (tags.includes(tag)) {
-      removeTag(tag)
-    } else {
-      addTag(tag)
+  /**
+   * Ein Achsenwert an oder aus.
+   *
+   * Die Bewegung steckt in toggleAxisTag (shared/tag-axes.ts) und nicht hier:
+   * bei einer ausschliessenden Achse wechselt die Auswahl, statt zu sammeln.
+   * Ohne das entstehen Notes, die zugleich `status:open` und `status:done`
+   * tragen, und das ist keine Aussage, sondern deren Abwesenheit.
+   */
+  const toggleAxis = useCallback((tag: string) => {
+    const next = toggleAxisTag(tags, tag)
+    if (next.length > MAX_TAGS) {
+      setWarning(`Max ${MAX_TAGS} Tags pro Note`)
+      return
     }
-  }, [tags, addTag, removeTag])
+    onTagsChange(next)
+  }, [tags, onTagsChange])
 
   const cycleTag = useCallback((tag: string) => {
     const colonIdx = tag.indexOf(':')
@@ -228,11 +261,16 @@ export function TagBar({ tags, onTagsChange, quickTags = DEFAULT_QUICK_TAGS }: T
           const cls = colonIdx > 0 ? tag.slice(0, colonIdx) : null
           const canCycle = !!(cls && EXCLUSIVE_TAG_CLASSES.includes(cls) && (classValues[cls]?.length ?? 0) > 1)
           const chipColor = cls ? classColors[cls] : undefined
+          // Herkunft, nicht Wahl: der Workspace kommt aus der Verbindung, die
+          // Entity aus ihrem Kopf. Beides gesetzt, nicht getroffen -- und das
+          // soll man sehen, sonst liest sich eine Tatsache wie eine Meinung.
+          const fromProcess = !!(cls && (PROCESS_SET_AXES as readonly string[]).includes(cls))
 
           return (
             <span
               key={tag}
-              class={`tag-bar__chip${canCycle ? ' tag-bar__chip--cyclable' : ''}`}
+              class={`tag-bar__chip${canCycle ? ' tag-bar__chip--cyclable' : ''}${fromProcess ? ' tag-bar__chip--process' : ''}`}
+              title={fromProcess ? 'vom Mux gesetzt — Herkunft dieser Note' : undefined}
               style={chipColor ? { borderColor: chipColor } : undefined}
             >
               {chipColor && <span class="tag-bar__chip-dot" style={{ background: chipColor }} />}
@@ -295,18 +333,32 @@ export function TagBar({ tags, onTagsChange, quickTags = DEFAULT_QUICK_TAGS }: T
         </div>
       </div>
 
-      {/* Quick-select buttons */}
-      <div class="tag-bar__quick">
-        {quickTags.map(qt => (
-          <button
-            key={qt}
-            class={`tag-bar__quick-btn ${tags.includes(qt) ? 'tag-bar__quick-btn--active' : ''}`}
-            onClick={() => toggleQuickTag(qt)}
-            title={qt}
-          >
-            {qt.split(':')[1]}
-          </button>
-        ))}
+      {/* Harte Auswahl pro Achse — kein Freitext, keine erfundenen Klassen */}
+      <div class="tag-bar__axes">
+        {CHOOSABLE_AXES.map(({ axis, label }) => {
+          const values = AXIS_VALUES[axis] ?? []
+          return (
+            <div key={axis} class="tag-bar__axis">
+              <span class="tag-bar__axis-label">{label}</span>
+              <div class="tag-bar__axis-values">
+                {values.map(value => {
+                  const tag = `${axis}:${value}`
+                  const active = tags.some(t => t.toLowerCase() === tag)
+                  return (
+                    <button
+                      key={tag}
+                      class={`tag-bar__quick-btn${active ? ' tag-bar__quick-btn--active' : ''}`}
+                      onClick={() => toggleAxis(tag)}
+                      title={tag}
+                    >
+                      {value}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Warning */}

@@ -5,6 +5,7 @@ import {
   isTypeCarryingTag,
   preserveTypeTags,
 } from '../../src/main/notes/note-type-tags'
+import { PROCESS_SET_AXES } from '../../src/shared/tag-axes'
 
 // ─── Type-carrying tags survive auto-tagging ────────────────
 //
@@ -78,5 +79,35 @@ describe('preserveTypeTags', () => {
   it('puts preserved tags first so a tag limit cannot cut them off', () => {
     const result = preserveTypeTags(['kind:finding', 'workspace:ws-1'], ['a', 'b', 'c', 'd', 'e'])
     assert.deepEqual(result.slice(0, 2), ['kind:finding', 'workspace:ws-1'])
+  })
+})
+
+describe('preserveTypeTags — Prozess-Tatsachen', () => {
+  // Dieselbe Falle wie beim Notentyp, nur eine Achse weiter: die Erhaltungsliste
+  // zaehlte die Achsen einzeln auf, und `entity` kam erst am 2026-09-30 dazu.
+  // Eine Liste, die man beim Hinzufuegen einer Achse pflegen muss, ist beim
+  // naechsten Mal wieder unvollstaendig -- deshalb wird sie jetzt aus
+  // PROCESS_SET_AXES abgeleitet.
+  it('behaelt die Entity, die der Prozess gesetzt hat', () => {
+    const result = preserveTypeTags(
+      ['entity:refinement', 'kind:spec'],
+      ['phase:architecture', 'status:open'],
+    )
+    assert.ok(result.includes('entity:refinement'), 'die Herkunft darf kein Modell ueberschreiben')
+  })
+
+  it('behaelt den Workspace weiterhin', () => {
+    const result = preserveTypeTags(['workspace:ws-mux'], ['status:open'])
+    assert.ok(result.includes('workspace:ws-mux'))
+  })
+
+  it('erhaelt jede Prozess-Achse, nicht nur die aufgezaehlten', () => {
+    for (const axis of PROCESS_SET_AXES) {
+      const tag = `${axis}:irgendwas`
+      assert.ok(
+        preserveTypeTags([tag], ['status:open']).includes(tag),
+        `${axis} muss erhalten bleiben`,
+      )
+    }
   })
 })

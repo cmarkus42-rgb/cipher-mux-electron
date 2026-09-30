@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { TagRepository, TagEntry } from '../../shared/types'
 import type { TagClassRepo } from './tag-repository'
-import { filterToAxes, KIND_VALUES, PHASE_VALUES, STATUS_VALUES } from './tag-axes'
+import { filterToAxes, KIND_VALUES, PHASE_VALUES, STATUS_VALUES } from '../../shared/tag-axes'
 
 const TIMEOUT_MS = 60_000
 
