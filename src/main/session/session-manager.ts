@@ -27,6 +27,7 @@ import { runCommand } from '../util/exec-util'
 import { injectStatusLineHook } from '../monitoring/statusline-hook'
 import { COMPANION_ENTITY_ID } from '../mcp/entity-header'
 import { getEntityBoundary, buildBoundaryHookScript, buildBoundaryHookSettings } from './entity-boundaries'
+import { resolveEntityRuntime, type EntityRuntimeConfig } from './entity-runtime'
 import type { PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
@@ -1350,16 +1351,34 @@ export class SessionManager extends EventEmitter {
     const config = this.entityRegistry.get(entityId)
     if (!config) return
 
-    const adapter = this.adapterRegistry.getDefault()
+    // Role -> model / adapter. Absent values keep the previous behaviour
+    // exactly: registry default adapter, no --model, CLI decides.
+    const runtime = resolveEntityRuntime(config, configStore.get('app') as EntityRuntimeConfig)
+    const adapter = this.resolveAdapter(runtime.adapterId)
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: config.projectPath,
       sessionName: config.displayName,
       isWorkshop: entityId === 'workshop',
       isCyberFactory: entityId === 'cyber-factory',
+      ...(runtime.model ? { model: runtime.model } : {}),
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
     this.autoLaunchedSessions.add(sessionId)
     this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
+  }
+
+  /**
+   * Adapter for a role, falling back to the registry default.
+   *
+   * An unknown id is a misconfiguration, not a reason to refuse to start a
+   * session — it is named in the log and the default takes over.
+   */
+  private resolveAdapter(adapterId: string | undefined): AgentAdapter {
+    if (!adapterId) return this.adapterRegistry.getDefault()
+    const adapter = this.adapterRegistry.get(adapterId)
+    if (adapter) return adapter
+    console.warn(`[SessionManager] unknown adapter '${adapterId}' — using the default`)
+    return this.adapterRegistry.getDefault()
   }
 
   /**
@@ -1419,13 +1438,15 @@ export class SessionManager extends EventEmitter {
     const session = await this.startEntity(entityId, { workspaceId: effectiveWorkspaceId })
 
     // Queue Claude launch resuming the prior conversation
-    const adapter = this.adapterRegistry.getDefault()
+    const runtime = resolveEntityRuntime(config, configStore.get('app') as EntityRuntimeConfig)
+    const adapter = this.resolveAdapter(runtime.adapterId)
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: config.projectPath,
       sessionName: config.displayName,
       isWorkshop: entityId === 'workshop',
       isCyberFactory: entityId === 'cyber-factory',
       resume: true,
+      ...(runtime.model ? { model: runtime.model } : {}),
       ...(priorClaudeSessionId ? { resumeClaudeSessionId: priorClaudeSessionId } : {}),
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
