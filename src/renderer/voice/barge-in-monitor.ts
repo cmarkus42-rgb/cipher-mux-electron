@@ -27,7 +27,11 @@ export class BargeInMonitor {
   private onBargeIn: () => void
 
   private analyser: AnalyserNode | null = null
-  private dataBuffer: Float32Array | null = null
+  // Float32Array<ArrayBuffer>, nicht der Standard-Alias: die aktuellen
+  // lib.dom-Typen parametrisieren die Sicht ueber ihren Puffertyp, und
+  // getFloatTimeDomainData akzeptiert nur eine Sicht auf einen echten
+  // ArrayBuffer (kein SharedArrayBuffer).
+  private dataBuffer: Float32Array<ArrayBuffer> | null = null
   private pollTimer: ReturnType<typeof setInterval> | null = null
 
   private enabled = false

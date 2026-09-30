@@ -342,17 +342,23 @@ function StatusBar({ summary, resolutionCounts }: { summary: TestcaseSummary; re
 interface TestcaseViewProps {
   testcase: ParsedTestcase
   onUpdate: (sections: TestcaseSection[]) => void
-  onArchive: () => void
-  onScreenshot: (itemId: string) => void
-  onFeatureRequest: (itemId: string, description: string) => void
+  /**
+   * Optional because a detached note window offers none of these — it renders
+   * the testcase without the surrounding app. They were required props that
+   * DetachedNoteView never passed, so the buttons called `undefined` there.
+   * Optional plus a no-op default states that absence instead of crashing on it.
+   */
+  onArchive?: () => void
+  onScreenshot?: (itemId: string) => void
+  onFeatureRequest?: (itemId: string, description: string) => void
 }
 
 export function TestcaseView({
   testcase,
   onUpdate,
   onArchive,
-  onScreenshot,
-  onFeatureRequest,
+  onScreenshot = () => {},
+  onFeatureRequest = () => {},
 }: TestcaseViewProps) {
   const { t } = useTranslation()
   const readOnly = !!testcase.frontmatter.archived
@@ -523,7 +529,7 @@ export function TestcaseView({
         {readOnly && (
           <span class="tc-view__archived">Archived {testcase.frontmatter.archivedAt || ''}</span>
         )}
-        {!readOnly && allDone && (
+        {!readOnly && allDone && onArchive && (
           <button class="tc-view__archive-btn" onClick={onArchive}>
             Archive
           </button>

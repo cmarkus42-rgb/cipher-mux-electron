@@ -2,11 +2,24 @@ import { useState, useEffect, useCallback } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { Memory, MemoryKind } from '../../shared/types'
 
+// MemoryKind carries 13 values. These maps covered four, so the other nine
+// rendered an empty label and `background: undefined` — a memory of kind
+// 'finding' or 'decision' showed up as an unlabelled blank chip. Record<K, V>
+// was the right type all along; it was the maps that had fallen behind.
 const KIND_LABELS: Record<MemoryKind, string> = {
   fact: 'fact',
   preference: 'pref',
   interaction: 'int',
   event: 'event',
+  decision: 'dec',
+  architecture: 'arch',
+  welle: 'welle',
+  'welle-plan': 'plan',
+  finding: 'find',
+  'risk-review': 'risk',
+  pattern: 'pat',
+  convention: 'conv',
+  off_limit: 'off',
 }
 
 const KIND_COLORS: Record<MemoryKind, string> = {
@@ -14,6 +27,15 @@ const KIND_COLORS: Record<MemoryKind, string> = {
   preference: 'var(--color-neon, #00ff88)',
   interaction: 'var(--color-warn, #ffaa00)',
   event: 'var(--color-error, #ff4444)',
+  decision: 'var(--color-accent, #7c5cff)',
+  architecture: 'var(--color-neon-cyan, #00d5ff)',
+  welle: 'var(--color-neon-green, #3ddc84)',
+  'welle-plan': 'var(--color-neon-green, #3ddc84)',
+  finding: 'var(--color-neon-orange, #ff9f45)',
+  'risk-review': 'var(--color-danger, #ff4d4d)',
+  pattern: 'var(--color-text-accent, #9aa8ff)',
+  convention: 'var(--color-text-muted, #8a8f98)',
+  off_limit: 'var(--color-neon-red, #ff2d55)',
 }
 
 interface CompanionMemoryViewProps {

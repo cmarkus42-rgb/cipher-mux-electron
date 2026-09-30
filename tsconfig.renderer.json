@@ -11,5 +11,11 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client"]
   },
-  "include": ["src/renderer/**/*.ts", "src/renderer/**/*.tsx", "src/shared/**/*.ts"]
+  "include": ["src/renderer/**/*.ts", "src/renderer/**/*.tsx", "src/renderer/**/*.d.ts", "src/shared/**/*.ts"],
+  // brand.ts liegt unter shared/, ist aber ein Main-Prozess-Modul: es liest
+  // beim Modulladen mit fs/__dirname die Profildatei. Kein Renderer-Modul
+  // importiert es. Es mitzukompilieren erzeugte fuenf Fehler ueber fehlende
+  // Node-Typen — und "node" in types aufzunehmen haette die Trennung
+  // aufgeweicht, statt sie zu benennen.
+  "exclude": ["src/shared/brand.ts"]
 }

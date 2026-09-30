@@ -12,7 +12,7 @@ interface SidebarPanelProps {
   visible: boolean
   workshopActive: boolean
   cyberFactoryActive: boolean
-  sessions: Array<{ id: string; name: string; status: string; projectPath?: string; workspaceId?: string | null }>
+  sessions: Array<{ id: string; name: string; status: string; projectPath?: string | null; workspaceId?: string | null }>
   gridSessionIds: string[]
   detachedIds?: Set<string>
   contextUsages: Record<string, { usedPercentage: number; used?: number; total?: number }>
@@ -397,7 +397,7 @@ export function SidebarPanel({
 }
 
 interface BackgroundSessionCardProps {
-  session: { id: string; name: string; projectPath?: string }
+  session: { id: string; name: string; projectPath?: string | null }
   contextUsage?: { usedPercentage: number; used?: number; total?: number }
   /** Precomputed, already-localized badge text; null hides the badge. */
   workspaceBadge?: string | null

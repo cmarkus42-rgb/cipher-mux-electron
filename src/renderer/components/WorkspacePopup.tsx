@@ -10,7 +10,7 @@ interface WorkspacePopupProps {
   onApply: (workspaceId: string) => void
   onOpenSettings: (tab: 'personas' | 'workspaces') => void
   currentGrid?: GridState
-  sessions?: Array<{ id: string; name: string; projectPath?: string }>
+  sessions?: Array<{ id: string; name: string; projectPath?: string | null }>
 }
 
 /** Inline span calculation (mirrors workspace-manager spanOf) */
@@ -164,7 +164,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     setSaving(true)
     try {
       const api = (window as any).cipherMux
-      const sessionMap: Record<string, { name: string; projectPath?: string }> = {}
+      const sessionMap: Record<string, { name: string; projectPath?: string | null }> = {}
       for (const s of currentSessions ?? []) {
         sessionMap[s.id] = s
       }
@@ -224,7 +224,7 @@ export function WorkspacePopup({ visible, onClose, onApply, onOpenSettings, curr
     setSaving(true)
     try {
       const api = (window as any).cipherMux
-      const sessionMap: Record<string, { name: string; projectPath?: string }> = {}
+      const sessionMap: Record<string, { name: string; projectPath?: string | null }> = {}
       for (const s of currentSessions ?? []) {
         sessionMap[s.id] = s
       }
