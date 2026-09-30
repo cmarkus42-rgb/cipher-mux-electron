@@ -1325,6 +1325,45 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     }
   )
 
+  // mux_mirror_sync — Dateien aus git im Mux sichtbar machen
+  registerMuxTool(server, 'mux_mirror_sync', {
+    description:
+      'Spiegelt Markdown-Dateien aus einem Repository als typisierte Notes. Der Mux spiegelt, '
+      + 'nicht die Rolle -- eine Rolle kann es vergessen, und dann haengt die Sichtbarkeit daran, '
+      + 'ob jemand daran gedacht hat. Wiederholbar: bereits gespiegelte Dateien werden '
+      + 'uebersprungen, erkannt an mirrors_file und nicht am Titel. Nur was in git liegt wird '
+      + 'gespiegelt -- eine uncommittete Datei hat keinen Commit, den der Spiegel nennen koennte.',
+    inputSchema: {
+      repo_path: z.string().describe('Absoluter Pfad des Repositories'),
+      directories: z.array(z.string()).describe('Verzeichnisse relativ zum Repo, z.B. ["docs/superpowers/specs"]'),
+      note_type: z.enum(['spec', 'requirements', 'research']).optional().describe('Typ der Notes (default: spec)'),
+      workspace_id: z.string().optional().describe('Workspace, den die Notes erben — sonst die aktive Bindung dieser Verbindung'),
+    },
+  }, async (args: { repo_path: string; directories: string[]; note_type?: string; workspace_id?: string }) => {
+    if (!ctx.noteManager) {
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'NoteManager not available' }) }], isError: true }
+    }
+    try {
+      const { syncMirrors } = await import('../notes/mirror-sync')
+      const result = await syncMirrors({
+        noteManager: ctx.noteManager,
+        repoPath: args.repo_path,
+        directories: args.directories,
+        noteType: args.note_type ?? 'spec',
+        // Ohne ausdrueckliche Angabe erbt die Note den Workspace dieser
+        // Verbindung -- der Workspace ist die Heimat eines Projekts.
+        workspaceId: args.workspace_id ?? ctx.workspaceId ?? null,
+      })
+      if (result.created.length > 0 && ctx.windowManager) {
+        ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created' })
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ error: message }) }], isError: true }
+    }
+  })
+
   // mux_readiness_stats — hat sich die Selbstmeldung bewaehrt?
   registerMuxTool(server, 'mux_readiness_stats', {
     description:
