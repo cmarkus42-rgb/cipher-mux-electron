@@ -52,7 +52,9 @@ import { pruneRunDirs, liveWorkspaceIds } from './session/entity-run-dir'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST, MAX_MANUAL_TAGS } from '../shared/constants'
 import { BRAND } from '../shared/brand'
-import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest, EntityId, Character, RecoveryResult } from '../shared/types'
+import type { StartSessionOpts, SendMessage, Topic, ContextUsage, KickoffRequest, EntityId, Character, RecoveryResult, SessionInfo, AppConfig } from '../shared/types'
+import type { GridSlot } from '../shared/grid-types'
+import type { TestcaseSection } from './notes/testcase-parser'
 import type { Persona, Workspace } from '../shared/persona-types'
 import { applyWorkspace } from './workspace/workspace-manager'
 import { NoteWatcher } from './notes/note-watcher'
@@ -127,10 +129,10 @@ export class IpcHub {
       }
     }
     // Migrate config key
-    const oldConfig = configStore.get('orchestrator' as any)
+    const oldConfig = configStore.getLegacy('orchestrator') as AppConfig['workshop'] | undefined
     if (oldConfig) {
       configStore.set('workshop', oldConfig)
-      configStore.set('orchestrator' as any, undefined as any)
+      configStore.clearLegacy('orchestrator')
       console.log('[IpcHub] Migrated orchestrator → workshop config key')
     }
 
@@ -317,7 +319,7 @@ export class IpcHub {
     }
 
     // Forward orphan detection events to renderer
-    this.sessionManager.on('orphans-detected', (orphans: any[]) => {
+    this.sessionManager.on('orphans-detected', (orphans: SessionInfo[]) => {
       this.windowManager.sendToMainWindow(IPC.SESSION_ORPHANS_DETECTED, orphans)
     })
 
@@ -336,8 +338,8 @@ export class IpcHub {
     // recovery completes. Without this, the renderer loads stale IDs that don't
     // match any live session → empty cells despite correct grid dimensions.
     const startupUi = configStore.get('ui')
-    if (startupUi?.grid?.slots?.some((s: any) => s.sessionId)) {
-      const clearedSlots = startupUi.grid.slots.map((s: any) => ({ ...s, sessionId: null }))
+    if (startupUi?.grid?.slots?.some((s: GridSlot) => s.sessionId)) {
+      const clearedSlots = startupUi.grid.slots.map((s: GridSlot) => ({ ...s, sessionId: null }))
       configStore.set('ui', { ...startupUi, grid: { ...startupUi.grid, slots: clearedSlots } })
       console.log('[IpcHub] Cleared stale session IDs from ui.grid on startup')
     }
@@ -453,7 +455,7 @@ export class IpcHub {
           this.sessionManager.killOrphan(orphan.tmuxSession).catch(() => {})
         }
         await this.restoreKeepWorkingFromRecovery(snapshotSessions, snapshotGridConfig, result.recovered, snapshotNotesSlots)
-        configStore.set('keepWorkingSnapshot', undefined as any)
+        configStore.clear('keepWorkingSnapshot')
         // Delay setting cachedRecoveryResult: the renderer needs time to process
         // the KEEP_WORKING_RESTORE event (sent by restoreKeepWorkingFromRecovery)
         // and set keepWorkingApplied.current = true. If we set cachedRecoveryResult
@@ -747,7 +749,7 @@ export class IpcHub {
       return { ok: true }
     })
 
-    ipcMain.handle('cipher-mux:sessions:capture', async (_e: any, sessionId: string) => {
+    ipcMain.handle('cipher-mux:sessions:capture', async (_e: unknown, sessionId: string) => {
       try {
         const content = await this.sessionManager.capture(sessionId)
         if (!content) return null
@@ -776,7 +778,7 @@ export class IpcHub {
       const pathNode = await import('path')
 
       // Save to workspace project dir > session projectPath > ~/Pictures fallback
-      const session = this.sessionManager.list().find((s: any) => s.id === sessionId)
+      const session = this.sessionManager.list().find((s: SessionInfo) => s.id === sessionId)
       const activeWs = getActiveWorkspace()
       const wsProjectDir = activeWs?.contextPaths?.[0] ?? null
       const baseDir = wsProjectDir ?? session?.projectPath ?? pathNode.join(os.homedir(), 'Pictures', 'cipher-mux')
@@ -987,13 +989,13 @@ export class IpcHub {
     })
 
     ipcMain.handle('cipher-mux:config:get-skip-permissions', () => {
-      const agent = configStore.get('agent') as any
+      const agent = configStore.get('agent')
       return agent?.skipPermissions ?? false
     })
 
-    ipcMain.handle('cipher-mux:config:set-skip-permissions', (_e: any, value: boolean) => {
-      const agent = (configStore.get('agent') as any) ?? {}
-      configStore.set('agent' as any, { ...agent, skipPermissions: value })
+    ipcMain.handle('cipher-mux:config:set-skip-permissions', (_e: unknown, value: boolean) => {
+      const agent = configStore.get('agent') ?? {}
+      configStore.set('agent', { ...agent, skipPermissions: value })
       return { ok: true }
     })
   }
@@ -1840,7 +1842,7 @@ export class IpcHub {
       const workspaces = configStore.get('workspaces') ?? []
       const activeId = configStore.get('activeWorkspaceId')
       // Sort: active workspace first, then by sortOrder (lower first), then by name
-      return [...workspaces].sort((a: any, b: any) => {
+      return [...workspaces].sort((a: Workspace, b: Workspace) => {
         if (a.id === activeId && b.id !== activeId) return -1
         if (b.id === activeId && a.id !== activeId) return 1
         const aSort = a.sortOrder ?? 100
@@ -2177,7 +2179,7 @@ export class IpcHub {
     })
 
     // Serialize testcase sections back to markdown body (main process)
-    ipcMain.handle(IPC.NOTES_SERIALIZE_TESTCASE, async (_e, { sections }: { sections: any[] }) => {
+    ipcMain.handle(IPC.NOTES_SERIALIZE_TESTCASE, async (_e, { sections }: { sections: TestcaseSection[] }) => {
       try {
         const { serializeTestcaseBody } = await import('./notes/testcase-parser')
         return serializeTestcaseBody(sections)
@@ -3125,7 +3127,7 @@ ist dieses Entity fokussiert?
     })
 
     // Clear consumed snapshot
-    configStore.set('detachedWindows', undefined as any)
+    configStore.clear('detachedWindows')
     console.log(`[IpcHub] restored detached windows from snapshot`)
 
     // Notify main window of detach state
@@ -3181,7 +3183,7 @@ ist dieses Entity fokussiert?
       configStore.set('detachedWindows', detachedEntries)
       console.log(`[IpcHub] saved ${detachedEntries.length} detached window(s) for restart`)
     } else {
-      configStore.set('detachedWindows', undefined as any)
+      configStore.clear('detachedWindows')
     }
 
     this.stopBtRemote()

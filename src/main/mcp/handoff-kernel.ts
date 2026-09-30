@@ -14,6 +14,7 @@ import { IPC } from '../../shared/ipc-channels'
 import type { ToolContext } from './mcp-tools'
 import type { Topic } from '../../shared/types'
 import { findEntitySessions } from '../session/entity-session-lookup'
+import { registerMuxTool } from './register-tool'
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -363,7 +364,7 @@ export function registerHandoffTool(
   ctx: ToolContext,
   def: HandoffToolDef,
 ): void {
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     def.toolName,
     {
       description: def.description,
@@ -400,7 +401,7 @@ export function registerHandoffTool(
 // ─── mux_entity_start Tool (REQ-HANDOFF-006) ──────────────
 
 function registerEntityStartTool(server: McpServer, ctx: ToolContext): void {
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_entity_start',
     {
       description:
@@ -563,7 +564,7 @@ export function registerAllHandoffTools(server: McpServer, ctx: ToolContext): vo
   // ─── REQ-TOOLS-006: mux_testing_findings_handoff_debugger ──
   // Special case: buildPayload needs ctx for TestingAssistantManager access.
   // We register manually instead of using registerHandoffTool.
-  ;(server.registerTool as any)(
+  registerMuxTool(server, 
     'mux_testing_findings_handoff_debugger',
     {
       description: 'Hand off testing findings to the debugger for fixing. Starts or finds a Debugger session and delivers prepared findings.',
