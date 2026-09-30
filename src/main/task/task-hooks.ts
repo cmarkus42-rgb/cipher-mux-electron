@@ -40,7 +40,7 @@ export class TaskHooks {
     }
 
     return new Promise((resolve) => {
-      const child = exec(cmd, { cwd, timeout }, (error, stdout, stderr) => {
+      exec(cmd, { cwd, timeout }, (error, stdout, stderr) => {
         const timedOut = error?.killed === true
         const exitCode = timedOut ? -1 : (error?.code ?? 0)
         resolve({
