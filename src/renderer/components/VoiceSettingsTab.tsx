@@ -1,5 +1,5 @@
 // src/renderer/components/VoiceSettingsTab.tsx
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
+import { useCallback, useEffect, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 
 const api = (window as any).cipherMux

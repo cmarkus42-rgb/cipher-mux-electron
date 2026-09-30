@@ -978,7 +978,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
             if (!item) { errors.push(`Item not found: ${op.itemId}`); continue }
             item.comment = op.comment
           } else if (op.op === 'add_item') {
-            let section = sections.find(s => s.title === op.section)
+            const section = sections.find(s => s.title === op.section)
             if (!section) { errors.push(`Section not found: ${op.section}`); continue }
             section.items.push({
               id: op.id,

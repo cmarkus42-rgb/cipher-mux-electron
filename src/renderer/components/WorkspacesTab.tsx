@@ -225,12 +225,6 @@ export function WorkspacesTab() {
     updateWs({ cells })
   }
 
-  const handleCellPresetChange = (presetId: string) => {
-    if (!ws) return
-    const cells = [...ws.cells]
-    cells[selectedCell] = { ...cells[selectedCell], presetId: presetId || undefined }
-    updateWs({ cells })
-  }
 
   /** Atomically set preset + project on selected cell (avoids stale-state overwrites). */
   const handleCellAssign = (presetId: string, project: string) => {

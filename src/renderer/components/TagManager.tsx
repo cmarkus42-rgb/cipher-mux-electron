@@ -1,6 +1,6 @@
 // src/renderer/components/TagManager.tsx
 // Tag Management UI — class-grouped layout with CRUD, merge, synonyms
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
+import { useState, useEffect, useCallback } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { TagClass, TagIndexData } from '../../shared/types'
 

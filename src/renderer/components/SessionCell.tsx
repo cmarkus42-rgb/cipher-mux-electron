@@ -130,7 +130,6 @@ export function SessionCell({
   const isClaudeSession = session.capabilities?.['status-line'] === true
 
   const dotClass = pct >= 85 ? 'neon-dot--error' : pct >= 60 ? 'neon-dot--warn' : 'neon-dot--ok'
-  const statusLabel = pct >= 85 ? 'Kritisch' : pct >= 60 ? 'Warnung' : 'OK'
 
   // Context bar: color based on breakpoints, width scaled so 65% displayed = full bar
   const barWidth = Math.min((pct / 65) * 100, 100)
