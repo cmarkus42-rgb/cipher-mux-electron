@@ -411,6 +411,10 @@ export class IpcHub {
       return this.sessionManager.recover()
     }).then(async (result) => {
       console.log(`[IpcHub] recovery complete: ${result.recovered.length} recovered, ${result.orphaned.length} orphaned, gridState=${!!result.gridState}`)
+      // Re-read the status files now that the sessions they belong to exist.
+      // The initial scan runs during construction, before recovery, so every
+      // claude-session-id it emitted was for a session nobody knew yet.
+      this.statusLineMonitor.rescan()
       this.sessionManager.startOrphanDetection()
       this.sessionManager.startExitDetection()
 
