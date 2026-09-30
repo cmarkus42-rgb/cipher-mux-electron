@@ -147,3 +147,12 @@ vorhanden und wurde nie als Bereitschaftssignal genutzt.
 
 Kein Datenmodell, keine Dateiliste, kein Task-Zuschnitt. Das ist Zielbild plus Begründung.
 Der Umsetzungsplan entsteht, wenn Abschnitt 7 entschieden ist.
+
+## 9. Selbsttest
+
+Dieses Dokument ist der erste Durchlauf des eigenen Konzepts: es liegt als Datei in git und
+ist im Mux als Note mit `noteType: spec` gespiegelt, die `mirrors_file` und `mirror_commit`
+trägt. Die Statuszeile über der Note entsteht beim Öffnen aus `computeMirrorDrift` und sagt,
+ob der Spiegel noch trägt.
+
+Die Probe auf Abschnitt 3.1 besteht darin, dass genau dieser Absatz den Spiegel altern lässt.
