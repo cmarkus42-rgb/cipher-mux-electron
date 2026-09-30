@@ -200,3 +200,8 @@ mehr danach fragen. Maßstab ist, dass es funktioniert.
 Voice, Bluetooth und Updater waren am 2026-09-29/30 nicht Gegenstand. **Stillschweigende
 Anforderung:** Sie sollen weiterhin funktionieren. Wer hier arbeitet, prüft das mit, statt es
 anzunehmen — die 88 Tests des VoiceInputRouter sind der billigste Teil davon.
+
+## 7. Nachtrag (2026-09-30)
+
+Dieser Abschnitt existiert, damit der Spiegel der Bestandsaufnahme veraltet und die
+Kopfzeile in der Oberflaeche etwas zu melden hat. Er darf nach dem Hinsehen wieder weg.

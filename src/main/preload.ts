@@ -270,6 +270,10 @@ const api = {
       ipcRenderer.invoke(IPC.NOTES_PARSE_TESTCASE, { id }),
     serializeTestcaseBody: (sections: any[]) =>
       ipcRenderer.invoke(IPC.NOTES_SERIALIZE_TESTCASE, { sections }),
+    mirrorStatus: (id: string) =>
+      ipcRenderer.invoke(IPC.NOTES_MIRROR_STATUS, { id }),
+    mirrorRefresh: (id: string) =>
+      ipcRenderer.invoke(IPC.NOTES_MIRROR_REFRESH, { id }),
     parseFinding: (id: string) =>
       ipcRenderer.invoke(IPC.NOTES_PARSE_FINDING, { id }),
     serializeFindingBody: (sections: any[]) =>

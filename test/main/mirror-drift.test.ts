@@ -5,7 +5,7 @@ import path from 'path'
 import os from 'os'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import { computeMirrorDrift, formatMirrorDrift, readMirrorSource } from '../../src/main/notes/mirror-drift'
+import { computeMirrorDrift, formatMirrorDrift, readMirrorSource, mirrorHistory } from '../../src/main/notes/mirror-drift'
 
 const runGit = promisify(execFile)
 
@@ -245,5 +245,73 @@ describe('readMirrorSource', () => {
   it('reports a non-repository instead of throwing', async () => {
     const result = await readMirrorSource({ repoPath: '/definitely/not/here', filePath: 'a.md' })
     assert.equal(result.ok, false)
+  })
+})
+
+// ─── History of a mirrored file ─────────────────────────────
+//
+// "Historie einer Spec" is git log on the file, rendered in the Mux — not a
+// notes history somebody has to maintain. The line the project drew: a list of
+// commits is following along; a diff viewer would be version control, and that
+// belongs in tools built for it.
+//
+// Deliberately without --follow. Renames are reported as "the original is no
+// longer in the repository" and the human decides; following them would be the
+// first step into the territory this stays out of.
+
+describe('mirrorHistory', () => {
+  let repo: string
+
+  before(async () => {
+    repo = await fs.mkdtemp(path.join(os.tmpdir(), 'mirror-history-'))
+    await git(repo, ['init', '-b', 'main'])
+    await fs.mkdir(path.join(repo, 'docs'), { recursive: true })
+    await fs.writeFile(path.join(repo, 'docs', 'spec.md'), 'eins\n')
+    await commit(repo, 'spec angelegt')
+    await fs.writeFile(path.join(repo, 'other.md'), 'x\n')
+    await commit(repo, 'fremde datei')
+    await fs.writeFile(path.join(repo, 'docs', 'spec.md'), 'zwei\n')
+    await commit(repo, 'spec ueberarbeitet')
+  })
+
+  after(async () => {
+    await fs.rm(repo, { recursive: true, force: true })
+  })
+
+  it('lists the commits that touched the file, newest first', async () => {
+    const h = await mirrorHistory({ repoPath: repo, filePath: 'docs/spec.md' })
+    assert.equal(h.ok, true)
+    assert.deepEqual(h.commits.map(c => c.subject), ['spec ueberarbeitet', 'spec angelegt'])
+  })
+
+  it('leaves out commits that touched other files', async () => {
+    const h = await mirrorHistory({ repoPath: repo, filePath: 'docs/spec.md' })
+    assert.ok(!h.commits.some(c => c.subject === 'fremde datei'))
+  })
+
+  it('carries hash, date and author for each commit', async () => {
+    const h = await mirrorHistory({ repoPath: repo, filePath: 'docs/spec.md' })
+    const c = h.commits[0]
+    assert.ok(c.hash.length >= 7)
+    assert.match(c.date, /^\d{4}-\d{2}-\d{2}$/)
+    assert.equal(c.author, 'T')
+  })
+
+  it('respects a limit', async () => {
+    const h = await mirrorHistory({ repoPath: repo, filePath: 'docs/spec.md', limit: 1 })
+    assert.equal(h.commits.length, 1)
+    assert.equal(h.truncated, true)
+  })
+
+  it('reports an unknown file as empty rather than failing', async () => {
+    const h = await mirrorHistory({ repoPath: repo, filePath: 'docs/gibtsnicht.md' })
+    assert.equal(h.ok, true)
+    assert.deepEqual(h.commits, [])
+  })
+
+  it('reports a non-repository instead of throwing', async () => {
+    const h = await mirrorHistory({ repoPath: '/definitely/not/here', filePath: 'a.md' })
+    assert.equal(h.ok, false)
+    assert.ok(h.problems.length > 0)
   })
 })

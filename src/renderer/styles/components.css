@@ -3987,3 +3987,86 @@
 
 .fv-row__file:disabled { cursor: default; }
 .fv-row__file:not(:disabled):hover { color: var(--color-text-accent); }
+
+/* ─── MirrorStatus ─────────────────────────────────────────
+   Kopfzeile über einer Note, die eine Datei in git spiegelt. Ein veralteter
+   Spiegel muss dort auffallen, wo er gelesen wird — deshalb trägt der
+   Stale-Zustand die Warnfarbe und nicht bloß ein anderes Wort. */
+
+.mirror {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-elev-1);
+  font-size: var(--font-size-xs);
+}
+
+.mirror--stale {
+  border-left: 2px solid var(--color-warning);
+  background: var(--color-bg-elevated);
+}
+
+.mirror__line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+}
+
+.mirror__summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
+.mirror--stale .mirror__summary { color: var(--color-warning); }
+
+.mirror__actions {
+  display: flex;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+}
+
+.mirror__btn {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  padding: 1px var(--space-xs);
+  cursor: pointer;
+}
+
+.mirror__btn:hover:not(:disabled) { border-color: var(--color-border-focus); color: var(--color-text); }
+.mirror__btn:disabled { opacity: 0.6; cursor: default; }
+.mirror__btn--primary { color: var(--color-warning); border-color: var(--color-warning); }
+
+.mirror__drift,
+.mirror__history {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-md) var(--space-xs);
+  max-height: 11em;
+  overflow-y: auto;
+}
+
+.mirror__drift li,
+.mirror__history li {
+  display: flex;
+  gap: var(--space-xs);
+  padding: 1px 0;
+  color: var(--color-text-muted);
+}
+
+.mirror__drift code,
+.mirror__history code {
+  color: var(--color-text-accent);
+  flex: 0 0 auto;
+}
+
+.mirror__date { flex: 0 0 auto; color: var(--color-text-dim); }
+.mirror__subject { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mirror__author { flex: 0 0 auto; color: var(--color-text-dim); }
+.mirror__more { color: var(--color-text-dim); font-style: italic; }
