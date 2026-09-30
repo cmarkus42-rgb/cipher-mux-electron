@@ -25,6 +25,7 @@ import { EntityRegistry } from './entity-registry'
 import { SessionStore, toPersistedSession } from './session-store'
 import { runCommand } from '../util/exec-util'
 import { injectStatusLineHook } from '../monitoring/statusline-hook'
+import { COMPANION_ENTITY_ID } from '../mcp/entity-header'
 import type { PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
@@ -118,6 +119,17 @@ const BASE_PERMISSIONS = [
   `${MCP_PREFIX}mux_ui_open`,
   `${MCP_PREFIX}mux_ui_highlight`,
   `${MCP_PREFIX}mux_theme_set`,
+]
+
+/**
+ * Companion memory tools. Only the Companion role gets them pre-approved,
+ * because only that role gets them registered at all — the MCP server decides
+ * that per connection from the X-Mux-Entity header (see entity-header.ts).
+ *
+ * Listing them for every entity, as this did, was misleading rather than
+ * harmful: a permission for a tool that was never registered does nothing.
+ */
+const COMPANION_MEMORY_PERMISSIONS = [
   `${MCP_PREFIX}companion_memory_write`,
   `${MCP_PREFIX}companion_memory_recall`,
   `${MCP_PREFIX}companion_memory_search`,
@@ -133,6 +145,9 @@ function getMcpPermissionsForEntity(entityId: EntityId): string[] {
     case 'launcher':
       perms.push(`${MCP_PREFIX}kickoff_complete`, 'Bash(tmux:*)')
       break
+  }
+  if (entityId === COMPANION_ENTITY_ID) {
+    perms.push(...COMPANION_MEMORY_PERMISSIONS)
   }
   return perms
 }
@@ -1173,7 +1188,10 @@ export class SessionManager extends EventEmitter {
       const mcpJsonPath = path.join(runDir, '.mcp.json')
       const mcpJson = {
         mcpServers: {
-          'cipher-mux': buildMcpServerConfig(mcpUrl, this.mcpConfig.mcpApiKey, workspaceId),
+          // config.id rides along as X-Mux-Entity: the MCP server has no other
+          // way to know which role is calling, and that decides which tools
+          // it registers for the connection.
+          'cipher-mux': buildMcpServerConfig(mcpUrl, this.mcpConfig.mcpApiKey, workspaceId, config.id),
         },
       }
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2), 'utf-8')

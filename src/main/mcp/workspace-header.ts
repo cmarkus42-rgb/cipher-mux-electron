@@ -5,6 +5,10 @@
 // tool parameter (which it can forget, silently writing into the wrong
 // workspace), the identity rides on the connection headers and is bound once
 // at initialize time.
+//
+// The role identity is the sibling case, in entity-header.ts.
+
+import { ENTITY_HEADER_CANONICAL } from './entity-header'
 
 /** Header name as Node normalises incoming headers: lowercase. */
 export const WORKSPACE_HEADER = 'x-mux-workspace'
@@ -43,15 +47,20 @@ export function resolveWorkspaceId(
 
 /**
  * Build the `mcpServers['cipher-mux']` entry written into .mcp.json and
- * settings.local.json. Omits the workspace header when unbound so an unbound
- * session is indistinguishable from a pre-upgrade one.
+ * settings.local.json. Omits each header when the corresponding identity is
+ * absent, so a client without it is indistinguishable from a pre-upgrade one.
+ *
+ * `entityId` is which role this connection belongs to — see entity-header.ts
+ * for why it has to travel on the connection rather than as a tool argument.
  */
 export function buildMcpServerConfig(
   mcpUrl: string,
   apiKey: string,
   workspaceId: string | null,
+  entityId?: string | null,
 ): { type: 'http'; url: string; headers: Record<string, string> } {
   const headers: Record<string, string> = { Authorization: `Bearer ${apiKey}` }
   if (workspaceId) headers[WORKSPACE_HEADER_CANONICAL] = workspaceId
+  if (entityId) headers[ENTITY_HEADER_CANONICAL] = entityId
   return { type: 'http', url: mcpUrl, headers }
 }
