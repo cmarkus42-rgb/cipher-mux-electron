@@ -25,6 +25,9 @@ import { EntityRegistry } from './entity-registry'
 import { SessionStore, toPersistedSession } from './session-store'
 import { runCommand } from '../util/exec-util'
 import { injectStatusLineHook } from '../monitoring/statusline-hook'
+import { COMPANION_ENTITY_ID } from '../mcp/entity-header'
+import { getEntityBoundary, buildBoundaryHookScript, buildBoundaryHookSettings } from './entity-boundaries'
+import { resolveEntityRuntime, type EntityRuntimeConfig } from './entity-runtime'
 import type { PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
@@ -118,6 +121,17 @@ const BASE_PERMISSIONS = [
   `${MCP_PREFIX}mux_ui_open`,
   `${MCP_PREFIX}mux_ui_highlight`,
   `${MCP_PREFIX}mux_theme_set`,
+]
+
+/**
+ * Companion memory tools. Only the Companion role gets them pre-approved,
+ * because only that role gets them registered at all — the MCP server decides
+ * that per connection from the X-Mux-Entity header (see entity-header.ts).
+ *
+ * Listing them for every entity, as this did, was misleading rather than
+ * harmful: a permission for a tool that was never registered does nothing.
+ */
+const COMPANION_MEMORY_PERMISSIONS = [
   `${MCP_PREFIX}companion_memory_write`,
   `${MCP_PREFIX}companion_memory_recall`,
   `${MCP_PREFIX}companion_memory_search`,
@@ -133,6 +147,9 @@ function getMcpPermissionsForEntity(entityId: EntityId): string[] {
     case 'launcher':
       perms.push(`${MCP_PREFIX}kickoff_complete`, 'Bash(tmux:*)')
       break
+  }
+  if (entityId === COMPANION_ENTITY_ID) {
+    perms.push(...COMPANION_MEMORY_PERMISSIONS)
   }
   return perms
 }
@@ -1152,6 +1169,48 @@ export class SessionManager extends EventEmitter {
         }
       }
 
+      // Role boundary as a PreToolUse hook. Measured before choosing this
+      // route: entity sessions run with --dangerously-skip-permissions, which
+      // bypasses permissions.deny entirely, while a PreToolUse hook still
+      // fires. A deny rule here would have looked enforced and done nothing.
+      // See entity-boundaries.ts.
+      try {
+        const boundary = getEntityBoundary(config.id)
+        const claudeDir = path.join(runDir, '.claude')
+        const hookPath = path.join(claudeDir, 'role-boundary.js')
+        const settingsPath = path.join(claudeDir, 'settings.local.json')
+        fs.mkdirSync(claudeDir, { recursive: true })
+
+        let settings: Record<string, unknown> = {}
+        try {
+          settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
+        } catch { /* doesn't exist yet */ }
+
+        if (boundary) {
+          fs.writeFileSync(
+            hookPath,
+            buildBoundaryHookScript(boundary.denyPathPatterns, boundary.reason),
+            { encoding: 'utf-8', mode: 0o755 },
+          )
+          settings.hooks = {
+            ...((settings.hooks as Record<string, unknown>) ?? {}),
+            ...buildBoundaryHookSettings(hookPath),
+          }
+          fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
+        } else if ((settings.hooks as { PreToolUse?: unknown })?.PreToolUse) {
+          // A role that lost its boundary must lose the hook too — otherwise a
+          // stale generated script keeps enforcing a rule nobody declares.
+          const hooks = { ...(settings.hooks as Record<string, unknown>) }
+          delete hooks.PreToolUse
+          settings.hooks = hooks
+          if (Object.keys(hooks).length === 0) delete settings.hooks
+          fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
+          try { fs.unlinkSync(hookPath) } catch { /* already gone */ }
+        }
+      } catch (err) {
+        console.warn(`[SessionManager] role boundary for ${config.id} failed:`, err)
+      }
+
       // Status-line hook into the RUN dir — the session's actual cwd, which is
       // where Claude Code reads settings from. It was only ever written to the
       // authored entity dir, so for entity sessions the hook never fired: no
@@ -1173,7 +1232,10 @@ export class SessionManager extends EventEmitter {
       const mcpJsonPath = path.join(runDir, '.mcp.json')
       const mcpJson = {
         mcpServers: {
-          'cipher-mux': buildMcpServerConfig(mcpUrl, this.mcpConfig.mcpApiKey, workspaceId),
+          // config.id rides along as X-Mux-Entity: the MCP server has no other
+          // way to know which role is calling, and that decides which tools
+          // it registers for the connection.
+          'cipher-mux': buildMcpServerConfig(mcpUrl, this.mcpConfig.mcpApiKey, workspaceId, config.id),
         },
       }
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2), 'utf-8')
@@ -1289,16 +1351,34 @@ export class SessionManager extends EventEmitter {
     const config = this.entityRegistry.get(entityId)
     if (!config) return
 
-    const adapter = this.adapterRegistry.getDefault()
+    // Role -> model / adapter. Absent values keep the previous behaviour
+    // exactly: registry default adapter, no --model, CLI decides.
+    const runtime = resolveEntityRuntime(config, configStore.get('app') as EntityRuntimeConfig)
+    const adapter = this.resolveAdapter(runtime.adapterId)
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: config.projectPath,
       sessionName: config.displayName,
       isWorkshop: entityId === 'workshop',
       isCyberFactory: entityId === 'cyber-factory',
+      ...(runtime.model ? { model: runtime.model } : {}),
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
     this.autoLaunchedSessions.add(sessionId)
     this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
+  }
+
+  /**
+   * Adapter for a role, falling back to the registry default.
+   *
+   * An unknown id is a misconfiguration, not a reason to refuse to start a
+   * session — it is named in the log and the default takes over.
+   */
+  private resolveAdapter(adapterId: string | undefined): AgentAdapter {
+    if (!adapterId) return this.adapterRegistry.getDefault()
+    const adapter = this.adapterRegistry.get(adapterId)
+    if (adapter) return adapter
+    console.warn(`[SessionManager] unknown adapter '${adapterId}' — using the default`)
+    return this.adapterRegistry.getDefault()
   }
 
   /**
@@ -1358,13 +1438,15 @@ export class SessionManager extends EventEmitter {
     const session = await this.startEntity(entityId, { workspaceId: effectiveWorkspaceId })
 
     // Queue Claude launch resuming the prior conversation
-    const adapter = this.adapterRegistry.getDefault()
+    const runtime = resolveEntityRuntime(config, configStore.get('app') as EntityRuntimeConfig)
+    const adapter = this.resolveAdapter(runtime.adapterId)
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: config.projectPath,
       sessionName: config.displayName,
       isWorkshop: entityId === 'workshop',
       isCyberFactory: entityId === 'cyber-factory',
       resume: true,
+      ...(runtime.model ? { model: runtime.model } : {}),
       ...(priorClaudeSessionId ? { resumeClaudeSessionId: priorClaudeSessionId } : {}),
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')

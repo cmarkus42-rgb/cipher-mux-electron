@@ -16,6 +16,7 @@ import type { TagClassRepo } from '../notes/tag-repository'
 import { IPC } from '../../shared/ipc-channels'
 import { registerAllHandoffTools, executeHandoff } from './handoff-kernel'
 import { resolveAnchorCommit } from '../notes/handoff-delta'
+import { mayUseCompanionMemory } from './entity-header'
 import { dispatchHandoffNote } from '../notes/handoff-dispatch'
 import type { EntityId } from '../../shared/types'
 import { integrate, inventory, migrationPlan, hubApply, hubVerify, hubRelease, hubRollback } from '../hub'
@@ -45,6 +46,12 @@ export interface ToolContext {
    * configStore at call time, which is the whole point.
    */
   workspaceId?: string | null
+  /**
+   * Role this connection belongs to, bound once at initialize from the
+   * X-Mux-Entity header. null = no role (the app's own tooling, a plain
+   * session). Decides which tools are registered — see entity-header.ts.
+   */
+  entityId?: string | null
 }
 
 const VALID_TOPICS: readonly string[] = ['status', 'bug', 'review', 'chat', 'system']
@@ -1318,6 +1325,16 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   )
 
   // ─── Companion Memory Tools ─────────────────────────────
+  //
+  // Registered only for the Companion role (and for connections carrying no
+  // role at all — the app's own tooling). Strategy paper 2.5: role-bound
+  // personal memory belongs to Companion, and every other role writing into
+  // the same store is what turned recall into a barrel.
+  //
+  // This is a registration-time decision on purpose. Dropping the tool from an
+  // entity's permission allowlist would only produce an approval prompt; a tool
+  // that is never registered for a connection cannot be called at all.
+  if (mayUseCompanionMemory(ctx.entityId)) {
 
   // 23. companion_memory_write — Write a memory
   ;(server.registerTool as any)(
@@ -1325,7 +1342,9 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     {
       description:
         'Write a memory to the companion memory store. Memories are transparent and deletable by the user. '
-        + 'Use for decisions, preferences, project state, personal facts. NOT for smalltalk or trivial details.',
+        + 'Use for decisions, preferences, project state, personal facts. NOT for smalltalk or trivial details. '
+        + 'When the content belongs in a note, store a POINTER: a short line plus note_id, not the note text. '
+        + 'The note is the content; duplicating it here creates a second copy that can go stale.',
       inputSchema: {
         text: z.string().describe('Memory text content'),
         kind: z.enum(['fact', 'preference', 'interaction', 'event']).describe('Memory category'),
@@ -1334,9 +1353,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         salience: z.number().min(0).max(1).optional().describe('Importance 0..1 (default 0.5)'),
         scope_kind: z.enum(['user', 'workspace', 'session']).optional().describe('Memory scope kind (default: user)'),
         scope_id: z.string().optional().describe('Scope identifier (workspace ID or session ID)'),
+        note_id: z.string().optional().describe('Note this memory points at — store the pointer, not the note text'),
       },
     },
-    async (args: { text: string; kind: 'fact' | 'preference' | 'interaction' | 'event'; session_id?: string; context_tags?: string[]; salience?: number; scope_kind?: 'user' | 'workspace' | 'session'; scope_id?: string }) => {
+    async (args: { text: string; kind: 'fact' | 'preference' | 'interaction' | 'event'; session_id?: string; context_tags?: string[]; salience?: number; scope_kind?: 'user' | 'workspace' | 'session'; scope_id?: string; note_id?: string }) => {
       if (!ctx.memoryStore) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'MemoryStore not available' }) }], isError: true }
       }
@@ -1362,9 +1382,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           sourceExcerpt: args.context_tags ? args.context_tags.join(', ') : undefined,
           scopeKind,
           scopeId,
+          ...(args.note_id ? { noteId: args.note_id } : {}),
         })
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: memory.id }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: memory.id, noteId: memory.noteId ?? null }) }],
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
@@ -1378,17 +1399,20 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     'companion_memory_recall',
     {
       description:
-        'Recall recent memories from the companion store. Returns newest first. '
-        + 'Use when the user references past events, decisions, or context.',
+        'Recall memories from the companion store. Ordered by relevance (salience, then recency) — '
+        + 'not by recency alone, which buried important old entries as the store filled up. '
+        + 'Pass rank="recent" for strict newest-first. Entries carrying a note_id are pointers: '
+        + 'read the note for the content. Use when the user references past events, decisions, or context.',
       inputSchema: {
         limit: z.number().optional().describe('Max results (default 20)'),
+        rank: z.enum(['relevance', 'recent']).optional().describe('Ordering (default relevance)'),
         entity_filter: z.string().optional().describe('Filter by memory kind'),
         since_hours: z.number().optional().describe('Only memories from the last N hours'),
         scope_kind: z.enum(['user', 'workspace', 'session']).optional().describe('Filter by scope kind'),
         scope_id: z.string().optional().describe('Filter by scope identifier'),
       },
     },
-    async (args: { limit?: number; entity_filter?: string; since_hours?: number; scope_kind?: 'user' | 'workspace' | 'session'; scope_id?: string }) => {
+    async (args: { limit?: number; rank?: 'relevance' | 'recent'; entity_filter?: string; since_hours?: number; scope_kind?: 'user' | 'workspace' | 'session'; scope_id?: string }) => {
       if (!ctx.memoryStore) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'MemoryStore not available' }) }], isError: true }
       }
@@ -1396,6 +1420,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         const since = args.since_hours ? Date.now() - (args.since_hours * 3600_000) : undefined
         const kindFilter = args.entity_filter as import('../../shared/types').MemoryKind | undefined
         const limit = args.limit ?? 20
+        const rank = args.rank ?? 'relevance'
 
         // Auto-scope: when workspace active and no explicit scope, recall both user + workspace memories
         let memories: import('../../shared/types').Memory[]
@@ -1408,16 +1433,21 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
           if (activeWsId) {
             // Merge user-scope and workspace-scope, sorted by timestamp desc
-            const userMemories = ctx.memoryStore.recall({ limit, kindFilter, since, scopeKind: 'user' })
-            const wsMemories = ctx.memoryStore.recall({ limit, kindFilter, since, scopeKind: 'workspace', scopeId: activeWsId })
+            const userMemories = ctx.memoryStore.recall({ limit, rank, kindFilter, since, scopeKind: 'user' })
+            const wsMemories = ctx.memoryStore.recall({ limit, rank, kindFilter, since, scopeKind: 'workspace', scopeId: activeWsId })
             const merged = [...userMemories, ...wsMemories]
-            merged.sort((a, b) => b.ts - a.ts)
+            // Re-sort with the same rule the store used. Sorting by ts here
+            // undid the relevance ordering for the common case -- a workspace
+            // being active is the norm, not the exception.
+            merged.sort((a, b) => rank === 'recent'
+              ? b.ts - a.ts
+              : (b.salience - a.salience) || (b.ts - a.ts))
             memories = merged.slice(0, limit)
           } else {
-            memories = ctx.memoryStore.recall({ limit, kindFilter, since })
+            memories = ctx.memoryStore.recall({ limit, rank, kindFilter, since })
           }
         } else {
-          memories = ctx.memoryStore.recall({ limit, kindFilter, since, scopeKind: args.scope_kind, scopeId: args.scope_id })
+          memories = ctx.memoryStore.recall({ limit, rank, kindFilter, since, scopeKind: args.scope_kind, scopeId: args.scope_id })
         }
 
         return {
@@ -1501,6 +1531,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       }
     }
   )
+
+  } // end companion memory tools
 
   // ─── Cyber Factory Tools ─────────────────────────────────
 
