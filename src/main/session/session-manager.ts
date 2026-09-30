@@ -109,6 +109,7 @@ const BASE_PERMISSIONS = [
   `${MCP_PREFIX}mux_notes_update`,
   `${MCP_PREFIX}mux_notes_delete`,
   `${MCP_PREFIX}mux_notes_open`,
+  `${MCP_PREFIX}mux_readiness_stats`,
   `${MCP_PREFIX}mux_notes_handoff_create`,
   `${MCP_PREFIX}mux_notes_handoff_search`,
   `${MCP_PREFIX}mux_notes_handoff_dispatch`,
