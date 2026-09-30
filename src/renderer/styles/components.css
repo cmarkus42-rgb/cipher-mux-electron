@@ -3848,3 +3848,141 @@
   gap: 8px;
   margin-bottom: 8px;
 }
+
+/* ─── FindingView ──────────────────────────────────────────
+   Review findings, parked minors, knowingly open gaps. Tokens and spacing
+   mirror .tc-view so the two typed note views read as one family. */
+
+.fv {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+}
+
+.fv__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  flex: 0 0 auto;
+}
+
+.fv__title {
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fv__summary,
+.fv__severities {
+  display: flex;
+  gap: var(--space-sm);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.fv__severities {
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: var(--font-size-xs);
+}
+
+.fv__count {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.fv__count--open { color: var(--color-warning); font-weight: 600; }
+.fv__count--parked { color: var(--color-text-dim); }
+.fv__count--resolved { color: var(--color-success); }
+
+.fv__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-sm) 0;
+}
+
+.fv__section-title {
+  padding: var(--space-sm) var(--space-md) var(--space-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fv-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+/* Closed findings stay readable but recede — the open ones are the work. */
+.fv-row--closed { opacity: 0.55; }
+
+.fv-row__status {
+  flex: 0 0 auto;
+  min-width: 6.5em;
+  padding: 1px var(--space-xs);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elev-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.fv-row__status:hover { border-color: var(--color-border-focus); }
+.fv-row__status--open { color: var(--color-warning); border-color: var(--color-warning); }
+.fv-row__status--parked { color: var(--color-text-dim); }
+.fv-row__status--resolved { color: var(--color-success); }
+.fv-row__status--wont_fix { color: var(--color-text-muted); }
+
+.fv-row__id {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: var(--color-text-accent);
+}
+
+.fv-row__severity {
+  flex: 0 0 auto;
+  min-width: 4.5em;
+  font-size: var(--font-size-xs);
+}
+
+.fv-row__severity--none { color: var(--color-text-dim); }
+
+.fv-row__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--color-text);
+}
+
+.fv-row__comment { color: var(--color-text-muted); }
+
+.fv-row__file {
+  flex: 0 0 auto;
+  max-width: 22em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-text-dim);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+
+.fv-row__file:disabled { cursor: default; }
+.fv-row__file:not(:disabled):hover { color: var(--color-text-accent); }

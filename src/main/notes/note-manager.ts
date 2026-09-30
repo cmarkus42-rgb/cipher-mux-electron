@@ -11,6 +11,34 @@ import { readMirrorSource } from './mirror-drift'
 // Scope-based subdirectories (global/, workspace-*/) are deprecated.
 // Categorization is purely tag-based. Migration from old layout runs once.
 
+/**
+ * Note types that a `kind:<type>` tag may set.
+ *
+ * The convention comes from testcases, where the tag is what makes
+ * TestcaseView pick a note up. Findings need the same, and a second hard-coded
+ * special case would mean a third one for the type after that — so the set is
+ * the list, and adding a type means adding it here.
+ *
+ * An unknown `kind:` tag stays a plain tag. Deriving a type from it would
+ * invent a view that does not exist.
+ */
+const TAG_DERIVED_NOTE_TYPES: readonly string[] = [
+  'testcase',
+  'finding',
+  'spec',
+  'requirements',
+  'research',
+]
+
+function deriveTypeFromTags(tags: readonly string[]): string | undefined {
+  for (const tag of tags) {
+    if (!tag.startsWith('kind:')) continue
+    const candidate = tag.slice('kind:'.length)
+    if (TAG_DERIVED_NOTE_TYPES.includes(candidate)) return candidate
+  }
+  return undefined
+}
+
 export class NoteManager {
   private notesDir: string
   private trashDir: string
@@ -298,7 +326,7 @@ export class NoteManager {
 
     const finalTitle = title || this.extractTitle(body)
     const tagList = tags ?? ([] as string[])
-    const type = opts?.type ?? (tagList.includes('kind:testcase') ? 'testcase' : undefined)
+    const type = opts?.type ?? deriveTypeFromTags(tagList)
     const mirrorsFile = opts?.mirrorsFile ?? null
     const mirrorCommit = opts?.mirrorCommit ?? null
     const anchorRepo = opts?.anchorRepo ?? null
