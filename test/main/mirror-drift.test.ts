@@ -5,7 +5,7 @@ import path from 'path'
 import os from 'os'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import { computeMirrorDrift, formatMirrorDrift } from '../../src/main/notes/mirror-drift'
+import { computeMirrorDrift, formatMirrorDrift, readMirrorSource } from '../../src/main/notes/mirror-drift'
 
 const runGit = promisify(execFile)
 
@@ -183,5 +183,67 @@ describe('formatMirrorDrift', () => {
       problems: [],
     })
     assert.ok(/nicht mehr|entfernt|fehlt/i.test(line))
+  })
+})
+
+// ─── Refreshing a mirror ────────────────────────────────────
+
+describe('readMirrorSource', () => {
+  let repo: string
+  let first: string
+
+  before(async () => {
+    repo = await fs.mkdtemp(path.join(os.tmpdir(), 'mirror-refresh-'))
+    await git(repo, ['init', '-b', 'main'])
+    await fs.mkdir(path.join(repo, 'docs'), { recursive: true })
+    await fs.writeFile(path.join(repo, 'docs', 'spec.md'), '# Spec\n\nerste Fassung\n')
+    first = await commit(repo, 'erste')
+    await fs.writeFile(path.join(repo, 'docs', 'spec.md'), '# Spec\n\nzweite Fassung\n')
+    await commit(repo, 'zweite')
+  })
+
+  after(async () => {
+    await fs.rm(repo, { recursive: true, force: true })
+  })
+
+  it('reads the committed content at HEAD, not the working tree', async () => {
+    // A dirty working tree must not leak into a mirror: the mirror names a
+    // commit, and an uncommitted edit has no commit to name.
+    await fs.writeFile(path.join(repo, 'docs', 'spec.md'), '# Spec\n\nUNCOMMITTED\n')
+
+    const result = await readMirrorSource({ repoPath: repo, filePath: 'docs/spec.md' })
+    assert.equal(result.ok, true)
+    assert.ok(result.content?.includes('zweite Fassung'))
+    assert.ok(!result.content?.includes('UNCOMMITTED'))
+    assert.ok(result.commit && result.commit.length >= 7)
+
+    await git(repo, ['checkout', '--', 'docs/spec.md'])
+  })
+
+  it('can read an older revision by commit', async () => {
+    const result = await readMirrorSource({
+      repoPath: repo, filePath: 'docs/spec.md', atCommit: first,
+    })
+    assert.ok(result.content?.includes('erste Fassung'))
+    assert.equal(result.commit, first)
+  })
+
+  it('reports a file that does not exist at that revision', async () => {
+    const result = await readMirrorSource({ repoPath: repo, filePath: 'docs/weg.md' })
+    assert.equal(result.ok, false)
+    assert.ok(result.problems.length > 0)
+  })
+
+  it('rejects a revision that is not a plain hash', async () => {
+    const result = await readMirrorSource({
+      repoPath: repo, filePath: 'docs/spec.md', atCommit: '--output=/tmp/pwned',
+    })
+    assert.equal(result.ok, false)
+    assert.ok(result.problems.some(p => /format/i.test(p)))
+  })
+
+  it('reports a non-repository instead of throwing', async () => {
+    const result = await readMirrorSource({ repoPath: '/definitely/not/here', filePath: 'a.md' })
+    assert.equal(result.ok, false)
   })
 })
