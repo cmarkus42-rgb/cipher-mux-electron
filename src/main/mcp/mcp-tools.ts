@@ -20,6 +20,15 @@ import { mayUseCompanionMemory } from './entity-header'
 import { dispatchHandoffNote } from '../notes/handoff-dispatch'
 import type { EntityId } from '../../shared/types'
 import { processTagsFor } from '../../shared/tag-axes'
+
+/**
+ * Obergrenze fuer von Hand mitgegebene Tags.
+ *
+ * Sieben ist die Zahl, die das Achsenmodell hergibt: ein Typ, zwei Phasen, ein
+ * Zustand, eine Schwere, zwei Bauteile. Workspace und Entity zaehlen nicht mit
+ * -- die setzt der Mux.
+ */
+const MAX_MANUAL_TAGS = 7
 import { integrate, inventory, migrationPlan, hubApply, hubVerify, hubRelease, hubRollback } from '../hub'
 import { registerMuxTool } from './register-tool'
 
@@ -702,7 +711,16 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: {
         title: z.string().describe('Note title (also used as # heading)'),
         body: z.string().describe('Markdown body (without the title heading — it will be prepended)'),
-        tags: z.array(z.string()).optional().describe('Tags for categorization (max 5, lowercase)'),
+        tags: z.array(z.string()).optional().describe(
+          'Tags, lowercase, as klasse:wert. Only registered values are accepted — an '
+          + 'unknown tag fails the call. Choose from: kind (testcase, finding, spec, '
+          + 'requirements, research, bugreport, handoff, journal, reference, todo, idea, '
+          + 'plan, report, guide), phase (research, architecture, coding, testing, '
+          + 'debugging, automation, monitoring), status (open, in-progress, blocked, '
+          + 'verify, done, superseded), severity (low, mid, hi, now), component '
+          + '(project-specific, see the Tag Manager). Do NOT pass workspace: or entity: — '
+          + 'the Mux sets those from the connection.',
+        ),
       },
     },
     async (args: { title: string; body: string; tags?: string[] }) => {
@@ -713,9 +731,13 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         const fullBody = `# ${args.title}\n\n${args.body}`
         let tags = args.tags ?? ([] as string[])
         // REQ-NOTES-007: warn if manual tags exceed limit, but create anyway
+        // Die Schwelle war 5 und stammt aus der Zeit vor den Achsen. Eine Note
+        // kann jetzt legitim sieben gewaehlte Tags tragen: kind, zwei Phasen,
+        // status, severity und zwei Bauteile. Eine Warnung, die bei normalem
+        // Gebrauch feuert, liest nach dem dritten Mal niemand mehr.
         const manualTagCount = tags.length
-        const tagLimitWarning = manualTagCount > 5
-          ? `Warning: ${manualTagCount} manual tags exceed recommended limit of 5.`
+        const tagLimitWarning = manualTagCount > MAX_MANUAL_TAGS
+          ? `Warning: ${manualTagCount} manual tags exceed recommended limit of ${MAX_MANUAL_TAGS}.`
           : undefined
         // Validate tags against tag repository (strict rejection of unknown tags)
         if (tags.length > 0 && ctx.tagClassRepo) {

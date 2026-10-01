@@ -313,6 +313,23 @@ export function migrateTags(tags: readonly string[], ctx: MigrationContext): Mig
     }
   }
 
+  // ── Ein toter Workspace neben einem gültigen entfällt ──
+  // Vor dem Umzug trugen 128 Notes zwei Workspace-Tags, fast alle nur, weil
+  // Anzeigename und Kleinschreibung als zwei galten; die bildet die Schleife
+  // oben auf dieselbe ID ab. Übrig bleiben Notes mit einem gültigen und einem
+  // gelöschten Workspace. Der gelöschte zeigt nirgendwohin und kann weg --
+  // solange ein gültiger bleibt. Ist er der Einzige, bleibt er stehen: ohne
+  // Workspace-Tag wäre die Note in JEDEM Workspace sichtbar.
+  const mappedWorkspaces = out.filter(t => /^workspace:ws-\d+$/.test(t.toLowerCase()))
+  if (mappedWorkspaces.length > 0) {
+    for (let i = out.length - 1; i >= 0; i--) {
+      const lower = out[i].toLowerCase()
+      if (lower.startsWith('workspace:') && !/^workspace:ws-\d+$/.test(lower)) {
+        out.splice(i, 1)
+      }
+    }
+  }
+
   // ── Aufgelöste Klassen räumen ──
   // Nach der Schleife, nicht darin: `scope:testing` muss erst zu
   // `phase:testing` geworden sein. Umgekehrt wäre die Phase nie entstanden.
