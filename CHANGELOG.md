@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] — 2026-10-01
+
+### Added
+- **Model selection per role.** Field **Modell** below **CLI** in the preset editor. `app.entityModels` and its resolution to `--model <id>` already existed — what was missing was a way to set it. The adapter contract gained an optional `listModels()`, because the three CLIs differ: Claude Code has no command for it and knows only the three aliases its `--help` names *as examples*; Codex returns nine models via `codex debug models`; opencode returns whatever its **authenticated** providers offer (eight without a login).
+- It is a free-text field **with** suggestions, not a dropdown: none of the lists is complete, and all three CLIs accept a full model name that is not in them. `ENTITY_MODEL_SET` deliberately does not validate against the list.
+
+### Fixed
+- **The capability hint promised consequences that do not occur.** Of the seven `AdapterCapabilities` flags, only `status-line` (5 readers) and `mcp-injection` (1) are read anywhere in the code. The other five — `skip-permissions`, `project-instructions`, `message-bus-participant`, `companion-mcp`, `sub-agents` — have **zero** readers; they are statements about the CLI, not switches. The preset editor now names only the two that act.
+- `sub-agents: false` means *unmeasured*, not *absent*. Both Tier-2 CLIs have sub-agents — Codex has `SubagentStart`/`SubagentStop` hook events and `codex agents`, opencode has `--agent <name>` and `opencode agent`. What is unmeasured is whether the Mux sees them.
+- `isClaudeSession` in `SessionCell` was `status-line === true`. The name claimed a CLI; the condition meant the prerequisite for forking. All three adapters now report that capability and all three can fork. Renamed to `canFork`.
+
 ## [0.10.0] — 2026-10-01
 
 ### Added
