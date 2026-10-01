@@ -105,6 +105,20 @@ export const ENTITY_PHASE_DEFAULT: Readonly<Record<string, string>> = {
   workshop: 'automation',
 }
 
+/**
+ * Tags ohne Klasse, die der Mux programmatisch liest.
+ *
+ * `handoff` wird von `NoteManager.createHandoff` auf jede Übergabe-Note
+ * geschrieben, und `mux_notes_handoff_search` filtert genau darauf. Er muss
+ * flach bleiben: ein `kind:handoff` daneben wäre der Typ, dieser hier ist der
+ * Marker „hier wartet eine Übergabe".
+ *
+ * Er steht hier, weil zwei Pfade sich sonst widersprechen — `createHandoff`
+ * umgeht die Tag-Prüfung und schrieb ihn, während `isKnownTag` ihn abwies.
+ * Dieselbe Note über `mux_notes_create` wäre an der Prüfung gescheitert.
+ */
+export const FLAT_MARKERS: readonly string[] = ['handoff']
+
 export const AXIS_VALUES: Partial<Record<TagAxis, readonly string[]>> = {
   kind: KIND_VALUES,
   entity: ENTITY_VALUES,

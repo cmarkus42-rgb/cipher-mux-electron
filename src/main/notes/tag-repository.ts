@@ -1,7 +1,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { TagClassRepository, TagClass } from '../../shared/types'
-import { AXIS_VALUES, SEVERITY_VALUES, type TagAxis } from '../../shared/tag-axes'
+import { AXIS_VALUES, FLAT_MARKERS, SEVERITY_VALUES, type TagAxis } from '../../shared/tag-axes'
 
 const TAGS_FILENAME = '.tags.json'
 
@@ -283,6 +283,11 @@ export class TagClassRepo {
       if (!cls) return false
       return cls.values.includes(value)
     }
+
+    // Flache Funktionsmarker: programmatisch gelesen, ohne Klasse. Siehe
+    // FLAT_MARKERS -- `handoff` wird von createHandoff geschrieben und von
+    // mux_notes_handoff_search gefiltert.
+    if (FLAT_MARKERS.includes(value)) return true
 
     // No colon — check if it matches a bare class name (tag === value here, tagClass is null)
     return Object.prototype.hasOwnProperty.call(this.data.classes, value)

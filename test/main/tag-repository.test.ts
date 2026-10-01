@@ -4,7 +4,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import { TagClassRepo } from '../../src/main/notes/tag-repository'
-import { AXIS_VALUES, PHASE_VALUES, KIND_VALUES } from '../../src/shared/tag-axes'
+import { AXIS_VALUES, PHASE_VALUES, KIND_VALUES, FLAT_MARKERS } from '../../src/shared/tag-axes'
 
 describe('TagClassRepo', () => {
   let tmpDir: string
@@ -283,6 +283,39 @@ describe('TagClassRepo — Startbelegung gegen Vorschrift', () => {
     const repo = new TagClassRepo(dir)
     for (const cls of ['domain', 'project', 'scope']) {
       assert.deepEqual(repo.getClassValues(cls), [], `${cls} ist aufgeloest`)
+    }
+  })
+})
+
+describe('TagClassRepo — flache Funktionsmarker', () => {
+  let dir: string
+  let repo: TagClassRepo
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tag-repo-flat-'))
+    repo = new TagClassRepo(dir)
+  })
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  // Audit-Befund vom 2026-10-01: zwei Pfade widersprachen sich.
+  // note-manager.ts schreibt `['handoff']` auf jede Handoff-Note und
+  // mcp-tools.ts sucht genau danach -- aber isKnownTag wies den Tag ab. Nur
+  // weil createHandoff die Pruefung umgeht, ist es nicht aufgefallen; ueber
+  // mux_notes_create haette dieselbe Note einen Fehler ergeben.
+  it('akzeptiert handoff', () => {
+    assert.equal(repo.isKnownTag('handoff'), true)
+  })
+
+  it('akzeptiert kein beliebiges klassenloses Wort', () => {
+    assert.equal(repo.isKnownTag('irgendwas'), false)
+  })
+
+  it('akzeptiert jeden Marker aus FLAT_MARKERS', () => {
+    for (const marker of FLAT_MARKERS) {
+      assert.equal(repo.isKnownTag(marker), true, marker)
     }
   })
 })

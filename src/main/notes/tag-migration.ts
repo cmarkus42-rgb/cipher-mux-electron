@@ -498,7 +498,10 @@ export async function runTagMigrationOnce(opts: {
 
   try {
     if (fs.existsSync(marker)) return null
-  } catch {
+  } catch (err) {
+    // Ein nicht pruefbarer Marker heisst "nie umziehen". Still waere das die
+    // schlechteste Variante: die Tags blieben alt und niemand wuesste, warum.
+    console.warn('[TagMigration] Marker nicht pruefbar, Umzug uebersprungen:', err)
     return null
   }
 
