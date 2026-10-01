@@ -22,10 +22,14 @@ MCP-Server und Projekt-Kick-off. Zielbild und Begründung:
    Lauf ist ab jetzt eine echte Regression.
 4. **`npm run lint` ist projektweit rot** (830 Probleme, 478 Fehler) und war es vorher schon.
    Ein grüner Lauf ist kein erreichbares Abnahmekriterium. Das Gate lautet: *keine neuen
-   Probleme in den geänderten Dateien*, geprüft per `npx eslint <dateien>` gegen `git blame`.
-   Der **Typecheck** dagegen ist grün — `tsconfig.main.json` und `tsconfig.renderer.json`
-   beide null Fehler. Der Root-`tsconfig.json` zieht `conserved/` mit und rauscht; nimm die
-   beiden spezifischen.
+   Probleme in den geänderten Dateien*, geprüft per `npx eslint <dateien>`. **Die CI prüft
+   seit dem 2026-10-01 genau das** — der Lint-Job nimmt die Dateien aus dem Diff. Vorher führte
+   er `npm run lint` aus und konnte deshalb nie grün werden; das hat das CI-Abzeichen seit Mai
+   rot gehalten und zwei echte Befunde darin versteckt (Node 20 statt 22, kein tmux auf dem
+   macOS-Runner, `distutils` unter Python 3.12). **Ein Gate, das nicht grün werden kann, ist
+   kein Signal.** Der **Typecheck** dagegen ist grün — `tsconfig.main.json` und
+   `tsconfig.renderer.json` beide null Fehler, und die CI hat dafür jetzt einen eigenen Job.
+   Der Root-`tsconfig.json` zieht `conserved/` mit und rauscht; nimm die beiden spezifischen.
 5. **Vier Sektionen dieser Datei werden von Mux injiziert**, nicht von Hand gepflegt:
    `## Global Rules`, `## Workspace Prompt`, `## Context Directories`, `## Session Identity`.
    Handarbeit daran wird beim nächsten Sessionstart überschrieben. Global Rules bearbeitet man
