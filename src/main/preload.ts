@@ -429,6 +429,16 @@ const api = {
       templateVersion: number | null
       stale: boolean
     } | null> => ipcRenderer.invoke(IPC.PRESET_TEMPLATE_STATUS, entityId),
+    /**
+     * Die Code-Vorlage uebernehmen. Schreibt vorher eine Sicherung daneben und
+     * gibt deren Pfad zurueck — `unchanged`, wenn die Datei schon gleich war.
+     */
+    presetTemplateApply: (entityId: string): Promise<{
+      ok: boolean
+      backupPath?: string | null
+      unchanged?: boolean
+      error?: string
+    }> => ipcRenderer.invoke(IPC.PRESET_TEMPLATE_APPLY, entityId),
     listModels: (adapterId: string): Promise<Array<{
       id: string
       label: string

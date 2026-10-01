@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { parsePresetVersion, comparePresetVersion } from '../../src/main/entity-content/preset-version'
+import { parsePresetVersion, comparePresetVersion, presetBackupPath } from '../../src/main/entity-content/preset-version'
 import { PRESET_TEMPLATES, presetTemplateFor } from '../../src/main/entity-content/preset-templates'
 
 describe('parsePresetVersion', () => {
@@ -72,6 +72,31 @@ describe('comparePresetVersion', () => {
 
   it('beide ohne Marker: keine Aussage, keine Warnung', () => {
     assert.equal(comparePresetVersion('a', 'b').stale, false)
+  })
+})
+
+describe('presetBackupPath', () => {
+  const at = new Date('2026-10-01T22:40:05.123Z')
+
+  it('haengt einen Zeitstempel an, der ein Dateiname sein darf', () => {
+    const p = presetBackupPath('/x/entities/companion/preset.md', at)
+    assert.equal(p, '/x/entities/companion/preset.md.bak-2026-10-01T22-40-05Z')
+    assert.ok(!p.slice(1).includes(':'), 'Doppelpunkte sind im Finder Pfadtrenner')
+  })
+
+  it('zwei Reparaturen ueberschreiben sich nicht', () => {
+    // Ohne Zeitstempel waere die erste Sicherung beim zweiten Mal weg -- und
+    // genau dann ist die Reparatur das irreversible Ding, das sie nicht sein soll.
+    const a = presetBackupPath('/x/preset.md', new Date('2026-10-01T22:40:05Z'))
+    const b = presetBackupPath('/x/preset.md', new Date('2026-10-01T22:41:05Z'))
+    assert.notEqual(a, b)
+  })
+
+  it('laesst den Originalpfad vollstaendig stehen', () => {
+    // Die Sicherung liegt neben der Datei, nicht irgendwo -- wer sie sucht,
+    // findet sie im selben Verzeichnis.
+    const p = presetBackupPath('/x/entities/debugger/preset.md', at)
+    assert.ok(p.startsWith('/x/entities/debugger/preset.md.'))
   })
 })
 
