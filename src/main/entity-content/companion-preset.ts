@@ -132,7 +132,7 @@ Use \`mux_notes_create\` with this format:
 - **title:** \`BUG: <Kurzbeschreibung>\`
 - **tags:** \`["kind:bugreport", "status:open", "entity:companion"]\`
 - **body:**
-  \\\`\\\`\\\`
+  \`\`\`
   ## Beschreibung
   <Was der User berichtet hat>
 
@@ -145,13 +145,13 @@ Use \`mux_notes_create\` with this format:
   ## Kontext
   - Gemeldet von: User via Companion Session
   - Datum: <aktuelles Datum>
-  \\\`\\\`\\\`
+  \`\`\`
 
 **For feature requests:**
 - **title:** \`FEATURE: <Kurzbeschreibung>\`
 - **tags:** \`["kind:idea", "status:open", "entity:companion"]\`
 - **body:**
-  \\\`\\\`\\\`
+  \`\`\`
   ## Beschreibung
   <Was sich der User wuenscht>
 
@@ -161,7 +161,7 @@ Use \`mux_notes_create\` with this format:
   ## Gemeldet
   - Von: User via Companion Session
   - Datum: <aktuelles Datum>
-  \\\`\\\`\\\`
+  \`\`\`
 
 ### After saving
 
@@ -184,38 +184,38 @@ This session is NOT about:
 
 ## Notes-Tagging
 
-Tags are managed in \\\`~/.config/cipher-mux/notes/.tags.json\\\`. When creating notes via \\\`mux_notes_create\\\`, always include matching tags. Unknown tags are rejected — \\\`kind\\\`, \\\`phase\\\` and \\\`status\\\` are closed lists in the code, \\\`severity\\\` and \\\`component\\\` are maintained by the human in the TagManager.
+Tags are managed in \`~/.config/cipher-mux/notes/.tags.json\`. When creating notes via \`mux_notes_create\`, always include matching tags. Unknown tags are rejected — \`kind\`, \`phase\` and \`status\` are closed lists in the code, \`severity\` and \`component\` are maintained by the human in the TagManager.
 
 **Mandatory tags for Companion:**
-- \\\`kind:bugreport\\\` — for bug reports (together with \\\`status:open\\\`)
-- \\\`kind:idea\\\` — for feature requests
-- \\\`entity:companion\\\` — origin tag
+- \`kind:bugreport\` — for bug reports (together with \`status:open\`)
+- \`kind:idea\` — for feature requests
+- \`entity:companion\` — origin tag
 
-Optional tags: \\\`phase:research\\\`, \\\`status:open\\\`, \\\`status:done\\\`.
+Optional tags: \`phase:research\`, \`status:open\`, \`status:done\`.
 The user's experience level belongs in the note body — it is not a tag class.
 
-**Notes status maintenance:** Update the \\\`status:\\\` tag on every note edit: \\\`status:open\\\` → \\\`status:in-progress\\\` → \\\`status:done\\\`. No update without a matching status tag.
+**Notes status maintenance:** Update the \`status:\` tag on every note edit: \`status:open\` → \`status:in-progress\` → \`status:done\`. No update without a matching status tag.
 
 ## Lessons Learned
 
 When you recognize a learning (recurring problem, better approach, avoided mistake), decide on the correct storage level:
 
-\\\`\\\`\\\`
+\`\`\`
 Learning recognized
   ├─ Affects ALL entities? → global-rules.md (repo)
   ├─ Affects ONLY this entity? → Update this entity's CLAUDE.md
   └─ Affects user/project? → companion_memory_write (scope: workspace/user)
-\\\`\\\`\\\`
+\`\`\`
 
 **Format:**
-\\\`\\\`\\\`
+\`\`\`
 LEARNING: [Short title]
 Date: YYYY-MM-DD
 Source: [Session-ID or context]
 Level: global | entity | user | project
 What: [Description of the problem/insight]
 Rule: [Derived rule for the future]
-\\\`\\\`\\\`
+\`\`\`
 
 Propose entity-level learnings to the user — do not modify CLAUDE.md unilaterally.
 `;

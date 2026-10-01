@@ -50,20 +50,20 @@ Das Grid ist dein Arbeitsbereich. Hier laufen deine KI-Sessions — sichtbar, gl
 
 Stell dir vor, du rufst Claude gleichzeitig auf mehreren Telefonen an. Jeder Anruf ist unabhängig — eigenes Gedächtnis, eigene Aufgabe, eigenes Verzeichnis. Das Grid zeigt dir alle Anrufe auf einen Blick.
 
-Eine **Zelle** ist ein Slot im Grid. Leer → zeigt \\\`+\\\`. Belegt → zeigt eine laufende Session.
+Eine **Zelle** ist ein Slot im Grid. Leer → zeigt \`+\`. Belegt → zeigt eine laufende Session.
 
 ---
 
 ## Eine Session starten
 
-1. Klick auf \\\`+\\\` in einer leeren Zelle
+1. Klick auf \`+\` in einer leeren Zelle
 2. Das **Launcher-Popup** öffnet sich — drei Tabs:
    - **Presets** — spezialisierte Rollen (Companion, Cyber Factory, etc.)
    - **Path** — eigenen Projektordner öffnen
    - **Notes** — eine Notiz in dieser Zelle anzeigen
 3. Preset oder Pfad wählen → Session startet
 
-Alternativ: \\\`Cmd+N\\\` öffnet das Launcher-Popup in der nächsten freien Zelle.
+Alternativ: \`Cmd+N\` öffnet das Launcher-Popup in der nächsten freien Zelle.
 
 ---
 
@@ -111,7 +111,7 @@ Header einer Session anfassen und auf eine andere Zelle ziehen. Die beiden Sessi
 
 ## Context-Warnung ernst nehmen
 
-Wenn der Balken orange oder rot wird, ist das Context Window fast voll. Claude "vergisst" dann ältere Teile des Gesprächs. Lösung: neue Session starten (\\\`/new\\\` in der Session oder Fork).
+Wenn der Balken orange oder rot wird, ist das Context Window fast voll. Claude "vergisst" dann ältere Teile des Gesprächs. Lösung: neue Session starten (\`/new\` in der Session oder Fork).
 
 ---
 
@@ -132,18 +132,18 @@ Der Focus Mode maximiert eine Session **im Grid** — sie belegt 2×2 Zellen. Di
 
 **Aktivieren:**
 - Scan-Icon (☰ mit Pfeilen) im Session-Header klicken
-- oder \\\`Cmd+Shift+F\\\`
+- oder \`Cmd+Shift+F\`
 
 **Was passiert:**
 - Die Session expandiert auf 2×2
 - Eine floating **Focus-Bar** erscheint oben
 
 **Die Focus-Bar:**
-\\\`\\\`\\\`
+\`\`\`
 [Session-Name]  CTX 34%  |  Aa  |  ESC
-\\\`\\\`\\\`
+\`\`\`
 - **CTX XX%** — Context-Nutzung, farbkodiert
-- **Aa** — Font-Größe anpassen (klicken → \\\`-\\\` / px-Anzeige / \\\`+\\\`, Bereich 8–36px)
+- **Aa** — Font-Größe anpassen (klicken → \`-\` / px-Anzeige / \`+\`, Bereich 8–36px)
 - **ESC** — Focus Mode beenden
 
 **Beenden:** ESC-Taste, ESC-Button in der Bar, oder Scan-Icon erneut klicken.
@@ -187,7 +187,7 @@ const GUIDE_SIDEBAR = `# Guide: Die Sidebar — Alles im Blick
 
 Die Sidebar ist die Kommandozentrale für alles, was nicht direkt im Grid sichtbar ist: Notes, Hintergrund-Sessions, Nachrichten, Erinnerungen.
 
-**Öffnen:** \\\`sidebar\\\`-Button in der Statusleiste (leuchtet wenn Inhalt wartet).
+**Öffnen:** \`sidebar\`-Button in der Statusleiste (leuchtet wenn Inhalt wartet).
 
 ---
 
@@ -201,7 +201,7 @@ Jede Sektion ist auf- und zuklappbar — der Zustand wird gespeichert. Klick auf
 
 Dein Notiz-Browser. Zeigt alle Notes, durchsuchbar und nach Tags filterbar.
 
-**Workspace-Filterung:** Wenn ein Workspace aktiv ist, filtert die Notes-Sektion automatisch auf \\\`workspace:<Name>\\\`. Du siehst nur Notes die zu deinem aktuellen Workspace gehören. Filter manuell überschreibbar.
+**Workspace-Filterung:** Wenn ein Workspace aktiv ist, filtert die Notes-Sektion automatisch auf \`workspace:<Name>\`. Du siehst nur Notes die zu deinem aktuellen Workspace gehören. Filter manuell überschreibbar.
 
 **Interaktion:**
 - Einfachklick → Details/Preview
@@ -264,9 +264,9 @@ cipher-mux kommt mit einer Reihe spezialisierter KI-Rollen — **Entities** gena
 
 Die Entities sind entlang eines Entwicklungsablaufs angeordnet:
 
-\\\`\\\`\\\`
+\`\`\`
 Idee → Anforderungen → Implementierung → Testen → Bugs fixen
-\\\`\\\`\\\`
+\`\`\`
 
 Und dahinter drei unterstützende Rollen: Companion, Audit, Workshop.
 
@@ -494,7 +494,7 @@ const GUIDE_WORKSPACES = `# Guide: Workspaces — Layouts speichern und anwenden
 
 Ein Workspace ist ein gespeichertes Grid-Layout — welche Sessions wo laufen, mit welchen Projekten und Einstellungen. Ein Klick, alles steht.
 
-**Öffnen:** \\\`workspaces\\\` in der Statusleiste → eigenes Fenster mit 4 Tabs.
+**Öffnen:** \`workspaces\` in der Statusleiste → eigenes Fenster mit 4 Tabs.
 
 ---
 
@@ -504,7 +504,7 @@ Links die Liste deiner Workspaces, rechts der Editor.
 
 ### Workspace erstellen
 
-1. \\\`+ Neu\\\` in der Liste
+1. \`+ Neu\` in der Liste
 2. Name vergeben
 3. Spalten/Zeilen einstellen
 4. Zellen befüllen (Klick auf Zelle → EntityPicker)
@@ -526,9 +526,9 @@ Am unteren Rand einer Zelle erscheint ein Handle — klicken verbindet die Zelle
 
 **Workspace Prompt:** Text der in *alle* Sessions dieses Workspaces injiziert wird.
 
-**Context Directories:** Verzeichnisse als zusätzlicher \\\`@\\\`-Kontext für alle Sessions.
+**Context Directories:** Verzeichnisse als zusätzlicher \`@\`-Kontext für alle Sessions.
 
-**Default Tags:** Tags die automatisch auf neue Notes angewendet werden (nur \\\`klasse:wert\\\`-Format).
+**Default Tags:** Tags die automatisch auf neue Notes angewendet werden (nur \`klasse:wert\`-Format).
 
 **Notes Global:** Notes-Sektion zeigt alle Notes global oder nur workspace-gefiltert.
 
@@ -585,11 +585,11 @@ Das Notes-System ist der Wissensspeicher von cipher-mux. Sessions schreiben Note
 
 ## Note anlegen
 
-**Über den Launcher:** \\\`+\\\` in einer leeren Zelle → Tab **Notes** → "Neue Notiz".
+**Über den Launcher:** \`+\` in einer leeren Zelle → Tab **Notes** → "Neue Notiz".
 
-**Über die Sidebar:** Notes-Sektion → \\\`+\\\`-Button.
+**Über die Sidebar:** Notes-Sektion → \`+\`-Button.
 
-**Per Session:** Jede Session kann Notes über MCP-Tools anlegen (\\\`mux_notes_create\\\`).
+**Per Session:** Jede Session kann Notes über MCP-Tools anlegen (\`mux_notes_create\`).
 
 ---
 
@@ -600,22 +600,22 @@ Eine Note öffnet sich in einer **Grid-Zelle** als Markdown-Editor (CodeMirror).
 Unterstützte Formatierung: Überschriften, **fett**, *kursiv*, Links, Code-Blöcke, Zitate, Listen, Tabellen.
 
 **Speichern:**
-- \\\`Cmd+S\\\` → speichert und schlägt **Tags** vor (via lokalem KI-Modell)
+- \`Cmd+S\` → speichert und schlägt **Tags** vor (via lokalem KI-Modell)
 - **Auto-Save** nach 2 Sekunden Inaktivität (ohne Tag-Vorschlag)
 
 ---
 
 ## Tags
 
-Tags sind das Organisationsprinzip. Format immer: \\\`klasse:wert\\\`
+Tags sind das Organisationsprinzip. Format immer: \`klasse:wert\`
 
 Beispiele:
-- \\\`workspace:CIPHER-MUX\\\`
-- \\\`kind:bugreport\\\`
-- \\\`entity:companion\\\`
-- \\\`status:open\\\`
+- \`workspace:CIPHER-MUX\`
+- \`kind:bugreport\`
+- \`entity:companion\`
+- \`status:open\`
 
-Beim Speichern mit \\\`Cmd+S\\\` schlägt das lokale Modell (Ollama) passende Tags vor. Du kannst sie übernehmen, ablehnen oder eigene tippen.
+Beim Speichern mit \`Cmd+S\` schlägt das lokale Modell (Ollama) passende Tags vor. Du kannst sie übernehmen, ablehnen oder eigene tippen.
 
 **Tag-Autocomplete:** Beim Tippen eines Tags werden bekannte Tags vorgeschlagen.
 
@@ -625,7 +625,7 @@ Beim Speichern mit \\\`Cmd+S\\\` schlägt das lokale Modell (Ollama) passende Ta
 
 Sidebar → Sektion **Notes**. Suche (Volltextsuche) und Tag-Filter.
 
-**Workspace-Filter:** Wenn ein Workspace aktiv ist, zeigt die Sidebar automatisch nur Notes mit \\\`workspace:<Name>\\\`. Manuell überschreibbar.
+**Workspace-Filter:** Wenn ein Workspace aktiv ist, zeigt die Sidebar automatisch nur Notes mit \`workspace:<Name>\`. Manuell überschreibbar.
 
 **Doppelklick** auf eine Note → öffnet sie in einer Grid-Zelle.
 **Drag** → Note auf eine leere Zelle ziehen.
@@ -653,7 +653,7 @@ In Workspaces kann eine Zelle als **Notes-Zelle** konfiguriert werden (statt Ses
 
 ## Handoff-Notes
 
-Sessions übergeben Aufgaben über **Handoff-Notes** — strukturierte Notes mit Tags wie \\\`kind:handoff\\\`, \\\`toEntity:debugger\\\`.
+Sessions übergeben Aufgaben über **Handoff-Notes** — strukturierte Notes mit Tags wie \`kind:handoff\`, \`toEntity:debugger\`.
 
 Das ist der Standard-Weg wie z.B. Testing Assistant seine Findings an Workshop übergibt: als Note, nicht als direkter Chat.
 
@@ -661,8 +661,8 @@ Das ist der Standard-Weg wie z.B. Testing Assistant seine Findings an Workshop �
 
 ## Bugreports als Notes
 
-Der Bugreport-Dialog (\\\`Cmd+B\\\`) legt Bugs und Feature-Requests als Notes an:
-- Tags: \\\`kind:bugreport\\\`, \\\`status:open\\\`
+Der Bugreport-Dialog (\`Cmd+B\`) legt Bugs und Feature-Requests als Notes an:
+- Tags: \`kind:bugreport\`, \`status:open\`
 - Sichtbar in der Sidebar unter dem workspace-Filter
 
 ---
@@ -680,7 +680,7 @@ cipher-mux hat eine vollständige Sprachsteuerung — lokal, ohne Cloud, ohne Ne
 
 ## Aktivieren
 
-Die Statusleiste zeigt drei Buttons: \\\`OFF\\\` / \\\`STT\\\` / \\\`COM\\\`
+Die Statusleiste zeigt drei Buttons: \`OFF\` / \`STT\` / \`COM\`
 
 - **OFF** — Sprachsteuerung aus
 - **STT** — Speech-to-Text: Mikrofon → Text wird in die fokussierte Session eingefügt
@@ -743,7 +743,7 @@ Der COM-Modus verbindet dich mit dem **Voice Relay** — das ist im Wesentlichen
 
 ## TTS — Konfiguration
 
-Einstellungen unter \\\`einstellungen\\\` → **Sprache** → TTS.
+Einstellungen unter \`einstellungen\` → **Sprache** → TTS.
 
 **Optionen:**
 - **TTS ein/aus**
@@ -758,7 +758,7 @@ Einstellungen unter \\\`einstellungen\\\` → **Sprache** → TTS.
 
 ## Bluetooth-Fernbedienung
 
-BT Shutter (z.B. AB Shutter 3) als Auslöser. Aktivieren unter \\\`einstellungen\\\` → **Sprache** → BT Shutter.
+BT Shutter (z.B. AB Shutter 3) als Auslöser. Aktivieren unter \`einstellungen\` → **Sprache** → BT Shutter.
 
 - **Auto:** Knopfdruck = sofort senden
 - **Manual:** Knopfdruck = Aufnahme starten, nochmal = stoppen und senden
@@ -915,9 +915,9 @@ When you are fixing a bug and suddenly ask "Oh, and can you also quickly refacto
 
 **Rules:**
 - One topic per session. Theme switch = new session.
-- Between unrelated tasks in the same session: use \\\`/clear\\\` to reset context.
+- Between unrelated tasks in the same session: use \`/clear\` to reset context.
 - After two failed correction attempts on the same issue: start a fresh session with a better initial prompt. The clean context almost always outperforms accumulated corrections.
-- Side questions that do not need to persist: use \\\`/btw\\\` — it answers in an overlay without entering conversation history.
+- Side questions that do not need to persist: use \`/btw\` — it answers in an overlay without entering conversation history.
 
 ---
 
@@ -1044,7 +1044,7 @@ The Launcher scaffolds a project from a requirements document. The quality of th
 
 ### Structure of a Good Requirements Document
 
-\\\`\\\`\\\`
+\`\`\`
 Goal: [one sentence — what does this project do?]
 
 Target Audience: [who will use it?]
@@ -1063,7 +1063,7 @@ Non-Functional Requirements:
 - [Performance targets]
 - [Security needs]
 - [Accessibility requirements]
-\\\`\\\`\\\`
+\`\`\`
 
 ### Common Mistakes
 
@@ -1087,7 +1087,7 @@ When the Cyber Factory cannot make a decision autonomously, it sends a bubble to
 
 ### What a Bubble Looks Like
 
-\\\`\\\`\\\`
+\`\`\`
 Question: The authentication sub-project needs a session storage
 strategy. Two workers will depend on this decision.
 
@@ -1101,7 +1101,7 @@ the database." Redis would add a dependency. JWT aligns better with
 the stated constraints.
 
 [Custom answer field]
-\\\`\\\`\\\`
+\`\`\`
 
 ### How to Answer Effectively
 
@@ -1182,10 +1182,10 @@ Sessions in cipher-mux communicate through two channels:
 A shared SQLite database where sessions post messages tagged with a topic. Anyone can read, anyone can write. The Workshop reads the bus regularly to monitor progress.
 
 **Topics:**
-- \\\`chat\\\` — user-facing messages, shown in sidebar Messages tab
-- \\\`status\\\` — progress updates from workers
-- \\\`bug\\\` — incoming bugreport notifications
-- \\\`system\\\` — warnings (high context usage, errors)
+- \`chat\` — user-facing messages, shown in sidebar Messages tab
+- \`status\` — progress updates from workers
+- \`bug\` — incoming bugreport notifications
+- \`system\` — warnings (high context usage, errors)
 
 The bus is asynchronous — you post a message, and other sessions pick it up when they check. There is no guarantee of immediate delivery.
 
@@ -1270,18 +1270,18 @@ Transformer attention creates pairwise relationships between tokens. In very lon
 
 ### The todo.md Attention Hack
 
-A technique from the Manus AI team: maintain a \\\`todo.md\\\` or \\\`progress.md\\\` file that gets updated as work progresses. At the end of each major step, the model updates this file — pushing the current state and remaining tasks into the recency zone of the context.
+A technique from the Manus AI team: maintain a \`todo.md\` or \`progress.md\` file that gets updated as work progresses. At the end of each major step, the model updates this file — pushing the current state and remaining tasks into the recency zone of the context.
 
-In cipher-mux terms: the Workshop and Cyber Factory do this naturally via the task system (\\\`mux_task_update\\\`). The tasks' current state is always queryable, always recent.
+In cipher-mux terms: the Workshop and Cyber Factory do this naturally via the task system (\`mux_task_update\`). The tasks' current state is always queryable, always recent.
 
 ### When to /compact vs. Start Fresh
 
-**\\\`/compact\\\`** compresses the conversation history, keeping key information and discarding noise. Good when: you want to continue in the same direction, just with more room. Tip: add focus instructions: \\\`/compact Focus on the auth module changes and ignore the earlier discussion about database schema.\\\`
+**\`/compact\`** compresses the conversation history, keeping key information and discarding noise. Good when: you want to continue in the same direction, just with more room. Tip: add focus instructions: \`/compact Focus on the auth module changes and ignore the earlier discussion about database schema.\`
 
 **Starting fresh** clears the entire context and begins from scratch. Surprisingly, this often outperforms compaction. Why? Claude can rediscover the current state by reading the filesystem — git log, file contents, test results. A fresh session with "Read the project state and continue the auth work" is cleaner than a compacted session carrying forward noise.
 
 **Rule of thumb:**
-- Working on the same narrow task? \\\`/compact\\\`
+- Working on the same narrow task? \`/compact\`
 - Switching focus or session feels degraded? Start fresh
 - After two failed fix attempts? Always start fresh (doom loop escape)
 
@@ -1291,7 +1291,7 @@ In cipher-mux terms: the Workshop and Cyber Factory do this naturally via the ta
 
 ### /clear Between Tasks
 
-If you switch topics in the same session, use \\\`/clear\\\` to reset the context. This is the single highest-impact habit for token efficiency. Without it, your database schema discussion pollutes your CSS debugging.
+If you switch topics in the same session, use \`/clear\` to reset the context. This is the single highest-impact habit for token efficiency. Without it, your database schema discussion pollutes your CSS debugging.
 
 ### Subagents for Exploration
 
@@ -1301,7 +1301,7 @@ In cipher-mux, this happens naturally: the Workshop and Cyber Factory delegate e
 
 ### /btw for Side Questions
 
-Claude Code has \\\`/btw\\\` — it answers a question in an overlay without entering the conversation history. Perfect for quick lookups: "/btw what is the default port for PostgreSQL?" You get the answer. The context is untouched.
+Claude Code has \`/btw\` — it answers a question in an overlay without entering the conversation history. Perfect for quick lookups: "/btw what is the default port for PostgreSQL?" You get the answer. The context is untouched.
 
 ### Stable Prompt Prefixes
 
@@ -1313,7 +1313,7 @@ This is a technical detail that matters economically. The Anthropic API caches p
 
 ### Prefer Pointers Over Inline Content
 
-Instead of pasting 200 lines of code into your prompt, use \\\`@path/to/file.ts:42-80\\\`. Claude reads the file directly, and the reference is a few tokens instead of hundreds. Same result, fraction of the cost.
+Instead of pasting 200 lines of code into your prompt, use \`@path/to/file.ts:42-80\`. Claude reads the file directly, and the reference is a few tokens instead of hundreds. Same result, fraction of the cost.
 
 ---
 
@@ -1334,7 +1334,7 @@ None of these are failures. They are signals. Acting on them promptly saves more
 Before ending a productive session:
 
 1. Ask Claude: "Fass den aktuellen Stand zusammen. Was ist fertig, was ist offen, welche Entscheidungen wurden getroffen?"
-2. Save the summary to a file: \\\`docs/handover-YYYY-MM-DD.md\\\`
+2. Save the summary to a file: \`docs/handover-YYYY-MM-DD.md\`
 3. Start a new session
 4. First message: "Lies docs/handover-YYYY-MM-DD.md und mach da weiter."
 
@@ -1373,7 +1373,7 @@ For every line: "Would removing this cause Claude to make a mistake?"
 - Standard language conventions (Claude already knows these)
 - File-by-file descriptions of the codebase (Claude can read the files)
 - Information that changes frequently (it becomes stale)
-- Long code examples (they become stale; use \\\`@file:line\\\` pointers)
+- Long code examples (they become stale; use \`@file:line\` pointers)
 
 ---
 
