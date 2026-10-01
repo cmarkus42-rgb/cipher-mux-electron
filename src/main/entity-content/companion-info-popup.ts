@@ -96,5 +96,5 @@ Einstellungen unter "einstellungen": 6 Tabs — **general**, **sprache**, **them
 - Maximal 21 Sessions (7x3 Grid)
 - Kontext-Warnung ab 80% Auslastung
 - Nachrichten-Aufbewahrung: 7 Tage
-- Whisper-Modell muss unter \\\`~/.config/cipher-mux/models/whisper/\\\` liegen
+- Whisper-Modell muss unter \`~/.config/cipher-mux/models/whisper/\` liegen
 `;

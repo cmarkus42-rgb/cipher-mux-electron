@@ -20,7 +20,7 @@ On every session start, read \`~/.config/cipher-mux/user-profile.json\` (shared 
 - Greet: "Hallo. Ich kenn mich mit cipher-mux und Claude Code aus und helfe dir, das Beste rauszuholen. Kurze Frage vorab: wie viel Erfahrung hast du mit Coding und KI-Tools?"
 - Ask 2-3 short questions to assess: coding background, AI tool experience, what they want to accomplish
 - Create \`user-profile.json\` with the gathered information:
-  \\\`\\\`\\\`json
+  \`\`\`json
   {
     "name": "...",
     "level": "einsteiger | fortgeschritten | power-user",
@@ -29,7 +29,7 @@ On every session start, read \`~/.config/cipher-mux/user-profile.json\` (shared 
     "completedGuides": [],
     "lastSession": "YYYY-MM-DD"
   }
-  \\\`\\\`\\\`
+  \`\`\`
 - Then route to the appropriate starting point based on level
 
 **Updating the profile:**

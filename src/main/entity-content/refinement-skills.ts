@@ -27,7 +27,7 @@ Im Software-Kontext: Trennt realistische Projekt-Roadmaps von Feature-Wunschlist
 
 3. **Rueckwaerts in Quartalscheiben.** Fuer jedes Quartal:
 
-   \\\`\\\`\\\`
+   \`\`\`
    ## Q-1 (ein Quartal vor Ziel)
 
    Was muss am Ende dieses Quartals wahr sein?
@@ -38,7 +38,7 @@ Im Software-Kontext: Trennt realistische Projekt-Roadmaps von Feature-Wunschlist
    - [Trajektorie] — plausibler naechster Schritt
    - [Sprung] — setzt etwas voraus das heute nicht in Sicht ist
    - [Wunsch] — Hoffnung ohne Substanz
-   \\\`\\\`\\\`
+   \`\`\`
 
    Markierungen Fakt / Trajektorie / Sprung / Wunsch sind Pflicht.
 
@@ -54,7 +54,7 @@ Im Software-Kontext: Trennt realistische Projekt-Roadmaps von Feature-Wunschlist
    - Fragile Kette → Abhaengigkeiten in den Anforderungen explizit benennen
    - Viel Wunsch im ersten Quartal → User-Erwartungen kalibrieren
 
-7. **Ablage.** Ergebnis als Note: \\\`brain/future-backwards.md\\\`. Spruenge und Wuensche in den Risiken des Anforderungsdokuments referenzieren.
+7. **Ablage.** Ergebnis als Note: \`brain/future-backwards.md\`. Spruenge und Wuensche in den Risiken des Anforderungsdokuments referenzieren.
 
 ## Regeln
 
@@ -85,7 +85,7 @@ Im Anforderungs-Kontext: Nicht um den Tech-Stack zu waehlen (das macht die Ziel-
 
 ## Ablauf
 
-1. **Idee in Komponenten zerlegen.** Relay liest den aktuellen Stand (aus \\\`brain/seed.md\\\` oder \\\`brain/brief.md\\\`) und zerlegt die Idee in funktionale Bausteine. Beispiel Web-App: Frontend-Framework, Backend, Datenbank, Auth, Hosting, APIs, CI/CD.
+1. **Idee in Komponenten zerlegen.** Relay liest den aktuellen Stand (aus \`brain/seed.md\` oder \`brain/brief.md\`) und zerlegt die Idee in funktionale Bausteine. Beispiel Web-App: Frontend-Framework, Backend, Datenbank, Auth, Hosting, APIs, CI/CD.
 
 2. **Pro Komponente suchen.** Quellen:
    - **Bestehende Tools** — Gibt es ein fertiges Produkt das das Problem loest? (Auch kommerzielle.)
@@ -97,13 +97,13 @@ Im Anforderungs-Kontext: Nicht um den Tech-Stack zu waehlen (das macht die Ziel-
 
 3. **Stueckliste aufbauen.** Pro Komponente maximal 3 Kandidaten:
 
-   \\\`\\\`\\\`markdown
+   \`\`\`markdown
    ### <Komponente>
 
    | Loesung | Art | Eignung | Anmerkung |
    |---------|-----|---------|-----------|
    | ... | OSS/Service/Tool | gut/bedingt/nein | Warum |
-   \\\`\\\`\\\`
+   \`\`\`
 
 4. **Lueckenliste.** Was bleibt wenn alle Bausteine gesetzt sind? Drei Kategorien:
    - **Glue** — Code der nur die Bausteine verbindet. Klein, aber projekt-spezifisch.
@@ -115,7 +115,7 @@ Im Anforderungs-Kontext: Nicht um den Tech-Stack zu waehlen (das macht die Ziel-
    - Grosse Gaps → Scope pruefen, vielleicht ist das Projekt groesser als gedacht
    - Existierende Loesung tut genau das → Frage an den User: "Brauchst du wirklich ein eigenes Projekt?"
 
-6. **Ablage.** Ergebnis als Note: \\\`brain/oss-telescope.md\\\`. Lueckenliste fliesst in \\\`brain/brief.md\\\` als *Eigenanteil*.
+6. **Ablage.** Ergebnis als Note: \`brain/oss-telescope.md\`. Lueckenliste fliesst in \`brain/brief.md\` als *Eigenanteil*.
 
 ## Regeln
 
@@ -158,7 +158,7 @@ Im Software-Kontext: Verschiedene Nutzertypen pruefen ob die geplante App fuer s
    - *Unique Insights* — was nur eine Persona gesehen hat, das aber trifft.
    - *Entfernbare Einwaende* — Kritik die auf Missverstaendnis beruht oder durch kleine Aenderung verschwindet.
 
-5. **Ablage.** Ergebnis als Note: \\\`brain/roundtable-<thema>.md\\\`. Verlinkung aus \\\`brain/_index.md\\\`.
+5. **Ablage.** Ergebnis als Note: \`brain/roundtable-<thema>.md\`. Verlinkung aus \`brain/_index.md\`.
 
 ## Standard-Personas (Software-Kontext)
 
@@ -191,7 +191,7 @@ Benutzt das Tool taeglich und stoesst an Grenzen. Fragt: "Kann ich X automatisie
 - Alle fuenf Personas obligatorisch, auch wenn drei reichen.
 - Personas die alle dasselbe sagen — dann ist die Wahl falsch.
 - Relay faellt in Neutralton zurueck und die Persona wird zur Fussnote.
-- Ergebnis bleibt im Chat und wandert nicht ins \\\`brain/\\\`.
+- Ergebnis bleibt im Chat und wandert nicht ins \`brain/\`.
 `;
 
 const SKILL_PRE_MORTEM = `---
@@ -236,7 +236,7 @@ Im Software-Kontext: Was wuerde dazu fuehren, dass das Projekt nach dem Bauen ni
    - Als Scope-Aenderung wenn ein Grund zeigt dass der Scope unrealistisch ist
    - Als Constraint wenn ein Grund eine technische Entscheidung erzwingt
 
-7. **Ablage.** Ergebnis als Note: \\\`brain/pre-mortem.md\\\`. Kritische Gruende zusaetzlich in \\\`brain/_index.md\\\` unter *Risiken*.
+7. **Ablage.** Ergebnis als Note: \`brain/pre-mortem.md\`. Kritische Gruende zusaetzlich in \`brain/_index.md\` unter *Risiken*.
 
 ## Regeln
 
@@ -301,7 +301,7 @@ Der Scope-Knife ist der ehrliche Moment: *Was davon muss wirklich in v1?*
    - "Bewusst draussen" als eigener Abschnitt
    - MVP-Satz als Einleitung oder Vision-Ergaenzung
 
-7. **Ablage.** Wenn signifikant genug: Note \\\`brain/scope-cut.md\\\` mit der Begruendung was rausgeflogen ist und warum. Sonst reicht der Rueckfluss ins Anforderungsdokument.
+7. **Ablage.** Wenn signifikant genug: Note \`brain/scope-cut.md\` mit der Begruendung was rausgeflogen ist und warum. Sonst reicht der Rueckfluss ins Anforderungsdokument.
 
 ## Relay's Rolle
 
