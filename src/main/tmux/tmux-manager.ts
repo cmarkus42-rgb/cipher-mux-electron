@@ -430,9 +430,21 @@ export class TmuxManager extends EventEmitter {
 
   /**
    * Capture pane content.
+   *
+   * **`-J` ist nicht optional.** Ohne das Flag gibt tmux eine umgebrochene Zeile
+   * als mehrere physische Zeilen zurueck, mit `\n` dazwischen. Der Aufrufer macht
+   * daraus `\r\n`, und im xterm-Puffer stehen dann eigenstaendige Zeilen, die
+   * kein spaeterer Reflow wieder zusammenfuegt — der Zerfall ist **dauerhaft**.
+   *
+   * Gemessen am 2026-10-01 in einem 40 Spalten breiten Pane: eine Zeile mit 95
+   * Zeichen kommt ohne `-J` als 40 + 40 + 15 zurueck, mit `-J` als eine mit 95.
+   *
+   * Die Nebenwirkung ist bekannt und harmlos: `-J` behaelt Leerzeichen am Ende
+   * einer zuvor umgebrochenen Zeile, die waechst also um ein bis zwei Zeichen.
+   * Im Terminal ist das unsichtbar.
    */
   async capturePane(target: string, lines?: number): Promise<string> {
-    const args = ['capture-pane', '-t', target, '-p', '-e']
+    const args = ['capture-pane', '-t', target, '-p', '-e', '-J']
     if (lines) {
       args.push('-S', String(-lines))
     }

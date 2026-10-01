@@ -13,6 +13,26 @@ import { getTerminalFontSize } from '../a11y/terminal-font-size'
 const api = () => window.cipherMux
 
 /**
+ * Ob der Nutzer selbst nach oben gescrollt hat.
+ *
+ * Dieselbe Pruefung, die `fitAndSync` schon zweimal benutzt
+ * (`buf.viewportY >= buf.baseY`), hier als Funktion — weil sie an drei weiteren
+ * Stellen gebraucht wird und ein drittes handgeschriebenes `>=` die Gelegenheit
+ * waere, es einmal falsch herum zu schreiben.
+ *
+ * Wirft nicht: ein entsorgtes Terminal hat keinen `buffer` mehr, und ein
+ * fehlgeschlagener Blick nach oben darf keinen Timer-Callback abschiessen.
+ */
+function userScrolledUp(term: Terminal): boolean {
+  try {
+    const buf = term.buffer.active
+    return buf.viewportY < buf.baseY
+  } catch {
+    return false
+  }
+}
+
+/**
  * Reads terminal color CSS variables from body and returns an xterm.js theme object.
  * Variables are defined on body[data-theme="..."], so we must read from body, not :root.
  * Falls back to the generated theme map if CSS variables are not yet defined.
@@ -330,7 +350,12 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       // be scrolled off the live region because xterm stored the shell prompt
       // + command echo in scrollback before claude's RIS+clear landed. Nudge
       // the viewport to the cursor a few times to catch up.
-      const nudge = () => term.write('', () => term.scrollToBottom())
+      // Nur nachschieben, solange der Nutzer unten steht. Hat er hochgescrollt,
+      // war das Absicht -- siehe `userScrolledUp`.
+      const nudge = () => {
+        if (userScrolledUp(term)) return
+        term.write('', () => term.scrollToBottom())
+      }
       setTimeout(nudge, 400)
       setTimeout(nudge, 900)
       setTimeout(nudge, 1500)
@@ -392,6 +417,15 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
     // late-arriving data from tmux, and TUI startup sequences (claude CLI).
     const AUTO_SCROLL_MS = 8000
     const scrollInterval = setInterval(() => {
+      // **Aufhoeren, sobald der Nutzer eingreift.** Acht Sekunden lang alle
+      // 200 ms nach unten zu ziehen heisst sonst: acht Sekunden lang kann er
+      // nicht hochscrollen, weil jeder Versuch binnen 200 ms zurueckgeholt
+      // wird. Ein uebersprungener Takt reichte nicht -- der naechste holt ihn
+      // wieder. Also Schluss, nicht Pause.
+      if (userScrolledUp(term)) {
+        clearInterval(scrollInterval)
+        return
+      }
       term.write('', () => term.scrollToBottom())
     }, 200)
     const scrollTimeout = setTimeout(() => clearInterval(scrollInterval), AUTO_SCROLL_MS)
