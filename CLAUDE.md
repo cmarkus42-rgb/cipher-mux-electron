@@ -16,7 +16,7 @@ MCP-Server und Projekt-Kick-off. Zielbild und Begründung:
    vorgeschalteten `rebuild:node` fehlt die better-sqlite3-ABI, und es fallen schlagartig über
    150 Tests um — alle in SQLite-gestützten Suiten (TaskManager, MessageBus, MemoryStore,
    CyberFactory, Debugger, Audit). Das Fehlerbild ist eindeutig: viele Fehler, alle dort.
-3. **Die Suite ist grün und soll grün bleiben.** Stand: **2150 Tests, 2150 pass, 0 fail,
+3. **Die Suite ist grün und soll grün bleiben.** Stand: **2205 Tests, 2205 pass, 0 fail,
    0 cancelled** (2026-10-01). Ältere Dokumente nennen „vier vorbestehend rote Suiten" —
    das galt bis zum 2026-09-30 und ist erledigt; keiner der Fälle war ein Flake. Ein roter
    Lauf ist ab jetzt eine echte Regression.
@@ -72,13 +72,16 @@ end-to-end gegen eine echte Session belegt. Zielbild:
 `docs/superpowers/specs/2026-09-30-notes-als-projektgedaechtnis.md`.
 
 **Zweite CLI (2026-10-01):** Der Codex-Adapter steht und ist end-to-end gegen das echte Codex
-belegt — Rollengrenze blockiert selektiv, Context-Usage landet im Format, das der bestehende
-Monitor liest, und Workspace plus Rolle reisen im Bearer-Token, weil Codex keine freien
-MCP-Header sendet. Details und die Messungen dahinter im Abschnitt „Zweite CLI: Codex".
-**Dritte CLI (2026-10-01):** Der opencode-Adapter steht — er geht den **normalen** Weg über die
-Verbindungsköpfe, weil opencode freie MCP-Header sendet (gemessen), und braucht die
-Token-Variante nicht. Zwei Capabilities stehen bewusst auf `false`, und eine Rollengrenze ist
-noch nicht verdrahtet. Details im Abschnitt „Dritte CLI: opencode".
+belegt — Context-Usage landet im Format, das der bestehende Monitor liest, und Workspace plus
+Rolle reisen im Bearer-Token, weil Codex keine freien MCP-Header sendet. Die Rollengrenze
+blockiert selektiv — gegen das echte Codex belegt, mit der Begründung, die beim Modell ankommt.
+Details und die Messungen im Abschnitt „Zweite CLI: Codex".
+**Dritte CLI (2026-10-01, abgenommen):** Der opencode-Adapter steht und ist end-to-end gegen
+die echte CLI belegt — MCP über die Verbindungsköpfe (opencode sendet freie Header, anders als
+Codex), Rollengrenze über ein Plugin, das selektiv ablehnt, Context-Usage im Format, das der
+bestehende Monitor liest. Die Abnahme fand **einen** Fehler, der die Session hochkommen und
+aussehen ließ wie Erfolg: das positionale Projektargument. Details und alle Messungen im
+Abschnitt „Dritte CLI: opencode".
 
 Nächste Richtung laut Strategiepapier: Rolle → Modell/Adapter, Rollengrenzen als Constraint,
 Memory auf Companion begrenzen. Offene Entscheidungen stehen dort in Abschnitt 7, die zur
@@ -197,6 +200,29 @@ zwei Workspaces würden sich überschreiben), und `hooks.<Event>`-Einträge werd
 validiert** — `{bogus=1}` und ein erfundener Eventname gehen durch. Zusammen mit den zwei
 stillen Fehlschlägen heißt das: **das Feuern nachweisen, nicht die Datei schreiben.**
 
+**Die Rollengrenze hat einen eigenen Pfadbegriff** (`adapters/codex-boundary.ts`), und das ist
+kein Beiwerk: das generische Skript aus `entity-boundaries.ts` liest `tool_input.file_path`, und
+**Codex liefert das nicht**. Sein Datei-Werkzeug heißt `apply_patch`, der Input ist
+`{"command": "*** Begin Patch\n*** Add File: /abs/pfad\n…"}` — der Pfad steckt in einem
+Patch-Umschlag. Das generische Skript hätte einen leeren String gelesen und **jeden** Dateizugriff
+durchgelassen. Gezogen werden die Pfade aus allen vier Patch-Köpfen (Add/Update/Delete/Move to);
+eine verbotene Datei verbietet den ganzen Aufruf, denn ein Patch lässt sich nicht zur Hälfte
+anwenden. Die Regeln selbst bleiben die aus `entity-boundaries.ts` — neu ist nur die Antwort auf
+die Frage, **wo der Pfad steht**.
+
+Erzeugt wird sie in `postLaunchInjection`, also dort, wo auch die `.codex/config.toml` entsteht,
+die sie registriert. Das ist Absicht: bis zum 2026-10-01 schrieb der SessionManager seine
+`role-boundary.js` unbedingt nach `.claude/settings.local.json` — eine Datei, die Codex nicht
+liest — und `buildCodexProjectConfig` bekam seinen `boundaryHookPath` von niemandem. Eine
+Codex-Session lief ohne Grenze, obwohl der Mechanismus gemessen und der Parameter vorhanden war.
+Gefunden bei der opencode-Abnahme. **Wer einen Adapter baut, erzeugt seine Grenze dort, wo die
+Datei entsteht, die sie trägt.**
+
+> **Die Shell-Lücke bleibt.** `Bash` trägt keinen Pfad, nur ein Kommando — eine Datei lässt sich
+> darüber weiterhin ändern. Dieselbe Lücke hat Claude Code. Sie zu schließen hieße Shell-Syntax
+> zu parsen, und ein halbherziger Parser wäre wieder eine Grenze, die nur so aussieht. Die Grenze
+> ist eine Leitplanke gegen Versehen, kein Sandkasten.
+
 **Context-Usage ohne Statusline:** Codex' `status_line` ist eine TUI-Anzeigeoption, kein
 Kommando. Stattdessen trägt jeder Hook-Input `transcript_path`, und in der Rollout-JSONL steht
 pro Antwort ein `token_usage_record`. `monitoring/codex-usage-hook.ts` erzeugt daraus genau das
@@ -257,34 +283,97 @@ die Verbindung (`src/main/mcp/entity-header.ts`) und registriert die vier `compa
 nur für Companion — oder für Verbindungen ohne Rolle, das ist die App selbst. Eine Permission
 zu entfernen hätte nicht gereicht: sie erzeugt eine Rückfrage, sie hält kein Werkzeug zurück.
 
-## Dritte CLI: opencode — der Normalfall des Vertrags
+## Dritte CLI: opencode — und der eine Fehler, der wie Erfolg aussah
 
-`adapters/opencode.ts` ist Tier-2 und gemessen an **opencode 1.18.34 (2026-10-01)**.
+`adapters/opencode.ts` ist Tier-2 und gemessen an **opencode 1.18.34 (2026-10-01)**, erst gegen
+Unit-Tests, dann gegen die laufende CLI mit einem echten Modell. Die zweite Runde ist die, die
+zählt.
 
 - **`AGENTS.md`** ist die Projektanweisung (`CLAUDE.md` liest opencode zusätzlich zur
   Verträglichkeit). Der Adapter liest und schreibt nur `AGENTS.md` — zwei Adapter, die in
   dieselbe Datei injizieren, überschreiben sich die Sektionen.
 - **Freie MCP-Header kommen an** — `authorization`, `x-mux-workspace`, `x-mux-entity` alle drei,
-  gegen denselben Horchposten wie bei Codex. Deshalb nutzt der Adapter `buildMcpServerConfig`
-  aus `mcp/workspace-header.ts` und **nicht** die Token-Bindung; die Kopfnamen stehen weiter nur
-  an einer Stelle. Geschrieben wird `opencode.json`, **lesen-mergen-schreiben** wie bei
-  `settings.local.json`: Besitz hat der Mux allein an `mcp['cipher-mux']`.
+  unter `user-agent: opencode/1.18.34`, gegen denselben Horchposten wie bei Codex. Deshalb nutzt
+  der Adapter `buildMcpServerConfig` aus `mcp/workspace-header.ts` und **nicht** die
+  Token-Bindung; die Kopfnamen stehen weiter nur an einer Stelle. Geschrieben wird
+  `opencode.json`, **lesen-mergen-schreiben** wie bei `settings.local.json`: Besitz hat der Mux
+  an `mcp['cipher-mux']` und an seinen **eigenen zwei** Einträgen im `plugin`-Feld.
 - **Die Hülle heißt anders**: `type: "remote"` statt `"http"`, plus ein ausdrückliches
   `enabled: true`. Nur das wird umgeformt, nicht die Köpfe.
-- **Launch:** Arbeitsverzeichnis als **positionales** Argument (nicht `-C` wie Codex),
-  `--auto` statt `--dangerously-skip-permissions`, Resume `--session <id>`, Fork
-  `--session <id> --fork` — `--fork` ist allein ungültig, es braucht `--session` oder
-  `--continue`.
 
-**Was hier ungemessen ist und deshalb `false` steht:** `status-line` (es gibt `stats`, aber
-keinen geprüften Weg, pro Session das JSON zu schreiben, das der `StatusLineMonitor` liest) und
-`sub-agents` (`--agent <name>` existiert, belegt aber keine Unteragenten, die der Mux sieht).
-**Rollengrenzen sind noch nicht verdrahtet:** opencode kennt Plugin-Events
-(`tool.execute.before`, `tool.execute.after`, `permission.ask`, `chat.message`, `chat.params`)
-statt Hook-Dateien — dass `tool.execute.before` einen Aufruf wirklich *ablehnen* kann, ist nicht
-gemessen, und eine geschriebene, nicht feuernde Grenze ist schlimmer als keine. **Und: anders
-als beim Codex-Adapter gibt es hier noch keinen Rauchtest gegen die echte CLI** — belegt sind
-die Unit-Tests, nicht der Lauf.
+**Der Befund der Abnahme: kein positionales Projektargument.** `opencode [project]` nimmt ein
+Verzeichnis entgegen, und der Adapter gab `projectPath` dorthin. Gemessen mit tmux-cwd =
+Run-Verzeichnis und Argument = authored-Verzeichnis: `pane_current_path` **und** opencodes eigene
+Statuszeile zeigten das authored-Verzeichnis, und am Horchposten kam **null** Verbindung an
+(gegen zwölf ohne das Argument). Die generierte `opencode.json` lag im Run-Verzeichnis und wurde
+nie gelesen — keine MCP-Werkzeuge, keine Grenze, kein Usage, und die Session stand am Prompt und
+sah gesund aus. Es ist derselbe Fehler, den Codex' `-C` hatte, aus demselben Grund:
+`LaunchOpts.projectPath` ist bei einer Entity-Session das **authored**-Verzeichnis, gearbeitet
+wird im **Run**-Verzeichnis. Jetzt wird das cwd des Panes geerbt, wie bei Claude Code.
+
+Der Rest des Startkommandos: `--auto` statt `--dangerously-skip-permissions`, Resume
+`--session <id>`, bare Resume `--continue`, Fork `--session <id> --fork` — `--fork` ist allein
+ungültig. **Niemals `--pure`**: das lädt die Session ohne Plugins, also ohne Grenze und ohne
+Usage.
+
+**Rollengrenzen über ein Plugin — und sie feuern.** opencode hat keine `PreToolUse`-Konfiguration,
+sondern Plugin-Module. Von seinen Events kann nur `tool.execute.before` einen Aufruf aufhalten:
+ein **Wurf** dort verhindert die Ausführung. Nachgewiesen in `opencode run` *und* in der TUI unter
+`--auto`, mit einem echten Modell und dem echten Workshop-Grund aus `entity-boundaries.ts`:
+
+- `src/NOPE.txt` entstand **nicht**, `docs/OK.txt` entstand — selektiv, keine Pauschalsperre.
+- Der abgelehnte Aufruf endet als `state.status: "error"` mit dem Grund in `state.error`; das
+  Modell zitierte ihn danach wörtlich („Du bist kein Coder, du koordinierst").
+- Der Wurf ist pro Werkzeugaufruf eingeschlossen: derselbe Zug lief weiter, die Session blieb.
+- `--auto` umgeht ihn nicht. Es beantwortet Permission-Rückfragen automatisch, und das hier ist
+  keine — genau deshalb nicht opencodes `permission`-Regelwerk.
+
+**Vier stille Fehlschläge rund um die Plugins**, alle gemessen, alle der Grund für die jetzige
+Form:
+
+1. **Ein CommonJS-Plugin lädt nicht.** `module.exports = fn` wird mit „Plugin export is not a
+   function" abgewiesen — und diese Zeile steht **nur** unter `--print-logs`. Beide erzeugten
+   Plugins sind deshalb ESM mit Default-Export einer Funktion.
+2. **Der Hook `permission.ask` feuert nie.** opencodes eigene Hilfe führt ihn auf; im Binary gibt
+   es `trigger("…")` für jeden anderen Hooknamen und für diesen keinen. Eine darauf gebaute
+   Grenze wäre geschrieben und tot.
+3. **`read` trägt auch einen `filePath`.** Eine Grenze auf „irgendein Pfadargument" hätte die
+   Rolle blind gemacht statt nur schreibunfähig. Gefiltert wird deshalb nach Werkzeugnamen; die
+   drei schreibenden heißen `write`, `edit`, `apply_patch` — abgelesen an
+   `GET /experimental/tool/ids`, nicht übersetzt.
+4. **`bash` trägt keinen Pfad**, nur `command`. Die Grenze deckt die Shell nicht ab — dieselbe
+   Lücke wie bei Claude Code, bewusst gleich gelassen.
+
+**Wo die Plugins liegen und wie sie registriert sind:** `.opencode/plugin/` **und**
+`.opencode/plugins/` werden beide gescannt, jede `*.ts` und jede ESM-`*.js` darin wird geladen.
+Der Mux schreibt in den Singular *und* trägt die Datei als `file://`-URL im `plugin`-Feld ein —
+gemessen lädt das **nicht** doppelt (ein Ladevorgang, ein `plugin_origins`-Eintrag), und der
+Eintrag macht die Verdrahtung in `opencode debug config` nachlesbar. Eine Rolle ohne Grenze
+verliert Datei *und* Eintrag; ein stehengebliebenes Plugin würde weiter eine Regel erzwingen, die
+niemand mehr nennt.
+
+**Context-Usage über denselben Plugin-Weg.** Ein `event`-Hook sieht jedes Bus-Ereignis — Eingabe
+ist genau `{ event: { id, type, properties } }` —, und `message.updated` trägt pro
+Assistentennachricht `sessionID`, `modelID` und `tokens`. `monitoring/opencode-usage-plugin.ts`
+baut daraus genau das JSON, das der `StatusLineMonitor` schon liest: ein weiterer Schreiber, kein
+zweiter Leser, wie bei Codex. Das `session_id`-Feld trägt Keep Working (`--session <id>` statt
+„die letzte Unterhaltung dieses Verzeichnisses"). Zwei Feinheiten: die **erste** Fassung derselben
+Nachricht kommt mit `tokens` auf Null und **ohne** `total` — daran trennt das Plugin „noch nichts
+gemessen" von „gemessen", statt 0 % zu behaupten. Und die **Fenstergröße ist geschätzt**: `GET
+/api/model` eines laufenden opencode liefert ohne angemeldeten Anbieter eine leere Liste, einen
+selbst eingetragenen Anbieter kennt der Katalog nie. Die Tokenzahlen sind gemessen, die
+Prozentzahl ist eine Schätzung gegen `OPENCODE_FALLBACK_CONTEXT_WINDOW` — dieselbe Entscheidung
+wie bei Codex.
+
+**Was weiter `false` steht:** `sub-agents`. `--agent <name>` existiert, belegt aber keine
+Unteragenten, die der Mux sieht.
+
+**Kein blockierender Dialog gefunden.** Anders als Codex (Update-Hinweis als Auswahldialog,
+Verzeichnis-Vertrauen) kommt opencode direkt an den Prompt — kein Update-Dialog, keine
+Vertrauensfrage. Was eine unbeaufsichtigte Session hier aufhält, ist etwas anderes: **ohne
+angemeldeten Anbieter** steht sie am Prompt mit dem Hinweis „Run /connect to add an AI provider"
+und tut auf jede Eingabe nichts. Das ist kein Dialog, den ein Flag wegnimmt — es ist eine
+Voraussetzung, die vor dem Start erfüllt sein muss.
 
 ## Entities, MCP, Voice
 
