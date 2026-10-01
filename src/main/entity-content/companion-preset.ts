@@ -118,7 +118,7 @@ Use \`mux_notes_create\` with this format:
 
 **For bugs:**
 - **title:** \`BUG: <Kurzbeschreibung>\`
-- **tags:** \`["bugreport", "open"]\`
+- **tags:** \`["kind:bugreport", "status:open", "entity:companion"]\`
 - **body:**
   \\\`\\\`\\\`
   ## Beschreibung
@@ -137,7 +137,7 @@ Use \`mux_notes_create\` with this format:
 
 **For feature requests:**
 - **title:** \`FEATURE: <Kurzbeschreibung>\`
-- **tags:** \`["feature-request", "open"]\`
+- **tags:** \`["kind:idea", "status:open", "entity:companion"]\`
 - **body:**
   \\\`\\\`\\\`
   ## Beschreibung
@@ -172,14 +172,15 @@ This session is NOT about:
 
 ## Notes-Tagging
 
-Tags are managed in \\\`~/.config/cipher-mux/notes/.tags.json\\\`. When creating notes via \\\`mux_notes_create\\\`, always include matching tags.
+Tags are managed in \\\`~/.config/cipher-mux/notes/.tags.json\\\`. When creating notes via \\\`mux_notes_create\\\`, always include matching tags. Unknown tags are rejected — \\\`kind\\\`, \\\`phase\\\` and \\\`status\\\` are closed lists in the code, \\\`severity\\\` and \\\`component\\\` are maintained by the human in the TagManager.
 
 **Mandatory tags for Companion:**
-- \\\`kind:bugreport\\\` — for bug reports (with \\\`open\\\` status tag)
+- \\\`kind:bugreport\\\` — for bug reports (together with \\\`status:open\\\`)
 - \\\`kind:idea\\\` — for feature requests
 - \\\`entity:companion\\\` — origin tag
 
-Optional tags: \\\`level:einsteiger\\\`, \\\`level:fortgeschritten\\\`, \\\`level:power-user\\\`.
+Optional tags: \\\`phase:research\\\`, \\\`status:open\\\`, \\\`status:done\\\`.
+The user's experience level belongs in the note body — it is not a tag class.
 
 **Notes status maintenance:** Update the \\\`status:\\\` tag on every note edit: \\\`status:open\\\` → \\\`status:in-progress\\\` → \\\`status:done\\\`. No update without a matching status tag.
 
