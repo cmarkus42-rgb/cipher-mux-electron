@@ -52,10 +52,11 @@ für den **jede** Capability gemessen ist.
 |---|---|---|---|
 | Tier | 1 | 2 | 2 |
 | Projektanweisungen | `CLAUDE.md` | `AGENTS.md` | `AGENTS.md` |
-| Rollengrenzen | PreToolUse-Hook | PreToolUse-Hook | **nicht gebaut** |
+| Rollengrenzen | PreToolUse-Hook | PreToolUse-Hook | Plugin auf `tool.execute.before` |
 | MCP-Bindung | Header | **Token** | Header |
-| Context-Usage | Statusline | Rollout-JSONL via Hook | **nicht gebaut** |
-| Rauchtest gegen echte CLI | — | ja | **nein** |
+| Context-Usage | Statusline | Rollout-JSONL via Hook | Plugin-`event`-Hook |
+| Rauchtest gegen echte CLI | — | ja | ja |
+| Modellliste | nein (3 Aliase) | ja (9) | ja (nur angemeldete Anbieter) |
 
 Dazu: die Auswahl in der UI (Feld „CLI" pro Rolle im Preset-Editor, „Standard-CLI" global),
 `mcp/bound-token.ts`, `adapters/codex-trust.ts`, `agent/entity-adapter-map.ts`, und
@@ -187,13 +188,15 @@ Präferenz", ein leerer wäre ein Adapter namens `""`, und der steht in keiner R
 
 ## 7. Was offen ist
 
-1. **opencode ist nicht abgenommen.** Kein Rauchtest gegen die echte CLI, keine Rollengrenzen.
-   Nach Abschnitt 1 ist eine nicht feuernde Grenze schlimmer als keine — deshalb wurde sie
-   bewusst nicht gebaut. Der Plugin-Weg (`tool.execute.before`) ist zu messen, bevor er gebaut
-   wird.
-2. **Das Feld „CLI" im Presets-Reiter ist nicht visuell abgenommen.** Gebaut, typgeprüft, Logik
-   unit-getestet; es rendert erst, wenn eine konkrete Rolle ausgewählt ist, und dorthin kam die
-   Automatisierung nicht. Ein Klick schließt es.
+1. ~~**opencode ist nicht abgenommen.**~~ **Erledigt** — abgenommen gegen die echte CLI,
+   Rollengrenze über ein Plugin auf `tool.execute.before` gebaut und als blockierend belegt,
+   Context-Usage über einen `event`-Hook. Dabei fand sich, dass das dokumentierte
+   `permission.ask` **nie feuert**: eine Grenze darauf wäre geschrieben und tot gewesen.
+2. ~~**Das Feld „CLI" im Presets-Reiter ist nicht visuell abgenommen.**~~ **Erledigt am
+   2026-10-01** — vom Nutzer gesehen und bestätigt, zusammen mit dem Feld „Modell" darunter.
+   Sessions starten mit dem gewählten Modell und im zugeordneten Workspace. Die Automatisierung
+   kam nicht dorthin (System Events erreicht die Electron-Fenster nicht); den letzten Meter ging
+   ein Mensch.
 3. **Vorlagen-Updates erreichen bestehende Rollen nicht** (Punkt 6 der Vorgänger-Übergabe).
    `preset.md` ist write-once. Beim Companion ist es anders: `deployCompanionGuides` und
    Geschwister schreiben bei jedem Start ohne Guard — dort erreicht eine Änderung den Bestand.
