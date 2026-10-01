@@ -49,7 +49,19 @@ export class WindowManager {
     this.mainWindow = new BrowserWindow({
       width,
       height,
-      minWidth: gridWidth,
+      // **`minWidth` muss denselben Deckel haben wie `width`.** Stand hier das
+      // ungedeckelte `gridWidth`, gewann es in Electron gegen die
+      // Konstruktorbreite — das `Math.min` darueber war damit wirkungslos, und
+      // bei vier Spalten wurde das Fenster 2956 px breit, egal wie breit der
+      // Bildschirm ist. Zusammen mit dem `will-resize`-preventDefault weiter
+      // unten liess sich das von Hand auch nicht korrigieren.
+      //
+      // Der Preis: passt das Grid nicht mehr, scrollt `.session-grid-area`
+      // waagerecht (die Spalten behalten `minmax(640px, 1fr)`). Ein schmales,
+      // scrollbares Grid ist besser als ein Fenster, das weder passt noch sich
+      // anfassen laesst. Ob stattdessen die 640 px nachgeben sollen, ist eine
+      // Produktentscheidung und steht offen.
+      minWidth: Math.min(gridWidth, screenWidth),
       minHeight: 600,
       title: 'cipher-mux',
       titleBarStyle: 'hiddenInset',

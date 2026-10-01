@@ -170,9 +170,18 @@ sich von selbst neu. Für TUI-Sessions ist der Resync also nicht nur riskant, so
 überflüssig. Gebraucht wird er für gewöhnliche Shell-Ausgabe, wo xterm und tmux
 unterschiedlich reflowen (das ist der ursprüngliche Anlass, Kommentar bei Zeile 88, T-LC.7).
 
-**Nicht geändert.** Hier sitzen drei Bugfix-Runden drin; eine Unterscheidung
-„TUI im Alternate-Screen / gewöhnliche Shell" ist der plausible Ansatz, aber sie braucht
-eine eigene Messung am laufenden Programm, keinen Diff auf Zuruf.
+**Teil 2 behoben am 2026-10-01: `-J` ist jetzt gesetzt.** Gemessen in einem 40 Spalten
+breiten Pane: eine Zeile mit 95 Zeichen kommt ohne `-J` als 40 + 40 + 15 zurück, mit `-J`
+als eine mit 95. Die Nebenwirkung ist belegt und harmlos — eine zuvor umgebrochene Zeile
+behält ihr Leerzeichen am Ende, im Terminal unsichtbar; eine nie umgebrochene Zeile bleibt
+Zeichen für Zeichen gleich. `test/main/capture-pane-join.test.ts` hält beides gegen das
+echte tmux fest, weil die Behauptung eine über tmux ist und ein Mock genau die Annahme
+festschriebe, die zu prüfen ist.
+
+**Teile 1 und 3 offen.** Relativ-gegen-absolut und die ungesicherte Reihenfolge brauchen
+die Unterscheidung „TUI im Alternate-Screen / gewöhnliche Shell" — und die braucht eine
+Messung am laufenden Programm, keinen Diff auf Zuruf. Der dauerhafte Zerfall ist damit
+weg, das Flackern während der Neuschrift nicht.
 
 ---
 
@@ -218,9 +227,11 @@ Das ist die Familie der offenen Bugreports `BUG-2026-04-22-HEIGHT-REGRESSION`,
 `BUG-2026-04-22-Q88ZHP`, `BUG-2026-04-23-WVDTTM` und `BUG-2026-04-25-HC5EX5` — dreimal
 dieselbe Beschwerde, mit „glaub ich schon gesagt" quittiert.
 
-**Nicht geändert, und zwar bewusst.** `minWidth: Math.min(gridWidth, screenWidth)` wäre ein
-Einzeiler, tauscht aber nur das Fehlerbild: statt „Fenster zu breit" käme „Grid scrollt
-waagerecht", solange die Spalten 640 px Minimum behalten. Welche Hälfte nachgibt — Spalten
+**Behoben am 2026-10-01**, gegen die ursprüngliche Einschätzung. Der Einzeiler steht jetzt
+dort. Begründung für die Kehrtwende: ein Fenster, das weder auf den Bildschirm passt noch
+sich anfassen lässt (`will-resize` → `preventDefault`), ist kein gleichwertiger Tausch gegen
+einen Scrollbalken — es ist schlechter. **Offen bleibt die eigentliche Produktfrage:** ob
+statt des Fensters die 640 px Spaltenminimum nachgeben sollen. Welche Hälfte nachgibt — Spalten
 unter 640 px oder Fenster über Bildschirmbreite — ist eine Produktentscheidung und keine,
 die aus dem Code folgt. Für eine Zelle unter 640 px spricht, dass ein nicht sichtbares
 Terminal schlechter ist als ein schmales.
@@ -242,8 +253,12 @@ steht daneben und ist nachvollziehbar (die TUI-Startsequenz schiebt den Viewport
 Scrollback). Der Preis ist, dass es nicht aufhört, wenn der Nutzer eingreift — ein
 `wasAtBottom`-Test wie in `fitAndSync` (Zeile 160) fehlt hier.
 
-Eingeordnet: Einzelbefund, mittlere Sicherheit in der Bewertung („Macke" oder „so gewollt"
-ist eine Nutzerfrage), **belegt** im Verhalten.
+**Behoben am 2026-10-01.** `userScrolledUp()` prüft vor jedem erzwungenen Scrollen, ob der
+Nutzer selbst hochgescrollt hat — dieselbe Prüfung, die `fitAndSync` zweimal benutzt, jetzt
+als Funktion. Scrollt er hoch, **endet** das Nachschieben (`clearInterval`), es setzt nicht
+nur einen Takt aus: ein übersprungener Takt hätte ihn 200 ms später wieder zurückgeholt.
+Die Absicht bleibt erhalten — solange niemand eingreift, fängt es die TUI-Startsequenz
+weiterhin ab.
 
 ---
 
