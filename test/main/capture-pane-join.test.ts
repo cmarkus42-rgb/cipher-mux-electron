@@ -68,10 +68,10 @@ describe('capture-pane und umgebrochene Zeilen', { skip: tmuxAvailable() ? false
     assert.equal(aCount, LINE_LENGTH)
   })
 
-  it('eine nie umgebrochene Zeile bleibt Zeichen fuer Zeichen gleich', () => {
-    // Die bekannte Nebenwirkung von -J ist, dass eine zuvor **umgebrochene**
-    // Zeile ihr Leerzeichen am Ende behaelt. Eine, die nie umgebrochen wurde,
-    // darf sich nicht aendern.
+  it('eine nie umgebrochene Zeile aendert ihren sichtbaren Inhalt nicht', () => {
+    // Die Nebenwirkung von -J sind Leerzeichen am Zeilenende. Entscheidend ist,
+    // dass sie **nur** das sind: in einem Terminal malt ein Leerzeichen am Ende
+    // nichts, jede Zeile wird mit \r\n abgeschlossen.
     //
     // Geprueft wird eine eigens ausgegebene Zeile, nicht „alles unter
     // Panebreite": ein umgebrochenes Segment kommt ohne -J um sein
@@ -79,12 +79,21 @@ describe('capture-pane und umgebrochene Zeilen', { skip: tmuxAvailable() ? false
     // eine kurze Zeile. Genau daran ist eine erste Fassung dieses Tests
     // gescheitert — die Heuristik war falsch, nicht der Code.
     // **Exakt**, nicht „enthaelt": der Suchbegriff steht auch im Echo des
-    // Befehls, der ihn ausgibt — und dieses Echo ist umgebrochen. Eine erste
+    // Befehls, der ihn ausgibt — und dieses Echo ist umgebrochen. Eine zweite
     // Fassung pruefte dadurch die falsche Zeile.
+    //
+    // Und eine dritte Fassung verlangte Gleichheit **Zeichen fuer Zeichen** und
+    // fiel auf dem Linux-Runner (tmux 3.2a aus ubuntu-22.04) um: dort haengt -J
+    // auch an eine nie umgebrochene Zeile zwei Leerzeichen, unter tmux 3.7c auf
+    // macOS nicht. Das ist eine Eigenschaft der tmux-Version und keine unseres
+    // Codes — die Behauptung war zu stark, nicht der Befund falsch.
     const finde = (out: string) => out.split('\n').find(l => l.trim() === SHORT_LINE)
     const ohne = finde(tmux('capture-pane', '-t', SESSION, '-p', '-e'))
     const mit = finde(tmux('capture-pane', '-t', SESSION, '-p', '-e', '-J'))
     assert.ok(ohne, 'Testzeile ohne -J nicht gefunden')
-    assert.equal(mit, ohne)
+    assert.ok(mit, 'Testzeile mit -J nicht gefunden')
+    assert.equal(mit.trimEnd(), ohne.trimEnd(), 'sichtbarer Inhalt')
+    // Was dazukommen darf, sind ausschliesslich Leerzeichen am Ende.
+    assert.match(mit.slice(ohne.trimEnd().length), /^ *$/, 'nur Leerzeichen angehaengt')
   })
 })
