@@ -1916,7 +1916,9 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     {
       description:
         'Open, close, or toggle a popup/dialog in the cipher-mux interface. Known targets: '
-        + 'workspace-popup (workspace chooser), info-dialog/settings (info/settings/shortcuts), '
+        + 'workspace-popup (workspace chooser), workspaces-window (separates Fenster mit den Reitern '
+        + 'workspaces/presets/companion/tags — context.tab waehlt den Reiter), '
+        + 'info-dialog/settings (info/settings/shortcuts), '
         + 'launcher-popup (launcher cell popup, use context.cell e.g. "1-0" to specify which cell), '
         + 'note (open a note in the editor, requires context.noteId). '
         + 'Use context.tab to open a specific tab (e.g. "themes", "shortcuts").',
@@ -1934,7 +1936,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       const targetAliases: Record<string, string> = { settings: 'info-dialog' }
       const resolvedTarget = targetAliases[args.target] ?? args.target
 
-      const knownTargets = ['workspace-popup', 'info-dialog', 'launcher-popup', 'note']
+      const knownTargets = ['workspace-popup', 'info-dialog', 'launcher-popup', 'note', 'workspaces-window']
       if (!knownTargets.includes(resolvedTarget)) {
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: `Unknown target: ${args.target}. Known: ${[...knownTargets, 'settings'].join(', ')}` }) }],
