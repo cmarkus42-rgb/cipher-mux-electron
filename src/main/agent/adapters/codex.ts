@@ -11,6 +11,7 @@ import type {
 import type { AdapterFeature, AdapterCapabilities, ContextUsage } from '../../../shared/types'
 import { writeCodexUsageHookScript, CODEX_USAGE_HOOK_FILENAME } from '../../monitoring/codex-usage-hook'
 import { BOUND_TOKEN_ENV_VAR } from '../../mcp/bound-token'
+import { trustRunDirectory } from './codex-trust'
 
 /**
  * Codex-CLI-Adapter — Tier-2.
@@ -61,6 +62,8 @@ import { BOUND_TOKEN_ENV_VAR } from '../../mcp/bound-token'
 /** Minimale Sicht auf die Agent-Konfiguration. Spiegelbild zu ClaudeCodeAdapter. */
 export interface CodexConfigReader {
   getSkipPermissions(): boolean
+  /** Ob der Mux dem Run-Verzeichnis Codex-Vertrauen erteilen darf. */
+  getTrustRunDirs(): boolean
 }
 
 const defaultConfigReader: CodexConfigReader = {
@@ -69,6 +72,11 @@ const defaultConfigReader: CodexConfigReader = {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { configStore } = require('../../config/config-store')
     return configStore.get('agent').skipPermissions
+  },
+  getTrustRunDirs(): boolean {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { configStore } = require('../../config/config-store')
+    return configStore.get('agent').codexTrustRunDirs !== false
   },
 }
 
@@ -200,6 +208,25 @@ export class CodexAdapter implements AgentAdapter {
         buildCodexProjectConfig({ mcpUrl: ctx.mcpUrl, usageHookPath: usageScript }),
         'utf-8',
       )
+
+      // Und jetzt das Vertrauen, sonst war alles davor umsonst: Codex laedt
+      // projektlokale Config, Hooks und exec-Policies **nur** aus einem
+      // vertrauten Verzeichnis, und fragt sonst in einem blockierenden Dialog.
+      // Ein nachtraegliches „Yes" laedt sie nicht mehr nach — die Session steht
+      // dann am Prompt und hat trotzdem keine Werkzeuge.
+      //
+      // Vertraut wird ausschliesslich das Run-Verzeichnis; `trustRunDirectory`
+      // weist jeden anderen Pfad ab. Begruendung im Kopf von codex-trust.ts.
+      if (this.configReader.getTrustRunDirs()) {
+        const res = trustRunDirectory(ctx.projectPath)
+        if (!res.trusted) {
+          console.warn(
+            `[CodexAdapter] Verzeichnis-Vertrauen nicht erteilt (${res.reason}) — `
+            + 'die Session wird beim Start nach Vertrauen fragen und ohne '
+            + 'MCP-Werkzeuge, Usage-Hook und Rollengrenze laufen.',
+          )
+        }
+      }
     } catch (err) {
       console.warn('[CodexAdapter] .codex/config.toml write failed:', err)
     }

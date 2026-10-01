@@ -39,6 +39,28 @@ interface PresetInfo {
   hasTemplate: boolean
 }
 
+/**
+ * Ein registrierter Adapter, wie ihn der Main-Prozess meldet.
+ *
+ * `capabilities` ist dabei, damit die Auswahl zeigen kann, was eine Rolle unter
+ * dieser CLI **nicht** kann — das beim Sessionstart herauszufinden ist der
+ * teurere Weg.
+ */
+interface AdapterInfo {
+  id: string
+  displayName: string
+  tier: 'tier-1' | 'tier-2'
+  capabilities: Record<string, boolean> | null
+}
+
+/** Welche Capabilities die UI benennt, wenn sie fehlen. Reihenfolge = Anzeigereihenfolge. */
+const NAMED_CAPABILITIES: ReadonlyArray<[string, string]> = [
+  ['status-line', 'Context-Anzeige'],
+  ['companion-mcp', 'Companion-Memory'],
+  ['sub-agents', 'Sub-Agents'],
+  ['mcp-injection', 'MCP-Werkzeuge'],
+]
+
 interface InjectedSection {
   name: string
   source: string
@@ -132,6 +154,12 @@ export function PresetEditor() {
   const [characters, setCharacters] = useState<Character[]>([])
   const [personaOverrideId, setPersonaOverrideId] = useState<string | null>(null)
 
+  // Welche CLI diese Rolle startet. `null` = keine Praeferenz, dann greift der
+  // globale Default — nicht „Adapter mit leerem Namen".
+  const [adapters, setAdapters] = useState<AdapterInfo[]>([])
+  const [defaultAdapterId, setDefaultAdapterId] = useState<string>('claude-code')
+  const [adapterOverrideId, setAdapterOverrideId] = useState<string | null>(null)
+
   // Injected sections modal
   const [showInjected, setShowInjected] = useState(false)
   const [injectedSections, setInjectedSections] = useState<InjectedSection[]>([])
@@ -150,6 +178,12 @@ export function PresetEditor() {
         const chars: Character[] = await api.characters.list()
         setCharacters(chars)
       } catch { /* older backend */ }
+      // Adapterliste und globaler Default. Beides faellt still aus, wenn das
+      // Backend sie nicht kennt — dann bleibt die Auswahl einfach unsichtbar.
+      try {
+        setAdapters(await api.agent.listAdapters())
+        setDefaultAdapterId(await api.agent.getDefaultAdapter())
+      } catch { /* older backend */ }
     } catch {
       // empty
     }
@@ -166,6 +200,9 @@ export function PresetEditor() {
     api.characters.getEntityPersonaOverride(selectedId).then((id: string | null) => {
       setPersonaOverrideId(id)
     }).catch(() => setPersonaOverrideId(null))
+    api.agent.getEntityAdapter(selectedId).then((id: string | null) => {
+      setAdapterOverrideId(id)
+    }).catch(() => setAdapterOverrideId(null))
     api.presets.read(selectedId).then((res: { ok: boolean; content: string }) => {
       if (res.ok) {
         setDraftContent(res.content)
@@ -450,6 +487,56 @@ export function PresetEditor() {
               </div>
               <div class="pp-hint" style={{ marginTop: '2px' }}>
                 Personas werden im Companion-Tab erstellt. Aenderungen gelten ab dem naechsten Session-Start.
+              </div>
+            </div>
+          )}
+
+          {/* Welche CLI diese Rolle startet */}
+          {adapters.length > 1 && (
+            <div class="pp-field" style={{ paddingBottom: '4px', paddingTop: '4px' }}>
+              <label style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-text-dim)' }}>
+                CLI
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <select
+                  value={adapterOverrideId ?? ''}
+                  onChange={async (e) => {
+                    const val = (e.target as HTMLSelectElement).value || null
+                    const res = await api.agent.setEntityAdapter(selectedId, val)
+                    if (res.ok) setAdapterOverrideId(val)
+                  }}
+                  style={{ flex: 1, padding: '4px 8px', fontSize: '12px', background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
+                >
+                  <option value="">{(() => {
+                    const def = adapters.find(a => a.id === defaultAdapterId)
+                    return def ? `Default (${def.displayName})` : 'Default'
+                  })()}</option>
+                  {adapters.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.displayName}{a.tier === 'tier-2' ? ' — Tier 2' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {(() => {
+                // Was diese CLI nicht kann, gehoert vor den Sessionstart und nicht
+                // hinein. Ein `false` heisst im Adapter „nicht gemessen" oder
+                // „nicht vorhanden" — beides bedeutet fuer den Nutzer dasselbe:
+                // dieses Stueck Mux fehlt in dieser Rolle.
+                const eff = adapters.find(a => a.id === (adapterOverrideId ?? defaultAdapterId))
+                if (!eff?.capabilities) return null
+                const missing = NAMED_CAPABILITIES
+                  .filter(([key]) => eff.capabilities?.[key] === false)
+                  .map(([, label]) => label)
+                if (missing.length === 0) return null
+                return (
+                  <div class="pp-hint" style={{ marginTop: '2px', color: 'var(--color-warning, var(--color-text-dim))' }}>
+                    Unter {eff.displayName} fehlt: {missing.join(', ')}.
+                  </div>
+                )
+              })()}
+              <div class="pp-hint" style={{ marginTop: '2px' }}>
+                Gilt ab dem naechsten Session-Start dieser Rolle. „Default" folgt der globalen Einstellung.
               </div>
             </div>
           )}
