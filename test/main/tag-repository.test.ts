@@ -21,12 +21,19 @@ describe('TagClassRepo', () => {
 
   // ─── Initialization ────────────────────────────────────
 
-  it('initializes with seed classes', () => {
+  // `domain` und `project` waren hier Seed-Klassen. Der Umzug am 2026-09-30 hat
+  // sie aufgeloest: `project` doppelte den Workspace, `domain` trug drei Werte.
+  // Sie weiter einzusaeen haette sie beim naechsten Start neu angelegt.
+  it('initializes with the axis classes and the registry start allocation', () => {
     const data = repo.getRepository()
-    assert.ok(data.classes.kind, 'should have "kind" class')
-    assert.ok(data.classes.status, 'should have "status" class')
-    assert.ok(data.classes.domain, 'should have "domain" class')
-    assert.ok(data.classes.project, 'should have "project" class')
+    for (const cls of ['kind', 'status', 'phase', 'entity']) {
+      assert.ok(data.classes[cls], `should have "${cls}" class`)
+    }
+    assert.ok(data.classes.severity, 'severity traegt eine Startbelegung')
+    assert.ok(data.classes.component, 'component wird angelegt, bleibt aber leer')
+    for (const cls of ['domain', 'project', 'scope']) {
+      assert.ok(!data.classes[cls], `"${cls}" ist aufgeloest`)
+    }
   })
 
   // Die Seeds sind die Achsen. `feature-request` stand hier, bis der Umzug am
@@ -161,8 +168,8 @@ describe('TagClassRepo', () => {
     const names = repo.getClassNames()
     assert.ok(names.includes('kind'))
     assert.ok(names.includes('status'))
-    assert.ok(names.includes('domain'))
-    assert.ok(names.includes('project'))
+    assert.ok(names.includes('phase'))
+    assert.ok(names.includes('severity'))
   })
 
   it('getClassValues returns values for a class', () => {
@@ -220,5 +227,62 @@ describe('TagClassRepo — Achsen als Quelle', () => {
     const reloaded = new TagClassRepo(tmpDir)
     assert.ok(reloaded.isKnownTag('kind:abschlussbericht'), 'Bestand darf nicht verschwinden')
     assert.ok(reloaded.isKnownTag('kind:spec'), 'die Achse kommt trotzdem dazu')
+  })
+})
+
+describe('TagClassRepo — Startbelegung gegen Vorschrift', () => {
+  let dir: string
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tag-repo-seed-'))
+  })
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  // Der Unterschied zwischen SEED_CLASSES und REGISTRY_SEED_CLASSES ist der
+  // ganze Punkt der Anforderung "die werte müssen editierbar sein": eine
+  // Startbelegung wird nur gesetzt, wenn die Klasse noch gar nicht existiert.
+  // Sonst waere "editierbar" nicht wahr -- wer severity:low entfernt, haette es
+  // beim naechsten Start wieder, und ein Knopf, dessen Wirkung ein Neustart
+  // aufhebt, ist eine Irrefuehrung.
+  it('legt severity beim ersten Start mit vier Stufen an', () => {
+    const repo = new TagClassRepo(dir)
+    assert.deepEqual(repo.getClassValues('severity'), ['low', 'mid', 'hi', 'now'])
+  })
+
+  it('laesst component leer — welche Bauteile ein Projekt hat, weiss der Code nicht', () => {
+    const repo = new TagClassRepo(dir)
+    assert.deepEqual(repo.getClassValues('component'), [])
+  })
+
+  it('setzt einen entfernten severity-Wert NICHT wieder ein', () => {
+    const first = new TagClassRepo(dir)
+    assert.equal(first.removeValue('severity', 'low'), true)
+
+    const second = new TagClassRepo(dir)
+    assert.ok(!second.getClassValues('severity').includes('low'),
+      'die Startbelegung darf beim zweiten Start nicht zurueckkommen')
+    assert.ok(second.getClassValues('severity').includes('now'),
+      'der Rest bleibt unangetastet')
+  })
+
+  // Die Achsen sind der Gegenfall: sie gehoeren dem Code und kommen zurueck.
+  it('setzt einen entfernten Achsenwert wieder ein', () => {
+    const first = new TagClassRepo(dir)
+    assert.equal(first.removeValue('kind', 'spec'), true)
+
+    const second = new TagClassRepo(dir)
+    assert.ok(second.getClassValues('kind').includes('spec'),
+      'kind gehoert dem Code — Ansichten haengen daran')
+  })
+
+  // Die aufgeloesten Klassen duerfen sich nicht neu anlegen.
+  it('legt domain, project und scope nicht mehr an', () => {
+    const repo = new TagClassRepo(dir)
+    for (const cls of ['domain', 'project', 'scope']) {
+      assert.deepEqual(repo.getClassValues(cls), [], `${cls} ist aufgeloest`)
+    }
   })
 })

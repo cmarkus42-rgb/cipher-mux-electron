@@ -65,6 +65,19 @@ export const STATUS_VALUES: readonly string[] = [
 ]
 
 /**
+ * Schwere eines Befunds — vier Stufen, aufsteigend.
+ *
+ * Festgelegt am 2026-09-30: „zum start sollte gerade severity auf 4 (low mid hi
+ * now) begrenzt werden ... now als höchste stufe". Der Bestand trug
+ * high/medium/low/critical; der Umzug bildet das ab.
+ *
+ * Die Werte stehen hier als **Startbelegung**, nicht als Gesetz: `severity` ist
+ * eine Registry-Klasse und im TagManager editierbar. Der Code schreibt vor, was
+ * beim ersten Start da ist, nicht was auf Dauer gilt.
+ */
+export const SEVERITY_VALUES: readonly string[] = ['low', 'mid', 'hi', 'now']
+
+/**
  * Die Rollen, die Notes erzeugen. Deckungsgleich mit der Entity-Registry —
  * ein Test hält das fest, damit eine neue Rolle nicht stillschweigend
  * aus der Achse fällt.
@@ -178,32 +191,6 @@ export function axisTagsOf(tags: readonly string[], axis: TagAxis): string[] {
 }
 
 /**
- * Einen Achsenwert an- oder abwählen — die Bewegung hinter einem Klick.
- *
- * Bei einer ausschließenden Achse **wechselt** die Auswahl, sie sammelt nicht:
- * ohne das entstehen Notes, die zugleich `status:open` und `status:done`
- * tragen, und das ist keine Aussage, sondern deren Abwesenheit.
- *
- * Tags außerhalb der Achsen bleiben stehen. Was jemand selbst vergeben hat
- * oder was aus alten Runs stammt, nimmt ihm die Auswahl nicht weg.
- */
-export function toggleAxisTag(tags: readonly string[], tag: string): string[] {
-  const parts = splitTag(tag)
-  if (!parts || !isAxisTag(tag)) return [...tags]
-
-  const normalized = `${parts.axis}:${parts.value}`
-  if (tags.some(t => t.toLowerCase() === normalized)) {
-    return tags.filter(t => t.toLowerCase() !== normalized)
-  }
-
-  const exclusive = (EXCLUSIVE_AXES as readonly string[]).includes(parts.axis)
-  const kept = exclusive
-    ? tags.filter(t => !t.toLowerCase().startsWith(`${parts.axis}:`))
-    : [...tags]
-  return [...kept, normalized]
-}
-
-/**
  * Tags, die der Prozess beim Anlegen einer Note setzt.
  *
  * Alles hier ist bekannt, nichts geschätzt: der Workspace aus der Verbindung,
@@ -224,4 +211,100 @@ export function processTagsFor(opts: {
   }
   if (opts.noteType && KIND_VALUES.includes(opts.noteType)) tags.push(`kind:${opts.noteType}`)
   return tags
+}
+
+
+// ─── Das Auswahlfeld: zwei Quellen, eine Bedienung ──────────
+//
+// Anforderung vom 2026-09-30: „severity und component finde ich legitim - aber
+// die werte müssen editierbar sein - gerade component ist dabei ja schon
+// projektspezifisch", und dann: „halt über das editieren auch fest als auswahl
+// vorgeben - ich denke das fehlt".
+//
+// Der Unterschied zwischen den Zeilen ist die HERKUNFT der Werte, nicht ihre
+// Verbindlichkeit. Angeboten werden beide gleich: als Knopf. Ein editierbarer
+// Wert, der nirgends zur Auswahl steht, ist eine Einstellung ohne Wirkung.
+
+export interface PickRow {
+  /** Die Tag-Klasse. */
+  klass: string
+  /** Beschriftung im Auswahlfeld. */
+  label: string
+  /**
+   * Woher die Werte kommen.
+   *
+   * `axis` — aus dem Code. Der Mux kennt sie, Ansichten hängen daran
+   * (TestcaseView, FindingView), sie sind nicht verhandelbar.
+   *
+   * `registry` — aus `.tags.json`, im TagManager editierbar. Welche Bauteile
+   * ein Projekt hat, weiß der Code nicht und soll es nicht wissen.
+   */
+  source: 'axis' | 'registry'
+  /** Ob die Note nur einen Wert dieser Klasse tragen darf. */
+  exclusive: boolean
+}
+
+/**
+ * Die Zeilen des Auswahlfelds, in der Reihenfolge des Arbeitsablaufs.
+ *
+ * `workspace` und `entity` fehlen: das sind Tatsachen aus dem Prozess. Ein
+ * Auswahlknopf dafür wäre eine Einladung, eine Note unter eine fremde Herkunft
+ * zu hängen. Sie erscheinen als Chip, nicht als Knopf (PROCESS_SET_AXES).
+ */
+export const PICK_ROWS: readonly PickRow[] = [
+  { klass: 'kind', label: 'Typ', source: 'axis', exclusive: true },
+  { klass: 'phase', label: 'Phase', source: 'axis', exclusive: false },
+  { klass: 'status', label: 'Zustand', source: 'axis', exclusive: true },
+  // Zwei Schweregrade gleichzeitig sind keine Aussage, sondern deren Abwesenheit.
+  { klass: 'severity', label: 'Schwere', source: 'registry', exclusive: true },
+  // Eine Note darf zwei Bauteile berühren; das ist eher die Regel.
+  { klass: 'component', label: 'Bauteil', source: 'registry', exclusive: false },
+]
+
+/** Die Zeile einer Klasse, oder undefined wenn sie nicht zur Auswahl steht. */
+export function rowFor(klass: string): PickRow | undefined {
+  return PICK_ROWS.find(r => r.klass === klass.toLowerCase())
+}
+
+/**
+ * Ob eine Klasse nur einen Wert pro Note zulässt.
+ *
+ * Fasst die Achsen und die Auswahlzeilen zusammen, damit die Tatsache einmal
+ * steht: `EXCLUSIVE_AXES` kennt `entity`, das nie zur Auswahl steht, und
+ * PICK_ROWS kennt `severity`, das keine Achse ist.
+ */
+export function isExclusiveClass(klass: string): boolean {
+  const lower = klass.toLowerCase()
+  if ((EXCLUSIVE_AXES as readonly string[]).includes(lower)) return true
+  return rowFor(lower)?.exclusive ?? false
+}
+
+/**
+ * Einen Tag an- oder abwählen — die Bewegung hinter einem Klick.
+ *
+ * Bei einer ausschließenden Klasse **wechselt** die Auswahl, sie sammelt nicht.
+ *
+ * Geprüft wird nur, was der Code kennt: bei einer geschlossenen Achse muss der
+ * Wert in ihrer Liste stehen. Bei einer Registry-Klasse bürgt der Aufrufer —
+ * die Oberfläche bietet nur an, was in `.tags.json` steht, und eine zweite
+ * Liste im Code wäre genau die Doppelung, die irgendwann auseinanderläuft.
+ *
+ * Tags anderer Klassen bleiben unangetastet.
+ */
+export function toggleTag(tags: readonly string[], tag: string): string[] {
+  const parts = splitTag(tag)
+  if (!parts) return [...tags]
+
+  const closed = AXIS_VALUES[parts.axis as TagAxis]
+  if (closed && !closed.includes(parts.value)) return [...tags]
+
+  const normalized = `${parts.axis}:${parts.value}`
+  if (tags.some(t => t.toLowerCase() === normalized)) {
+    return tags.filter(t => t.toLowerCase() !== normalized)
+  }
+
+  const kept = isExclusiveClass(parts.axis)
+    ? tags.filter(t => !t.toLowerCase().startsWith(`${parts.axis}:`))
+    : [...tags]
+  return [...kept, normalized]
 }

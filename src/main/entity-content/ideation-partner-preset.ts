@@ -191,13 +191,14 @@ Diese Session ist NICHT fuer:
 Tags werden in \`~/.config/cipher-mux/notes/.tags.json\` verwaltet. Beim Anlegen von Notes via \`mux_notes_create\` immer passende Tags mitgeben.
 
 **Pflicht-Tags fuer Ideation Partner:**
-- \`kind:brain\` — fuer Brain-Notes (Recherche, Seed, Brief)
-- \`kind:anforderungspaket\` — fuer das finale Anforderungs-Paket
+- \`kind:reference\` — fuer Brain-Notes (Recherche, Seed, Brief)
+- \`kind:requirements\` — fuer das finale Anforderungs-Paket
 - \`entity:ideation-partner\` — Herkunfts-Tag
 
-Optionale Tags: \`phase:0\` bis \`phase:4\`, \`skill:pre-mortem\`, \`skill:roundtable\`, \`skill:future-backwards\`, \`skill:oss-telescope\`.
+Optionale Tags: \`phase:research\`, \`phase:architecture\`.
+Das genutzte Skill (Pre-Mortem, Roundtable, Future-Backwards, OSS-Telescope) gehoert in den Rumpf der Note — es ist keine Tag-Klasse.
 
-**Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \`status:\`-Tag aktualisieren: \`status:open\` → \`status:in-progress\` → \`status:done\` / \`status:closed\`. Kein Update ohne passenden Status-Tag.
+**Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \`status:\`-Tag aktualisieren: \`status:open\` → \`status:in-progress\` → \`status:done\`. Kein Update ohne passenden Status-Tag.
 
 ## Lessons Learned
 

@@ -240,12 +240,13 @@ Tags are managed in \\\`~/.config/cipher-mux/notes/.tags.json\\\`. When creating
 
 **Required tags for Refinement:**
 - \\\`kind:spec\\\` — for detail specs with REQ-IDs
-- \\\`kind:lueckenanalyse\\\` — for RE audit results
+- \\\`kind:research\\\` — for RE audit results
 - \\\`entity:refinement\\\` — origin tag
 
-Optional tags: \\\`phase:1\\\` through \\\`phase:7\\\`, \\\`req-status:draft\\\`, \\\`req-status:final\\\`.
+Optional tags: \\\`phase:architecture\\\`, \\\`phase:research\\\`.
+The maturity of the requirements is read from the note body (requirements-parser), not from a tag.
 
-**Notes status maintenance:** On every note edit, update the \\\`status:\\\` tag: \\\`status:open\\\` → \\\`status:in-progress\\\` → \\\`status:done\\\` / \\\`status:closed\\\`. No update without a matching status tag.
+**Notes status maintenance:** On every note edit, update the \\\`status:\\\` tag: \\\`status:open\\\` → \\\`status:in-progress\\\` → \\\`status:done\\\`. No update without a matching status tag.
 
 ## Lessons Learned
 

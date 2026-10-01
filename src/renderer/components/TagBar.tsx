@@ -1,11 +1,12 @@
 // src/renderer/components/TagBar.tsx
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'preact/hooks'
-import { EXCLUSIVE_TAG_CLASSES } from '../../shared/constants'
 import {
   AXIS_VALUES,
+  isExclusiveClass,
+  PICK_ROWS,
   PROCESS_SET_AXES,
-  toggleAxisTag,
+  toggleTag,
   type TagAxis,
 } from '../../shared/tag-axes'
 import type { TagClass } from '../../shared/types'
@@ -19,24 +20,29 @@ import type { TagClass } from '../../shared/types'
  */
 const MAX_TAGS = 8
 
+// Welche Zeilen das Auswahlfeld zeigt, steht in PICK_ROWS (shared/tag-axes.ts).
+// Die Werte kommen je Zeile aus dem Code (source: 'axis') oder aus der
+// editierbaren Registry (source: 'registry') — siehe valuesForRow unten.
+
 /**
- * Die Achsen, die zur Auswahl stehen, in der Reihenfolge des Arbeitsablaufs.
+ * Die Werte einer Auswahlzeile.
  *
- * Anforderung vom 2026-09-30: „tags müssen glaub ich schlicht hart zur auswahl
- * angeboten werden bzw aus dem prozess kommen". Ein Freitextfeld kann das
- * nicht — es lädt zum Erfinden ein, und genau dabei sind 14 Klassen und 29
- * kind-Werte entstanden.
+ * Der Unterschied zwischen den beiden Quellen ist der Grund, warum es diese
+ * Funktion gibt: Achsenwerte stehen im Code und sind für jedes Projekt
+ * dieselben. Registry-Werte stehen in `.tags.json` und sind projektspezifisch —
+ * welche Bauteile ein Projekt hat, weiß der Code nicht und soll es nicht wissen.
  *
- * `workspace` und `entity` fehlen hier absichtlich: die setzt der Prozess (aus
- * der Verbindung), und ein Auswahlknopf dafür wäre eine Einladung, eine Note in
- * ein fremdes Projekt oder unter eine fremde Rolle zu hängen. Sie erscheinen
- * als Chip, nicht als Knopf.
+ * Fällt die Registry aus (IPC noch nicht geantwortet), bleibt die Zeile leer und
+ * wird nicht gezeigt. Sie mit einer Notliste aus dem Code zu füllen wäre
+ * schlimmer: dann stünde dort etwas, das der Tag-Manager nicht kennt.
  */
-const CHOOSABLE_AXES: ReadonlyArray<{ axis: TagAxis; label: string }> = [
-  { axis: 'kind', label: 'Typ' },
-  { axis: 'phase', label: 'Phase' },
-  { axis: 'status', label: 'Zustand' },
-]
+function valuesForRow(
+  row: (typeof PICK_ROWS)[number],
+  classValues: Record<string, string[]>,
+): readonly string[] {
+  if (row.source === 'axis') return AXIS_VALUES[row.klass as TagAxis] ?? []
+  return classValues[row.klass] ?? []
+}
 
 /** Validate tag format: must be klasse:wert */
 function isValidTag(tag: string): boolean {
@@ -69,19 +75,36 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
     }).catch(() => {})
   }, [])
 
+  /**
+   * Die Klassen laden — und neu laden, wenn sie sich ändern.
+   *
+   * Ohne den Horcher wäre das Editieren im Tag-Manager erst nach einem Neustart
+   * im Auswahlfeld zu sehen. Eine Einstellung, die scheinbar nichts tut, ist
+   * schlimmer als eine, die es nicht gibt: man ändert sie zweimal und glaubt
+   * dann, sie sei kaputt.
+   */
   useEffect(() => {
     const api = window.cipherMux
     if (!api?.notes?.tagClassRepo) return
-    api.notes.tagClassRepo().then((repo: { classes: Record<string, TagClass> }) => {
-      const cv: Record<string, string[]> = {}
-      const cc: Record<string, string> = {}
-      for (const [cls, data] of Object.entries(repo.classes)) {
-        cv[cls] = data.values
-        if (data.color) cc[cls] = data.color
-      }
-      setClassValues(cv)
-      setClassColors(cc)
-    }).catch(() => {})
+
+    const load = (): void => {
+      api.notes.tagClassRepo().then((repo: { classes: Record<string, TagClass> }) => {
+        const cv: Record<string, string[]> = {}
+        const cc: Record<string, string> = {}
+        for (const [cls, data] of Object.entries(repo.classes)) {
+          cv[cls] = data.values
+          if (data.color) cc[cls] = data.color
+        }
+        setClassValues(cv)
+        setClassColors(cc)
+      }).catch(() => {})
+    }
+
+    load()
+    if (!api.notes.onChanged) return
+    return api.notes.onChanged<{ action?: string }>(data => {
+      if (data?.action === 'tags-updated') load()
+    })
   }, [])
 
   // Parse class prefix from input (e.g. "kind:" → classPrefix="kind")
@@ -179,7 +202,11 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
     const colonIdx = trimmed.indexOf(':')
     const tagClass = colonIdx > 0 ? trimmed.slice(0, colonIdx) : null
     let newTags = [...tags]
-    if (tagClass && EXCLUSIVE_TAG_CLASSES.includes(tagClass)) {
+    // isExclusiveClass statt der Achsen-Liste: `severity` ist keine Achse und
+    // trotzdem ausschliessend. Mit EXCLUSIVE_TAG_CLASSES liess der Freitext-Pfad
+    // zwei Schweregrade an einer Note zu, waehrend die Auswahl sie austauschte --
+    // zwei Wege, zwei Ergebnisse.
+    if (tagClass && isExclusiveClass(tagClass)) {
       newTags = newTags.filter(t => !t.startsWith(tagClass + ':'))
     }
     newTags.push(trimmed)
@@ -224,13 +251,13 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
   /**
    * Ein Achsenwert an oder aus.
    *
-   * Die Bewegung steckt in toggleAxisTag (shared/tag-axes.ts) und nicht hier:
+   * Die Bewegung steckt in toggleTag (shared/tag-axes.ts) und nicht hier:
    * bei einer ausschliessenden Achse wechselt die Auswahl, statt zu sammeln.
    * Ohne das entstehen Notes, die zugleich `status:open` und `status:done`
    * tragen, und das ist keine Aussage, sondern deren Abwesenheit.
    */
   const toggleAxis = useCallback((tag: string) => {
-    const next = toggleAxisTag(tags, tag)
+    const next = toggleTag(tags, tag)
     if (next.length > MAX_TAGS) {
       setWarning(`Max ${MAX_TAGS} Tags pro Note`)
       return
@@ -259,7 +286,7 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
         {tags.map(tag => {
           const colonIdx = tag.indexOf(':')
           const cls = colonIdx > 0 ? tag.slice(0, colonIdx) : null
-          const canCycle = !!(cls && EXCLUSIVE_TAG_CLASSES.includes(cls) && (classValues[cls]?.length ?? 0) > 1)
+          const canCycle = !!(cls && isExclusiveClass(cls) && (classValues[cls]?.length ?? 0) > 1)
           const chipColor = cls ? classColors[cls] : undefined
           // Herkunft, nicht Wahl: der Workspace kommt aus der Verbindung, die
           // Entity aus ihrem Kopf. Beides gesetzt, nicht getroffen -- und das
@@ -333,23 +360,29 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
         </div>
       </div>
 
-      {/* Harte Auswahl pro Achse — kein Freitext, keine erfundenen Klassen */}
+      {/* Harte Auswahl pro Zeile — kein Freitext, keine erfundenen Klassen */}
       <div class="tag-bar__axes">
-        {CHOOSABLE_AXES.map(({ axis, label }) => {
-          const values = AXIS_VALUES[axis] ?? []
+        {PICK_ROWS.map(row => {
+          const values = valuesForRow(row, classValues)
+          // Eine Registry-Zeile ohne Werte wird nicht gezeigt. Eine leere
+          // Zeile mit Beschriftung sieht wie ein Fehler aus; sie bedeutet nur,
+          // dass für diese Klasse noch keine Werte angelegt sind.
+          if (values.length === 0) return null
           return (
-            <div key={axis} class="tag-bar__axis">
-              <span class="tag-bar__axis-label">{label}</span>
+            <div key={row.klass} class="tag-bar__axis">
+              <span class="tag-bar__axis-label">{row.label}</span>
               <div class="tag-bar__axis-values">
                 {values.map(value => {
-                  const tag = `${axis}:${value}`
+                  const tag = `${row.klass}:${value}`
                   const active = tags.some(t => t.toLowerCase() === tag)
                   return (
                     <button
                       key={tag}
                       class={`tag-bar__quick-btn${active ? ' tag-bar__quick-btn--active' : ''}`}
                       onClick={() => toggleAxis(tag)}
-                      title={tag}
+                      title={row.source === 'registry'
+                        ? `${tag} — Werte im Tag-Manager editierbar`
+                        : tag}
                     >
                       {value}
                     </button>

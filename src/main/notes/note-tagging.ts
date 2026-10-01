@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { TagRepository, TagEntry } from '../../shared/types'
 import type { TagClassRepo } from './tag-repository'
-import { filterToAxes, KIND_VALUES, PHASE_VALUES, STATUS_VALUES } from '../../shared/tag-axes'
+import { AXIS_VALUES, filterToAxes, KIND_VALUES, PHASE_VALUES, STATUS_VALUES } from '../../shared/tag-axes'
 
 const TIMEOUT_MS = 60_000
 
@@ -36,53 +36,69 @@ function getLlmConfig() {
 // Entity-specific functional tags (no class prefix): handoff
 // These are used as programmatic markers and must stay flat.
 
-export const SEED_TAGS: Record<string, TagEntry> = {
-  // kind — note purpose
-  'kind:bugreport': { count: 0, description: 'Bug report notes' },
-  'kind:journal': { count: 0, description: 'Personal journal, daily notes, reflections' },
-  'kind:reference': { count: 0, description: 'Reference material, documentation, guides' },
-  'kind:todo': { count: 0, description: 'Todo items, tasks, action points' },
-  'kind:idea': { count: 0, description: 'Ideas, brainstorming, concepts' },
-  // domain — subject area
-  'domain:trading': { count: 0, description: 'Trading strategies, market analysis, order execution' },
-  'domain:risk': { count: 0, description: 'Risk management, position sizing, drawdown' },
-  'domain:market-data': { count: 0, description: 'Market data feeds, price history, tick data' },
-  'domain:portfolio': { count: 0, description: 'Portfolio management, allocation, performance tracking' },
-  'domain:infra': { count: 0, description: 'Infrastructure, server setup, deployment' },
-  'domain:ai-ml': { count: 0, description: 'AI/ML models, training, inference, LLMs' },
-  'domain:security': { count: 0, description: 'Security, access control, credentials, encryption' },
-  'domain:backup': { count: 0, description: 'Backups, snapshots, data recovery' },
-  // tech — technology
-  'tech:typescript': { count: 0, description: 'TypeScript, type system, compiler' },
-  'tech:python': { count: 0, description: 'Python scripts, libraries, automation' },
-  'tech:electron': { count: 0, description: 'Electron framework, desktop app, IPC' },
-  'tech:tailscale': { count: 0, description: 'Tailscale VPN, mesh networking, node connectivity' },
-  'tech:truenas': { count: 0, description: 'TrueNAS SCALE, storage, ZFS, datasets' },
-  // project — project name
-  'project:cipher-mux': { count: 0, description: 'cipher-mux-electron project, terminal multiplexer UI' },
-  'project:cipher-boox': { count: 0, description: 'cipher-boox project, e-reader integration' },
-  'project:openclaw': { count: 0, description: 'OpenClaw project, SSH keys, infrastructure access' },
-  // phase — workflow phase
-  'phase:research': { count: 0, description: 'Research, analysis, investigation' },
-  'phase:architecture': { count: 0, description: 'System architecture, design patterns, ADRs' },
-  'phase:coding': { count: 0, description: 'General coding, implementation, development' },
-  'phase:testing': { count: 0, description: 'Unit tests, integration tests, test coverage' },
-  'phase:debugging': { count: 0, description: 'Debugging, troubleshooting, error investigation' },
-  'phase:automation': { count: 0, description: 'Automation scripts, workflows, CI/CD' },
-  'phase:monitoring': { count: 0, description: 'Monitoring, alerts, metrics, dashboards' },
-  'kind:testcase': { count: 0, description: 'Testcase note with checklist format' },
-  // Entity-specific functional tags (flat, no class prefix)
-  handoff: { count: 0, description: 'Handoff note between sessions' },
+/**
+ * Beschreibungen zu den Achsenwerten, soweit eine gebraucht wird.
+ *
+ * Nur ein Nachschlagewerk — die LISTE der Vokabeln kommt aus den Achsen, nicht
+ * von hier. Vorher standen hier 16 Einträge für `domain:`, `tech:` und
+ * `project:`; der Umzug am 2026-10-01 hat diese Klassen aufgelöst, und ein Seed
+ * hätte sie bei jedem Speichern in `.tags.json` zurückgeschrieben.
+ */
+const VALUE_DESCRIPTIONS: Record<string, string> = {
+  'kind:bugreport': 'Bug report notes',
+  'kind:journal': 'Personal journal, daily notes, reflections',
+  'kind:reference': 'Reference material, documentation',
+  'kind:todo': 'Todo items, tasks, action points',
+  'kind:idea': 'Ideas, brainstorming, concepts',
+  'kind:testcase': 'Testcase note with checklist format',
+  'kind:spec': 'Specification with requirement IDs',
+  'kind:requirements': 'Requirements package',
+  'kind:finding': 'Findings from a review, audit or test run',
+  'kind:handoff': 'Handoff note between sessions',
+  'kind:research': 'Research, investigation, gap analysis',
+  'kind:plan': 'Plan — waves, fixes, sequencing',
+  'kind:report': 'Report on something completed',
+  'kind:guide': 'Walkthrough or guide',
+  'phase:research': 'Research, analysis, investigation',
+  'phase:architecture': 'System architecture, design patterns, ADRs',
+  'phase:coding': 'General coding, implementation, development',
+  'phase:testing': 'Unit tests, integration tests, test coverage',
+  'phase:debugging': 'Debugging, troubleshooting, error investigation',
+  'phase:automation': 'Automation scripts, workflows, CI/CD',
+  'phase:monitoring': 'Monitoring, alerts, metrics, audits',
 }
+
+/**
+ * Die Startvokabeln für `.tags.json`.
+ *
+ * **Abgeleitet, nicht aufgeschrieben.** Dieselbe Tatsache zweimal zu notieren
+ * heißt, dass eine der beiden Stellen irgendwann falsch ist — und genau das war
+ * sie: die Liste enthielt `category:*`, obwohl es die Klasse nie gab, und die
+ * Testing-Vorlage wies ihre Rolle darauf hin. Deren Notes wären an der
+ * Tag-Prüfung gescheitert.
+ */
+export const SEED_TAGS: Record<string, TagEntry> = (() => {
+  const out: Record<string, TagEntry> = {}
+  for (const [axis, values] of Object.entries(AXIS_VALUES)) {
+    for (const value of values ?? []) {
+      const tag = `${axis}:${value}`
+      out[tag] = { count: 0, description: VALUE_DESCRIPTIONS[tag] ?? `${axis}: ${value}` }
+    }
+  }
+  // Flacher Funktionsmarker ohne Klasse — programmatisch gelesen, bleibt flach.
+  out.handoff = { count: 0, description: 'Handoff note between sessions' }
+  return out
+})()
 
 /** Recommended tag classes for .tags.json documentation */
 export const TAG_CLASSES: Record<string, string> = {
-  kind: 'Note type/purpose (bugreport, journal, reference, todo, idea)',
-  domain: 'Subject area (trading, risk, infra, ai-ml, security)',
-  tech: 'Technology (typescript, python, electron, tailscale)',
-  project: 'Project name (cipher-mux, cipher-boox, openclaw)',
-  phase: 'Workflow phase (research, architecture, coding, testing, debugging)',
-  scope: 'Visibility/lifecycle — auto-assigned (workspace:<id>, session)',
+  kind: 'Note type/purpose — see KIND_VALUES in shared/tag-axes.ts',
+  phase: 'Workflow phase — research, architecture, coding, testing, debugging, automation, monitoring',
+  status: 'State — open, in-progress, blocked, verify, done, superseded',
+  entity: 'Origin: the role that created the note. Set by the Mux, never guessed',
+  workspace: 'Origin: the workspace. Set by the Mux, never guessed',
+  severity: 'Severity of a finding — low, mid, hi, now. Editable in the Tag Manager',
+  component: 'Project-specific part. Editable in the Tag Manager',
 }
 
 const TAGS_FILENAME = '.tags.json'

@@ -308,6 +308,8 @@ const api = {
       ipcRenderer.invoke(IPC.NOTES_TAG_CLASS_SET_COLOR, { name, color }),
     tagClassAddValue: (className: string, value: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IPC.NOTES_TAG_CLASS_ADD_VALUE, { className, value }),
+    tagClassRemoveValue: (className: string, value: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.NOTES_TAG_CLASS_REMOVE_VALUE, { className, value }),
     tagSynonymsList: (): Promise<Record<string, string>> =>
       ipcRenderer.invoke(IPC.NOTES_TAG_SYNONYMS_LIST),
     tagIndex: () => ipcRenderer.invoke(IPC.NOTES_TAG_INDEX),

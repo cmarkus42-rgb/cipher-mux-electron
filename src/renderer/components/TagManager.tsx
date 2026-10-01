@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { TagClass, TagIndexData } from '../../shared/types'
+import { AXIS_VALUES, type TagAxis } from '../../shared/tag-axes'
 
 interface TagInfo {
   name: string
@@ -23,6 +24,25 @@ interface TagValueRow {
   value: string
   count: number
   isSeed: boolean
+  /** Vom Code vorgegeben (Achsenwert) — nicht editierbar, siehe isCodeOwnedValue. */
+  codeOwned: boolean
+}
+
+/**
+ * Ob ein Wert vom Code vorgegeben ist.
+ *
+ * Die Achsen (kind, phase, status, entity) speisen SEED_CLASSES. Wer einen
+ * solchen Wert hier entfernt, hat ihn beim naechsten Start wieder — der Seed
+ * stellt ihn her. Ein Knopf, dessen Wirkung ein Neustart aufhebt, ist kein
+ * Knopf, sondern eine Irreführung; deshalb steht er fuer diese Werte nicht da.
+ *
+ * `severity` und `component` sind ausdruecklich anders: projektspezifisch und
+ * editierbar. severity traegt eine Startbelegung (low/mid/hi/now), die bleibt
+ * aber verhandelbar.
+ */
+function isCodeOwnedValue(className: string, value: string): boolean {
+  const axisValues = AXIS_VALUES[className as TagAxis]
+  return axisValues?.includes(value.toLowerCase()) ?? false
 }
 
 const api = window.cipherMux
@@ -102,6 +122,7 @@ export function TagManager() {
           value: v,
           count: tagCounts[fullTag] || 0,
           isSeed: seedSet.has(fullTag),
+          codeOwned: isCodeOwnedValue(clsName, v),
         }
       })
       values.sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
@@ -122,6 +143,8 @@ export function TagManager() {
         value: t.name,
         count: tagCounts[t.name] || t.count,
         isSeed: t.isSeed,
+        // Ein klassenloser Tag gehoert keiner Achse — er ist immer editierbar.
+        codeOwned: false,
       }))
 
     setClasses(prev => {
@@ -169,6 +192,19 @@ export function TagManager() {
   }
 
   // Tag value delete
+  /**
+   * Den Wert aus der Auswahlliste nehmen, die Notes aber behalten.
+   *
+   * Der Unterschied zu handleDelete ist der ganze Punkt: handleDelete streicht
+   * den Tag aus jeder Note, das hier nimmt ihn nur aus dem Angebot.
+   */
+  const handleRemoveValue = async (row: TagValueRow) => {
+    const parsed = row.fullTag.split(':')
+    if (parsed.length < 2) return
+    await api.notes.tagClassRemoveValue(parsed[0], parsed.slice(1).join(':'))
+    await loadData()
+  }
+
   const handleDelete = async (tag: string) => {
     await api.notes.tagDelete(tag)
     setDeleteConfirm(null)
@@ -319,7 +355,13 @@ export function TagManager() {
           ) : (
             <span class="tag-manager__value-label">
               {row.value}
-              {row.isSeed && <span class="tag-manager__badge">{t('tags.seed', 'seed')}</span>}
+              {row.codeOwned && (
+                <span
+                  class="tag-manager__badge"
+                  title="Vom Code vorgegeben — ein Entfernen hält den Neustart nicht aus."
+                >fest</span>
+              )}
+              {row.isSeed && !row.codeOwned && <span class="tag-manager__badge">{t('tags.seed', 'seed')}</span>}
               {isTarget && <span class="tag-manager__badge tag-manager__badge--target">{t('tags.mergeTarget', 'target')}</span>}
             </span>
           )}
@@ -337,7 +379,7 @@ export function TagManager() {
           </div>
         )}
 
-        {!mergeMode && (
+        {!mergeMode && !row.codeOwned && (
           <div class="tag-manager__value-actions">
             <button
               class="tag-manager__action"
@@ -345,6 +387,17 @@ export function TagManager() {
               title={t('tags.rename', 'Rename')}
             >
               Aa
+            </button>
+            {/* Zwei Bedeutungen, die vorher eine waren: den Wert nicht mehr
+                anbieten, oder ihn ueberall loeschen. Fuer eine editierbare
+                Auswahlliste ist das Erste der Normalfall — "critical" wird
+                nicht mehr vergeben, alte Befunde tragen es weiter. */}
+            <button
+              class="tag-manager__action"
+              onClick={(e) => { e.stopPropagation(); handleRemoveValue(row) }}
+              title={`Nicht mehr zur Auswahl anbieten (${row.count} Notes behalten den Tag)`}
+            >
+              {'\u2212'}
             </button>
             {deleteConfirm === row.fullTag ? (
               <>

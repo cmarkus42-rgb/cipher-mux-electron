@@ -96,8 +96,8 @@ Learning erkannt
 
 ### Notes-Status-Pflege
 
-- **Status-Tag aktualisieren:** Wenn du eine Note bearbeitest oder ihren Inhalt aenderst, MUSS der \`status:\`-Tag aktualisiert werden: \`status:open\` → \`status:in-progress\` → \`status:done\` / \`status:closed\`.
-- **Regel:** Kein \`mux_notes_update\` ohne passenden Status-Tag-Update. Offene Notes die aktiv bearbeitet werden → \`status:in-progress\`. Abgeschlossene Arbeit → \`status:done\` oder \`status:closed\`.
+- **Status-Tag aktualisieren:** Wenn du eine Note bearbeitest oder ihren Inhalt aenderst, MUSS der \`status:\`-Tag aktualisiert werden: \`status:open\` → \`status:in-progress\` → \`status:done\`.
+- **Regel:** Kein \`mux_notes_update\` ohne passenden Status-Tag-Update. Offene Notes die aktiv bearbeitet werden → \`status:in-progress\`. Abgeschlossene Arbeit → \`status:done\`.
 - **Gilt fuer alle Entities:** Jede Entity die Notes anlegt oder bearbeitet muss diese Konvention einhalten.
 
 ### Testcase-Konventionen

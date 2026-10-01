@@ -210,6 +210,7 @@ export const IPC = {
   NOTES_TAG_CLASS_DELETE: 'cipher-mux:notes:tag-class-delete',
   NOTES_TAG_CLASS_SET_COLOR: 'cipher-mux:notes:tag-class-set-color',
   NOTES_TAG_CLASS_ADD_VALUE: 'cipher-mux:notes:tag-class-add-value',
+  NOTES_TAG_CLASS_REMOVE_VALUE: 'cipher-mux:notes:tag-class-remove-value',
   NOTES_TAG_SYNONYMS_LIST: 'cipher-mux:notes:tag-synonyms-list',
   NOTES_TAG_INDEX: 'cipher-mux:notes:tag-index',
   NOTES_TAG_INDEX_REFRESH: 'cipher-mux:notes:tag-index-refresh',

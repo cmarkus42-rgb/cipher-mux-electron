@@ -27,7 +27,7 @@ import {
   AXIS_VALUES,
   ENTITY_PHASE_DEFAULT,
   ENTITY_VALUES,
-  EXCLUSIVE_AXES,
+  isExclusiveClass,
   KIND_VALUES,
   PHASE_VALUES,
   STATUS_VALUES,
@@ -58,6 +58,9 @@ export const KIND_MAP: Readonly<Record<string, string>> = {
 
   // Berichte über etwas Abgeschlossenes
   abschlussbericht: 'report',       // 59
+  'audit-report': 'report',         // aus der Audit-Vorlage
+  'release-empfehlung': 'report',   // aus der Audit-Vorlage
+  'testing-run': 'report',          // aus der Testing-Vorlage
   'workshop-run': 'report',         // 30 — die Mitschrift eines Laufs
   'findings-report': 'finding',     // 50 — trägt die FindingView
 
@@ -122,6 +125,48 @@ export const SCOPE_TO_PHASE: Readonly<Record<string, string>> = {
   refinement: 'architecture',       // 2
   architecture: 'architecture',     // 1
 }
+
+/**
+ * Bestands-Schwere → die vier Stufen.
+ *
+ * Festgelegt am 2026-09-30: „zum start sollte gerade severity auf 4 (low mid hi
+ * now) begrenzt werden ... now als höchste stufe". Der Bestand trug
+ * high(36) medium(26) low(15) critical(1).
+ *
+ * `now` ist mehr als `critical` je war: es sagt nicht „schlimm", sondern „jetzt".
+ */
+export const SEVERITY_MAP: Readonly<Record<string, string>> = {
+  low: 'low',
+  medium: 'mid',
+  mid: 'mid',
+  high: 'hi',
+  hi: 'hi',
+  critical: 'now',
+  now: 'now',
+}
+
+/**
+ * Klassen, die es nicht mehr gibt.
+ *
+ * Jede aus einem eigenen Grund, und keine willkürlich:
+ *
+ *  - `scope` — seine Phasen-Werte sind zu `phase` geworden (siehe
+ *    SCOPE_TO_PHASE), der Rest benannte Bauteile. Das ist `component`.
+ *  - `project` — doppelte den Workspace. 147 von 161 Vergaben standen auf
+ *    Notes, die den Workspace ohnehin trugen.
+ *  - `req-status` — doppelte den Zustand, den der requirements-parser aus dem
+ *    **Rumpf** liest. Ein Tag daneben kann nur veralten.
+ *  - `welle` — die Wellennummer steht im Titel der Note („… Welle 3").
+ *  - `verdict` — das Urteil steht im Titel und im Rumpf der Audit-Note.
+ *  - `domain`, `tech` — drei und zwei Werte, beide ohne Leser im Code.
+ *
+ * Nicht dabei: `severity` und `component`. Die sind legitim und editierbar.
+ * Ebenfalls nicht dabei: Schlagworte ohne Klasse. Die erzeugen keine
+ * Filterebene, und `raspberry-pi` steht nirgends sonst.
+ */
+export const DISSOLVED_CLASSES: readonly string[] = [
+  'scope', 'project', 'req-status', 'welle', 'verdict', 'domain', 'tech', 'category', 'skill',
+]
 
 export interface MigrationContext {
   /** Workspace-Anzeigename (kleingeschrieben) → ID. */
@@ -231,8 +276,11 @@ export function migrateTags(tags: readonly string[], ctx: MigrationContext): Mig
 
       case 'phase': {
         if (PHASE_VALUES.includes(lowerValue)) { push(`phase:${lowerValue}`); break }
-        // Eine Wellennummer ist keine Phase. `welle` bedeutet genau das.
-        if (/^\d+[a-z]?$/.test(lowerValue)) { push(`welle:${lowerValue}`); break }
+        // Eine Wellennummer ist keine Phase — und seit `welle` aufgelöst ist,
+        // auch keine Welle mehr: die Nummer steht im Titel der Note
+        // („… Welle 3"). Sie hierher zu hängen wäre Theater, weil
+        // DISSOLVED_CLASSES sie gleich danach wieder wegräumt.
+        if (/^\d+[a-z]?$/.test(lowerValue)) break
         push(tag)
         unmapped.push(tag)
         break
@@ -241,6 +289,14 @@ export function migrateTags(tags: readonly string[], ctx: MigrationContext): Mig
       case 'entity': {
         if (ENTITY_VALUES.includes(lowerValue)) { push(`entity:${lowerValue}`); break }
         // `orchestrator` etwa gibt es als Rolle nicht mehr.
+        push(tag)
+        unmapped.push(tag)
+        break
+      }
+
+      case 'severity': {
+        const target = SEVERITY_MAP[lowerValue]
+        if (target) { push(`severity:${target}`); break }
         push(tag)
         unmapped.push(tag)
         break
@@ -258,9 +314,13 @@ export function migrateTags(tags: readonly string[], ctx: MigrationContext): Mig
     }
   }
 
-  // ── project: entfällt, wo der Workspace dasselbe sagt ──
-  const hasWorkspace = out.some(t => t.toLowerCase().startsWith('workspace:'))
-  let result = hasWorkspace ? out.filter(t => !t.toLowerCase().startsWith('project:')) : out
+  // ── Aufgelöste Klassen räumen ──
+  // Nach der Schleife, nicht darin: `scope:testing` muss erst zu
+  // `phase:testing` geworden sein. Umgekehrt wäre die Phase nie entstanden.
+  let result = out.filter(t => {
+    const parts = splitTag(t)
+    return !parts || !DISSOLVED_CLASSES.includes(parts.axis)
+  })
 
   // ── Ausschliessende Achsen: der erste Wert gewinnt ──
   // Nach dem Zusammenfassen können zwei Bestandswerte auf denselben Achsenwert
@@ -270,7 +330,9 @@ export function migrateTags(tags: readonly string[], ctx: MigrationContext): Mig
   result = result.filter(t => {
     const parts = splitTag(t)
     if (!parts) return true
-    if (!(EXCLUSIVE_AXES as readonly string[]).includes(parts.axis)) return true
+    // isExclusiveClass fasst die Achsen und die Auswahlzeilen zusammen --
+    // `severity` ist keine Achse und trotzdem ausschliessend.
+    if (!isExclusiveClass(parts.axis)) return true
     if (seenExclusive.has(parts.axis)) return false
     seenExclusive.add(parts.axis)
     return true
@@ -389,4 +451,68 @@ export async function migrateNotesDir(opts: MigrationRunOptions): Promise<Migrat
   }
 
   return report
+}
+
+// ─── Einmalig beim Start ────────────────────────────────────
+
+/**
+ * Markerdatei neben den Notes. Verhindert den zweiten Lauf.
+ *
+ * Der Umzug ist nachweislich wiederholbar — ein zweiter Lauf schreibt null
+ * Dateien. Der Marker ist deshalb keine Sicherung gegen Schaden, sondern gegen
+ * 958 sinnlose Dateilesevorgänge bei jedem Start.
+ */
+const MIGRATION_MARKER = '.tag-axes-migration-done'
+
+/**
+ * Den Umzug einmal ausführen, falls er auf dieser Maschine noch nicht lief.
+ *
+ * **Warum das hier steht:** Der Umzug lief am 2026-09-30 als Skript gegen die
+ * echten Notes. Dabei fiel auf, dass `tag-migration.ts` überhaupt nicht im Build
+ * landet — nichts im Main-Prozess importierte es. Auf einer zweiten Maschine, in
+ * einem frischen Profil oder nach einem Rechnerwechsel wäre die alte Tag-Suppe
+ * also unberührt geblieben, und zwar unbemerkt.
+ *
+ * Wirft nie. Ein fehlgeschlagener Umzug darf den Start nicht verhindern: die
+ * Notes sind dann unverändert lesbar, nur eben noch nicht umgezogen.
+ */
+export async function runTagMigrationOnce(opts: {
+  notesDir: string
+  /** Workspaces aus der Konfiguration — für die Abbildung Anzeigename → ID. */
+  workspaces: ReadonlyArray<{ id: string; name?: string }>
+}): Promise<MigrationRunReport | null> {
+  const fs = await import('fs')
+  const path = await import('path')
+  const marker = path.join(opts.notesDir, MIGRATION_MARKER)
+
+  try {
+    if (fs.existsSync(marker)) return null
+  } catch {
+    return null
+  }
+
+  const workspaceNameToId = new Map<string, string>()
+  for (const ws of opts.workspaces) {
+    if (ws.name) workspaceNameToId.set(ws.name.toLowerCase(), ws.id)
+    workspaceNameToId.set(ws.id.toLowerCase(), ws.id)
+  }
+
+  try {
+    const report = await migrateNotesDir({
+      notesDir: opts.notesDir,
+      ctx: { workspaceNameToId },
+      apply: true,
+    })
+    // Marker erst nach dem Lauf: bricht er ab, läuft er beim nächsten Start
+    // erneut — und das ist richtig, weil er wiederholbar ist.
+    fs.writeFileSync(marker, new Date().toISOString(), 'utf-8')
+    console.log(
+      `[TagMigration] ${report.written} von ${report.examined} Notes umgezogen`
+      + (report.problems.length > 0 ? `, ${report.problems.length} Probleme` : ''),
+    )
+    return report
+  } catch (err) {
+    console.warn('[TagMigration] fehlgeschlagen, Notes bleiben unverändert:', err)
+    return null
+  }
 }
