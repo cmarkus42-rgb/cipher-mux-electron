@@ -308,3 +308,36 @@ export function toggleTag(tags: readonly string[], tag: string): string[] {
     : [...tags]
   return [...kept, normalized]
 }
+
+/**
+ * Kanonische Reihenfolge für Registry-Klassen, soweit es eine gibt.
+ *
+ * Nur `severity` hat eine: eine Skala, bei der die Reihenfolge eine Aussage ist.
+ * Nach dem Umzug stand in `.tags.json` `low hi now mid` — das war die
+ * Entstehungsgeschichte der Datei, und „now als höchste Stufe" war im
+ * Auswahlfeld nicht zu sehen.
+ *
+ * `component` fehlt absichtlich: welche Bauteile zuerst kommen, entscheidet das
+ * Projekt und nicht der Code.
+ */
+const CANONICAL_ORDER: Readonly<Record<string, readonly string[]>> = {
+  severity: SEVERITY_VALUES,
+}
+
+/**
+ * Die Werte einer Auswahlzeile in der Reihenfolge, in der sie stehen sollen.
+ *
+ * Werte, die der Code kennt, kommen in seiner Reihenfolge; alles darüber hinaus
+ * hängt hinten an — sortiert, damit die Reihenfolge nicht von der Datei abhängt.
+ * Editierbar heißt, dass ein eigener Wert nicht verschwindet, nur weil der Code
+ * ihn nicht kennt.
+ */
+export function orderedValuesForRow(klass: string, values: readonly string[]): string[] {
+  const canonical = CANONICAL_ORDER[klass.toLowerCase()]
+  if (!canonical) return [...values]
+
+  const present = new Set(values.map(v => v.toLowerCase()))
+  const known = canonical.filter(v => present.has(v))
+  const extra = values.filter(v => !canonical.includes(v.toLowerCase())).sort()
+  return [...known, ...extra]
+}

@@ -6,6 +6,7 @@ import {
   isExclusiveClass,
   toggleTag,
   rowFor,
+  orderedValuesForRow,
 } from '../../src/shared/tag-axes'
 
 // ─── Was editierbar ist, muss auswaehlbar sein ──────────────
@@ -144,5 +145,34 @@ describe('rowFor', () => {
 
   it('gibt undefined fuer eine Klasse ohne Zeile', () => {
     assert.equal(rowFor('workspace'), undefined)
+  })
+})
+
+describe('orderedValuesForRow', () => {
+  // Bei einer Skala ist die Reihenfolge eine Aussage. Nach dem Umzug stand in
+  // .tags.json `low hi now mid` -- die Reihenfolge kam aus der
+  // Entstehungsgeschichte der Datei, und "now als höchste stufe" (2026-09-30)
+  // war im Auswahlfeld nicht zu sehen.
+  it('ordnet severity nach der Skala, nicht nach der Datei', () => {
+    const fromFile = ['low', 'hi', 'now', 'mid']
+    assert.deepEqual(orderedValuesForRow('severity', fromFile), ['low', 'mid', 'hi', 'now'])
+  })
+
+  // Editierbar heisst: ein eigener Wert verschwindet nicht, nur weil der Code
+  // ihn nicht kennt. Er haengt hinten an.
+  it('haengt einen eigenen Wert hinten an', () => {
+    const result = orderedValuesForRow('severity', ['sofort', 'low', 'now'])
+    assert.deepEqual(result, ['low', 'now', 'sofort'])
+  })
+
+  it('laesst eine Klasse ohne Skala in Dateireihenfolge', () => {
+    // `component` hat keine kanonische Ordnung -- welche Bauteile zuerst kommen,
+    // entscheidet das Projekt und nicht der Code.
+    const values = ['grid', 'xterm', 'notes']
+    assert.deepEqual(orderedValuesForRow('component', values), values)
+  })
+
+  it('vertraegt eine leere Liste', () => {
+    assert.deepEqual(orderedValuesForRow('severity', []), [])
   })
 })
