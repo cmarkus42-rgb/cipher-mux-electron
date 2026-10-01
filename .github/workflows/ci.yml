@@ -9,18 +9,70 @@ on:
 permissions:
   contents: read
 
+# Node 22 ist keine Vorliebe, sondern die Voraussetzung: `engines.node` sagt
+# ">=22 <23", `.nvmrc` sagt 22, und npm wertet beides nicht aus. Bis zum
+# 2026-10-01 lief die CI auf 20 — und `rebuild:node` fiel auf dem macOS-Runner
+# um, seit Mai, bei jedem Lauf.
+env:
+  NODE_VERSION: '22'
+
 jobs:
+  # Der Lint-Lauf prueft **die geaenderten Dateien**, nicht das Projekt.
+  #
+  # `npm run lint` ist projektweit rot (830 Probleme, 478 Fehler) und war es
+  # vorher schon. Ein Job, der das ausfuehrt, kann nie gruen werden — er hat das
+  # CI-Abzeichen im README seit Mai rot gehalten und damit jede echte Regression
+  # unsichtbar gemacht. Das dokumentierte Gate des Projekts lautet: *keine neuen
+  # Probleme in den geaenderten Dateien*. Genau das steht hier, maschinell.
   lint:
-    name: Lint
+    name: Lint (geaenderte Dateien)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fuer den Diff gegen den Vorgaenger-Commit bzw. den PR-Basispunkt.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: ESLint auf den geaenderten Dateien
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="origin/${{ github.base_ref }}"
+            git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          else
+            base="${{ github.event.before }}"
+            # Erster Push auf einen Branch: kein Vorgaenger, dann der Elternteil.
+            if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+              base="HEAD^"
+            fi
+          fi
+          files=$(git diff --name-only --diff-filter=d "$base" HEAD -- 'src/**/*.ts' 'src/**/*.tsx' || true)
+          if [ -z "$files" ]; then
+            echo "Keine geaenderten Quelldateien unter src/ — nichts zu pruefen."
+            exit 0
+          fi
+          echo "$files"
+          # --max-warnings bleibt ungesetzt: Warnungen sind im Bestand
+          # allgegenwaertig, Fehler sind das Gate.
+          npx eslint $files
+
+  typecheck:
+    name: Typecheck
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - run: npm run lint
+      # Die beiden spezifischen Configs, nicht die Root-Config: die zieht
+      # `conserved/` mit und rauscht. Beide sind gruen und sollen es bleiben.
+      - run: npx tsc -p tsconfig.main.json --noEmit
+      - run: npx tsc -p tsconfig.renderer.json --noEmit
 
   test:
     name: Test (${{ matrix.os }})
@@ -34,17 +86,31 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Install tmux (Linux)
+      # tmux ist harte Voraussetzung des Projekts und nicht nur Testbeiwerk:
+      # `capture-pane-join.test.ts` prueft eine Behauptung ueber tmux selbst.
+      # Die Versionen unterscheiden sich — ubuntu-22.04 liefert 3.2a, macOS ueber
+      # Homebrew 3.7c —, und genau daran ist eine zu starke Zusicherung in jenem
+      # Test aufgefallen. Die Matrix ist hier der Nutzen, nicht die Last.
+      - name: tmux installieren (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y tmux
 
+      - name: tmux-Version protokollieren
+        run: tmux -V
+
       - run: npm ci
 
-      - name: Rebuild better-sqlite3 for Node.js
-        run: npm run rebuild:node
+      # **Nicht** `npm run rebuild:node`: das Skript haengt `2>/dev/null` an, und
+      # damit war der Fehlschlag auf dem macOS-Runner monatelang eine nackte
+      # Exit-1 ohne Grund. Lokal ist das Schweigen gewollt (Rauschen bei jedem
+      # Testlauf), in der CI ist es der Unterschied zwischen einem Befund und
+      # einem Raetsel.
+      - name: better-sqlite3 fuer Node bauen
+        working-directory: node_modules/better-sqlite3
+        run: npx node-gyp rebuild --release
 
       - run: npm run test
 
@@ -58,11 +124,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # `version:generate` zaehlt Commits seit dem letzten Tag und braucht
+          # die Historie.
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - run: npm ci
@@ -75,7 +143,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
       - run: npm audit --omit=dev --audit-level=high

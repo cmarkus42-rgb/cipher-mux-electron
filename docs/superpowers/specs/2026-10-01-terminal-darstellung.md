@@ -172,11 +172,19 @@ unterschiedlich reflowen (das ist der ursprüngliche Anlass, Kommentar bei Zeile
 
 **Teil 2 behoben am 2026-10-01: `-J` ist jetzt gesetzt.** Gemessen in einem 40 Spalten
 breiten Pane: eine Zeile mit 95 Zeichen kommt ohne `-J` als 40 + 40 + 15 zurück, mit `-J`
-als eine mit 95. Die Nebenwirkung ist belegt und harmlos — eine zuvor umgebrochene Zeile
-behält ihr Leerzeichen am Ende, im Terminal unsichtbar; eine nie umgebrochene Zeile bleibt
-Zeichen für Zeichen gleich. `test/main/capture-pane-join.test.ts` hält beides gegen das
-echte tmux fest, weil die Behauptung eine über tmux ist und ein Mock genau die Annahme
-festschriebe, die zu prüfen ist.
+als eine mit 95. Die Nebenwirkung ist belegt und harmlos: `-J` hängt Leerzeichen an das
+Zeilenende, und ein Leerzeichen am Ende malt in einem Terminal nichts — jede Zeile wird mit
+`\r\n` abgeschlossen. `test/main/capture-pane-join.test.ts` hält das gegen das echte tmux
+fest, weil die Behauptung eine über tmux ist und ein Mock genau die Annahme festschriebe,
+die zu prüfen ist.
+
+> **Korrektur vom 2026-10-01, Nacht.** Hier stand zunächst, eine **nie umgebrochene** Zeile
+> bleibe Zeichen für Zeichen gleich. Das gilt für tmux 3.7c (macOS) und **nicht** für 3.2a
+> aus ubuntu-22.04: dort bekommt auch sie zwei Leerzeichen angehängt. Gefunden hat es der
+> Linux-Runner in der CI, nicht ich — der Test verlangte Gleichheit Zeichen für Zeichen und
+> fiel dort um. Die Behauptung war zu stark, der Befund stimmt: was dazukommt, sind
+> ausschliesslich Leerzeichen am Ende, und das prüft der Test jetzt ausdrücklich, statt
+> Gleichheit zu fordern, die tmux nicht zusagt.
 
 **Teile 1 und 3 offen.** Relativ-gegen-absolut und die ungesicherte Reihenfolge brauchen
 die Unterscheidung „TUI im Alternate-Screen / gewöhnliche Shell" — und die braucht eine
