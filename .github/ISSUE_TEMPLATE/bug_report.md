@@ -26,8 +26,8 @@ What happens instead.
 
 ## Environment
 
-- **OS:** macOS / Linux (distro)
-- **cipher-mux version:** (from Info/Settings or `--version`)
+- **macOS version:** (cipher-mux is macOS-only)
+- **cipher-mux version:** (Settings → About; there is no `--version` flag)
 - **Agent CLI and version:** Claude Code (`claude --version`) / Codex CLI (`codex --version`) / opencode (`opencode --version`) — which one the affected session ran under. If the role overrides the global default, say so: Settings → General shows "Default CLI", the preset editor shows the per-role "CLI" field.
 - **tmux version:** (`tmux -V`)
 - **Node.js version:** (`node -v`)

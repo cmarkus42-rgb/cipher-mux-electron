@@ -6,8 +6,8 @@ cipher-mux is pre-1.0 and ships from a single maintained branch. Only the latest
 
 | Version | Supported |
 |---------|-----------|
-| `0.9.x` (current beta) | Yes |
-| `< 0.9.0`              | No  |
+| `0.11.x` (current beta) | Yes |
+| `< 0.11.0`              | No  |
 
 When 1.0 ships, this table will change to cover the last two minor versions.
 
@@ -23,7 +23,7 @@ Send a private report to:
 
 Include, as much as you can:
 
-- affected version (output of `cipher-mux --version` or the git SHA from the About dialog)
+- affected version — Settings → **About** names it; there is no `--version` flag, cipher-mux is a GUI application
 - operating system and tmux version
 - reproduction steps
 - impact you observed
