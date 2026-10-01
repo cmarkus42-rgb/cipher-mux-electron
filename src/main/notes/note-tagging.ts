@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { TagRepository, TagEntry } from '../../shared/types'
 import type { TagClassRepo } from './tag-repository'
-import { AXIS_VALUES, filterToAxes, KIND_VALUES, PHASE_VALUES, STATUS_VALUES } from '../../shared/tag-axes'
+import { AXIS_VALUES, FLAT_MARKERS, filterToAxes, KIND_VALUES, PHASE_VALUES, STATUS_VALUES } from '../../shared/tag-axes'
 
 const TIMEOUT_MS = 60_000
 
@@ -66,6 +66,7 @@ const VALUE_DESCRIPTIONS: Record<string, string> = {
   'phase:debugging': 'Debugging, troubleshooting, error investigation',
   'phase:automation': 'Automation scripts, workflows, CI/CD',
   'phase:monitoring': 'Monitoring, alerts, metrics, audits',
+  handoff: 'Handoff note between sessions',
 }
 
 /**
@@ -85,8 +86,10 @@ export const SEED_TAGS: Record<string, TagEntry> = (() => {
       out[tag] = { count: 0, description: VALUE_DESCRIPTIONS[tag] ?? `${axis}: ${value}` }
     }
   }
-  // Flacher Funktionsmarker ohne Klasse — programmatisch gelesen, bleibt flach.
-  out.handoff = { count: 0, description: 'Handoff note between sessions' }
+  // Flache Funktionsmarker ohne Klasse — programmatisch gelesen, bleiben flach.
+  for (const marker of FLAT_MARKERS) {
+    out[marker] = { count: 0, description: VALUE_DESCRIPTIONS[marker] ?? marker }
+  }
   return out
 })()
 
