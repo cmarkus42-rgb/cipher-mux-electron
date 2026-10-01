@@ -16,7 +16,7 @@ MCP-Server und Projekt-Kick-off. Zielbild und Begründung:
    vorgeschalteten `rebuild:node` fehlt die better-sqlite3-ABI, und es fallen schlagartig über
    150 Tests um — alle in SQLite-gestützten Suiten (TaskManager, MessageBus, MemoryStore,
    CyberFactory, Debugger, Audit). Das Fehlerbild ist eindeutig: viele Fehler, alle dort.
-3. **Die Suite ist grün und soll grün bleiben.** Stand: **2076 Tests, 2076 pass, 0 fail,
+3. **Die Suite ist grün und soll grün bleiben.** Stand: **2113 Tests, 2113 pass, 0 fail,
    0 cancelled** (2026-10-01). Ältere Dokumente nennen „vier vorbestehend rote Suiten" —
    das galt bis zum 2026-09-30 und ist erledigt; keiner der Fälle war ein Flake. Ein roter
    Lauf ist ab jetzt eine echte Regression.
@@ -75,8 +75,10 @@ end-to-end gegen eine echte Session belegt. Zielbild:
 belegt — Rollengrenze blockiert selektiv, Context-Usage landet im Format, das der bestehende
 Monitor liest, und Workspace plus Rolle reisen im Bearer-Token, weil Codex keine freien
 MCP-Header sendet. Details und die Messungen dahinter im Abschnitt „Zweite CLI: Codex".
-Als nächstes opencode — das sendet die Header (gemessen) und braucht die Token-Variante nicht;
-seine Rollengrenzen laufen über ein Plugin mit `tool.execute.before` statt über Hook-Dateien.
+**Dritte CLI (2026-10-01):** Der opencode-Adapter steht — er geht den **normalen** Weg über die
+Verbindungsköpfe, weil opencode freie MCP-Header sendet (gemessen), und braucht die
+Token-Variante nicht. Zwei Capabilities stehen bewusst auf `false`, und eine Rollengrenze ist
+noch nicht verdrahtet. Details im Abschnitt „Dritte CLI: opencode".
 
 Nächste Richtung laut Strategiepapier: Rolle → Modell/Adapter, Rollengrenzen als Constraint,
 Memory auf Companion begrenzen. Offene Entscheidungen stehen dort in Abschnitt 7, die zur
@@ -226,6 +228,35 @@ codex-spezifisch, nicht eine des Adapter-Vertrags.
 die Verbindung (`src/main/mcp/entity-header.ts`) und registriert die vier `companion_memory_*`
 nur für Companion — oder für Verbindungen ohne Rolle, das ist die App selbst. Eine Permission
 zu entfernen hätte nicht gereicht: sie erzeugt eine Rückfrage, sie hält kein Werkzeug zurück.
+
+## Dritte CLI: opencode — der Normalfall des Vertrags
+
+`adapters/opencode.ts` ist Tier-2 und gemessen an **opencode 1.18.34 (2026-10-01)**.
+
+- **`AGENTS.md`** ist die Projektanweisung (`CLAUDE.md` liest opencode zusätzlich zur
+  Verträglichkeit). Der Adapter liest und schreibt nur `AGENTS.md` — zwei Adapter, die in
+  dieselbe Datei injizieren, überschreiben sich die Sektionen.
+- **Freie MCP-Header kommen an** — `authorization`, `x-mux-workspace`, `x-mux-entity` alle drei,
+  gegen denselben Horchposten wie bei Codex. Deshalb nutzt der Adapter `buildMcpServerConfig`
+  aus `mcp/workspace-header.ts` und **nicht** die Token-Bindung; die Kopfnamen stehen weiter nur
+  an einer Stelle. Geschrieben wird `opencode.json`, **lesen-mergen-schreiben** wie bei
+  `settings.local.json`: Besitz hat der Mux allein an `mcp['cipher-mux']`.
+- **Die Hülle heißt anders**: `type: "remote"` statt `"http"`, plus ein ausdrückliches
+  `enabled: true`. Nur das wird umgeformt, nicht die Köpfe.
+- **Launch:** Arbeitsverzeichnis als **positionales** Argument (nicht `-C` wie Codex),
+  `--auto` statt `--dangerously-skip-permissions`, Resume `--session <id>`, Fork
+  `--session <id> --fork` — `--fork` ist allein ungültig, es braucht `--session` oder
+  `--continue`.
+
+**Was hier ungemessen ist und deshalb `false` steht:** `status-line` (es gibt `stats`, aber
+keinen geprüften Weg, pro Session das JSON zu schreiben, das der `StatusLineMonitor` liest) und
+`sub-agents` (`--agent <name>` existiert, belegt aber keine Unteragenten, die der Mux sieht).
+**Rollengrenzen sind noch nicht verdrahtet:** opencode kennt Plugin-Events
+(`tool.execute.before`, `tool.execute.after`, `permission.ask`, `chat.message`, `chat.params`)
+statt Hook-Dateien — dass `tool.execute.before` einen Aufruf wirklich *ablehnen* kann, ist nicht
+gemessen, und eine geschriebene, nicht feuernde Grenze ist schlimmer als keine. **Und: anders
+als beim Codex-Adapter gibt es hier noch keinen Rauchtest gegen die echte CLI** — belegt sind
+die Unit-Tests, nicht der Lauf.
 
 ## Entities, MCP, Voice
 
