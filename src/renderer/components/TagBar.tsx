@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'preact/hooks'
 import {
   AXIS_VALUES,
   isExclusiveClass,
+  orderedValuesForRow,
   PICK_ROWS,
   PROCESS_SET_AXES,
   toggleTag,
@@ -41,7 +42,10 @@ function valuesForRow(
   classValues: Record<string, string[]>,
 ): readonly string[] {
   if (row.source === 'axis') return AXIS_VALUES[row.klass as TagAxis] ?? []
-  return classValues[row.klass] ?? []
+  // Die Reihenfolge der Registry-Werte kommt aus der Datei und ist damit
+  // Entstehungsgeschichte. Bei einer Skala ist sie eine Aussage -- deshalb
+  // orderedValuesForRow.
+  return orderedValuesForRow(row.klass, classValues[row.klass] ?? [])
 }
 
 /** Validate tag format: must be klasse:wert */
