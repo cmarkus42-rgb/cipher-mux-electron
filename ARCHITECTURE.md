@@ -103,14 +103,15 @@ Communication between main and renderer flows through typed IPC channels defined
 | **MCP Server** | `mcp/` | Streamable HTTP endpoint on `127.0.0.1:3100`. Bearer token auth. Exposes 40+ tools (`mux_send`, `mux_read`, `mux_create_session`, `mux_status`, `mux_context_usage`, `mux_task_*`, `mux_notes_*`, `companion_memory_*`, `mux_ui_*`, `mux_tts_speak`, `mux_grid_*`, `mux_cell_scroll`, `mux_cyber_factory_*`, `mux_debugger_*`, `mux_testing_*`, handoff tools, etc.). See [ADR-002](docs/decisions/ADR-002-mcp-transport.md). |
 | **WindowManager** | `window-manager.ts` | BrowserWindow registry for detached sessions/notes. Pop-out, dock-in, bounds persistence, focus callbacks for voice routing. |
 | **IPC Hub** | `ipc-hub.ts` | Central router for all renderer-main IPC. Registers handlers for ~97 typed channels. |
-| **SessionManager** | `session/` | Session registry, status tracking, crash recovery. Manages the lifecycle of tmux-backed agent sessions. |
+| **AgentAdapters** | `agent/` | The `AgentAdapter` contract plus three implementations (`adapters/claude-code.ts`, `adapters/codex.ts`, `adapters/opencode.ts`), the registry, and the per-role CLI mapping (`entity-adapter-map.ts`). See [Adapter Contract](#adapter-contract). |
+| **SessionManager** | `session/` | Session registry, status tracking, crash recovery. Manages the lifecycle of tmux-backed agent sessions. Resolves the adapter **per role** at launch, fork and restore. |
 | **EntityRegistry** | `session/entity-registry.ts` | Entity registration and lifecycle. Registers 7 built-in entities at startup and manages their configs. |
 | **EntityScanner** | `session/entity-scanner.ts` | Dynamic entity discovery from `~/.config/cipher-mux/entities/`. Scans for directories containing `CLAUDE.md`. |
 | **EntityAssets** | `session/entity-assets.ts` | Entity asset management (icons, colors, feature flags). |
 | **ConfigStore** | `config/` | App settings persistence via JSON (electron-store pattern). Grid layout, theme, scan paths. |
 | **ProjectScanner** | `project/` | Discovers projects by scanning configured directories for marker files (`CLAUDE.md`, `AGENTS.md`). Powers the cockpit project card grid. |
 | **KickoffManager** | `project/` | Project scaffolding and session spawn. Handles the "launch a new project" flow with optional requirements interview. |
-| **StatusLineMonitor** | `monitoring/` | Reads real-time context/token usage from Claude Code sessions via the statusLine hook. See [ADR-003](docs/decisions/ADR-003-statusline-integration.md). |
+| **StatusLineMonitor** | `monitoring/` | Reads real-time context/token usage via the statusLine hook. Claude Code writes that JSON itself; for Codex, `monitoring/codex-usage-hook.ts` derives the same shape from the `token_usage_record` entries in the rollout JSONL — a second writer, not a second reader. opencode has no measured path and declares `status-line: false`. See [ADR-003](docs/decisions/ADR-003-statusline-integration.md). |
 | **TaskManager** | `task/` | SQLite-backed task outbox. State machine (inbox -> in-progress -> done/parked/dropped). Watcher, hooks, MCP tool integration. |
 | **NoteManager** | `notes/note-manager.ts` | Note CRUD + full-text search. SQLite-backed. Powers `mux_notes_*` MCP tools. |
 | **NoteTagging** | `notes/note-tagging.ts` | Ollama-powered auto-tagging for notes. |
@@ -200,53 +201,116 @@ Entities replace the old persona-based session launch. Where personas were displ
 
 ## Adapter Contract
 
-The AgentAdapter interface (`src/main/agent/agent-adapter.ts`) abstracts over coding agent CLIs. TP-2 is complete: ClaudeCodeAdapter is the production Tier-1 implementation; ReferenceStubAdapter is a documented Tier-2 template for new adapters. SessionManager is fully decoupled from Claude Code specifics.
+The AgentAdapter interface (`src/main/agent/agent-adapter.ts`) abstracts over coding agent CLIs. It carries **three production implementations** as of 2026-10-01 — `claude-code` (Tier 1), `codex` (Tier 2), `opencode` (Tier 2) — plus an annotated template, `_reference-stub.ts`. SessionManager is decoupled from Claude Code specifics; the contract was first exercised by a second implementation rather than assumed to work.
 
 ```typescript
 interface AgentAdapter {
-  id: string                    // e.g. 'claude-code'
-  displayName: string
-  tier: 'tier-1' | 'tier-2'
+  readonly id: string                  // 'claude-code' | 'codex' | 'opencode'
+  readonly displayName: string
+  readonly tier: 'tier-1' | 'tier-2'
 
-  buildLaunchCommand(opts: LaunchOpts): { cmd: string; args: string[] }
-  postLaunchInjection?(ctx: AdapterContext): Promise<void>   // optional: MCP registration
-  getProjectMarkers(): string[]                               // e.g. ['CLAUDE.md', '.claude']
-  readProjectInstructions(path: string): Promise<string | null>
+  // lifecycle
+  buildLaunchCommand(opts: LaunchOpts): LaunchCommand        // { cmd, args[], envOverrides? }
+  postLaunchInjection?(ctx: AdapterContext): Promise<void>    // optional: MCP registration
+
+  // project awareness
+  getProjectMarkers(): string[]                              // e.g. ['CLAUDE.md', '.claude']
+  readProjectInstructions(projectPath: string): Promise<ProjectInstructions | null>
+
+  // runtime signals (capability-gated)
   supports(feature: AdapterFeature): boolean
-  getCapabilities(): Record<AdapterFeature, boolean>
-  getContextUsage?(sessionId: string): Promise<ContextUsage | null>
-  attachStatusHook?(projectPath: string): Promise<void>
-  sendPrompt(tmuxTarget: string, prompt: string): Promise<void>
-  buildOrchestratorPromptFragment(lang: string): string
-  buildLauncherPromptFragment(lang: string): string
+  getCapabilities(): AdapterCapabilities                     // Record<AdapterFeature, boolean>
+  getContextUsage?(sessionId: string): Promise<ContextUsage | null>  // only if supports('status-line')
+  attachStatusHook?(projectPath: string): Promise<void>              // only if supports('status-line')
+
+  // prompt delivery
+  sendPrompt(tmuxTarget: string, prompt: string, opts?: SendOpts): Promise<void>
+
+  // prompt fragments
+  buildWorkshopPromptFragment(lang: 'de' | 'en'): string
+  buildLauncherPromptFragment(lang: 'de' | 'en'): string
+  buildCyberFactoryPromptFragment(lang: 'de' | 'en'): string
 }
 ```
 
+`buildLaunchCommand` returns a structured `{ cmd, args[] }` and never a shell string — that is what keeps tmux `send-keys` free of injection.
+
+`AdapterContext` carries `projectPath`, `mcpUrl`, `mcpApiKey`, `sessionId`, `workspaceId` and — since the Codex adapter — an optional `entityId`. The last one exists because a CLI that cannot send custom headers needs the role binding to travel somewhere else; see "MCP binding" below.
+
 ### Adapter Capabilities (AdapterFeature)
 
-Six features gate optional behaviour. The UI degrades gracefully when a feature is unsupported:
+**Seven** features gate optional behaviour (`src/shared/types.ts`). The UI degrades gracefully when a feature is unsupported:
 
 | Feature | When unsupported |
 |---------|-----------------|
 | `mcp-injection` | Badge "MCP not active" on pane header; session excluded from MCP tool delegation |
-| `status-line` | Context % shows `---` instead of percentage; context warnings skip this session |
+| `status-line` | Context % shows `---` instead of percentage; context warnings skip this session. `getContextUsage` and `attachStatusHook` are then absent entirely rather than returning empty values |
 | `skip-permissions` | User must manually confirm prompts in the terminal |
 | `sub-agents` | Multi-agent orchestration unavailable for this session |
 | `project-instructions` | Project instruction display skipped in cockpit card |
 | `message-bus-participant` | Badge "Read-only Bus"; no send capability in chatroom for this session |
+| `companion-mcp` | The `companion_memory_*` tools do not reach this session (the server binds the role per connection and registers them only for Companion) |
+
+**A `false` in an adapter means "not measured", not "impossible."** That distinction is written into the adapter source and it matters for contributors: the honest value for an unverified feature is `false`, because a gate that says `true` on a hunch makes the Mux call a tool that grabs at nothing. For the user the two readings collapse into one — the capability is unavailable — which is why the UI names it the same way either way.
 
 ### Implemented Adapters
 
-| Adapter | Tier | All capabilities | Location |
-|---------|------|-----------------|----------|
-| `ClaudeCodeAdapter` | Tier-1 | All 6 enabled | `src/main/agent/adapters/claude-code-adapter.ts` |
-| `ReferenceStubAdapter` | Tier-2 | All disabled | `src/main/agent/adapters/_reference-stub.ts` |
+| Adapter | id | Tier | Capabilities `false` | Measured against | Location |
+|---------|----|------|---------------------|------------------|----------|
+| `ClaudeCodeAdapter` | `claude-code` | Tier-1 | none (all 7 `true`) | Claude Code v2.1.284 | `src/main/agent/adapters/claude-code.ts` |
+| `CodexAdapter` | `codex` | Tier-2 | `sub-agents` | codex-cli 0.155.1 | `src/main/agent/adapters/codex.ts` |
+| `OpenCodeAdapter` | `opencode` | Tier-2 | `status-line`, `sub-agents` | opencode 1.18.34 | `src/main/agent/adapters/opencode.ts` |
+| `ReferenceStubAdapter` | `reference-stub` | Tier-2 | all 7 (template) | — | `src/main/agent/adapters/_reference-stub.ts` |
+
+The reference stub is not registered; it is the file you copy.
+
+**Beyond the capability flags, opencode carries no role boundary and no smoke test against the real CLI.** Both are stated here rather than encoded as a capability, because `AdapterFeature` has no flag for either. The opencode adapter's evidence is its unit tests; Claude Code and Codex were each run against the live CLI.
+
+### Where the three CLIs diverge structurally
+
+Two places in the contract are not differences of degree but of mechanism. Everything else — launch flags, resume semantics, which file carries the project instructions — is a parameter.
+
+**1. MCP binding.** The Mux has to tell the MCP server which workspace and which role a connection belongs to.
+
+- *Claude Code and opencode* send connection headers: `X-Mux-Workspace` and `X-Mux-Entity`, bound once at `initialize`. Both adapters build their server entry through `buildMcpServerConfig` in `src/main/mcp/workspace-header.ts`, so the header names live in one place. opencode's config shell differs (`type: "remote"` plus an explicit `enabled`, written into `opencode.json`) — the shell is reshaped, the headers are not.
+- *Codex cannot send custom headers.* Measured against a listening post: the connection arrives, the `X-Mux-*` headers do not, and a `headers` key in the TOML is silently discarded — its server config knows `url` and `bearer_token_env_var`. The binding therefore travels inside the bearer token: `<apiKey>.<base64url(JSON)>`, implemented in `src/main/mcp/bound-token.ts`. A token **without** a dot is the bare key and means *unbound*, which is exactly what every pre-existing client sends, so the scheme is backward-compatible and stateless. `stripBindingFromAuthHeader` runs **before** `validateBearer`; without that step every Codex connection would be a 401 — and only at use time, not when the config is written. At `initialize` the header wins and the token fills in per field. The suffix is deliberately **unsigned**: whoever holds the key can call every tool anyway, so the suffix grants no rights, it only names the caller. Were the key ever to carry a finer permission structure, a signature would become mandatory. The reasoning sits in the file header so it is not re-weighed from scratch next time.
+
+**2. Role boundaries.** A role's limits are enforced, not merely prompted (see `src/main/session/entity-boundaries.ts`).
+
+- *Claude Code and Codex* both take a dependency-free Node script in the run directory wired as a **`PreToolUse` hook**. Codex carries the Claude Code hook protocol verbatim — `hookSpecificOutput.permissionDecision`, `permissionDecisionReason`, exit 2 plus stderr — and a `deny` takes effect even under `--dangerously-bypass-approvals-and-sandbox`. Two Codex specifics are measured and silent when missed: without `--dangerously-bypass-hook-trust` a freshly written hook does not fire at all, and the hook input reports `tool_name: "Bash"` even though the output shows `exec`, so a `matcher = "shell"` matches nothing. The adapter therefore sets both flags together and writes **no** matcher, filtering inside the hook script instead.
+- *opencode has no hook files.* It exposes plugin events — `tool.execute.before`, `tool.execute.after`, `permission.ask`, `chat.message`, `chat.params`. Whether `tool.execute.before` can actually *deny* a call has not been measured, so **the opencode adapter wires no boundary at all.** A boundary that looks like one and does not fire is worse than none.
+
+A third Codex-only obstacle sits outside the contract and is worth knowing before debugging a hung session: Codex loads project-local config, hooks and exec policies **only from a trusted directory** and otherwise blocks on a dialog, and a belated "Yes" does not load them after the fact. Of the workarounds, only an entry in the global `~/.codex/config.toml` works — `src/main/agent/adapters/codex-trust.ts` writes it, and only for paths under `~/.config/cipher-mux/runs/`, checked on the resolved path. The justification is in that file's header: the dialog protects against foreign content, and a run directory has none — everything under it was generated by the Mux. Switchable off via `agent.codexTrustRunDirs`.
 
 ### AdapterRegistry
 
-Singleton (`src/main/agent/adapter-registry.ts`) that pre-registers `ClaudeCodeAdapter` as the default. Additional adapters are registered via `registry.register(adapter)`.
+`src/main/agent/registry.ts` pre-registers all three adapters and holds `claude-code` as the default. Additional adapters register via `registry.register(adapter)`; `setDefault(id)` throws for an unregistered id.
 
-See `src/main/agent/adapters/_reference-stub.ts` for a fully annotated skeleton.
+The default stays `claude-code` for a stated reason, not out of habit: it is the only Tier-1 adapter, and the only one for which every capability has been measured.
+
+### Choosing an adapter per role
+
+`resolveEntityRuntime` (`src/main/session/entity-runtime.ts`) resolves model and adapter per role:
+
+```
+app.entityAdapters[<entityId>]   — user override, set in the preset editor ("CLI" field)
+  > EntityConfig.adapterId       — role default, if the role carries one
+  > agent.defaultAdapter         — global setting ("Default CLI"), ships as 'claude-code'
+```
+
+The mapping itself lives as pure functions in `src/main/agent/entity-adapter-map.ts` rather than in the IPC handler, because a mapping whose failure mode is "the role silently starts the wrong CLI" has to be testable. The same three-state discipline as for workspaces applies: **a missing key is not an empty one.** A missing key means "no preference" and lets `agent.defaultAdapter` take over; an empty string would resolve to an adapter named `""`, which is in no registry — so `readEntityAdapter` treats blank as absent and `withEntityAdapter(…, null)` deletes the key instead of blanking it.
+
+Resolution must happen at *every* consumer, not once. The Codex acceptance pass found this the hard way: the launch command resolved per role while `start()`, the fork path and the Keep-Working restore each used `getDefault()`, so a role on Codex under a global default of `claude-code` launched `codex` and then received a `.claude/settings.local.json`. With one adapter that was latent; with three it is a bug. `start()` now resolves via `adapterForEntity(opts.entityId)`, the fork reuses the source session's `sessionAdapters`, and the restore resolves **per entry**.
+
+**Config location.** All of the above is persisted in `app.getPath('userData')`:
+
+```
+~/Library/Application Support/cipher-mux-electron/cipher-mux-config.json
+```
+
+There is a second, identically named file at `~/.config/cipher-mux/config.json`. **The Mux does not read it.** Editing it changes nothing. `~/.config/cipher-mux/` holds content — `entities/<id>/` (authored assets), `runs/<workspaceId>/<entityId>/` (generated artefacts), voice models — but no app settings.
+
+See `src/main/agent/adapters/_reference-stub.ts` for a fully annotated skeleton, and CONTRIBUTING.md §"Writing an Adapter" for the measurement discipline that the two Tier-2 adapters were built under.
 
 ## Data Flow
 
@@ -276,12 +340,16 @@ Claude Code session (MCP client)
 ### Context Usage
 
 ```
-Claude Code CLI
-  -> writes JSON to statusLine hook path
-  -> StatusLineMonitor (fs.watch)
-  -> IPC Hub emits cipher-mux:context:updated
-  -> ActivityRail + PaneHeader update
+Claude Code CLI                    Codex CLI
+  -> writes JSON                     -> PreToolUse hook reads transcript_path
+     to statusLine hook path         -> codex-usage-hook writes the same JSON shape
+                     \              /
+                      StatusLineMonitor (fs.watch)
+                      -> IPC Hub emits cipher-mux:context:updated
+                      -> ActivityRail + PaneHeader update
 ```
+
+opencode does not appear here: no measured way writes that JSON per session, so the adapter declares `status-line: false` and the UI shows `---` rather than a number it does not have.
 
 ### Companion Memory
 
@@ -382,4 +450,7 @@ If you are new to the codebase, read in this order:
 For adapter development specifically:
 1. **`src/main/agent/agent-adapter.ts`** — The adapter interface
 2. **`src/main/agent/adapters/_reference-stub.ts`** — Documented skeleton
-3. **`src/main/session/session-manager.ts`** — Where adapters are consumed
+3. **`src/main/agent/adapters/codex.ts`** — A worked Tier-2 example. Its file header lists the four measurements that determined the design, three of which fail silently if guessed
+4. **`src/main/agent/adapters/opencode.ts`** — A second Tier-2 example, and the one that shows what an unmeasured capability looks like when documented honestly
+5. **`src/main/agent/registry.ts`** and **`entity-adapter-map.ts`** — Registration and the per-role CLI mapping
+6. **`src/main/session/session-manager.ts`** — Where adapters are consumed (note: resolved per role, at launch, fork **and** restore)
