@@ -3084,7 +3084,6 @@ ist dieses Entity fokussiert?
     notesSlots?: Array<{ slotIndex: number; notesId?: string; openNoteIds?: string[] }>,
   ): Promise<void> {
     const effectiveGrid = gridConfig ?? { cols: 1, rows: 1 }
-    const adapter = this.sessionManager['adapterRegistry'].getDefault()
 
     // Build lookup of recovered sessions by name (primary) and projectPath (fallback)
     const recoveredByName = new Map<string, typeof recovered[0]>()
@@ -3130,6 +3129,12 @@ ist dieses Entity fokussiert?
         // No matching recovered session — start new with --resume
         try {
           const escaped = entry.projectPath.replace(/'/g, "'\\''")
+          // Pro Eintrag aufloesen, nicht einmal fuer den ganzen Restore: jede
+          // wiederhergestellte Session traegt ihre eigene Rolle, und die Rolle
+          // entscheidet ueber die CLI. Ein Default fuer alle wuerde eine
+          // Codex-Rolle als `claude --resume` zurueckbringen — die Session kaeme
+          // hoch, nur mit der falschen CLI, und das sieht nach Erfolg aus.
+          const adapter = this.sessionManager.adapterForEntity(entry.entityId ?? null)
           const launchCmd = adapter.buildLaunchCommand({
             projectPath: entry.projectPath,
             sessionName: entry.name,
@@ -3138,11 +3143,16 @@ ist dieses Entity fokussiert?
           const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
           const autoLaunch = `cd '${escaped}' && clear; ${cmdStr}\n`
 
+          // `entityId` muss mit: `start()` loest daran den Adapter fuer
+          // MCP-Injektion und Status-Hook auf. Fehlt es, baut das Startkommando
+          // oben die richtige CLI, waehrend die Injektion die Dateien der
+          // falschen schreibt — die Session kommt hoch, nur ohne ihre Werkzeuge.
           const session = await this.sessionManager.start({
             name: entry.name,
             projectPath: entry.projectPath,
             autoLaunch,
             workspaceId: entry.workspaceId ?? null,
+            entityId: entry.entityId ?? null,
           })
           // Restore entity link for newly created sessions too
           if (entry.entityId) {
