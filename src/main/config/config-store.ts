@@ -63,6 +63,10 @@ const defaults: AppConfig = {
     // nennt. `entityAdapters` schlägt diesen Wert — dieselbe Reihenfolge wie
     // beim Modell: User-Override pro Rolle > Rollen-Default > dieser Wert.
     defaultAdapter: 'claude-code',
+    // Siehe adapters/codex-trust.ts: ohne das haengt jede Codex-Session in
+    // einem Vertrauensdialog. Vertraut wird ausschliesslich das generierte
+    // Run-Verzeichnis, nie ein Projektverzeichnis des Nutzers.
+    codexTrustRunDirs: true,
   },
   llm: {
     ollamaHost: '127.0.0.1',

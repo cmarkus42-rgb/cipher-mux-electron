@@ -125,6 +125,9 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
   const [activeTab, setActiveTab] = useState<TabId>(resolveTab(initialTab))
   const [loading, setLoading] = useState(true)
   const [skipPerms, setSkipPerms] = useState(false)
+  // Welche CLI neue Sessions starten, wenn die Rolle keine eigene nennt.
+  const [adapters, setAdapters] = useState<Array<{ id: string; displayName: string; tier: string }>>([])
+  const [defaultAdapter, setDefaultAdapter] = useState('claude-code')
   const [language, setLanguage] = useState<'en' | 'de'>(i18n.language as 'en' | 'de')
   const [themeEditorOpen, setThemeEditorOpen] = useState(false)
   const [customTokens, setCustomTokens] = useState<Record<string, string>>({})
@@ -145,6 +148,12 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
 
   const load = useCallback(async () => {
     const sp: boolean = await api.config.getSkipPermissions()
+    // Still durchfallen, wenn das Backend die Adapter nicht kennt: dann bleibt
+    // die Auswahl unsichtbar statt leer und kaputt.
+    try {
+      setAdapters(await api.agent.listAdapters())
+      setDefaultAdapter(await api.agent.getDefaultAdapter())
+    } catch { /* aelteres Backend */ }
     setSkipPerms(sp)
     const ui = await api.config.get('ui')
     if (ui?.language) setLanguage(ui.language)
@@ -446,6 +455,34 @@ export function InfoSettingsView({ theme, onSetTheme, initialTab, onThemeEditorT
             <div class="settings-section__hint" style={{ color: 'var(--color-warning)', marginTop: '6px' }}>
               {t('settings.skipPermissionsWarning')}
             </div>
+          )}
+
+          {adapters.length > 1 && (
+            <>
+              <div class="settings-row" style={{ marginTop: '12px' }}>
+                <label class="settings-label" style={{ userSelect: 'none' }}>
+                  {t('settings.defaultAdapter')}
+                </label>
+                <select
+                  value={defaultAdapter}
+                  onChange={async (e) => {
+                    const v = (e.target as HTMLSelectElement).value
+                    const res = await api.agent.setDefaultAdapter(v)
+                    if (res.ok) setDefaultAdapter(v)
+                  }}
+                  style={{ padding: '4px 8px', fontSize: '12px', background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
+                >
+                  {adapters.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.displayName}{a.tier === 'tier-2' ? ' — Tier 2' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div class="settings-section__hint" style={{ marginTop: '6px' }}>
+                {t('settings.defaultAdapterHint')}
+              </div>
+            </>
           )}
 
           <div class="settings-section__title" style={{ marginTop: 'var(--space-lg)' }}>{t('voice.keepWorking')}</div>

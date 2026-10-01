@@ -16,7 +16,7 @@ MCP-Server und Projekt-Kick-off. Zielbild und Begründung:
    vorgeschalteten `rebuild:node` fehlt die better-sqlite3-ABI, und es fallen schlagartig über
    150 Tests um — alle in SQLite-gestützten Suiten (TaskManager, MessageBus, MemoryStore,
    CyberFactory, Debugger, Audit). Das Fehlerbild ist eindeutig: viele Fehler, alle dort.
-3. **Die Suite ist grün und soll grün bleiben.** Stand: **2115 Tests, 2115 pass, 0 fail,
+3. **Die Suite ist grün und soll grün bleiben.** Stand: **2150 Tests, 2150 pass, 0 fail,
    0 cancelled** (2026-10-01). Ältere Dokumente nennen „vier vorbestehend rote Suiten" —
    das galt bis zum 2026-09-30 und ist erledigt; keiner der Fälle war ein Flake. Ein roter
    Lauf ist ab jetzt eine echte Regression.

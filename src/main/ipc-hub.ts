@@ -43,6 +43,7 @@ import { generateCompanionClaudeMd } from './entity-content/companion-preset'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { getGlobalRules, setGlobalRules, ensureGlobalRulesFile, invalidateGlobalRulesCache } from './config/global-rules'
 import { AdapterRegistry } from './agent/registry'
+import { readEntityAdapter, withEntityAdapter } from './agent/entity-adapter-map'
 import { EntityRegistry, registerBuiltinEntities } from './session/entity-registry'
 import { CyberFactoryManager } from './cyber-factory/cyber-factory-manager'
 import { scanAndRegisterEntities } from './session/entity-scanner'
@@ -1848,6 +1849,57 @@ export class IpcHub {
         delete overrides[entityId]
       }
       configStore.set('entityPersonaOverrides', overrides)
+      return { ok: true }
+    })
+
+    // ─── Welche CLI startet was ──────────────────────────────
+    //
+    // Die Auflösung ist alt, der Weg sie zu setzen ist neu. Reihenfolge wie beim
+    // Modell: `app.entityAdapters` pro Rolle > Rollen-Default > `agent.defaultAdapter`.
+
+    ipcMain.handle(IPC.AGENT_ADAPTERS_LIST, () => {
+      return this.adapterRegistry.listIds().map(id => {
+        const a = this.adapterRegistry.get(id)
+        return {
+          id,
+          displayName: a?.displayName ?? id,
+          tier: a?.tier ?? 'tier-2',
+          // Die UI zeigt damit, was eine Rolle unter dieser CLI *nicht* kann,
+          // statt es den Nutzer beim Start herausfinden zu lassen.
+          capabilities: a?.getCapabilities() ?? null,
+        }
+      })
+    })
+
+    ipcMain.handle(IPC.AGENT_DEFAULT_ADAPTER_GET, () => {
+      return configStore.get('agent').defaultAdapter ?? 'claude-code'
+    })
+
+    ipcMain.handle(IPC.AGENT_DEFAULT_ADAPTER_SET, (_e, adapterId: string) => {
+      if (!this.adapterRegistry.get(adapterId)) {
+        return { ok: false, error: `Unbekannter Adapter: ${adapterId}` }
+      }
+      configStore.set('agent', { ...configStore.get('agent'), defaultAdapter: adapterId })
+      // Sofort wirksam, nicht erst beim naechsten App-Start: der Registry-Default
+      // wird hier mitgesetzt. Ohne das waere der Schalter ein Versprechen auf
+      // spaeter, und der Nutzer sieht nicht, dass seine Auswahl noch nicht gilt.
+      this.adapterRegistry.setDefault(adapterId)
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.ENTITY_ADAPTER_GET, (_e, entityId: string) => {
+      return readEntityAdapter(configStore.get('app').entityAdapters, entityId)
+    })
+
+    ipcMain.handle(IPC.ENTITY_ADAPTER_SET, (_e, entityId: string, adapterId: string | null) => {
+      if (adapterId && !this.adapterRegistry.get(adapterId)) {
+        return { ok: false, error: `Unbekannter Adapter: ${adapterId}` }
+      }
+      const app = { ...configStore.get('app') }
+      // Die Drei-Zustands-Disziplin steckt in `withEntityAdapter` — dort ist sie
+      // pruefbar, statt hier als Handler-Rumpf nur beim Hinsehen in der App.
+      app.entityAdapters = withEntityAdapter(app.entityAdapters, entityId, adapterId)
+      configStore.set('app', app)
       return { ok: true }
     })
   }

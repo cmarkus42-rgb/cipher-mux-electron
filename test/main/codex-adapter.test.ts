@@ -13,8 +13,10 @@ import type { CodexConfigReader } from '../../src/main/agent/adapters/codex'
 import { buildCodexUsageHookScript } from '../../src/main/monitoring/codex-usage-hook'
 import { AdapterRegistry } from '../../src/main/agent/registry'
 
-function reader(skipPermissions: boolean): CodexConfigReader {
-  return { getSkipPermissions: () => skipPermissions }
+function reader(skipPermissions: boolean, trustRunDirs = false): CodexConfigReader {
+  // trustRunDirs standardmaessig aus: kein Test soll in eine globale Config
+  // schreiben, nur weil er ein Startkommando prueft.
+  return { getSkipPermissions: () => skipPermissions, getTrustRunDirs: () => trustRunDirs }
 }
 
 const baseOpts = { projectPath: '/tmp/proj', sessionName: 'cmux-test' }

@@ -212,6 +212,17 @@ export interface AppConfig {
     projectlauncherPath: string
     /** Minutes to wait for a kickoff completion signal before warning. */
     kickoffTimeoutMinutes: number
+    /**
+     * Per-role adapter override: entity id → adapter id.
+     *
+     * Beats the role's own default and `agent.defaultAdapter`. An absent or
+     * blank entry means "no preference" — see `entity-runtime.ts`, which has
+     * read this all along through a cast. Declared here so it stops being a
+     * cast: a field read by name in three places is part of the shape.
+     */
+    entityAdapters?: Record<string, string>
+    /** Per-role model override: entity id → model id. Same resolution order. */
+    entityModels?: Record<string, string>
   }
   mcp: {
     port: number
@@ -263,6 +274,18 @@ export interface AppConfig {
      * at startup and claude-code stays in place. Default: 'claude-code'.
      */
     defaultAdapter: string
+    /**
+     * Whether the Mux grants Codex directory trust for its own run directories.
+     *
+     * Codex refuses to load project-local config, hooks and exec policies from
+     * an untrusted directory, and asks in a blocking dialog — fatal for an
+     * unattended entity session. Only `~/.config/cipher-mux/runs/**` is ever
+     * trusted, and those contain nothing but Mux-generated files.
+     *
+     * Turn it off and you confirm once per workspace × role by hand; trust
+     * persists. Default: true.
+     */
+    codexTrustRunDirs: boolean
   }
   /** LLM provider configuration (Ollama, external APIs). */
   llm: {

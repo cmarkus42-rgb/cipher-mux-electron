@@ -246,6 +246,15 @@ export const IPC = {
   ENTITY_PERSONA_OVERRIDE_GET: 'cipher-mux:entity:persona-override:get',
   ENTITY_PERSONA_OVERRIDE_SET: 'cipher-mux:entity:persona-override:set',
 
+  // Welche CLI eine Rolle startet. Die Auflösung gab es schon lange
+  // (`entity-runtime.ts`: entityAdapters > Rollen-Default > global); was fehlte,
+  // war ein Weg, sie zu setzen, der nicht „Config-Datei von Hand editieren" heisst.
+  AGENT_ADAPTERS_LIST: 'cipher-mux:agent:adapters:list',
+  AGENT_DEFAULT_ADAPTER_GET: 'cipher-mux:agent:default-adapter:get',
+  AGENT_DEFAULT_ADAPTER_SET: 'cipher-mux:agent:default-adapter:set',
+  ENTITY_ADAPTER_GET: 'cipher-mux:entity:adapter:get',
+  ENTITY_ADAPTER_SET: 'cipher-mux:entity:adapter:set',
+
   // UI Control (Companion Demo Mode)
   UI_HIGHLIGHT: 'cipher-mux:ui:highlight',
   UI_OPEN: 'cipher-mux:ui:open',
