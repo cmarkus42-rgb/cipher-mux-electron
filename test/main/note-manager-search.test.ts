@@ -142,7 +142,8 @@ describe('NoteManager — search + handoff (SP-2)', () => {
 
     assert.ok(note.id)
     assert.equal(note.title, 'Handoff: Auth context')
-    assert.deepEqual(note.tags, ['handoff'])
+    // Seit 2026-10-01 zusaetzlich der Typ auf der kind-Achse.
+    assert.deepEqual(note.tags, ['handoff', 'kind:handoff'])
     assert.equal(note.fromSession, 'worker-1')
     assert.equal(note.toEntity, 'companion')
     assert.equal(note.handoffStatus, 'pending')

@@ -168,7 +168,7 @@ describe('NoteManager.markHandoffConsumed', () => {
     assert.ok(content.body.includes('Wichtiger Inhalt'), 'body must survive the status flip')
     assert.equal(content.info.anchorCommit, 'abc1234')
     assert.equal(content.info.anchorRepo, '/repo/z')
-    assert.deepEqual(content.info.tags, ['handoff', 'workspace:ws-mux'])
+    assert.deepEqual(content.info.tags, ['handoff', 'kind:handoff', 'workspace:ws-mux'])
   })
 
   it('returns null for an unknown note instead of throwing', async () => {
@@ -202,7 +202,10 @@ describe('NoteManager.createHandoff — workspace binding', () => {
       { workspaceId: 'ws-mux' },
     )
 
-    assert.deepEqual(info.tags, ['handoff', 'workspace:ws-mux'])
+    // `kind:handoff` kam am 2026-10-01 dazu: `handoff` ist das Signal "hier
+    // wartet eine Uebergabe", der kind-Tag ist der TYP auf der Achse. Ohne ihn
+    // hatte die Note keinen Typ und fiel aus jeder Filterung nach Typ heraus.
+    assert.deepEqual(info.tags, ['handoff', 'kind:handoff', 'workspace:ws-mux'])
 
     const notes = await mgr.list(['workspace:ws-mux'])
     assert.equal(notes.length, 1)
@@ -211,7 +214,26 @@ describe('NoteManager.createHandoff — workspace binding', () => {
 
   it('stays unbound without a workspace id', async () => {
     const info = await mgr.createHandoff('Handoff: ungebunden', 'Body.', 'Refinement')
-    assert.deepEqual(info.tags, ['handoff'])
+    assert.deepEqual(info.tags, ['handoff', 'kind:handoff'])
+    assert.ok(!info.tags.some(t => t.startsWith('workspace:')))
+  })
+
+  // Die Rolle, die die Uebergabe schreibt, und die Phase, die sich aus ihr
+  // ergibt -- dieselbe Ableitung wie in mux_notes_create.
+  it('traegt die Rolle und die abgeleitete Phase, wenn sie bekannt ist', async () => {
+    const info = await mgr.createHandoff(
+      'Handoff: mit Rolle', 'Body.', 'Refinement', 'cyber-factory',
+      { entityId: 'refinement' },
+    )
+    assert.ok(info.tags.includes('entity:refinement'))
+    assert.ok(info.tags.includes('phase:architecture'), 'aus der Rolle abgeleitet')
+  })
+
+  it('erfindet keine Rolle', async () => {
+    const info = await mgr.createHandoff(
+      'Handoff: ohne Rolle', 'Body.', 'Refinement', 'any', { entityId: 'gibtsnicht' },
+    )
+    assert.ok(!info.tags.some(t => t.startsWith('entity:')))
   })
 
   it('never writes a duplicate workspace tag', async () => {
