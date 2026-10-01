@@ -110,6 +110,14 @@ export interface StartSessionOpts {
   contextPaths?: string[]
   /** Workspace this session belongs to. null/undefined = no binding. */
   workspaceId?: string | null
+  /**
+   * Role this session belongs to, when it is an entity session.
+   *
+   * Travels only so the MCP binding can reach a CLI that cannot send custom
+   * headers — see `mcp/bound-token.ts`. The authoritative record of which
+   * session belongs to which entity stays in the EntityRegistry.
+   */
+  entityId?: string | null
   /** Model override — passed as --model <id> to the agent CLI. */
   model?: string
   /** Internal flag: global rules already injected by startEntity(). */

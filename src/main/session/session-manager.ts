@@ -38,6 +38,7 @@ import { extractCharacterBlock } from '../character/character-defaults'
 import { resolvePersonaForPreset } from './persona-resolver'
 import { ensureRunDir, resolveRunDir } from './entity-run-dir'
 import { buildMcpServerConfig } from '../mcp/workspace-header'
+import { buildBoundToken, BOUND_TOKEN_ENV_VAR } from '../mcp/bound-token'
 import { findEntitySessions, entityStartKey } from './entity-session-lookup'
 import type { Workspace } from '../../shared/persona-types'
 
@@ -286,6 +287,15 @@ export class SessionManager extends EventEmitter {
         ...env,
         CIPHER_MUX_MCP_URL: mcpUrl,
         CIPHER_MUX_MCP_KEY: this.mcpConfig.mcpApiKey,
+        // Derselbe Schluessel, aber mit Workspace und Rolle darin — fuer CLIs,
+        // die dem MCP-Server keine freien Header mitgeben koennen (Codex).
+        // Ohne Bindung ist das Token Zeichen fuer Zeichen der blanke Schluessel.
+        // Siehe mcp/bound-token.ts.
+        [BOUND_TOKEN_ENV_VAR]: buildBoundToken(
+          this.mcpConfig.mcpApiKey,
+          opts.workspaceId ?? null,
+          opts.entityId ?? null,
+        ),
       }
 
       // Inject MCP config via adapter (handles CLI + direct settings.json)
@@ -298,6 +308,7 @@ export class SessionManager extends EventEmitter {
             mcpApiKey: this.mcpConfig.mcpApiKey,
             sessionId: id,
             workspaceId: opts.workspaceId ?? null,
+            entityId: opts.entityId ?? null,
           })
         } catch (err) {
           console.warn('[SessionManager] Adapter MCP injection failed:', err)
@@ -1303,6 +1314,7 @@ export class SessionManager extends EventEmitter {
       ...restOpts,
       projectPath: runDir,
       workspaceId,
+      entityId,
       _entityInjected: true,
     })
 

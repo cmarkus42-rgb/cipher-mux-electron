@@ -7,6 +7,7 @@ import { validateBearer } from './mcp-auth'
 import { registerTools, ToolContext } from './mcp-tools'
 import { parseWorkspaceHeader, resolveWorkspaceId } from './workspace-header'
 import { parseEntityHeader, resolveEntityId } from './entity-header'
+import { parseAuthHeaderBinding, stripBindingFromAuthHeader } from './bound-token'
 import { configStore } from '../config/config-store'
 
 /** Session timeout: sessions inactive for longer than this are garbage-collected. */
@@ -230,8 +231,13 @@ export class McpServerManager {
       return
     }
 
-    // Auth check — require Bearer token on all non-OPTIONS requests
-    if (!validateBearer(req.headers.authorization, this.apiKey)) {
+    // Auth check — require Bearer token on all non-OPTIONS requests.
+    //
+    // Ein Token darf eine Workspace- und Rollenbindung mittragen, fuer CLIs die
+    // keine freien Header senden koennen (Codex). Geprueft wird unveraendert und
+    // zeitkonstant nur der Schluesselteil — die Bindung ist keine Berechtigung.
+    // Siehe bound-token.ts.
+    if (!validateBearer(stripBindingFromAuthHeader(req.headers.authorization), this.apiKey)) {
       res.writeHead(401, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'Unauthorized' }))
       return
@@ -301,12 +307,19 @@ export class McpServerManager {
         try {
           // Bind the workspace once, here — this is the only point in the
           // connection's life where the client's headers are available.
+          //
+          // Der Kopf hat Vorrang, das Token faellt pro Feld ein: ein Client, der
+          // Header senden kann, soll sich nicht anders verhalten als vorher, und
+          // ein Client, der es nicht kann, soll trotzdem gebunden sein. Beides
+          // wird danach gegen die bekannten IDs geprueft — eine Bindung aus dem
+          // Token ist eine Behauptung wie die aus dem Kopf, nicht mehr.
+          const tokenBinding = parseAuthHeaderBinding(req.headers.authorization)
           const workspaceId = resolveWorkspaceId(
-            parseWorkspaceHeader(req.headers),
+            parseWorkspaceHeader(req.headers) ?? tokenBinding.workspaceId,
             this.listKnownWorkspaceIds(),
           )
           const entityId = resolveEntityId(
-            parseEntityHeader(req.headers),
+            parseEntityHeader(req.headers) ?? tokenBinding.entityId,
             this.listKnownEntityIds(),
           )
           const session = await this.createSession(workspaceId, entityId)

@@ -115,10 +115,11 @@ describe('CodexAdapter — Capabilities sind gemessen, nicht geraten', () => {
     assert.equal(adapter.supports('sub-agents'), false)
   })
 
-  it('meldet companion-mcp als nicht verfuegbar, weil die Rollenbindung fehlt', () => {
-    // Die vier companion_memory_* haengen am Verbindungskopf X-Mux-Entity, und
-    // Codex kann keine freien HTTP-Header.
-    assert.equal(adapter.supports('companion-mcp'), false)
+  it('meldet companion-mcp als verfuegbar — die Rolle reist im Token', () => {
+    // Die vier companion_memory_* haengen an der Rollenbindung. Codex kann den
+    // Kopf X-Mux-Entity nicht senden, aber das gebundene Token traegt dieselbe
+    // Tatsache, und der Server bindet sie beim initialize genauso.
+    assert.equal(adapter.supports('companion-mcp'), true)
   })
 
   it('meldet status-line als verfuegbar — ueber den Hook, nicht ueber eine Statusline', () => {
@@ -165,6 +166,17 @@ describe('buildCodexProjectConfig', () => {
   it('traegt den MCP-Server mit URL ein', () => {
     assert.match(cfg, /\[mcp_servers\.cipher-mux\]/)
     assert.match(cfg, /url = "http:\/\/127\.0\.0\.1:3100\/mcp"/)
+  })
+
+  it('verweist auf die Umgebungsvariable und schreibt das Token NICHT hinein', () => {
+    // Eine generierte Datei im Run-Verzeichnis ist kein Ort fuer ein Geheimnis.
+    assert.match(cfg, /bearer_token_env_var = "CIPHER_MUX_MCP_TOKEN"/)
+    assert.ok(!/Bearer /.test(cfg))
+  })
+
+  it('schreibt keinen headers-Block — Codex verwirft ihn stillschweigend', () => {
+    assert.ok(!cfg.includes('headers'))
+    assert.ok(!cfg.includes('X-Mux-Workspace'))
   })
 
   it('schreibt KEINEN matcher', () => {

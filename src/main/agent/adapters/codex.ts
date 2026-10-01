@@ -10,6 +10,7 @@ import type {
 } from '../agent-adapter'
 import type { AdapterFeature, AdapterCapabilities, ContextUsage } from '../../../shared/types'
 import { writeCodexUsageHookScript, CODEX_USAGE_HOOK_FILENAME } from '../../monitoring/codex-usage-hook'
+import { BOUND_TOKEN_ENV_VAR } from '../../mcp/bound-token'
 
 /**
  * Codex-CLI-Adapter — Tier-2.
@@ -47,12 +48,14 @@ import { writeCodexUsageHookScript, CODEX_USAGE_HOOK_FILENAME } from '../../moni
  *    sich mit der naechsten CLI-Version aendert, soll nicht entscheiden, ob eine
  *    Rollengrenze greift.
  *
- * Und eine Grenze, die bleibt: **Codex kann keine freien HTTP-Header für
- * MCP-Server.** Die Serverkonfiguration kennt `url` und
+ * Und eine Grenze, um die herum gebaut werden musste: **Codex kann keine freien
+ * HTTP-Header für MCP-Server.** Die Serverkonfiguration kennt `url` und
  * `bearer_token_env_var`, sonst nichts; unbekannte Felder werden stillschweigend
  * verworfen. `X-Mux-Workspace` und `X-Mux-Entity` — ueber die der Mux Workspace
- * und Rolle pro Verbindung bindet — lassen sich so nicht uebertragen. Siehe
- * `postLaunchInjection`.
+ * und Rolle pro Verbindung bindet — lassen sich so nicht uebertragen. Die
+ * Bindung reist deshalb im Bearer-Token mit (`mcp/bound-token.ts`); siehe
+ * `postLaunchInjection`. opencode kann die Header, die Luecke ist also eine
+ * Eigenschaft dieser CLI und keine des Adapter-Vertrags.
  */
 
 /** Minimale Sicht auf die Agent-Konfiguration. Spiegelbild zu ClaudeCodeAdapter. */
@@ -144,14 +147,21 @@ export class CodexAdapter implements AgentAdapter {
    * darin gegenseitig ueberschreiben. Dieselbe Trennung wie bei
    * `runs/<workspaceId>/<entityId>/`.
    *
-   * **Die offene Stelle:** Codex kann dem MCP-Server keine freien Header
-   * mitgeben. Der Mux bindet Workspace und Rolle aber genau so
-   * (`X-Mux-Workspace`, `X-Mux-Entity`, beim `initialize` einmalig in den
-   * Tool-Kontext gebunden). Bis das entschieden ist, wird der Server **ohne**
-   * Bindung eingetragen — das ist nach der Drei-Zustands-Disziplin ein
-   * ausdrueckliches „ungebunden" und keine stille Uebernahme des aktiven
-   * Workspace. Die Rollen-Werkzeuge (`companion_memory_*`) fehlen einer solchen
-   * Verbindung damit ebenso, und `companion-mcp` steht deshalb auf `false`.
+   * **Workspace und Rolle reisen im Token, nicht im Kopf.** Codex kann dem
+   * MCP-Server keine freien Header mitgeben — gemessen gegen einen Horchposten:
+   * die Verbindung kommt an, `X-Mux-Workspace` und `X-Mux-Entity` nicht, und ein
+   * `headers`-Schluessel in der TOML wird stillschweigend verworfen. Die
+   * Serverkonfiguration kennt `url` und `bearer_token_env_var`.
+   *
+   * Deshalb traegt das Bearer-Token die Bindung (`mcp/bound-token.ts`), und die
+   * TOML verweist nur auf die Umgebungsvariable, in die der SessionManager das
+   * gebundene Token geschrieben hat. Der Vorteil gegenueber einem Pfad-Praefix:
+   * die Bindung bleibt an der Identitaet und nicht am Transport, und der Server
+   * prueft sie gegen die bekannten IDs wie die Header-Variante auch.
+   *
+   * Das Token steht **nicht** in dieser Datei. Es steht in der Umgebung der
+   * tmux-Session — eine generierte Datei im Run-Verzeichnis ist kein Ort fuer
+   * ein Geheimnis.
    */
   async postLaunchInjection(ctx: AdapterContext): Promise<void> {
     try {
@@ -193,7 +203,6 @@ export class CodexAdapter implements AgentAdapter {
 
   getCapabilities(): AdapterCapabilities {
     return {
-      // Eingetragen wird der Server, nur ohne Workspace- und Rollenbindung.
       'mcp-injection': true,
       // Nicht ueber eine Statusline wie bei Claude Code, sondern ueber einen
       // Hook, der die Rollout-JSONL ausliest. Siehe codex-usage-hook.ts.
@@ -205,9 +214,10 @@ export class CodexAdapter implements AgentAdapter {
       'sub-agents': false,
       'project-instructions': true,
       'message-bus-participant': true,
-      // Haengt an der Rollenbindung ueber `X-Mux-Entity`, die Codex nicht
-      // uebertragen kann. Siehe postLaunchInjection.
-      'companion-mcp': false,
+      // Haengt an der Rollenbindung. Codex kann den Kopf `X-Mux-Entity` nicht
+      // senden, aber das gebundene Token traegt dieselbe Tatsache — und der
+      // Server bindet sie beim `initialize` genauso. Siehe mcp/bound-token.ts.
+      'companion-mcp': true,
     }
   }
 
@@ -327,9 +337,10 @@ export function buildCodexProjectConfig(opts: CodexProjectConfigOpts): string {
     '',
     '[mcp_servers.cipher-mux]',
     `url = ${q(opts.mcpUrl)}`,
-    '# Hinweis: Codex kann keine freien HTTP-Header. X-Mux-Workspace und',
-    '# X-Mux-Entity fehlen dieser Verbindung deshalb — sie ist ausdruecklich',
-    '# ungebunden, nicht stillschweigend an den aktiven Workspace gehaengt.',
+    '# Codex kann keine freien HTTP-Header, deshalb reisen Workspace und Rolle',
+    '# im Token mit (siehe mcp/bound-token.ts). Hier steht nur der Name der',
+    '# Umgebungsvariablen — das Token selbst gehoert nicht in eine Datei.',
+    `bearer_token_env_var = ${q(BOUND_TOKEN_ENV_VAR)}`,
     '',
   ]
 

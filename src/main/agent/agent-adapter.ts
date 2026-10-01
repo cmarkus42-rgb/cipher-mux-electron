@@ -66,6 +66,14 @@ export interface AdapterContext {
   sessionId: string
   /** Workspace this session is bound to. null = unbound. */
   workspaceId: string | null
+  /**
+   * Role this session is bound to. null = no role, which is the app itself.
+   *
+   * An adapter needs this when its CLI cannot send custom headers and the
+   * binding has to ride in the bearer token instead — see `mcp/bound-token.ts`.
+   * Optional so existing adapters stay source-compatible.
+   */
+  entityId?: string | null
 }
 
 export interface ProjectInstructions {
