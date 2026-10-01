@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Documentation and CI only — no application behaviour changed, so no version was cut. The
+Companion's reference files are the exception: `deployCompanionRef` rewrites them at every
+session start, so the corrections below reach an installed copy without a new build.
+
+### Fixed
+- **The Companion taught two keys that do not exist.** `Cmd+1–5` for grid navigation (the real
+  ones are `Cmd+Shift+W/A/S/D`, and they were missing entirely), and `Ctrl+Shift+Space` as a
+  voice toggle — it is push-to-talk and returns immediately when voice is off
+  (`if (!active) return`). Also `Cmd+Enter` for "input requests", a feature that no longer
+  exists, and a settings tab list of six without **Remote**.
+- **`docs/HOWTO.md` rewritten against the code.** The README links it as *the* first-run guide,
+  and its central chapter was "Start the orchestrator" — a role renamed to Workshop months ago,
+  whose leftover directory `ipc-hub.ts` deletes on startup. Also in there: an AppImage for
+  Linux (there is none), Aider as an adapter (there is none), three links to a GitHub org that
+  does not exist, Node ≥ 18 where the project needs 22, the config in a directory that is not
+  read, Ollama on the wrong port, the message bus as the way to talk to a session, an invented
+  task state machine, and a four-row shortcut table of which two rows were wrong.
+- **`ARCHITECTURE.md` contradicted itself** — ten roles at the top, a table of eleven 150 lines
+  later, containing an `Orchestrator` and a `Bugreport` that is a dialog.
+- **`docs/linux-notes.md` opened with "cipher-mux runs on Linux as an AppImage."** It does not;
+  `electron-builder.yml` has no Linux target. The file is useful as groundwork for a port and
+  misleading as an install guide — it now says which it is. `CONTRIBUTING.md` promised the same
+  AppImage.
+- **`SECURITY.md` listed `0.9.x` as the supported version** and, with the bug-report template,
+  pointed reporters at `cipher-mux --version`. There is no such flag; it is a GUI application.
+- **Four links to a GitHub org that does not exist** (`cmarkus42` instead of `cmarkus42-rgb`).
+- **ADR-008** describes the Orchestrator template. An ADR is a record, so the text stays — but
+  it now carries an addendum mapping then to now, including that "template updates require an
+  app update" is sharper than it reads: `preset.md` is write-once.
+- **cipher-mux.dev:** three more shortcut claims corrected — `Cmd+→/←` for the grid size (no
+  such handler), `Ctrl+Shift+Space` as a voice toggle, `Cmd+Enter` for input requests.
+
+### Changed
+- **The CI runs on Node 22**, matching `engines.node`, and has a `typecheck` job. The lint job
+  checks **the changed files** from the diff instead of running the projectwide `npm run lint`,
+  which is red by nature. See the 0.11.3 entry for why that mattered.
+
 ## [0.11.3] — 2026-10-01
 
 ### Fixed
