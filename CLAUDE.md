@@ -16,8 +16,8 @@ MCP-Server und Projekt-Kick-off. Zielbild und Begründung:
    vorgeschalteten `rebuild:node` fehlt die better-sqlite3-ABI, und es fallen schlagartig über
    150 Tests um — alle in SQLite-gestützten Suiten (TaskManager, MessageBus, MemoryStore,
    CyberFactory, Debugger, Audit). Das Fehlerbild ist eindeutig: viele Fehler, alle dort.
-3. **Die Suite ist grün und soll grün bleiben.** Stand: **2235 Tests, 2235 pass, 0 fail,
-   0 cancelled** (2026-10-01). Ältere Dokumente nennen „vier vorbestehend rote Suiten" —
+3. **Die Suite ist grün und soll grün bleiben.** Stand: **2239 Tests, 2239 pass, 0 fail,
+   0 cancelled**, 465 Suiten, rund 91 s (gemessen 2026-10-01 abends). Ältere Dokumente nennen „vier vorbestehend rote Suiten" —
    das galt bis zum 2026-09-30 und ist erledigt; keiner der Fälle war ein Flake. Ein roter
    Lauf ist ab jetzt eine echte Regression.
 4. **`npm run lint` ist projektweit rot** (830 Probleme, 478 Fehler) und war es vorher schon.
@@ -432,8 +432,12 @@ sieht, ist ungeprüft" — nicht „gibt es nicht".
 - **Entities** sind Rollen mit eigenem Verzeichnis, eigener CLAUDE.md und Recovery-Fähigkeit:
   Workshop, Cyber Factory, Companion, Refinement, Ideation Partner, Debugger,
   Testing Assistant, Audit, Voice-Relay, Launcher. Registry: `src/main/session/entity-registry.ts`.
-- **MCP-Server** im Main-Prozess, 57 Tools (gezählt über `registerMuxTool`), **eine `McpServer`-Instanz pro Client**
+- **MCP-Server** im Main-Prozess, **67 Tools**, **eine `McpServer`-Instanz pro Client**
   (`mcp-server.ts:createSession`) — deshalb kann Workspace-Kontext pro Verbindung gebunden werden.
+  **Der Grep zählt zu wenig:** `registerMuxTool(` findet 57, weil die zehn Entity-Handoffs in
+  `registerAllHandoffTools` aus einer Definition erzeugt werden und nicht einzeln dastehen.
+  Maßgeblich ist, was eine Verbindung angeboten bekommt. Referenz: `docs/mcp-tools.md`,
+  dort alle 67 in zwölf Kategorien.
 - **Worker-Startup:** Nach `mux_create_session` 8–10s warten, dann `tmux capture-pane` prüfen,
   dann `tmux send-keys`. `mux_send` ist Inter-Session-Kommunikation, **kein** Prompt-Input.
 - **Voice:** Silero VAD im Renderer → Whisper STT → `VoiceInputRouter` → tmux sendKeys.
@@ -505,7 +509,10 @@ Handarbeit überlebt — ein Vorlagen-Fix im Code erreicht sie also nicht. Nur `
 - **Tests importieren per ESM `import`** (67 von 71 Dateien); `require()` nutzen vier Ausreißer
   und erzeugt einen Lintfehler
 - CSS: Tokens mit `--color-*`-Präfix, **nicht** `--accent`/`--text-secondary`. `--radius-*` ist
-  projektweit `0` — keine abgerundeten Ecken. 10 Themes über `body[data-theme]`
+  projektweit `0` — keine abgerundeten Ecken. **13 Themes** — die Liste steht in
+  `shared/grid-types.ts` (`ThemeName`), `useTheme.ts` leitet `ALL_THEMES` daraus ab. Unter
+  `styles/` liegen nur **12** `body[data-theme]`-Blöcke: `cipher-ivory` ist der Default und
+  braucht kein Attribut. Wer die Blöcke zählt, zählt einen zu wenig
 - **Preact-Falle:** kein `stopPropagation()` auf Popup-Containern — bricht Child-Klicks in
   preact/compat. Stattdessen `e.target === e.currentTarget` auf dem Overlay prüfen
 
