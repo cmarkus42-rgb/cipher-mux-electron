@@ -878,7 +878,12 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         id: z.string().describe('Note ID (ULID)'),
         title: z.string().optional().describe('New title — updates the first # heading in the body'),
         body: z.string().optional().describe('New markdown body (replaces entire body)'),
-        tags: z.array(z.string()).optional().describe('New tags (max 5, replaces all existing tags)'),
+        tags: z.array(z.string()).optional().describe(
+          'New tags — REPLACES all existing tags, so pass the ones you want to keep. '
+          + 'Read the note first if you only mean to add one. Same values as '
+          + 'mux_notes_create; workspace: and entity: are set by the Mux and must be '
+          + 'carried over unchanged if the note already has them.',
+        ),
         handoff_status: z.enum(['pending', 'consumed']).optional().describe('Update handoff status for handoff notes'),
       },
     },
@@ -901,7 +906,17 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         }
 
         let body = args.body ?? existing.body
-        const tags = args.tags ? args.tags.slice(0, 5) : existing.info.tags
+        // Vorher: `args.tags.slice(0, 5)`. Das hat still abgeschnitten, und eine
+        // Handoff-Note traegt legitim sechs Tags (handoff, kind:handoff,
+        // workspace:, entity:, phase:, status:) -- ein Update haette also
+        // lautlos die Herkunft oder den Typ verloren. Stilles Abschneiden ist
+        // der schlechteste Umgang mit einer Grenze: der Aufrufer erfaehrt nicht,
+        // dass etwas fehlt. Jetzt wird uebernommen und gewarnt, wie bei
+        // mux_notes_create.
+        const tags = args.tags ?? existing.info.tags
+        const updateTagWarning = args.tags && args.tags.length > MAX_MANUAL_TAGS
+          ? `Warning: ${args.tags.length} tags exceed recommended limit of ${MAX_MANUAL_TAGS}.`
+          : undefined
 
         // Update title heading if title provided
         if (args.title && !args.body) {
@@ -933,8 +948,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', note })
         }
 
+        const updateResult: Record<string, unknown> = { ok: true, id: note.id, title: note.title }
+        if (updateTagWarning) updateResult.warning = updateTagWarning
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id: note.id, title: note.title }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(updateResult) }],
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
