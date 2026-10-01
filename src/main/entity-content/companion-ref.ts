@@ -195,6 +195,8 @@ Custom characters: Name + color + prompt text.
 ### Tab: Presets
 Preset editor. Global Rules (always first entry) + all entity presets. Builtin presets are read-only — "Copy as Custom" creates editable copy. New custom preset via "+ New".
 
+Per role, a **CLI** field selects the agent CLI (see *Agent-CLIs*). "Default" follows the global setting. A Tier-2 pick names its gap right below the field; the choice applies at the next session start of that role.
+
 ### Tab: Tags
 Tag management. Tag classes and predefined tags configurable.
 
@@ -216,6 +218,51 @@ Tag management. Tag classes and predefined tags configurable.
 | **Launcher** | Project kickoff workflow. Scans projects, starts orchestration. |
 
 **Lifecycle:** Ideation → Refinement → Cyber Factory → Testing → Debugger. Workshop coordinates, Audit runs parallel.
+
+---
+
+## Agent-CLIs (3)
+
+Which command-line AI runs in a cell. Independent of the entity: the entity is the role, the CLI is the executable.
+
+| CLI | Id | Tier | Measured against |
+|---|---|---|---|
+| Claude Code | \`claude-code\` | Tier 1 | default |
+| Codex CLI | \`codex\` | Tier 2 | codex-cli 0.155.1 (2026-10-01) |
+| opencode | \`opencode\` | Tier 2 | opencode 1.18.34 (2026-10-01) |
+
+**Tier 1** — every Mux capability measured. **Tier 2** — not every capability measured. \`false\` in an adapter means "unproven", not "absent".
+
+**Capability gaps:**
+
+| CLI | Not measured | Also missing |
+|---|---|---|
+| Claude Code | — | — |
+| Codex CLI | Sub-Agents | — |
+| opencode | Context display (status line), Sub-Agents | role boundaries not wired; no smoke test against the real CLI |
+
+Codex has no status line of its own — a hook reads usage from the session rollout and writes the format the existing monitor reads. The context bar looks the same to the user.
+
+**Selecting a CLI:**
+
+| Scope | Where |
+|---|---|
+| Per role | Workspaces window → Tab Presets → role → field **CLI**. Shows the gap of a Tier-2 pick inline ("Unter opencode fehlt: ..."). |
+| Global | \`einstellungen\` → general → **Standard-CLI**. Also governs sessions without a role (Path tab). |
+
+**Resolution order:** \`app.entityAdapters\` (per role) > role default (no builtin role has one) > \`agent.defaultAdapter\` (initial value: \`claude-code\`). Takes effect at the next session start of that role.
+
+**Project instructions per CLI:**
+
+| CLI | File |
+|---|---|
+| Claude Code | \`CLAUDE.md\` |
+| Codex CLI | \`AGENTS.md\` |
+| opencode | \`AGENTS.md\` (reads \`CLAUDE.md\` additionally; the Mux writes only \`AGENTS.md\`) |
+
+**Codex directory trust:** Codex loads project-local config, hooks and exec policies only from a trusted directory, and otherwise asks in a blocking dialog — a later "Yes" does not load them. The Mux therefore registers the role's run directory in \`~/.codex/config.toml\`, and only that directory. Switch: \`agent.codexTrustRunDirs\` (initial value: on).
+
+**Config file:** \`~/Library/Application Support/cipher-mux-electron/cipher-mux-config.json\`. A second file \`~/.config/cipher-mux/config.json\` exists and is **not** read by the Mux.
 
 ---
 
@@ -330,6 +377,7 @@ Appears on startup when sessions exist. **Two phases:**
 
 ### General
 - Skip Permissions — \\\`--dangerously-skip-permissions\\\` for all new sessions
+- **Standard-CLI** — which CLI new sessions launch when the role names none. Tier-2 picks are marked "— Tier 2" in the dropdown.
 - Keep Working — save sessions on quit (recovery on next start)
 - Bugreport button
 
@@ -373,7 +421,7 @@ All tools available via the cipher-mux MCP server. Used by the Workshop, Cyber F
 
 ### mux_create_session
 
-Create a new Claude Code session in a tmux pane.
+Create a new agent session in a tmux pane.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -385,6 +433,7 @@ Create a new Claude Code session in a tmux pane.
 **Use case:** Workshop spawning a worker for a specific task.
 **Returns:** Session object with id, name, tmuxSession.
 **Note:** After creation, wait 8-10 seconds before sending instructions (Worker-Startup Protocol).
+**Which CLI:** a session created here carries no role, so the global **Standard-CLI** (\`agent.defaultAdapter\`) decides — not necessarily Claude Code. See \`ref/features.md\`, section *Agent-CLIs*.
 
 ### mux_kill_session
 
@@ -822,6 +871,8 @@ Quick reference for all input methods in cipher-mux.
 const REF_SLASH_COMMANDS = `# Slash Commands — Claude Code
 
 Schnellreferenz fuer alle \\\`/\\\`-Befehle in Claude Code. Diese funktionieren in jeder Claude-Code-Session (auch innerhalb von cipher-mux).
+
+**Geltungsbereich:** Diese Liste gilt fuer **Claude Code**. Eine Zelle kann auch mit Codex CLI oder opencode laufen (siehe \`ref/features.md\`, Abschnitt *Agent-CLIs*) — welche Slash-Befehle dort existieren, ist nicht geprueft. Nicht aus dieser Liste auf die anderen CLIs schliessen.
 
 ---
 

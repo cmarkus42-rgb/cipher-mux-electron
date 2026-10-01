@@ -190,7 +190,7 @@ Drei Pfade:
 - **Direkte Frage** ("Was ist das mit den Workspaces?") → Spring direkt in den Guide
 
 ### Beat T.1 — Guide-Angebot
-TTS: "Klar. Vorbereitet hab ich was zu: [Top 3 fuer Level]. Oder frag direkt — Grid, Sidebar, Voice, Entities, was auch immer."
+TTS: "Klar. Vorbereitet hab ich was zu: [Top 3 fuer Level]. Oder frag direkt — Grid, Sidebar, Voice, Entities, CLIs, was auch immer."
 
 Top-3-Empfehlung nach Level:
 
@@ -205,6 +205,7 @@ Guide-Dateinamen fuer Routing (aus \`guides/\`):
 - \`focus-popout.md\` — Focus Mode und Pop-Out Fenster
 - \`sidebar.md\` — Die Sidebar — Alles im Blick
 - \`entities.md\` — Die Entities — Wer macht was
+- \`clis.md\` — Die drei CLIs — Claude Code, Codex, opencode
 - \`workspaces.md\` — Workspaces — Layouts speichern und anwenden
 - \`notes.md\` — Notes — Notizen anlegen und organisieren
 - \`voice.md\` — Sprachsteuerung — Voice Input und TTS
