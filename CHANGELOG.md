@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] — 2026-10-01
+
+### Added
+- **Three agent CLIs instead of one.** The `AgentAdapter` contract now carries three production implementations: `claude-code` (Tier 1, still the default), `codex` (Tier 2, measured against codex-cli 0.155.1), `opencode` (Tier 2, measured against opencode 1.18.34). Tier 2 means not every Mux capability has been measured there — the gaps are the `false` entries in each adapter's `getCapabilities()`.
+- **CLI selection in the UI.** Field **CLI** per role in the preset editor, **Default CLI** in Settings → General. Both name what is missing under the CLI you pick, before the session starts. Resolution: `app.entityAdapters` > role default > `agent.defaultAdapter`. The per-role choice applies at that role's next session start; the global switch takes effect immediately.
+- **MCP binding in the bearer token** (`mcp/bound-token.ts`), format `<apiKey>.<base64url(JSON)>`. Needed because Codex sends no custom HTTP headers — measured. A token without a dot is the bare key and means unbound, so existing clients are unaffected. The suffix is deliberately unsigned; the reasoning is in the file header.
+- **Codex directory trust** (`agent/adapters/codex-trust.ts`). Codex loads project-local config, hooks and exec policies only from a trusted directory and otherwise blocks on a dialog. Only an entry in the global `~/.codex/config.toml` helps, and the adapter writes it exclusively for paths under `~/.config/cipher-mux/runs/`. Switchable off via `agent.codexTrustRunDirs`.
+- **Context usage for Codex sessions** via `monitoring/codex-usage-hook.ts` — derives the JSON the existing `StatusLineMonitor` already reads from the rollout JSONL, rather than adding a second reader.
+
+### Changed
+- **The adapter is now resolved per role everywhere** — at launch, at fork, and per entry during the Keep-Working restore. It previously diverged across three call sites, so a role on Codex under a global default of `claude-code` launched `codex` and was then handed Claude Code's config files. Latent with one adapter, a bug with three.
+- **Role boundaries** run through `PreToolUse` hooks for Claude Code and Codex, and through a plugin on `tool.execute.before` for opencode. All three were proven to deny selectively against the live CLI. Two findings came out of it: opencode's documented `permission.ask` hook **never fires** — a boundary built on it would have been written and dead — and Codex carries no `file_path` in its tool input, so its boundary parses the `apply_patch` envelope instead (`adapters/codex-boundary.ts`).
+
+### Documentation
+- README, ARCHITECTURE and CONTRIBUTING rewritten for three adapters: capability matrix per adapter, the two structural divergences (MCP binding, role boundaries), the per-role CLI selection, and the measurement discipline for new adapters.
+- **Config location documented, with the trap named:** settings live in `~/Library/Application Support/cipher-mux-electron/cipher-mux-config.json`. The identically named `~/.config/cipher-mux/config.json` exists and is **not** read — editing it changes nothing.
+- `docs/website-update-2026-10-01.md` — proposed text for the eleven places on cipher-mux.dev that the three adapters made wrong or incomplete. A proposal, not a deployment.
+
+### Known gaps
+- **The shell gap is open in all three.** `Bash` carries no path, so a file can still be changed through the shell. Closing it would mean parsing shell syntax, and a half-hearted parser is another boundary that only looks like one. The boundary is a guardrail against mistakes, not a sandbox.
+- `sub-agents` is `false` for both Tier-2 adapters. That means *unmeasured*, not *impossible*.
+- **opencode needs an authenticated provider.** Without one it reaches its prompt and then does nothing on any input. No flag removes this — it is a precondition, not a dialog.
+- The **CLI** field in the preset editor is built, typechecked and unit-tested, but has not been visually accepted.
+
 ## [0.9.104] — 2026-05-17
 
 ### Fixed

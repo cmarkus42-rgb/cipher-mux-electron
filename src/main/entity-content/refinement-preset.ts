@@ -89,11 +89,11 @@ Wofuer wird die Software entwickelt?
 - Persoenlich/Hobby? Freier, aber dokumentiert
 - Intern? Wenig Lizenz-Druck, aber Compliance je nach Branche
 
-Ergebnis als Companion-Memory mit Tags \\\`verwendungszweck\\\`, \\\`lizenz-policy\\\`.
+Ergebnis als Companion-Memory mit Tags \`verwendungszweck\`, \`lizenz-policy\`.
 
 ### Phase 6 — Detail-Spec mit REQ-IDs
 
-Jede Anforderung bekommt eine ID: \\\`REQ-<Subsystem>-<Nummer>\\\`.
+Jede Anforderung bekommt eine ID: \`REQ-<Subsystem>-<Nummer>\`.
 
 Pro REQ:
 - *Akzeptanz-Kriterien* als Checkbox-Liste
@@ -104,7 +104,7 @@ Pro REQ:
 
 Format-Beispiel:
 
-\\\`\\\`\\\`markdown
+\`\`\`markdown
 ### REQ-S2-014 · MessageBus persistiert Nachrichten ueber Neustart hinweg
 
 **Akzeptanzkriterien:**
@@ -112,11 +112,11 @@ Format-Beispiel:
 - [ ] Nach App-Neustart werden ungesendete Nachrichten zugestellt
 - [ ] Wenn Empfaenger nicht existiert, Nachricht 7 Tage halten
 
-**Tests:** \\\`tests/messagebus/persistence.test.ts\\\`
-**Off-Limits:** keine Schema-Aenderung ohne Migration in \\\`db/migrations/\\\`
-\\\`\\\`\\\`
+**Tests:** \`tests/messagebus/persistence.test.ts\`
+**Off-Limits:** keine Schema-Aenderung ohne Migration in \`db/migrations/\`
+\`\`\`
 
-Ablage unter \\\`docs/specs/<subsystem>.md\\\`. Subsystem-Schnitt ist vorlaeufig —
+Ablage unter \`docs/specs/<subsystem>.md\`. Subsystem-Schnitt ist vorlaeufig —
 die Cyber-Factory-Architekt-Phase bestaetigt oder revidiert ihn.
 
 **5%-Fall:** Wenn der User ein anderes Output-Format vorgibt (Konzept, Pitch), faellt
@@ -181,38 +181,38 @@ Diese Session ist NICHT fuer:
 
 ## Notes-Tagging
 
-Tags werden in \\\`~/.config/cipher-mux/notes/.tags.json\\\` verwaltet. Beim Anlegen von Notes via \\\`mux_notes_create\\\` immer passende Tags mitgeben.
+Tags werden in \`~/.config/cipher-mux/notes/.tags.json\` verwaltet. Beim Anlegen von Notes via \`mux_notes_create\` immer passende Tags mitgeben.
 
 **Pflicht-Tags fuer Refinement:**
-- \\\`kind:spec\\\` — fuer Detail-Specs mit REQ-IDs
-- \\\`kind:research\\\` — fuer RE-Audit-Ergebnisse
-- \\\`entity:refinement\\\` — Herkunfts-Tag
+- \`kind:spec\` — fuer Detail-Specs mit REQ-IDs
+- \`kind:research\` — fuer RE-Audit-Ergebnisse
+- \`entity:refinement\` — Herkunfts-Tag
 
-Optionale Tags: \\\`phase:architecture\\\`, \\\`phase:research\\\`.
+Optionale Tags: \`phase:architecture\`, \`phase:research\`.
 Den Reifegrad der Anforderungen liest der Mux aus dem Rumpf (requirements-parser), nicht aus einem Tag.
 
-**Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \\\`status:\\\`-Tag aktualisieren: \\\`status:open\\\` → \\\`status:in-progress\\\` → \\\`status:done\\\`. Kein Update ohne passenden Status-Tag.
+**Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \`status:\`-Tag aktualisieren: \`status:open\` → \`status:in-progress\` → \`status:done\`. Kein Update ohne passenden Status-Tag.
 
 ## Lessons Learned
 
 Wenn du ein Learning erkennst (wiederkehrendes Problem, besserer Ansatz, vermiedener Fehler), entscheide ueber die richtige Ablage-Ebene:
 
-\\\`\\\`\\\`
+\`\`\`
 Learning erkannt
   ├─ Betrifft ALLE Entities? → global-rules.md (Repo)
   ├─ Betrifft NUR diese Entity? → CLAUDE.md dieser Entity aktualisieren
   └─ Betrifft User/Projekt? → companion_memory_write (scope: workspace/user)
-\\\`\\\`\\\`
+\`\`\`
 
 **Format:**
-\\\`\\\`\\\`
+\`\`\`
 LEARNING: [Kurztitel]
 Datum: YYYY-MM-DD
 Quelle: [Session-ID oder Kontext]
 Ebene: global | entity | user | projekt
 Was: [Beschreibung des Problems/der Erkenntnis]
 Regel: [Abgeleitete Regel fuer die Zukunft]
-\\\`\\\`\\\`
+\`\`\`
 
 Learnings auf Entity-Ebene als Vorschlag an den User formulieren — CLAUDE.md-Aenderungen nicht eigenmaechtg vornehmen.
 
@@ -228,29 +228,29 @@ zeigen, Bestaetigung abwarten.
 
 ### MCP-Tool-Grundregeln
 
-- **Session-Handoff Timing:** Nach \\\`mux_create_session\\\` mindestens 8-10s warten bevor Instruktionen gesendet werden. tmux + Shell + Claude CLI brauchen Startzeit.
-- **mux_send vs. tmux send-keys:** \\\`mux_send\\\` ist fuer Inter-Session-Kommunikation (Message Bus), NICHT fuer Prompt-Input. Direkte Instruktionen via \\\`tmux send-keys\\\`.
-- **Context-Monitoring:** Bei laufenden Worker-Sessions regelmaessig \\\`mux_context_usage\\\` pruefen. Bei >80% proaktiv handeln.
+- **Session-Handoff Timing:** Nach \`mux_create_session\` mindestens 8-10s warten bevor Instruktionen gesendet werden. tmux + Shell + Claude CLI brauchen Startzeit.
+- **mux_send vs. tmux send-keys:** \`mux_send\` ist fuer Inter-Session-Kommunikation (Message Bus), NICHT fuer Prompt-Input. Direkte Instruktionen via \`tmux send-keys\`.
+- **Context-Monitoring:** Bei laufenden Worker-Sessions regelmaessig \`mux_context_usage\` pruefen. Bei >80% proaktiv handeln.
 - **Task-Updates:** Tasks zeitnah updaten — nicht erst am Ende. Andere Sessions verlassen sich auf aktuelle Task-Stati.
-- **Notes fuer Persistenz:** Wichtige Erkenntnisse, die ueber die Session hinaus gelten, als Notes anlegen (\\\`mux_notes_create\\\`).
+- **Notes fuer Persistenz:** Wichtige Erkenntnisse, die ueber die Session hinaus gelten, als Notes anlegen (\`mux_notes_create\`).
 
 ### TTS-Guardrail
 
-- **Baseline:** \\\`mux_tts_speak\\\` fuer Kernaussagen: Zusammenfassungen, Meilensteine, direkte Antworten. Saetze kurz und klar.
+- **Baseline:** \`mux_tts_speak\` fuer Kernaussagen: Zusammenfassungen, Meilensteine, direkte Antworten. Saetze kurz und klar.
 - **Nie per TTS:** Code, Pfade, IDs, technische Details — gehoeren in schriftlichen Output.
 - **Override:** Entity-CLAUDE.md kann TTS erweitern (voice-relay), einschraenken oder deaktivieren (cyber-factory, debugger).
 
 ### mux_send Push-Delivery
 
-- **Separates Enter noetig:** Nach \\\`mux_send\\\` mit Push-Delivery wird der Text in die Session eingefuegt, aber NICHT submitted. Ein zweites \\\`mux_send\\\` mit "\\n" (oder tmux send-keys Enter) ist Pflicht.
-- **Pattern:** \\\`mux_send(text)\\\` → 1-2s Pause → \\\`mux_send("\\n")\\\` = Submit.
+- **Separates Enter noetig:** Nach \`mux_send\` mit Push-Delivery wird der Text in die Session eingefuegt, aber NICHT submitted. Ein zweites \`mux_send\` mit "\\n" (oder tmux send-keys Enter) ist Pflicht.
+- **Pattern:** \`mux_send(text)\` → 1-2s Pause → \`mux_send("\\n")\` = Submit.
 - **Ohne:** Text steht in der Eingabezeile, Session wartet — sieht aus als waere nichts angekommen.
 
 ### Lessons Learned — Entscheidungsbaum
 
 Wenn du ein Learning erkennst (etwas das beim naechsten Mal anders laufen soll), lege es auf der richtigen Ebene ab:
 
-\\\`\\\`\\\`
+\`\`\`
 Learning erkannt
   → Betrifft ein spezifisches MCP-Tool?
       → JA: Tool-Description anreichern (in mcp-tools.ts)
@@ -260,18 +260,18 @@ Learning erkannt
       → JA: Entity-CLAUDE.md (unter ~/.config/cipher-mux/entities/<id>/)
   → User/Projekt-spezifisch?
       → JA: Companion Memory (companion_memory_write)
-\\\`\\\`\\\`
+\`\`\`
 
 **Format fuer Eintraege hier:**
-\\\`\\\`\\\`
+\`\`\`
 - **[Kurztitel]:** [Was ab jetzt gilt]. Quelle: [woher das Learning kommt].
-\\\`\\\`\\\`
+\`\`\`
 
 ### Testcase-Konventionen
 
-- **Testcases gehoeren in die Notes-System-Testcase-Note** (noteType: testcase, ID: \\\`01KQNBDCH1D4G11PMAEM60TPTX\\\`). NICHT in Dateien unter \\\`docs/archiv/\\\`. Der TestcaseView rendert nur Notes mit \\\`noteType: testcase\\\`.
-- **Format:** \\\`- [ ] **T-PREFIX.N** Beschreibung\\\` — der Parser braucht dieses exakte Checkbox+Bold-ID-Format.
-- **Neue Testcases ans Ende anhaengen**, unter einer neuen \\\`## Section\\\`-Ueberschrift.
+- **Testcases gehoeren in die Notes-System-Testcase-Note** (noteType: testcase, ID: \`01KQNBDCH1D4G11PMAEM60TPTX\`). NICHT in Dateien unter \`docs/archiv/\`. Der TestcaseView rendert nur Notes mit \`noteType: testcase\`.
+- **Format:** \`- [ ] **T-PREFIX.N** Beschreibung\` — der Parser braucht dieses exakte Checkbox+Bold-ID-Format.
+- **Neue Testcases ans Ende anhaengen**, unter einer neuen \`## Section\`-Ueberschrift.
 `;
 
 export function generateRefinementClaudeMd(): string {

@@ -1,10 +1,11 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="cipher-mux — Coding Cockpit for Claude Code" width="100%">
+  <img src="assets/banner.svg" alt="cipher-mux — Coding Cockpit for agent CLIs" width="100%">
 </p>
 
 <p align="center">
-  <b>Orchestrates Claude Code into a real development process</b><br>
-  with roles, memory, and voice.
+  <b>Orchestrates coding CLIs into a real development process</b><br>
+  with roles, memory, and voice.<br>
+  <sub>Claude Code (Tier 1, the default) · Codex CLI (Tier 2) · opencode (Tier 2)</sub>
 </p>
 
 <p align="center">
@@ -13,7 +14,7 @@
 
 <p align="center">
   <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cmarkus42-rgb/cipher-mux-electron/ci.yml?branch=main&label=CI&style=flat-square&labelColor=000000&color=F5F5EC"></a>
-  <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.9.104-0088A0?style=flat-square&labelColor=000000"></a>
+  <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.10.0-0088A0?style=flat-square&labelColor=000000"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="#"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="CONTRIBUTING.md#maintenance-status"><img alt="Maintenance" src="https://img.shields.io/badge/maintenance-active-00FF88?style=flat-square&labelColor=000000"></a>
@@ -21,7 +22,7 @@
   <a href="https://cipher-mux.dev"><img alt="Website" src="https://img.shields.io/badge/web-cipher--mux.dev-0088A0?style=flat-square&labelColor=000000"></a>
 </p>
 
-> **v0.9.103** — Open beta. Feedback welcome via [Issues](https://github.com/cmarkus42-rgb/cipher-mux-electron/issues).
+> **v0.10.0** — Open beta. Feedback welcome via [Issues](https://github.com/cmarkus42-rgb/cipher-mux-electron/issues).
 
 ---
 
@@ -35,17 +36,18 @@
 
 ## What it does
 
-cipher-mux is an Electron environment. Its core is a grid with up to 21 cells (7×3) for Claude Code sessions and Markdown editors. In the background, tmux ensures that your sessions are safely preserved — even during a system restart or crash.
+cipher-mux is an Electron environment. Its core is a grid with up to 21 cells (7×3) for agent-CLI sessions and Markdown editors. Each cell is its own CLI process — Claude Code, Codex CLI, or opencode, picked per role. In the background, tmux ensures that your sessions are safely preserved — even during a system restart or crash.
 
 Got an idea? Build it. cipher-mux structures the path from idea to code — with specialized agents that build in quality and security you can't get from a single chat session.
 
 ### Key features
 
+- **Three Agent CLIs** — Claude Code (Tier 1), Codex CLI (Tier 2), opencode (Tier 2). Pick one per role, or set a global default. See [Agent CLIs](#agent-clis)
 - **Grid System** — Adaptable workspace, drag & drop, vertical cell merges, up to 21 cells
 - **8 Presets** — Specialized roles: Companion, Ideation, Refinement, Cyber Factory, Testing, Debugger, Workshop, Audit
 - **6 Personas** — Control how the model communicates: from bone-dry to socratic to chaos
 - **Voice I/O** — Local Whisper.cpp STT (no cloud), Silero VAD, Piper/macOS TTS, BT remote support
-- **MCP Server** — 37 tools across 9 categories, Streamable HTTP, bearer auth per entity
+- **MCP Server** — 57 tools across 9 categories, Streamable HTTP, bearer auth per entity
 - **Tag Management** — Merge tags, exclusive groups, tag cycling. Hierarchical tag tree with tri-state filtering
 - **Focus Mode** — Full-screen focus: selected cell fills the grid, others dim. Reduces visual noise for deep work
 - **Update Checker** — Automatic release checks on startup (opt-out in Settings)
@@ -60,14 +62,15 @@ Got an idea? Build it. cipher-mux structures the path from idea to code — with
 ### System boundaries
 
 - Not a commercial product — an open-source project born out of personal necessity
-- Not a replacement for Claude Code CLI — a graphical orchestration layer on top of it
+- Not a replacement for the agent CLIs — a graphical orchestration layer on top of them
 - Not a magic wand for vague ideas — the ability to formulate precise specifications remains essential
-- Requires Claude Code (subscription may change — current info: anthropic.com)
+- Requires at least one supported agent CLI. Claude Code is the default and needs an Anthropic account (subscription terms may change — current info: anthropic.com). Codex CLI and opencode work too, at Tier 2 — see [Agent CLIs](#agent-clis)
 
 ## Table of Contents
 
 - [Install](#install)
 - [Usage](#usage)
+- [Agent CLIs](#agent-clis)
 - [How It Compares](#how-it-compares)
 - [FAQ](#faq)
 - [Architecture](#architecture)
@@ -77,7 +80,7 @@ Got an idea? Build it. cipher-mux structures the path from idea to code — with
 
 ## Install
 
-**Requirements:** macOS 12+ (Apple Silicon or Intel) · Anthropic account with Claude Code access · ~1 GB free space
+**Requirements:** macOS 12+ (Apple Silicon or Intel) · at least one supported agent CLI (Claude Code needs an Anthropic account; Codex CLI and opencode are alternatives at Tier 2) · ~1 GB free space
 
 ### macOS (DMG)
 
@@ -102,6 +105,11 @@ After the wizard, log in to Claude Code (one-time):
 ```bash
 claude login
 ```
+
+**Codex CLI and opencode are deliberately absent from that table.** The setup wizard neither
+installs nor checks them (`src/main/setup/`, `src/main/util/dependency-check.ts` know only the
+Claude Code CLI). If you point a role at Codex or opencode, install and authenticate the CLI
+yourself.
 
 ### Linux & Windows
 
@@ -152,7 +160,7 @@ npm run dist      # Package as DMG (macOS)
 
 ### The Grid
 
-The main window shows a grid of terminal panes — each one is a Claude Code session running inside tmux. Click a cell to focus it. The activity rail on the left shows session status, unread messages, and context usage at a glance.
+The main window shows a grid of terminal panes — each one an agent-CLI session running inside tmux. Click a cell to focus it. The activity rail on the left shows session status, unread messages, and context usage at a glance.
 
 ### Presets
 
@@ -189,6 +197,62 @@ Integrated Markdown editor (CodeMirror 6) with auto-tagging via local Ollama (ge
 
 Sessions communicate through a SQLite message bus. The chatroom panel shows inter-session messages. MCP tools (`mux_send` / `mux_read`) enable structured coordination without terminal scraping.
 
+## Agent CLIs
+
+A role is not tied to one CLI. Three adapters ship in the registry
+(`src/main/agent/registry.ts`):
+
+| CLI | Adapter id | Tier | Project instructions | Measured against | What is missing |
+|-----|-----------|------|---------------------|------------------|-----------------|
+| **Claude Code** | `claude-code` | Tier 1 | `CLAUDE.md`, `.claude` | v2.1.284 | — |
+| **Codex CLI** | `codex` | Tier 2 | `AGENTS.md`, `.codex` | codex-cli 0.155.1 | sub-agents |
+| **opencode** | `opencode` | Tier 2 | `AGENTS.md`, `opencode.json`, `.opencode` | opencode 1.18.34 | context display (`status-line`), sub-agents, role boundaries |
+
+**Tier 2 means: not every Mux capability has been measured there.** The "What is missing" column
+is not a guess — it is the set of `false` entries in the adapter's own `getCapabilities()`. A
+`false` there says *unproven*, not *impossible*; for your session the effect is the same, so the
+UI names it either way. Grid, presets, personas, workspaces, notes, voice, the MCP server, and
+the message bus work under all three.
+
+Two differences deserve naming outright. **Role boundaries use a different mechanism per CLI:**
+Claude Code and Codex enforce them through a `PreToolUse` hook, opencode through a plugin on
+`tool.execute.before`. All three were proven to deny selectively against the live CLI — the
+mechanism differs, the guarantee does not. The shell gap is shared: `Bash` carries no path, so a
+file can still be changed through the shell. The boundary is a guardrail against mistakes, not a
+sandbox.
+
+And **opencode needs an authenticated provider.** Without one it starts, reaches its prompt, and
+then does nothing on any input. No flag removes this — it is a precondition, not a dialog.
+
+### Choosing a CLI
+
+- **Per role:** field **CLI** in the preset editor. `Default` follows the global setting; anything
+  else overrides it. Takes effect at that role's next session start — a running session does not
+  switch CLI. Under the field, the editor names what is missing under the CLI you picked.
+- **Globally:** **Default CLI** in Settings → General. Takes effect immediately, for sessions
+  started afterwards.
+
+Resolution order, in the code at `src/main/session/entity-runtime.ts`:
+
+```
+app.entityAdapters[<role>]      (your per-role choice)
+  > role default                (EntityConfig.adapterId, if the role carries one)
+  > agent.defaultAdapter        (the global setting; ships as 'claude-code')
+```
+
+### Where the config lives
+
+```
+~/Library/Application Support/cipher-mux-electron/cipher-mux-config.json
+```
+
+That is `app.getPath('userData')`. `agent.defaultAdapter` and `app.entityAdapters` live there.
+
+**There is also `~/.config/cipher-mux/config.json`, and cipher-mux does not read it.** Editing
+that file changes nothing. `~/.config/cipher-mux/` holds *content* — role directories
+(`entities/`), run directories (`runs/<workspaceId>/<entityId>/`), voice models — but no app
+settings. You should not need to touch either file: everything above is settable in the UI.
+
 ## Built with Itself
 
 cipher-mux was built with cipher-mux. Not a single test was written by hand — every one was produced by Claude Code. From Wave 5, the Testing Entity was wired into the process: it writes tests, hands findings to the Debugger, and the cycle runs without manual trigger.
@@ -220,6 +284,18 @@ All of these are valid choices. Pick what fits your workflow.
 
 37 tools across 9 categories: Session Management, Messaging, Task Management, Notes, Companion Memory, Grid & UI Control, Demo & Presentation, Voice/TTS, and Other. Every tool is callable by any entity that has MCP access. See [docs/mcp-tools.md](docs/mcp-tools.md) for the full reference.
 
+### Which agent CLIs are supported?
+
+Three: Claude Code (Tier 1, the default), Codex CLI (Tier 2), and opencode (Tier 2). See
+[Agent CLIs](#agent-clis) for the capability table, how to pick one per role, and what Tier 2
+costs you.
+
+### I edited `~/.config/cipher-mux/config.json` and nothing changed
+
+That file is not the one cipher-mux reads. The settings live in
+`~/Library/Application Support/cipher-mux-electron/cipher-mux-config.json`. See
+[Where the config lives](#where-the-config-lives).
+
 ### What are entities?
 
 Entities are specialized session types with pre-configured instructions, persona settings, and tool access. Think of them as roles: a Workshop coordinates, a Companion teaches, a Refinement entity reviews code. Each entity type gets its own `CLAUDE.md`, and some (Companion, Refinement, Voice-Relay) have persistent memory across sessions.
@@ -230,7 +306,7 @@ Not yet. Linux support is planned.
 
 ### Can I write my own adapter?
 
-Yes. See [CONTRIBUTING.md](CONTRIBUTING.md#writing-an-adapter) and the reference stub at `src/main/agent/adapters/_reference-stub.ts`. The [adapter test protocol](docs/contributing/adapter-test-protocol.md) describes the weekend-test workflow for validating a new adapter.
+Yes — three exist, and the third was built against the same contract as the first. See [CONTRIBUTING.md](CONTRIBUTING.md#writing-an-adapter) and the reference stub at `src/main/agent/adapters/_reference-stub.ts`. The [adapter test protocol](docs/contributing/adapter-test-protocol.md) describes the weekend-test workflow for validating a new adapter. Read `adapters/codex.ts` and `adapters/opencode.ts` before you start: both file headers list the CLI properties that were measured and the ones that were not.
 
 ## Architecture
 
@@ -242,6 +318,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture overview, modul
 
 ```
 src/main/          — Electron main process
+  agent/           — AgentAdapter contract, registry, three adapters (claude-code, codex, opencode)
   tmux/            — TmuxManager, Control Mode parser, output batcher
   message-bus/     — SQLite CRUD, schema, typed messages
   mcp/             — Streamable HTTP MCP server, tools, auth

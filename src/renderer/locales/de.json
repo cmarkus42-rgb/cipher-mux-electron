@@ -346,6 +346,8 @@
   "settings.themeHint": "wähle ein farbschema. die app und alle terminals übernehmen sofort.",
   "settings.agent": "agent",
   "settings.skipPermissions": "Skip Permission Prompts",
+  "settings.defaultAdapter": "Standard-CLI",
+  "settings.defaultAdapterHint": "Welche CLI neue Sessions starten, wenn die Rolle keine eigene nennt. Pro Rolle einstellbar im Presets-Tab. Tier 2 heisst: nicht jede Mux-Faehigkeit ist dort gemessen.",
   "settings.skipPermissionsWarning": "Sessions starten mit --dangerously-skip-permissions. Alle Tool-Aufrufe werden automatisch genehmigt.",
   "settings.llmProvider": "LLM-Provider",
   "settings.llmProviderHint": "Verbindung zu Ollama konfigurieren fuer Bugreport-Enrichment und Auto-Tagging.",

@@ -1213,6 +1213,15 @@ export function App() {
           }
           break
         }
+        case 'workspaces-window': {
+          // Eigenes Fenster, kein Popup — „close" gibt es dafuer nicht, und
+          // „toggle" waere eine Luege: ob es offen ist, weiss der Main-Prozess,
+          // nicht diese Komponente. Jede Aktion oeffnet es also, und `tab`
+          // entscheidet, auf welchem Reiter.
+          const tab = (data.context?.tab as string) ?? 'workspaces'
+          if (action !== 'close') window.cipherMux.window.openWorkspaces(tab)
+          break
+        }
         case 'launcher-popup': {
           const cell = (data.context?.cell as string) ?? '0-0'
           const [col, row] = cell.split('-').map(Number)

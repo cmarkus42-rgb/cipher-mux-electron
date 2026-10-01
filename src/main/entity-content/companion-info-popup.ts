@@ -50,6 +50,14 @@ CodeMirror-6-Editor mit Live-Markdown-Rendering. YAML-Frontmatter fuer Titel und
 
 **Workspaces** sind vorkonfigurierte Grid-Layouts. Im visuellen Editor werden Personas und Projekte pro Zelle zugewiesen. Ein Klick auf "Apply" baut das Grid auf, startet alle Sessions und weist die Rollen zu. Prompt-Aufloesung in drei Stufen: Zell-Prompt > Workspace-Override > Persona-Default.
 
+## Agent-CLIs
+
+Drei Kommandozeilen-KIs koennen in einer Zelle laufen: **Claude Code** (Tier 1, Voreinstellung), **Codex CLI** (Tier 2, gemessen an codex-cli 0.155.1) und **opencode** (Tier 2, gemessen an opencode 1.18.34). Tier 2 heisst: nicht jede Mux-Faehigkeit ist dort gemessen. Unter Codex ist Sub-Agents nicht gemessen; unter opencode fehlen Context-Anzeige und Sub-Agents, Rollengrenzen sind nicht verdrahtet und es gibt keinen Rauchtest gegen die echte CLI.
+
+Gewaehlt wird pro Rolle im Presets-Tab (Feld **CLI**), global unter "einstellungen" → general → **Standard-CLI**. Reihenfolge: Wahl pro Rolle > Default der Rolle > globale Einstellung. Gilt ab dem naechsten Sessionstart der Rolle.
+
+Projektanweisungen liest Claude Code aus \`CLAUDE.md\`, Codex und opencode aus \`AGENTS.md\`. Dem Run-Verzeichnis einer Codex-Rolle traegt der Mux in \`~/.codex/config.toml\` Vertrauen ein — ohne das haengt die Session in einem blockierenden Dialog. Abschaltbar ueber \`agent.codexTrustRunDirs\`.
+
 ## Workshop
 
 Delegiert Aufgaben an Worker-Sessions, ueberwacht den Fortschritt und verarbeitet Bug-Reports. Erstellt automatisch neue Sessions fuer Teilaufgaben, sendet Instruktionen ueber tmux, prueft den Kontext-Verbrauch alle 2 Minuten. Bei Fehlschlaegen: bis zu N Wiederholungen, danach Eskalation an den Nutzer ueber die Sidebar.
@@ -80,7 +88,7 @@ Zusaetzliche Aktionen per Klick: Zell-Header (Hoehe umschalten, Projekt wechseln
 
 ## Konfiguration
 
-Einstellungen unter "einstellungen": 6 Tabs — **general**, **sprache**, **themes**, **shortcuts**, **a11y**, **about**. Konfiguration gespeichert in \\\`~/.config/cipher-mux/cipher-mux-config.json\\\`.
+Einstellungen unter "einstellungen": 6 Tabs — **general**, **sprache**, **themes**, **shortcuts**, **a11y**, **about**. Konfiguration gespeichert in \`~/Library/Application Support/cipher-mux-electron/cipher-mux-config.json\`. Die Datei \`~/.config/cipher-mux/config.json\` existiert daneben und wird **nicht** gelesen — wer dort editiert, aendert nichts.
 
 ## Einschraenkungen
 
@@ -88,5 +96,5 @@ Einstellungen unter "einstellungen": 6 Tabs — **general**, **sprache**, **them
 - Maximal 21 Sessions (7x3 Grid)
 - Kontext-Warnung ab 80% Auslastung
 - Nachrichten-Aufbewahrung: 7 Tage
-- Whisper-Modell muss unter \\\`~/.config/cipher-mux/models/whisper/\\\` liegen
+- Whisper-Modell muss unter \`~/.config/cipher-mux/models/whisper/\` liegen
 `;
