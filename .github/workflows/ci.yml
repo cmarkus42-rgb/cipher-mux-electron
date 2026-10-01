@@ -117,13 +117,25 @@ jobs:
       - name: tmux-Version protokollieren
         run: tmux -V
 
+      # **Python 3.11, und das ist der Kern des macOS-Fehlschlags.** Das Projekt
+      # zieht node-gyp 9.4.1 mit, und dessen `gyp` importiert
+      # `distutils.version` — aus Python 3.12 ist `distutils` entfernt. Der
+      # macOS-Runner bringt 3.12+ mit, der Linux-Runner 3.10; deshalb fiel genau
+      # ein Feld der Matrix um, mit `ModuleNotFoundError: No module named
+      # 'distutils'`. Hier wird die Version festgenagelt statt node-gyp
+      # ausgetauscht: so baut die CI mit demselben node-gyp wie die Entwicklung.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - run: npm ci
 
       # **Nicht** `npm run rebuild:node`: das Skript haengt `2>/dev/null` an, und
       # damit war der Fehlschlag auf dem macOS-Runner monatelang eine nackte
       # Exit-1 ohne Grund. Lokal ist das Schweigen gewollt (Rauschen bei jedem
       # Testlauf), in der CI ist es der Unterschied zwischen einem Befund und
-      # einem Raetsel.
+      # einem Raetsel — der distutils-Fehler stand im ersten Lauf ohne die
+      # Umleitung sofort da.
       - name: better-sqlite3 fuer Node bauen
         working-directory: node_modules/better-sqlite3
         run: npx node-gyp rebuild --release
