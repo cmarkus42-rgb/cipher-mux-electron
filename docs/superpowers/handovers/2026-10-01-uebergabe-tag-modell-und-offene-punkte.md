@@ -1,13 +1,13 @@
 # Übergabe: Tag-Modell steht, vier Punkte offen
 
-**Anker-Commit:** `b202f24` (2026-10-01), Version `v0.9.104+95`
+**Anker-Commit:** `8024a95` (2026-10-01) — der letzte Code-Commit, nicht der dieser Datei
 **Von:** einer langen Session, die aus den Übergabe-Notes heraus das Tag-Modell gebaut hat
 **An:** eine frische Hauptsession
 **Status:** offen
 **Vorgänger:** `docs/superpowers/handovers/2026-09-29-uebergabe-an-frische-session.md`
 
 > **Was dieses Dokument ist.** Entscheidungen, Fallen und Zeiger — **keine Bestandsliste.**
-> Berechne den Ist-Zustand selbst gegen den Anker-Commit (`git diff b202f24..HEAD`). Die
+> Berechne den Ist-Zustand selbst gegen den Anker-Commit (`git diff 8024a95..HEAD`). Die
 > Begründungen stehen hier, damit man mit ihnen streiten kann, nicht damit man ihnen folgt.
 >
 > Es gibt eine Note dazu im Mux, die diese Datei spiegelt. Die Datei ist die Wahrheit, die Note
@@ -37,7 +37,14 @@ daraufhin liest, dass der Code keine Tags nennt, die die Registry abweist
 Vollständig in `CLAUDE.md`, Sektion „Tags: fünf Achsen, zwei editierbare Klassen". **Lies die
 zuerst**, bevor du hier etwas anfasst — insbesondere die drei Stellen, die leicht kaputtgehen.
 
-**Suite: 2012 Tests, 0 fail.** Ein roter Lauf ist eine Regression.
+Zuletzt kam noch ein Mangel heraus, der beim Anlegen *dieser* Übergabe auffiel: eine
+Handoff-Note trug genau einen Tag, `handoff` — keinen Typ, keinen Workspace. Behoben, samt der
+Ursache dahinter: `mux_notes_create` nahm den **aktiven** Workspace und ignorierte die Bindung
+der Verbindung, `mux_notes_handoff_create` genau umgekehrt. Beide halb richtig. Die Regel steht
+jetzt an einer Stelle: `resolveNoteWorkspaceId` in `src/main/notes/note-workspace.ts` — Bindung
+schlägt Ansicht, ohne Bindung die Ansicht.
+
+**Suite: 2019 Tests, 0 fail.** Ein roter Lauf ist eine Regression.
 
 ---
 
