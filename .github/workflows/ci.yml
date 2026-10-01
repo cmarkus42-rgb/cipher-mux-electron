@@ -38,12 +38,21 @@ jobs:
           cache: npm
       - run: npm ci
       - name: ESLint auf den geaenderten Dateien
+        # Die drei Werte kommen ueber die Umgebung herein und nicht per
+        # `${{ }}`-Einsetzung in die Zeile: ein Branchname darf Zeichen tragen,
+        # die eine Shell als Syntax liest, und bei einem PR aus einem Fork
+        # bestimmt den Namen jemand anderes. Siehe die Hinweise zu
+        # Workflow-Injection in der GitHub-Doku.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base="origin/${{ github.base_ref }}"
-            git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin -- "$BASE_REF"
+            base="origin/$BASE_REF"
           else
-            base="${{ github.event.before }}"
+            base="$BEFORE_SHA"
             # Erster Push auf einen Branch: kein Vorgaenger, dann der Elternteil.
             if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
               base="HEAD^"
@@ -97,6 +106,13 @@ jobs:
       - name: tmux installieren (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y tmux
+
+      # **Der macOS-Runner bringt kein tmux mit.** Das war nicht bekannt, weil
+      # der Job vorher schon im Schritt davor umfiel; der erste Lauf mit
+      # `tmux -V` hat es in einer Zeile gezeigt: `command not found`, Exit 127.
+      - name: tmux installieren (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tmux
 
       - name: tmux-Version protokollieren
         run: tmux -V

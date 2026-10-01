@@ -1,8 +1,18 @@
-# How-To — cipher-mux from Zero to First Delegation
+# How-To — cipher-mux from zero to the first delegation
 
-This is the narrative walkthrough. If you already know the tool and just need reference, read the feature overview in the [README](../README.md#usage) or the architecture doc in [ARCHITECTURE.md](../ARCHITECTURE.md).
+This is the narrative walkthrough. If you already know the tool and want reference, read
+[README § Usage](../README.md#usage), the architecture in [ARCHITECTURE.md](../ARCHITECTURE.md),
+or the tool list in [docs/mcp-tools.md](mcp-tools.md).
 
-Audience: a developer who uses Claude Code daily, is comfortable with tmux, and has never opened cipher-mux before. Expected time from a fresh install to a running orchestrator delegation: **15–25 minutes**.
+Audience: a developer who uses an agent CLI daily, is comfortable with tmux, and has never
+opened cipher-mux before. From a fresh install to a running delegation: **15–25 minutes**.
+
+> **This document was rewritten on 2026-10-01 against the code.** The version before it
+> described an **Orchestrator** role that no longer exists — it was renamed to **Workshop**
+> months ago, and `ipc-hub.ts` even deletes its leftover directory on startup. It also offered
+> an AppImage for Linux (there is none), named Aider as an adapter (there is none), pointed at
+> a GitHub org that does not exist, and asked for Node ≥ 18 where the project needs 22. If you
+> find another claim here that the code contradicts, the code wins and this file is wrong.
 
 ---
 
@@ -12,11 +22,11 @@ Audience: a developer who uses Claude Code daily, is comfortable with tmux, and 
 2. [Install](#install)
 3. [First launch](#first-launch)
 4. [Start your first session](#start-your-first-session)
-5. [Start the orchestrator](#start-the-orchestrator)
+5. [Start the Workshop](#start-the-workshop)
 6. [Your first delegation](#your-first-delegation)
-7. [Voice input](#voice-input)
-8. [Notes editor](#notes-editor)
-9. [The task outbox](#the-task-outbox)
+7. [Voice](#voice)
+8. [Notes](#notes)
+9. [Tasks](#tasks)
 10. [Keyboard shortcuts](#keyboard-shortcuts)
 11. [Troubleshooting](#troubleshooting)
 12. [Next steps](#next-steps)
@@ -25,24 +35,29 @@ Audience: a developer who uses Claude Code daily, is comfortable with tmux, and 
 
 ## Before you start
 
-cipher-mux is glue. It does not replace Claude Code, tmux, or your editor. Make sure the pieces below are in place.
+cipher-mux is glue. It does not replace your agent CLI, tmux, or your editor.
 
 ### Required
 
-- **Node.js ≥ 18** — `node --version`
-- **tmux** — `tmux -V` (any version ≥ 3.2 works)
-  - macOS: `brew install tmux`
-  - Linux: `sudo apt install tmux` (Debian/Ubuntu) or equivalent
-- **Claude Code CLI** — `claude --version`
-  - `npm install -g @anthropic-ai/claude-code`
-  - Run `claude login` once before using cipher-mux so the CLI is authenticated.
+- **macOS 12+.** There is no Linux and no Windows build. The architecture sits on tmux,
+  `osascript` and the macOS Keychain.
+- **tmux** — `tmux -V`. Any 3.x works. `brew install tmux`.
+- **At least one agent CLI**, and you must be able to use it from a terminal first:
+  - **Claude Code** (Tier 1, the default) — `npm install -g @anthropic-ai/claude-code`, then
+    `claude login` once.
+  - **Codex CLI** or **opencode** (Tier 2) also work. The setup wizard neither installs nor
+    checks them — that is on you, including the login. **opencode without an authenticated
+    provider reaches its prompt and then does nothing on any input.**
+- **Node.js 22** if you build from source. `engines.node` says `>=22 <23`, `.nvmrc` says 22,
+  and npm evaluates neither — so this is on you. Under a newer Node, `better-sqlite3` does not
+  compile and `npm run test` silently runs **zero** tests.
 
 ### Optional
 
-- **Ollama** with a small instruction-tuned model (e.g. `llama3.2:3b` or `qwen2.5:7b`) if you want the Ollama-enriched bug-report interview. Without Ollama, voice bug reports still work but skip the enrichment step.
-- **git** with working SSH for cloning into projects.
-
-If any of those are missing, cipher-mux will tell you on first launch (a dependency-check runs at startup).
+- **Ollama** with a small instruction-tuned model, for auto-tagging notes. Default is
+  `127.0.0.1:11434` and the model `gemma4:26b`; both are configurable. Without Ollama, tagging
+  is skipped and everything else works.
+- **A Bluetooth remote** (BT Shutter class) for hands-free voice.
 
 ---
 
@@ -50,279 +65,274 @@ If any of those are missing, cipher-mux will tell you on first launch (a depende
 
 ### macOS (DMG)
 
-1. Download the latest `.dmg` from [Releases](https://github.com/cmarkus42/cipher-mux-electron/releases).
-2. Mount it. Drag `cipher-mux.app` into Applications.
-3. First open: right-click the app → **Open** (Gatekeeper needs this once for unsigned beta builds).
+1. Download the latest `.dmg` from
+   [Releases](https://github.com/cmarkus42-rgb/cipher-mux-electron/releases).
+2. Mount it, drag `cipher-mux.app` into Applications.
+3. **Remove the quarantine flag once:** `xattr -cr /Applications/cipher-mux.app`. The DMG is
+   unsigned on purpose — notarisation needs an Apple developer account this project does not
+   have.
 
-### Linux (AppImage)
-
-```bash
-chmod +x cipher-mux-*.AppImage
-./cipher-mux-*.AppImage
-```
-
-If you see `libfuse` errors on Ubuntu 22.04+: `sudo apt install libfuse2`.
-
-For desktop integration (icon, menu entry), install [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher) or write a `.desktop` file manually.
-
-### Development build (any platform)
+### From source
 
 ```bash
-git clone https://github.com/cmarkus42/cipher-mux-electron.git
+git clone https://github.com/cmarkus42-rgb/cipher-mux-electron.git
 cd cipher-mux-electron
 npm install
-npm run dev
+npm run dev     # tsc --watch + Vite, hot reload in the renderer
 ```
 
-`npm run dev` runs TypeScript in watch mode and Vite dev server concurrently. The Electron window opens with hot-reload for the renderer.
+`npm start` is **not** a build. It is `electron .` plus a dependency rebuild; Electron runs
+what is in `dist/`. If you change the main process and want to see it, run `npm run build:main`
+first — `npm run build:renderer` for renderer changes.
 
 ---
 
 ## First launch
 
-On first start, cipher-mux does three things:
+Three things happen:
 
-1. **Dependency check** — verifies `tmux` and `claude` are on your `PATH`.
-2. **Creates the app data directory** — `~/.config/cipher-mux/` on Linux and macOS. Config file `config.json`, SQLite databases (`messages.db`, `tasks.db`), and the bugreport outbox live here.
-3. **Starts the MCP server** — on `127.0.0.1:3100` (configurable) with a bearer token. The token is generated on first run and stored in `config.json` so that spawned sessions reconnect across restarts. Treat `config.json` like a credential file.
+1. **Dependency check** — is `tmux` on the `PATH`, is a CLI reachable.
+2. **The content directory** is created: `~/.config/cipher-mux/`. Role directories
+   (`entities/`), run directories (`runs/`), notes, voice models and the bugreport outbox live
+   there.
+3. **The MCP server starts** on `127.0.0.1:3100` with a bearer token. The token is generated
+   once and kept in the config so restarted sessions reconnect.
 
-You land in the **cockpit view**: an empty grid with launcher cells, the activity rail on the far left, and the sidebar on the right.
+> **The settings file is not in `~/.config/cipher-mux/`.** It is
+> `~/Library/Application Support/cipher-mux-electron/cipher-mux-config.json`, i.e.
+> `app.getPath('userData')`. There *is* a `~/.config/cipher-mux/config.json` and cipher-mux
+> **does not read it** — editing that file changes nothing and costs an evening. Treat the real
+> one like a credential file; the MCP bearer token is in it.
 
-### Hub setup (first launch only)
+### Hub setup (once)
 
-On first launch, cipher-mux asks you to choose a **Hub directory** — the central folder for all your projects. The default suggestion is `~/cipher-mux/`. After confirming, the app creates the folder (with a `projects/` subfolder) and remembers the path. This dialog appears only once.
+You are asked for a **Hub directory** — the central folder for your projects. The suggestion is
+`~/cipher-mux/`. The app creates it with a `projects/` subfolder and remembers the path.
+
+You land in the grid: empty launcher cells, the activity rail on the left, the sidebar on the
+right.
 
 ---
 
 ## Start your first session
 
-Click a launcher cell in the grid, switch to the **Path** tab, and pick a project folder. The folder picker opens in your Hub's `projects/` directory by default. Behind the scenes:
+Click a launcher cell, switch to the **Path** tab, pick a project folder — the picker opens in
+your Hub's `projects/` by default. Behind the scenes:
 
-1. cipher-mux creates a tmux session named `cipher-mux-<ulid>`.
-2. It spawns a pane inside that session running `claude` with the project directory as CWD.
-3. It injects the MCP server URL and bearer token via a `statusLine` hook so Claude Code reports context usage back.
-4. The session is placed into the next free cell on the grid.
+1. a tmux session is created,
+2. a pane inside it runs the CLI for that role with the project directory as cwd,
+3. the MCP URL and bearer token are injected so the session can reach the `mux_*` tools, and
+   the context-usage hook reports back,
+4. the session lands in the next free cell.
 
-You should now see a live Claude Code prompt inside an Electron pane. The top-left corner of the pane shows session name, status dot, and context usage (`12% / 180k`). If the context percentage shows `—`, that session's adapter does not report usage (Aider sessions always show `—`).
+The cell header shows name, status dot and context usage. All three CLIs report usage — Claude
+Code through a statusline hook, Codex from its rollout JSONL, opencode through a plugin. A `—`
+means nothing has been measured **yet**, not that it cannot be.
 
-To switch focus between panes: click. Most navigation in cipher-mux is mouse-driven by design — see [Keyboard shortcuts](#keyboard-shortcuts) for the small set of reserved hotkeys.
+Focus follows the mouse: click a cell. `Cmd+Shift+W/A/S/D` moves focus without the mouse.
 
 ---
 
-## Start the orchestrator
+## Start the Workshop
 
-The orchestrator is **just another Claude Code session**, with two differences:
+The **Workshop** is the coordinator for everyday work: it distributes tasks, watches context,
+and rotates workers. For large projects there is **Cyber Factory** instead — wave plans,
+parallel workers, its own run state.
 
-- it has access to the `mux_*` MCP tools (`mux_create_session`, `mux_send`, `mux_read`, `mux_status`, `mux_context_usage`, `mux_task_*`);
-- it starts with a structured `CLAUDE.md` template that describes how to coordinate workers (see [ADR-008](decisions/ADR-008-orchestrator-template.md)).
+Both are *roles* ("entities"), and a role is three things:
 
-**Launch it:**
+- its **own directory** under `~/.config/cipher-mux/entities/<id>/` with the authored material
+  (`preset.md`, skills, guides),
+- a **run directory** under `~/.config/cipher-mux/runs/<workspaceId>/<entityId>/` where the
+  generated files land (project instructions, MCP config, hooks) — this separation is what
+  stops two workspaces from overwriting each other's instructions,
+- a **CLI and optionally a model**, pickable per role in the preset editor.
 
-- Activity rail → **Orchestrator** icon → **Start**.
-- On first launch, cipher-mux generates `~/.config/cipher-mux/orchestrator/CLAUDE.md` from the template. You can edit it later; your changes survive upgrades.
+**Launch it:** click a launcher cell and pick **Workshop** from the role list. On first start
+its directory and instruction file are generated. `preset.md` is written **once** so your edits
+survive; if a corrected template ships later, the preset editor says so and offers **Vorlage
+übernehmen**.
 
-The orchestrator lands in its own pane, marked with a green tag in the activity rail. It announces its MCP tool set on startup.
-
-**Verify it works:** type `list my active sessions` into the orchestrator prompt. It should call `mux_status` and return a JSON blob describing all sessions. If it instead tries to run a shell command, the MCP tools are not reaching it — check the MCP server log in the Info/Help tab.
+**Verify it works:** type `list my active sessions`. It should call `mux_status` and return
+JSON. If it tries a shell command instead, the MCP tools are not reaching it — see
+[Troubleshooting](#troubleshooting).
 
 ---
 
 ## Your first delegation
 
-A realistic first workflow: spawn a worker, hand it a task, watch the chatroom.
-
-1. In the orchestrator pane, type:
+1. In the Workshop pane, type:
 
    ```
-   Create a new session for the project at ~/code/my-app. Send it a greeting
-   and ask it to summarize the top-level README.md.
+   Start a session for the project at ~/code/my-app and have it summarise the
+   top-level README.md.
    ```
 
-2. The orchestrator calls `mux_create_session` (you'll see the tool call rendered in Claude Code's output). A new pane opens in the next grid cell.
+2. It calls `mux_create_session`; a pane opens in the next free cell.
 
-3. The orchestrator then calls `mux_send` with the greeting. The message appears in the **chatroom panel** on the right.
+3. **Wait 8–10 seconds before sending the first instruction.** tmux, the shell and the CLI all
+   need to come up. Then check with `tmux capture-pane`, then send keys. This is not politeness
+   — a prompt sent too early lands in a shell that is not listening yet.
 
-4. The worker session reads the message (via `mux_read`), acts on it, and replies with a summary. The reply is visible both in the worker's own pane and in the chatroom.
+4. Instructions go to a session via **`tmux send-keys`**, not via `mux_send`.
 
-That's the whole loop: orchestrator coordinates, workers execute, the message bus is the shared context.
+> **The message bus is deprecated.** `mux_send` / `mux_read` still write to SQLite, and the
+> module still carries the database behind the task manager, but it is **not** the way to say
+> something to a session. Older documents describe a chatroom loop; that was the model up to
+> v0.9.x.
 
-**Observations to calibrate against:**
+**What to calibrate against:**
 
-- Workers do not magically read your mind. The orchestrator's `CLAUDE.md` tells it to poll the message bus — if your worker is idle, it's waiting for a message or a tmux keystroke.
-- Context usage is shown per-session. When a worker hits ~85 %, the orchestrator receives a warning (configurable) and can decide to split work or wrap up the session.
-- Claude Code sessions do not share conversation history. The message bus is the only cross-session memory unless you dump a file to the project dir.
+- Sessions do not share conversation history. What crosses a boundary is what you hand over:
+  a **handoff note**, a file in the project, or a direct `tmux send-keys`.
+- A handoff note carries an anchor commit, and the world state — branch, commits, diff since
+  the anchor — is computed when the note is **dispatched**, not when it was written. A note
+  that sat for three days describes the repository as it is now.
+- Context usage is per session. Above ~80 % act rather than hope: wrap up, split, or rotate.
 
 ---
 
-## Voice input
+## Voice
 
-Voice is optional. If you skipped the `sherpa-onnx-node` and `@fugood/whisper.node` optional deps, voice features are disabled and the UI hides the microphone button.
+Voice is optional. Without the native modules the microphone stays hidden.
 
-### Dictation into a pane
+### Dictation
 
-1. Focus a session pane.
-2. Hold **Ctrl+Shift+Space** (push-to-talk). A red dot appears in the bottom-left status bar while recording.
-3. Speak. Release.
-4. Whisper transcribes locally. The text is sent to the focused pane via tmux `send-keys`.
+1. Enable voice with the **voice pill** in the status bar. Three modes: **OFF**, **STT**
+   (microphone → text into the focused session), **COM** (spoken conversation through the
+   Voice-Relay role with speech output).
+2. In an active voice session, **Ctrl+Shift+Space** is push-to-talk. It does **not** switch
+   voice on — it only works while voice is already active.
+3. Whisper transcribes locally. No network, no cloud.
 
-This is not a replacement for typing — it's for long prose prompts where typing slows you down.
+**The fixed commands are German**, and transcription defaults to German: `hoch`, `runter`,
+`ganz hoch`, `ganz runter`, `zum marker` for scrolling, `grid hoch` / `zelle links` for grid
+navigation, `abschicken` to press Enter. Dictation itself follows whatever Whisper hears. An
+English command vocabulary does not exist yet.
 
 ### Voice bug report
 
-The voice pipeline also powers a structured bug-report interview:
-
-1. Press **Cmd+B** (macOS) / **Ctrl+B** (Linux), or click the bugreport icon in the activity rail.
-2. An overlay opens with an interview script. **Escape** cancels at any time.
-3. Speak the report. The VAD detects silence, Whisper transcribes, Piper reads back the next question.
-4. If Ollama is running, the raw transcript is enriched into structured fields (reproduction steps, expected vs. actual, env info).
-5. The final report lands in `~/.config/cipher-mux/bugreports/outbox/` as a markdown file with front-matter.
-
-The orchestrator can pick up these reports — `mux_task_list` surfaces them as tasks ready for triage.
+`Cmd+B` opens the bug-report dialog. The report lands under
+`~/.config/cipher-mux/bugreports/`. With Ollama running, the raw transcript is enriched into
+structured fields.
 
 ---
 
-## Notes editor
+## Notes
 
-cipher-mux includes a lightweight Markdown editor that lives alongside terminal sessions in the grid. Think of it as scratch space for design notes, meeting logs, or architecture decisions — right next to the sessions that produce them.
+A Markdown editor (CodeMirror 6) that lives in a grid cell next to the sessions that produce
+the material. Notes are files under `~/.config/cipher-mux/notes/`, each a `.md` with YAML
+frontmatter.
 
-### Opening a notes cell
+- **Open:** any empty cell → **Notes**. Or drag a note from the sidebar onto a cell.
+- **Save:** `Cmd+S`. That also triggers auto-tagging. Auto-save fires a couple of seconds after
+  you stop typing and does **not** tag.
+- **Delete:** sidebar card or the tab's trash icon, both with confirmation.
 
-From any empty grid slot (the launcher cell with the three buttons), click **Notes**. The cell switches to the notes editor view with a tab bar at the top.
+### Tags are an axis model, not free text
 
-Alternatively, if the sidebar is open, the **NOTES** section lists all notes for the current scope. Double-click a note to open it in the notes cell.
+Five axes in code plus two classes whose values you edit in the Tag Manager. You choose from
+`kind`, `phase`, `status`, `severity`, `component`; the Mux sets `workspace` and `entity` from
+the connection itself. **An unknown tag fails the call** — `mux_notes_create` rejects
+`["bugreport", "open"]` and accepts `["kind:bugreport", "status:open"]`. Five tags is a
+recommendation, not a limit: above it you get a warning and keep every tag.
 
-### Creating and editing
-
-- Click **+** in the tab bar to create a new note.
-- Notes are Markdown with live syntax highlighting (headings, bold, italic, code, links, lists).
-- **Cmd+S** (macOS) / **Ctrl+S** (Linux) saves and triggers auto-tagging (see below).
-- Auto-save fires 2 seconds after you stop typing — this writes the file but does **not** trigger tagging.
-
-### Where notes are stored
-
-Notes live under `~/.config/cipher-mux/notes/`. Each note is a `.md` file with YAML frontmatter:
-
-```yaml
----
-title: My design note
-tags:
-  - architecture
-  - cipher-mux
----
-# My design note
-
-Content here...
-```
-
-If a workspace is active, notes are scoped to `~/.config/cipher-mux/notes/workspace-<id>/`. Global notes are always visible.
-
-### Auto-tagging
-
-When you save with Cmd+S and Ollama is running locally (`127.0.0.1:11433`), cipher-mux sends the note content to the configured model (default: `gemma4:26b`) and receives up to 5 tag suggestions. Tags are written into the frontmatter automatically.
-
-A seed repository of ~27 tags covers common categories (trading, infra, coding, project, etc.). New tags discovered by the model are added to the repository. Tag counts track how often each tag is used.
-
-Without Ollama, tagging is skipped silently — notes work fine without it.
-
-### Sidebar integration
-
-The sidebar's **NOTES** section shows:
-
-- A **search field** that filters by title and tag name.
-- **Tag filter chips** — click a tag to filter, click again to remove the filter. Multiple tags are AND-combined.
-- **Note cards** with title, tags, and last-modified date. Double-click to open.
-- A **delete button** (✕) appears on hover. Confirmation required.
-
-### Deleting notes
-
-Two ways to delete:
-
-1. **From the sidebar:** hover over a note card, click the ✕ button.
-2. **From the tab bar:** when a note is active, a trash icon appears on its tab. Click to delete.
-
-Both require confirmation. Deletion removes the `.md` file from disk permanently.
+Auto-tagging asks a local Ollama and then **filters** the answer down to the axes. Filtering
+rather than asking nicely is deliberate: asking produced 14 classes and 29 `kind` values.
 
 ---
 
-## The task outbox
+## Tasks
 
-cipher-mux ships a SQLite-backed task outbox with a state machine:
-
-```
-inbox  →  in-progress  →  done
-                       ↘  parked
-                       ↘  dropped
-```
-
-Tasks land in `inbox` from three sources:
-
-1. **Voice bug reports** (above)
-2. **Chatroom messages** tagged with `#task` (configurable)
-3. **Direct MCP calls** — the orchestrator itself, or any Claude Code session with MCP access, can call `mux_task_create`
-
-Triage from the orchestrator:
+A SQLite-backed task queue with a state machine. The states are the ones in
+`task-manager.ts`, not a tidier version of them:
 
 ```
-Check the task outbox. For each inbox task, decide:
-- route it to an existing session,
-- spawn a new session for it,
-- or park it with a reason.
+queued → dispatched → running → validating → completed
+   ↘        ↘           ↘  ↘
+  failed   stalled    stalled failed        (stalled → queued, failed → queued)
 ```
 
-The orchestrator iterates through `mux_task_list`, calls `mux_task_update` on each, and spawns sessions via `mux_create_session` where needed.
+Tasks are created through `mux_task_create` — by a role, or by you through the UI. Update them
+**as you go**, not at the end: other sessions read the state.
 
 ---
 
 ## Keyboard shortcuts
 
-cipher-mux deliberately keeps the global hotkey surface small. Most navigation is mouse-driven. The full reference lives in Info/Help → Shortcuts inside the app.
+Deliberately small; most navigation is mouse-driven. `Cmd+Shift+?` opens the full list inside
+the app.
 
-| Key | Scope | Action |
-|-----|-------|--------|
-| `Cmd+B` / `Ctrl+B` | global | Open bug report dialog |
-| `Escape` | global | Close dialog / overlay |
-| `Ctrl+Shift+Space` | session pane | Push-to-talk voice input into focused pane |
-| `Cmd+C` / `Cmd+V` | terminal | Copy / paste (xterm.js defaults) |
+| Key | Action |
+|-----|--------|
+| `Cmd+N` | Launcher in the first empty cell |
+| `Cmd+B` | Bug report dialog |
+| `Cmd+Shift+F` | Focus Mode on the focused cell (again, or `Escape`, to leave) |
+| `Cmd+Shift+W` / `A` / `S` / `D` | Move focus up / left / down / right |
+| `Cmd+Shift+?` | Shortcut list |
+| `Cmd+S` | Save note (and tag it) |
+| `Escape` | Leave Focus Mode, close dialog |
+| `Ctrl+Shift+Space` | Push-to-talk — **only while voice is active** |
+| `Cmd+Alt+I` | DevTools |
 
-Claude Code's own shortcuts (`ESC ESC` to interrupt, `/` to switch model, etc.) work inside the pane exactly as in a standalone terminal.
-
-Zoom accelerators (`Cmd+-`, `Cmd+=`, `Cmd+0`) are intentionally stripped from the Electron menu so they do not clash with renderer-level handling.
+Your CLI's own keys (`ESC ESC`, `/`, …) work inside the pane as in any terminal. Zoom
+accelerators are stripped from the Electron menu so they do not clash with the renderer.
 
 ---
 
 ## Troubleshooting
 
-### The orchestrator does not see `mux_*` tools
+### A role does not see the `mux_*` tools
 
-- Open the Info/Help view. The MCP status line should read `listening on 127.0.0.1:3100`.
-- If not: check the main-process logs. Port conflict is the most common cause (another app on 3100). Change the port in Settings → Advanced.
-- If a session was spawned manually outside of cipher-mux, it will not have the MCP env vars and cannot reach the `mux_*` tools. Restart the session from the activity rail so cipher-mux injects the bearer token.
+- The MCP server listens on `127.0.0.1:3100`. A port conflict is the most common cause — and
+  note that **the installed app and a `npm start` from the repo both want 3100**; the second
+  one quits silently.
+- A session started outside cipher-mux has no MCP configuration and cannot reach the tools.
+  Start it from the launcher.
+- **Under Codex, check the directory trust.** Codex loads project-local config, hooks and
+  policies **only** from a trusted directory, and a later "Yes" does **not** load them
+  afterwards: the session then sits at its prompt with no tools, no usage hook and no role
+  boundary, looking perfectly healthy. The Mux writes the run directory into
+  `~/.codex/config.toml` for exactly this reason.
 
-### `tmux: command not found` on app start
+### `tmux: command not found` on startup
 
-cipher-mux patches `PATH` to include common Homebrew and Nix paths before spawning tmux, but GUI-launched Electron apps on macOS can miss PATH extensions set in `~/.zshrc`. Workaround: run `launchctl setenv PATH "$PATH"` from a shell, or start the app from a terminal.
+cipher-mux extends `PATH` with the usual Homebrew and Nix locations before spawning tmux, but a
+GUI-launched Electron app on macOS can miss what your `~/.zshrc` sets. Workaround: start the
+app from a terminal, or `launchctl setenv PATH "$PATH"`.
 
-### Voice input does nothing
+### Voice does nothing
 
-- Check microphone permission (macOS: System Settings → Privacy & Security → Microphone).
-- On Linux, voice needs PulseAudio or PipeWire. Check with `pactl info`.
-- Open the Info/Help → Features tab. The **Voice** row should show `ready`. If it shows `disabled (optional deps missing)`, reinstall with `npm install` (or download a full DMG that bundles the native modules).
+- Microphone permission: System Settings → Privacy & Security → Microphone.
+- The voice pill must be in **STT** or **COM**. In OFF, push-to-talk does nothing by design.
+- The Whisper model lives under `~/.config/cipher-mux/models/whisper/` — **not** in the
+  settings directory.
 
-### Session crashed / zombie pane
+### Sessions are gone after a restart
 
-- The activity rail marks crashed sessions with a red dot.
-- Click → **Recover** attempts to reattach to the tmux session.
-- If the tmux session is truly gone, **Dismiss** removes the pane. Any unsaved terminal state is lost (Claude Code sessions are not file-system persistent).
+They should not be: tmux keeps them and the restore brings them back. If they are gone,
+`/tmp/kw-debug.json` is written at **every** startup — success and failure — and names the
+phase, the error, and what was recovered or orphaned. That file is the first thing to read.
 
-### Grid cell heights are wrong
+### The terminal looks wrong
 
-Grid uses a fixed 380 px cell height by design ([fixed in 0.8.3-beta](../CHANGELOG.md)). If you see clipped panes: update to the latest release.
+Scrollback torn, lines split, content jumping: the diagnosis for all of it is in
+`docs/superpowers/specs/2026-10-01-terminal-darstellung.md`, with what is fixed and what is
+still open. If you hit something that is not in there, that is a finding worth an issue.
 
 ---
 
 ## Next steps
 
-- **Write an adapter.** If you use a coding agent other than Claude Code or Aider, see [CONTRIBUTING.md § Writing an Adapter](../CONTRIBUTING.md#writing-an-adapter) and the [adapter test protocol](contributing/adapter-test-protocol.md).
-- **Customize the orchestrator template.** `~/.config/cipher-mux/orchestrator/CLAUDE.md` is your playground.
-- **Read the ADRs** under [docs/decisions/](decisions/) to understand *why* the architecture looks the way it does. ADR-002 (MCP transport) and ADR-008 (orchestrator template) are the highest-leverage reads.
-- **Feedback:** [open an issue](https://github.com/cmarkus42/cipher-mux-electron/issues/new/choose). Bug reports with a voice-bug-report export attached are the gold standard.
+- **Pick a CLI per role.** Field **CLI** in the preset editor, **Default CLI** in Settings →
+  General. See [README § Agent CLIs](../README.md#agent-clis).
+- **Write an adapter.** [CONTRIBUTING § Writing an Adapter](../CONTRIBUTING.md#writing-an-adapter),
+  the stub at `src/main/agent/adapters/_reference-stub.ts`, and the
+  [adapter test protocol](contributing/adapter-test-protocol.md). Read the headers of
+  `adapters/codex.ts` and `adapters/opencode.ts` first — they list what was measured and what
+  was not, including four silent failure modes that produce a session which comes up, looks
+  healthy, and has no tools.
+- **Read the ADRs** under [docs/decisions/](decisions/) for *why* the architecture looks like
+  this.
+- **Feedback:**
+  [open an issue](https://github.com/cmarkus42-rgb/cipher-mux-electron/issues/new/choose).

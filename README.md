@@ -303,7 +303,7 @@ hears; the fixed commands do not.
 
 ### Notes and memory
 
-Markdown editor with auto-tagging through a local Ollama (`gemma3:4b`). A **handoff note**
+Markdown editor with auto-tagging through a local Ollama (`gemma4:26b`). A **handoff note**
 carries an anchor commit, and the world state — branch, commits, diff since the anchor — is
 computed when it is dispatched, not when it was written. A note can mirror a file in git and
 shows drift instead of claiming authority. Companion memory is SQLite FTS5, scoped per
