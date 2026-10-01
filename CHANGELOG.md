@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] — 2026-10-01
+
+### Fixed
+- **A theme change tore down every terminal and built a new one.** `theme` sat in the dependency array of the effect in `useTerminal.ts`. This did not only hit a manual switch: `useTheme` starts at `DEFAULT_THEME` and applies the stored theme once the config has loaded — so on **every start** the value changes once, and every terminal was rebuilt. Scrollback was lost, the content reconstructed from `capture-pane`, and the guard against overwriting a starting TUI turned against itself. The theme is now held in a ref; the MutationObserver in the same effect already updates a running terminal.
+- **The `dimensions` error on startup is an access after dispose**, on the one unguarded getter in xterm 5.5.0 (`RenderService.dimensions`). It is thrown at a terminal that is already dead and cannot draw anything — the mis-drawing happens at its successor, caused by the rebuild above. Error and glitches share the trigger chain, not the effect.
+- **Renderer errors now carry file and line.** `window-manager.ts` discarded the `line` and `sourceId` that Electron passes along, which made every `console-message` unattributable.
+
+### Known, documented, not changed
+- `docs/superpowers/specs/2026-10-01-terminal-darstellung.md` carries seven findings and five named gaps. Two are worth knowing: the resync after a resize writes a `capture-pane` snapshot against the live stream, and it runs **without `-J`** — an over-long line comes back as two physical lines and stays split. And Focus Mode and cell merge drop hidden slots with `return null`, which kills the terminals of the covered sessions rather than moving them to the background.
+
 ## [0.11.0] — 2026-10-01
 
 ### Added
