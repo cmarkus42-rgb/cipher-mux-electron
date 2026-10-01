@@ -277,8 +277,16 @@ export class SessionManager extends EventEmitter {
       CIPHER_MUX_SESSION_ID: id,
     }
 
-    // Resolve adapter for this session
-    const adapter = this.adapterRegistry.getDefault()
+    // Resolve adapter for this session.
+    //
+    // **Auf demselben Weg wie `queueEntityClaude`**, und das ist kein Detail:
+    // dort wird das Startkommando mit dem Rollen-Adapter gebaut
+    // (`resolveEntityRuntime` → `resolveAdapter`). Stünde hier `getDefault()`,
+    // liefen die beiden auseinander, sobald eine Rolle einen anderen Adapter
+    // traegt als der globale Default — die Session wuerde `codex` starten und
+    // danach eine `.claude/settings.local.json` samt `claude mcp add-json`
+    // bekommen. Mit nur einem Adapter war das latent; mit zwei ist es ein Fehler.
+    const adapter = this.adapterForEntity(opts.entityId ?? null)
 
     // Merge MCP env vars if config is set
     if (this.mcpConfig) {
@@ -1384,6 +1392,29 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
+   * Adapter fuer eine Rolle, ueber dieselbe Auflösungskette wie das
+   * Startkommando: `entityAdapters` > Rollen-Default > globaler Default.
+   *
+   * Ohne Rolle — eine freie Session, kein Entity — gilt der globale Default.
+   * Ein unbekannter Rollenname ist keine Ausnahme: die Registry kennt ihn dann
+   * nicht, und es bleibt beim Default.
+   */
+  adapterForEntity(entityId: string | null): AgentAdapter {
+    if (!entityId) return this.adapterRegistry.getDefault()
+    const config = this.entityRegistry.get(entityId as EntityId)
+    if (!config) return this.adapterRegistry.getDefault()
+    try {
+      const runtime = resolveEntityRuntime(config, configStore.get('app') as EntityRuntimeConfig)
+      return this.resolveAdapter(runtime.adapterId)
+    } catch (err) {
+      // Ein Wurf hier liegt in der Init-Kette einer Session. Der Default ist
+      // immer eine gueltige Antwort; ein Abbruch waere es nicht.
+      console.warn('[SessionManager] Adapter-Auflösung fuer Rolle fehlgeschlagen:', err)
+      return this.adapterRegistry.getDefault()
+    }
+  }
+
+  /**
    * Adapter for a role, falling back to the registry default.
    *
    * An unknown id is a misconfiguration, not a reason to refuse to start a
@@ -1632,7 +1663,12 @@ export class SessionManager extends EventEmitter {
       throw new Error('Source session has no Claude session ID — cannot fork')
     }
 
-    const adapter = this.adapterRegistry.getDefault()
+    // Ein Fork laeuft in derselben CLI wie die Quelle. `sessionAdapters` haelt
+    // fest, womit die Session wirklich gestartet wurde — das ist genauer als
+    // jede Neuauflösung, weil die Konfiguration sich seitdem geaendert haben
+    // kann. Die Rolle ist der Rueckfall, der globale Default der letzte.
+    const adapter = this.getAdapterForSession(sourceSessionId)
+      ?? this.adapterForEntity(source.entityId ?? null)
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: source.projectPath || os.homedir(),
       sessionName: `${source.name}-fork`,

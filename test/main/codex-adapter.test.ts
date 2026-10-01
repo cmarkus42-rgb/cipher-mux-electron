@@ -35,14 +35,33 @@ describe('CodexAdapter — Identitaet', () => {
 })
 
 describe('CodexAdapter — Startkommando', () => {
-  it('uebergibt das Arbeitsverzeichnis ausdruecklich und unterdrueckt den Alternate Screen', () => {
+  it('unterdrueckt den Alternate Screen', () => {
     const { cmd, args } = new CodexAdapter(reader(false)).buildLaunchCommand(baseOpts)
     assert.equal(cmd, 'codex')
-    const cd = args.indexOf('-C')
-    assert.ok(cd >= 0, '-C fehlt')
-    assert.equal(args[cd + 1], '/tmp/proj')
     // Ohne das frisst die TUI die Scrollback-Historie des Panes.
     assert.ok(args.includes('--no-alt-screen'))
+  })
+
+  it('schaltet die Update-Pruefung ab', () => {
+    // Gefunden in der manuellen Abnahme: der Update-Hinweis ist ein blockierender
+    // Auswahldialog, nicht ein Banner. Eine unbeaufsichtigte Entity-Session haengt
+    // davor, bis ein Mensch hinsieht.
+    const { args } = new CodexAdapter(reader(false)).buildLaunchCommand(baseOpts)
+    const i = args.indexOf('-c')
+    assert.ok(i >= 0, '-c fehlt')
+    assert.equal(args[i + 1], 'check_for_update_on_startup=false')
+  })
+
+  it('setzt KEIN -C und erbt das cwd des Panes', () => {
+    // Gefunden in der manuellen Abnahme am 2026-10-01: LaunchOpts.projectPath ist
+    // bei einer Entity-Session das authored-Verzeichnis (entities/<id>), nicht das
+    // Arbeitsverzeichnis. Ein -C darauf zog Codex aus dem Run-Verzeichnis heraus,
+    // in dem seine generierte .codex/config.toml liegt — keine MCP-Werkzeuge, kein
+    // Usage-Hook, keine Rollengrenze, und zwar lautlos.
+    const { args } = new CodexAdapter(reader(false)).buildLaunchCommand(baseOpts)
+    assert.ok(!args.includes('-C'))
+    assert.ok(!args.includes('--cd'))
+    assert.ok(!args.includes('/tmp/proj'))
   })
 
   it('setzt ohne skipPermissions keines der beiden Bypass-Flags', () => {

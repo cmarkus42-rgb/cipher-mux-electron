@@ -121,10 +121,21 @@ export class CodexAdapter implements AgentAdapter {
       args.push('--dangerously-bypass-hook-trust')
     }
 
-    // Codex nimmt das Arbeitsverzeichnis ausdruecklich entgegen, statt sich auf
-    // das cwd des Prozesses zu verlassen. Das ist fuer tmux-Panes die
-    // belastbarere Variante.
-    args.push('-C', opts.projectPath)
+    // **Kein `-C`.** Codex nimmt ein Arbeitsverzeichnis entgegen, und das sah
+    // nach der belastbareren Variante aus — bis die Abnahme zeigte, dass es die
+    // Session aus dem richtigen Verzeichnis herauszieht.
+    //
+    // Der Grund: `LaunchOpts.projectPath` ist bei einer Entity-Session das
+    // **authored**-Verzeichnis (`entities/<id>`, dort liegen preset.md und
+    // Skills), nicht das Arbeitsverzeichnis. Gearbeitet wird im
+    // **Run**-Verzeichnis (`runs/<workspaceId>/<entityId>`), und genau dorthin
+    // schreibt `postLaunchInjection` die `.codex/config.toml`. Der tmux-Pane
+    // startet bereits dort — ein `-C` auf das authored-Verzeichnis liess Codex
+    // seine eigene Konfiguration nicht finden: keine MCP-Werkzeuge, kein
+    // Usage-Hook, keine Rollengrenze. Und zwar lautlos.
+    //
+    // Claude Code hat dieses Problem nie gehabt, weil es kein cwd-Flag kennt und
+    // das cwd des Panes erbt. Hier wird dasselbe getan, aus demselben Grund.
 
     if (opts.model) {
       args.push('--model', opts.model)
@@ -133,6 +144,17 @@ export class CodexAdapter implements AgentAdapter {
     // Die TUI laeuft sonst im Alternate Screen, und der frisst die
     // Scrollback-Historie des Panes — genau das, was xterm.js anzeigt.
     args.push('--no-alt-screen')
+
+    // Der Update-Hinweis ist ein **blockierender** Auswahldialog, kein Banner:
+    // „1. Update now / 2. Skip / 3. Skip until next version", und davor kommt
+    // die Session nicht an ihren Prompt. In einer unbeaufsichtigten
+    // Entity-Session heisst das: sie haengt, bis ein Mensch hinsieht.
+    //
+    // Gemessen am 2026-10-01: dieser Schalter nimmt ihn weg. Der Name stammt aus
+    // dem Binary, nicht aus einer Dokumentation — unbekannte Config-Keys
+    // akzeptiert Codex stillschweigend, ein angenommener Key beweist also nichts.
+    // Belegt ist hier der Effekt, nicht die Annahme.
+    args.push('-c', 'check_for_update_on_startup=false')
 
     return { cmd: 'codex', args }
   }
