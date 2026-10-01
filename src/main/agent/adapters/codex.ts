@@ -12,6 +12,8 @@ import type { AdapterFeature, AdapterCapabilities, ContextUsage } from '../../..
 import { writeCodexUsageHookScript, CODEX_USAGE_HOOK_FILENAME } from '../../monitoring/codex-usage-hook'
 import { BOUND_TOKEN_ENV_VAR } from '../../mcp/bound-token'
 import { trustRunDirectory } from './codex-trust'
+import { writeCodexBoundaryScript } from './codex-boundary'
+import { getEntityBoundary } from '../../session/entity-boundaries'
 
 /**
  * Codex-CLI-Adapter — Tier-2.
@@ -203,9 +205,28 @@ export class CodexAdapter implements AgentAdapter {
         modelId: '',
       })
 
+      // Die Rollengrenze gehoert **hierher**, in dieselbe Methode, die die Datei
+      // schreibt, in der sie registriert wird. Der SessionManager erzeugt seine
+      // Fassung nach `.claude/role-boundary.js` und traegt sie in
+      // `.claude/settings.local.json` ein — Claude-Code-Pfade, die Codex nicht
+      // liest. Eine Codex-Session lief deshalb ohne Grenze, obwohl
+      // `buildCodexProjectConfig` den Parameter dafuer die ganze Zeit hatte.
+      //
+      // Und sie braucht ein eigenes Skript, nicht das aus `entity-boundaries.ts`:
+      // dessen Pfad kommt aus `tool_input.file_path`, und das liefert Codex nicht.
+      // Siehe codex-boundary.ts.
+      const boundary = getEntityBoundary(ctx.entityId ?? null)
+      const boundaryHookPath = boundary
+        ? writeCodexBoundaryScript(ctx.projectPath, boundary.denyPathPatterns, boundary.reason)
+        : undefined
+
       fs.writeFileSync(
         path.join(codexDir, 'config.toml'),
-        buildCodexProjectConfig({ mcpUrl: ctx.mcpUrl, usageHookPath: usageScript }),
+        buildCodexProjectConfig({
+          mcpUrl: ctx.mcpUrl,
+          usageHookPath: usageScript,
+          ...(boundaryHookPath ? { boundaryHookPath } : {}),
+        }),
         'utf-8',
       )
 
