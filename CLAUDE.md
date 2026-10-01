@@ -380,7 +380,7 @@ Voraussetzung, die vor dem Start erfüllt sein muss.
 - **Entities** sind Rollen mit eigenem Verzeichnis, eigener CLAUDE.md und Recovery-Fähigkeit:
   Workshop, Cyber Factory, Companion, Refinement, Ideation Partner, Debugger,
   Testing Assistant, Audit, Voice-Relay, Launcher. Registry: `src/main/session/entity-registry.ts`.
-- **MCP-Server** im Main-Prozess, ~52 Tools, **eine `McpServer`-Instanz pro Client**
+- **MCP-Server** im Main-Prozess, 57 Tools (gezählt über `registerMuxTool`), **eine `McpServer`-Instanz pro Client**
   (`mcp-server.ts:createSession`) — deshalb kann Workspace-Kontext pro Verbindung gebunden werden.
 - **Worker-Startup:** Nach `mux_create_session` 8–10s warten, dann `tmux capture-pane` prüfen,
   dann `tmux send-keys`. `mux_send` ist Inter-Session-Kommunikation, **kein** Prompt-Input.

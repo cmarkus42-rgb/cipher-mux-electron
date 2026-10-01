@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.10.0] — 2026-10-01
 
 ### Added
 - **Three agent CLIs instead of one.** The `AgentAdapter` contract now carries three production implementations: `claude-code` (Tier 1, still the default), `codex` (Tier 2, measured against codex-cli 0.155.1), `opencode` (Tier 2, measured against opencode 1.18.34). Tier 2 means not every Mux capability has been measured there — the gaps are the `false` entries in each adapter's `getCapabilities()`.
