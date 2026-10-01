@@ -76,6 +76,25 @@ export interface UseTerminalResult {
 
 export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory', createdAt?: number): UseTerminalResult {
   const terminalRef = useRef<HTMLDivElement>(null!)
+  /**
+   * Theme als Ref, nicht als Effect-Dependency.
+   *
+   * `theme` dient nur als Rueckfall, wenn die CSS-Variablen beim Bauen des
+   * Terminals noch nicht stehen (`getCssTerminalTheme`). Den laufenden
+   * Themewechsel traegt der MutationObserver weiter unten, der
+   * `term.options.theme` ohne Neubau aktualisiert.
+   *
+   * Stand im Dependency-Array war der Themewechsel ein **Neubau** des
+   * Terminals: dispose + neues xterm + capture-pane-Restore. Das kostete
+   * Scrollback, erzeugte Flackern, und weil `capturedSessions` die Session
+   * danach kennt, lief der Restore-Pfad auch auf einer frisch erzeugten
+   * Session — genau das Ueberschreiben einer startenden TUI, das der
+   * `isBrandNew`-Guard verhindern soll. Beim Start traf das jedes Terminal:
+   * `useTheme` beginnt bei DEFAULT_THEME und setzt das gespeicherte Theme
+   * erst, wenn `config.get('ui')` zurueck ist.
+   */
+  const themeRef = useRef(theme)
+  themeRef.current = theme
   const termRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const fitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -209,7 +228,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       lineHeight: 1.3,
       cursorBlink: true,
       cursorStyle: 'block',
-      theme: getCssTerminalTheme(theme),
+      theme: getCssTerminalTheme(themeRef.current),
       allowProposedApi: true,
     })
 
@@ -453,7 +472,9 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       fitAddonRef.current = null
       lastSizeRef.current = { cols: 0, rows: 0 }
     }
-  }, [sessionId, theme])
+    // Bewusst nur `sessionId`: ein Themewechsel darf das Terminal nicht
+    // neu bauen (siehe themeRef oben).
+  }, [sessionId])
 
   return { terminalRef, fit }
 }
