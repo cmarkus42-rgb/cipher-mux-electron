@@ -1,6 +1,7 @@
 import type { AgentAdapter } from './agent-adapter'
 import { ClaudeCodeAdapter } from './adapters/claude-code'
 import { CodexAdapter } from './adapters/codex'
+import { OpenCodeAdapter } from './adapters/opencode'
 
 /**
  * AdapterRegistry — config-based adapter lookup.
@@ -21,6 +22,8 @@ export class AdapterRegistry {
     this.adapters.set(claude.id, claude)
     const codex = new CodexAdapter()
     this.adapters.set(codex.id, codex)
+    const opencode = new OpenCodeAdapter()
+    this.adapters.set(opencode.id, opencode)
   }
 
   register(adapter: AgentAdapter): void {
