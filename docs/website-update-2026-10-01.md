@@ -1,6 +1,6 @@
 # Website-Update-Vorschlag: cipher-mux.dev und die drei CLIs
 
-**Stand:** 2026-10-01 · **Anlass:** Der Mux fährt seit dem 2026-10-01 drei Agent-CLIs
+**Stand:** 2026-10-01, Tabelle nach dem Merge von `opencode-abnahme` korrigiert · **Anlass:** Der Mux fährt seit dem 2026-10-01 drei Agent-CLIs
 (`claude-code` Tier 1, `codex` Tier 2, `opencode` Tier 2). Die öffentliche Website kennt
 ausschließlich Claude Code.
 
@@ -32,11 +32,11 @@ Quellen: `src/main/agent/agent-adapter.ts`, `src/main/agent/registry.ts`,
 | Tier | Tier 1 | Tier 2 | Tier 2 |
 | gemessen gegen | v2.1.284 | codex-cli 0.155.1 | opencode 1.18.34 |
 | Projektanweisung | `CLAUDE.md` | `AGENTS.md` | `AGENTS.md` |
-| `status-line` (Context-Anzeige) | ja | ja (über Usage-Hook) | **nein** |
+| `status-line` (Context-Anzeige) | ja | ja (über Usage-Hook) | ja (über Usage-Plugin) |
 | `sub-agents` | ja | **nein** | **nein** |
 | `mcp-injection`, `skip-permissions`, `project-instructions`, `message-bus-participant`, `companion-mcp` | ja | ja | ja |
-| Rollengrenzen | `PreToolUse`-Hook | `PreToolUse`-Hook | **nicht verdrahtet** |
-| Rauchtest gegen die echte CLI | ja | ja | **nein**, nur Unit-Tests |
+| Rollengrenzen | `PreToolUse`-Hook | `PreToolUse`-Hook | Plugin auf `tool.execute.before` |
+| Rauchtest gegen die echte CLI | ja | ja | ja |
 
 Ein `false` in dieser Tabelle heißt im Code ausdrücklich **„nicht gemessen"**, nicht „gibt es
 nicht". Für den Nutzer läuft es auf dasselbe hinaus: dieses Stück Mux fehlt dort.
