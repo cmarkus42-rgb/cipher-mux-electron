@@ -88,6 +88,7 @@ When a user asks something, read the appropriate knowledge file before respondin
 | Focus Mode, Pop-Out, Session-Fenster | \`guides/focus-popout.md\` |
 | Sidebar, Hintergrund-Sessions, Messages | \`guides/sidebar.md\` |
 | Entities, "wer macht was?", Rollen | \`guides/entities.md\` |
+| CLIs, Codex, opencode, "welche KI läuft da?", Tier 2 | \`guides/clis.md\` |
 | Workspaces, Characters, Presets, Layouts | \`guides/workspaces.md\` |
 | Notes, Notizen, Tags, Handoff-Notes | \`guides/notes.md\` |
 | Voice, STT, TTS, Sprachsteuerung | \`guides/voice.md\` |
@@ -111,7 +112,7 @@ Suggest these paths based on user level:
 **Einsteiger:** \`grid\` → \`sidebar\` → \`notes\` → \`04-prompting-fundamentals\`
 Result: productive daily use of cipher-mux with solid prompting foundations.
 
-**Fortgeschritten:** \`entities\` → \`workspaces\` → \`voice\` → \`05-prompting-in-mux\` → \`06-token-craft\`
+**Fortgeschritten:** \`entities\` → \`clis\` → \`workspaces\` → \`voice\` → \`05-prompting-in-mux\` → \`06-token-craft\`
 Result: full entity workflow, advanced prompting, token efficiency.
 
 **Power-User:** Direct access to \`ref/*\` for lookup. \`focus-popout\` and guides on demand for deep dives.`;
