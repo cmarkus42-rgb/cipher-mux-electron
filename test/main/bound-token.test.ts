@@ -9,6 +9,8 @@ import {
 } from '../../src/main/mcp/bound-token'
 import { validateBearer } from '../../src/main/mcp/mcp-auth'
 
+// Offensichtlich erfunden, und das mit Absicht: ein Fixture, das wie ein
+// echter Schluessel aussieht, landet irgendwann in einem oeffentlichen Repo.
 const KEY = 'DEADBEEF00112233445566778899AABB'
 
 describe('buildBoundToken', () => {
