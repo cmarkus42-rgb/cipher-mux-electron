@@ -16,8 +16,8 @@ MCP-Server und Projekt-Kick-off. Zielbild und Begründung:
    vorgeschalteten `rebuild:node` fehlt die better-sqlite3-ABI, und es fallen schlagartig über
    150 Tests um — alle in SQLite-gestützten Suiten (TaskManager, MessageBus, MemoryStore,
    CyberFactory, Debugger, Audit). Das Fehlerbild ist eindeutig: viele Fehler, alle dort.
-3. **Die Suite ist grün und soll grün bleiben.** Stand: **1742 Tests, 1742 pass, 0 fail,
-   0 cancelled** (seit 4f12f22). Ältere Dokumente nennen „vier vorbestehend rote Suiten" —
+3. **Die Suite ist grün und soll grün bleiben.** Stand: **2055 Tests, 2055 pass, 0 fail,
+   0 cancelled** (2026-10-01). Ältere Dokumente nennen „vier vorbestehend rote Suiten" —
    das galt bis zum 2026-09-30 und ist erledigt; keiner der Fälle war ein Flake. Ein roter
    Lauf ist ab jetzt eine echte Regression.
 4. **`npm run lint` ist projektweit rot** (830 Probleme, 478 Fehler) und war es vorher schon.
@@ -70,6 +70,13 @@ Anker-Commit; der Weltzustand wird beim Dispatch berechnet statt gespeichert
 mit sichtbarer Drift statt behaupteter Nicht-Autorität (`notes/mirror-drift.ts`). Beides ist
 end-to-end gegen eine echte Session belegt. Zielbild:
 `docs/superpowers/specs/2026-09-30-notes-als-projektgedaechtnis.md`.
+
+**Zweite CLI (2026-10-01):** Der Codex-Adapter steht und ist end-to-end gegen das echte Codex
+belegt — Rollengrenze blockiert selektiv, Context-Usage landet im Format, das der bestehende
+Monitor liest. Details und die vier Messungen dahinter im Abschnitt „Zweite CLI: Codex". Offen
+ist dort genau eine Entscheidung: wie Workspace und Rolle gebunden werden, solange Codex keine
+freien MCP-Header sendet. Als nächstes opencode — das sendet sie (gemessen) und ist für
+Multi-Workspace damit der leichtere Fall.
 
 Nächste Richtung laut Strategiepapier: Rolle → Modell/Adapter, Rollengrenzen als Constraint,
 Memory auf Companion begrenzen. Offene Entscheidungen stehen dort in Abschnitt 7, die zur
@@ -160,8 +167,47 @@ misst nach, statt sie zu glauben.
 
 **Rolle → Modell/Adapter:** `EntityConfig.model` und `.adapterId`, aufgelöst in
 `entity-runtime.ts` als User-Override (configStore `entityModels` / `entityAdapters`) >
-Rollen-Default > CLI-Default. Keine Rolle trägt einen Modell-Default; das ist eine
-Kostenentscheidung und keine Vermutung.
+Rollen-Default > `agent.defaultAdapter` aus der Config. Keine Rolle trägt einen
+Modell-Default; das ist eine Kostenentscheidung und keine Vermutung.
+
+## Zweite CLI: Codex — und die vier Messungen, die den Adapter bestimmen
+
+`adapters/codex.ts` ist Tier-2 und gemessen an **codex-cli 0.155.1 (2026-10-01)**. Dieselbe
+Disziplin wie oben: das hier steht in keinem Diff und kann mit der nächsten CLI-Version kippen.
+
+1. **`AGENTS.md` wird befolgt**, hierarchisch nach Scope, und eine direkte Instruktion schlägt
+   sie. Damit trägt dieselbe Injektionsmechanik wie CLAUDE.md bei Claude Code.
+2. **`PreToolUse`-Hooks tragen wortgleich das Claude-Code-Protokoll** —
+   `hookSpecificOutput.permissionDecision` mit `allow`/`deny`/`ask`, `permissionDecisionReason`,
+   Exit 2 plus stderr. Ein `deny` wirkt auch unter
+   `--dangerously-bypass-approvals-and-sandbox`, und der Grund erreicht das Modell wörtlich.
+3. **Ohne `--dangerously-bypass-hook-trust` feuert ein frisch geschriebener Hook nicht — still.**
+   Keine Warnung, keine Logzeile, der Aufruf läuft durch. Deshalb setzt der Adapter beide Flags
+   gemeinsam. Eine geschriebene und nicht feuernde Grenze ist schlimmer als keine.
+4. **Der `matcher` trägt den Claude-Code-Werkzeugnamen.** Der Hook-Input meldet
+   `tool_name: "Bash"`, obwohl die Ausgabe `exec` und `/bin/zsh -lc` zeigt. `matcher = "shell"`
+   passt auf nichts und überspringt den Hook — wieder still. Der Adapter schreibt deshalb
+   **keinen** Matcher und filtert im Hook-Skript.
+
+Dazu zwei Eigenschaften, die den Bau erst möglich machen: eine **projektlokale
+`.codex/config.toml`** greift (sonst müsste der Mux die globale Config des Nutzers anfassen, und
+zwei Workspaces würden sich überschreiben), und `hooks.<Event>`-Einträge werden **nicht
+validiert** — `{bogus=1}` und ein erfundener Eventname gehen durch. Zusammen mit den zwei
+stillen Fehlschlägen heißt das: **das Feuern nachweisen, nicht die Datei schreiben.**
+
+**Context-Usage ohne Statusline:** Codex' `status_line` ist eine TUI-Anzeigeoption, kein
+Kommando. Stattdessen trägt jeder Hook-Input `transcript_path`, und in der Rollout-JSONL steht
+pro Antwort ein `token_usage_record`. `monitoring/codex-usage-hook.ts` erzeugt daraus genau das
+JSON, das der bestehende `StatusLineMonitor` schon liest — ein weiterer Schreiber, kein zweiter
+Leser. Das `session_id`-Feld darin ist nicht Beiwerk: Keep Working braucht es für
+`codex resume <id>` statt des interaktiven Pickers.
+
+**Die offene Stelle — MCP-Bindung.** Codex sendet dem MCP-Server **keine freien Header**
+(gemessen gegen einen Horchposten: Verbindung ja, `X-Mux-*` nein; der `headers`-Schlüssel wird
+stillschweigend verworfen). Workspace und Rolle werden aber genau so gebunden. Der Adapter
+trägt die Verbindung deshalb **ausdrücklich ungebunden** ein und setzt `companion-mcp` auf
+`false`. **opencode kann es** — dieselbe Messung, alle drei Header kamen an. Die Lücke ist
+codex-spezifisch.
 
 **Companion Memory nur für Companion:** Der MCP-Server bindet die Rolle über `X-Mux-Entity` an
 die Verbindung (`src/main/mcp/entity-header.ts`) und registriert die vier `companion_memory_*`

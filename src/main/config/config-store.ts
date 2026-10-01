@@ -59,6 +59,10 @@ const defaults: AppConfig = {
   },
   agent: {
     skipPermissions: false,
+    // Welche CLI neue Sessions starten, wenn die Rolle keinen eigenen Adapter
+    // nennt. `entityAdapters` schlägt diesen Wert — dieselbe Reihenfolge wie
+    // beim Modell: User-Override pro Rolle > Rollen-Default > dieser Wert.
+    defaultAdapter: 'claude-code',
   },
   llm: {
     ollamaHost: '127.0.0.1',

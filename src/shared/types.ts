@@ -235,8 +235,26 @@ export interface AppConfig {
     language: 'en' | 'de'
   }
   agent: {
-    /** When true, launches Claude Code with --dangerously-skip-permissions. Default: false. */
+    /**
+     * When true, launches the agent CLI with its permission bypass.
+     *
+     * Each adapter names its own flag — `--dangerously-skip-permissions` for
+     * Claude Code, `--dangerously-bypass-approvals-and-sandbox` plus
+     * `--dangerously-bypass-hook-trust` for Codex. The second Codex flag is not
+     * cosmetic: without it a freshly written PreToolUse hook does not fire, and
+     * a role boundary would be written and silently ineffective.
+     *
+     * Default: false.
+     */
     skipPermissions: boolean
+    /**
+     * Adapter id new sessions use when the role names none.
+     *
+     * Resolution order mirrors the model: per-role user override
+     * (`entityAdapters`) > role default > this value. An unknown id is ignored
+     * at startup and claude-code stays in place. Default: 'claude-code'.
+     */
+    defaultAdapter: string
   }
   /** LLM provider configuration (Ollama, external APIs). */
   llm: {
