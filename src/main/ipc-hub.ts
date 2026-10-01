@@ -109,6 +109,24 @@ export class IpcHub {
       this.setupCompleteResolve = resolve
     })
     this.adapterRegistry = new AdapterRegistry()
+    // Der CLI-Schalter. Pro Rolle wird der Adapter schon lange aufgelöst
+    // (`entity-runtime.ts` → `resolveAdapter`); was fehlte, war der globale
+    // Default — und ein zweiter Adapter, auf den er zeigen kann.
+    //
+    // Defensiv und still: `agent.defaultAdapter` ist JSON auf der Platte und
+    // von Hand editierbar. Ein unbekannter Name darf den Start nicht kosten,
+    // also bleibt es dann bei claude-code. Ein Wurf hier würde die ganze
+    // Init-Kette killen, und das heißt beim Sessionstart: keine Sessions, ohne
+    // Fehlermeldung.
+    try {
+      const configured = configStore.get('agent').defaultAdapter
+      if (configured && configured !== this.adapterRegistry.getDefault().id) {
+        this.adapterRegistry.setDefault(configured)
+        console.log(`[IpcHub] Default-Adapter aus Config: ${configured}`)
+      }
+    } catch (err) {
+      console.warn('[IpcHub] agent.defaultAdapter nicht anwendbar — bleibe bei claude-code:', err)
+    }
     // Migrate orchestrator → workshop directory
     const oldDir = path.join(os.homedir(), '.config/cipher-mux/entities/orchestrator')
     const newDir = path.join(os.homedir(), '.config/cipher-mux/entities/workshop')
