@@ -16,7 +16,7 @@ MCP-Server und Projekt-Kick-off. Zielbild und Begründung:
    vorgeschalteten `rebuild:node` fehlt die better-sqlite3-ABI, und es fallen schlagartig über
    150 Tests um — alle in SQLite-gestützten Suiten (TaskManager, MessageBus, MemoryStore,
    CyberFactory, Debugger, Audit). Das Fehlerbild ist eindeutig: viele Fehler, alle dort.
-3. **Die Suite ist grün und soll grün bleiben.** Stand: **2055 Tests, 2055 pass, 0 fail,
+3. **Die Suite ist grün und soll grün bleiben.** Stand: **2076 Tests, 2076 pass, 0 fail,
    0 cancelled** (2026-10-01). Ältere Dokumente nennen „vier vorbestehend rote Suiten" —
    das galt bis zum 2026-09-30 und ist erledigt; keiner der Fälle war ein Flake. Ein roter
    Lauf ist ab jetzt eine echte Regression.
@@ -73,10 +73,10 @@ end-to-end gegen eine echte Session belegt. Zielbild:
 
 **Zweite CLI (2026-10-01):** Der Codex-Adapter steht und ist end-to-end gegen das echte Codex
 belegt — Rollengrenze blockiert selektiv, Context-Usage landet im Format, das der bestehende
-Monitor liest. Details und die vier Messungen dahinter im Abschnitt „Zweite CLI: Codex". Offen
-ist dort genau eine Entscheidung: wie Workspace und Rolle gebunden werden, solange Codex keine
-freien MCP-Header sendet. Als nächstes opencode — das sendet sie (gemessen) und ist für
-Multi-Workspace damit der leichtere Fall.
+Monitor liest, und Workspace plus Rolle reisen im Bearer-Token, weil Codex keine freien
+MCP-Header sendet. Details und die Messungen dahinter im Abschnitt „Zweite CLI: Codex".
+Als nächstes opencode — das sendet die Header (gemessen) und braucht die Token-Variante nicht;
+seine Rollengrenzen laufen über ein Plugin mit `tool.execute.before` statt über Hook-Dateien.
 
 Nächste Richtung laut Strategiepapier: Rolle → Modell/Adapter, Rollengrenzen als Constraint,
 Memory auf Companion begrenzen. Offene Entscheidungen stehen dort in Abschnitt 7, die zur
@@ -202,12 +202,25 @@ JSON, das der bestehende `StatusLineMonitor` schon liest — ein weiterer Schrei
 Leser. Das `session_id`-Feld darin ist nicht Beiwerk: Keep Working braucht es für
 `codex resume <id>` statt des interaktiven Pickers.
 
-**Die offene Stelle — MCP-Bindung.** Codex sendet dem MCP-Server **keine freien Header**
-(gemessen gegen einen Horchposten: Verbindung ja, `X-Mux-*` nein; der `headers`-Schlüssel wird
-stillschweigend verworfen). Workspace und Rolle werden aber genau so gebunden. Der Adapter
-trägt die Verbindung deshalb **ausdrücklich ungebunden** ein und setzt `companion-mcp` auf
-`false`. **opencode kann es** — dieselbe Messung, alle drei Header kamen an. Die Lücke ist
-codex-spezifisch.
+**MCP-Bindung ohne Header: das Token trägt sie.** Codex sendet dem MCP-Server **keine freien
+Header** (gemessen gegen einen Horchposten: Verbindung ja, `X-Mux-*` nein; der
+`headers`-Schlüssel wird stillschweigend verworfen). Workspace und Rolle reisen deshalb im
+Bearer-Token mit — `mcp/bound-token.ts`, Format `<apiKey>.<base64url(JSON)>`:
+
+- Ein Token **ohne Punkt** ist der blanke Schlüssel und heißt „ungebunden" — also exakt das,
+  was jeder bestehende Client schickt. Zustandslos, keine Tokenverwaltung.
+- `stripBindingFromAuthHeader` läuft **vor** `validateBearer`. Ohne diesen Schritt wäre jede
+  Codex-Verbindung ein 401 — und zwar erst beim Benutzen, nicht beim Schreiben der Config.
+- Am `initialize` hat der **Kopf Vorrang**, das Token fällt pro Feld ein. Beide werden gegen die
+  bekannten IDs geprüft; eine Bindung aus dem Token ist eine Behauptung wie die aus dem Kopf.
+- **Der Zusatz ist nicht signiert, und das ist eine Entscheidung.** Wer den Schlüssel hat, kann
+  ohnehin jedes Werkzeug rufen — der Zusatz erweitert keine Rechte, er benennt den Anrufer.
+  Bekäme der Schlüssel eine feinere Rechtestruktur, wäre eine Signatur Pflicht.
+- Das Token steht in der tmux-Umgebung (`CIPHER_MUX_MCP_TOKEN`), **nicht** in der generierten
+  `.codex/config.toml`. `CIPHER_MUX_MCP_KEY` bleibt unverändert daneben stehen.
+
+**opencode braucht das nicht** — dieselbe Messung, alle drei Header kamen an. Die Lücke ist
+codex-spezifisch, nicht eine des Adapter-Vertrags.
 
 **Companion Memory nur für Companion:** Der MCP-Server bindet die Rolle über `X-Mux-Entity` an
 die Verbindung (`src/main/mcp/entity-header.ts`) und registriert die vier `companion_memory_*`
