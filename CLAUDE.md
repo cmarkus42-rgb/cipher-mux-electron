@@ -204,6 +204,34 @@ JSON, das der bestehende `StatusLineMonitor` schon liest — ein weiterer Schrei
 Leser. Das `session_id`-Feld darin ist nicht Beiwerk: Keep Working braucht es für
 `codex resume <id>` statt des interaktiven Pickers.
 
+**Drei Dinge halten eine unbeaufsichtigte Codex-Session auf, und alle drei sind stumm oder
+blockierend.** Zwei nimmt der Adapter weg, das dritte braucht einen Eintrag außerhalb:
+
+1. **Verzeichnis-Vertrauen.** Codex lädt projektlokale Config, Hooks und exec-Policies **nur**
+   aus einem vertrauten Verzeichnis und fragt sonst in einem blockierenden Dialog. Ein
+   nachträgliches „Yes" lädt sie **nicht nach** — die Session steht dann am Prompt und hat
+   trotzdem keine MCP-Werkzeuge, keinen Usage-Hook und keine Rollengrenze. Gemessen und
+   wirkungslos: `-c projects."<pfad>".trust_level`, `CODEX_NON_INTERACTIVE=1`, beide
+   Bypass-Flags. Es geht nur über `~/.codex/config.toml`. `adapters/codex-trust.ts` trägt das
+   Run-Verzeichnis dort ein — und **nur** das: der Dialog schützt vor fremdem Inhalt, und unter
+   `runs/<workspaceId>/<entityId>/` liegt ausschließlich Mux-Erzeugtes. Jeder andere Pfad wird
+   abgewiesen, auf dem aufgelösten Pfad geprüft. Abschaltbar über `agent.codexTrustRunDirs`.
+2. **Der Update-Hinweis** ist ein Auswahldialog, kein Banner →
+   `-c check_for_update_on_startup=false`.
+3. **`-C` auf das falsche Verzeichnis** — siehe `buildLaunchCommand`, der Adapter setzt es
+   bewusst nicht.
+
+**Die CLI pro Rolle wählt man in der UI**, seit dem 2026-10-01: Feld „CLI" im Preset-Editor,
+„Standard-CLI" in den Einstellungen. Die Auflösung ist älter (`entityAdapters` > Rollen-Default
+> `agent.defaultAdapter`); neu ist nur der Weg, sie zu setzen. Die Logik dahinter steht als
+reine Funktionen in `agent/entity-adapter-map.ts`, nicht im IPC-Handler — ein fehlender
+Schlüssel ist „keine Präferenz", ein leerer wäre ein Adapter namens `""`.
+
+**Die Config liegt in `app.getPath('userData')`**, also
+`~/Library/Application Support/cipher-mux-electron/cipher-mux-config.json` — **nicht** in
+`~/.config/cipher-mux/config.json`. Diese zweite Datei existiert und wird vom Mux **nicht**
+gelesen; wer dort editiert, ändert nichts und sucht lange.
+
 **MCP-Bindung ohne Header: das Token trägt sie.** Codex sendet dem MCP-Server **keine freien
 Header** (gemessen gegen einen Horchposten: Verbindung ja, `X-Mux-*` nein; der
 `headers`-Schlüssel wird stillschweigend verworfen). Workspace und Rolle reisen deshalb im
