@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cmarkus42-rgb/cipher-mux-electron/ci.yml?branch=main&label=CI&style=flat-square&labelColor=000000&color=F5F5EC"></a>
-  <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.9.104-0088A0?style=flat-square&labelColor=000000"></a>
+  <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.10.0-0088A0?style=flat-square&labelColor=000000"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="#"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="CONTRIBUTING.md#maintenance-status"><img alt="Maintenance" src="https://img.shields.io/badge/maintenance-active-00FF88?style=flat-square&labelColor=000000"></a>
@@ -22,7 +22,7 @@
   <a href="https://cipher-mux.dev"><img alt="Website" src="https://img.shields.io/badge/web-cipher--mux.dev-0088A0?style=flat-square&labelColor=000000"></a>
 </p>
 
-> **v0.9.104** — Open beta. Feedback welcome via [Issues](https://github.com/cmarkus42-rgb/cipher-mux-electron/issues).
+> **v0.10.0** — Open beta. Feedback welcome via [Issues](https://github.com/cmarkus42-rgb/cipher-mux-electron/issues).
 
 ---
 
@@ -47,7 +47,7 @@ Got an idea? Build it. cipher-mux structures the path from idea to code — with
 - **8 Presets** — Specialized roles: Companion, Ideation, Refinement, Cyber Factory, Testing, Debugger, Workshop, Audit
 - **6 Personas** — Control how the model communicates: from bone-dry to socratic to chaos
 - **Voice I/O** — Local Whisper.cpp STT (no cloud), Silero VAD, Piper/macOS TTS, BT remote support
-- **MCP Server** — 37 tools across 9 categories, Streamable HTTP, bearer auth per entity
+- **MCP Server** — 57 tools across 9 categories, Streamable HTTP, bearer auth per entity
 - **Tag Management** — Merge tags, exclusive groups, tag cycling. Hierarchical tag tree with tri-state filtering
 - **Focus Mode** — Full-screen focus: selected cell fills the grid, others dim. Reduces visual noise for deep work
 - **Update Checker** — Automatic release checks on startup (opt-out in Settings)
