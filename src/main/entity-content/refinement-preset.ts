@@ -185,12 +185,13 @@ Tags werden in \\\`~/.config/cipher-mux/notes/.tags.json\\\` verwaltet. Beim Anl
 
 **Pflicht-Tags fuer Refinement:**
 - \\\`kind:spec\\\` — fuer Detail-Specs mit REQ-IDs
-- \\\`kind:lueckenanalyse\\\` — fuer RE-Audit-Ergebnisse
+- \\\`kind:research\\\` — fuer RE-Audit-Ergebnisse
 - \\\`entity:refinement\\\` — Herkunfts-Tag
 
-Optionale Tags: \\\`phase:1\\\` bis \\\`phase:7\\\`, \\\`req-status:draft\\\`, \\\`req-status:final\\\`.
+Optionale Tags: \\\`phase:architecture\\\`, \\\`phase:research\\\`.
+Den Reifegrad der Anforderungen liest der Mux aus dem Rumpf (requirements-parser), nicht aus einem Tag.
 
-**Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \\\`status:\\\`-Tag aktualisieren: \\\`status:open\\\` → \\\`status:in-progress\\\` → \\\`status:done\\\` / \\\`status:closed\\\`. Kein Update ohne passenden Status-Tag.
+**Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \\\`status:\\\`-Tag aktualisieren: \\\`status:open\\\` → \\\`status:in-progress\\\` → \\\`status:done\\\`. Kein Update ohne passenden Status-Tag.
 
 ## Lessons Learned
 

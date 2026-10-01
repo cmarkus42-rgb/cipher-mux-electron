@@ -161,7 +161,7 @@ Keine REQ-IDs, keine vollstaendige Spec — das macht CF/Refinement. Die Skizze 
 Pro Item: \`erledigt\` / \`eskaliert\` / \`abgelehnt\` / \`worker-error\`
 Pro erledigtem Item: kompakter Risk-Review-Drei-Zeiler (geaendert / status / betroffen)
 Gesamt-Bilanz: Token-Verbrauch, Erfolgs-Quote
-Als Note ablegen: \`mux_notes_create\` mit Tags \`kind:workshop-run\`
+Als Note ablegen: \`mux_notes_create\` mit Tags \`kind:report\`
 
 ### Bugreport-Modus (erweitert)
 
@@ -236,9 +236,9 @@ Learning erkannt
 Tags muessen dem Format \`klasse:wert\` folgen. Gueltige Klassen: siehe \`.tags.json\`.
 
 Pflicht-Tags fuer Workshop:
-- \`kind:workshop-run\` fuer Status-Reports
+- \`kind:report\` fuer Status-Reports
 - \`status:open\` / \`status:done\` fuer Lifecycle
 
-**Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \`status:\`-Tag aktualisieren: \`status:open\` → \`status:in-progress\` → \`status:done\` / \`status:closed\`. Kein Update ohne passenden Status-Tag.
+**Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \`status:\`-Tag aktualisieren: \`status:open\` → \`status:in-progress\` → \`status:done\`. Kein Update ohne passenden Status-Tag.
 `
 }

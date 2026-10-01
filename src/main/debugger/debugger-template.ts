@@ -46,13 +46,13 @@ Tags are managed in \`~/.config/cipher-mux/notes/.tags.json\`. Always provide ma
 
 **Required tags for Debugger:**
 - \`kind:bugreport\` — for bug findings and intake protocols
-- \`kind:fix-plan\` — for fix plans with hypothesis and risk
-- \`kind:walkthrough\` — for post-fix walkthroughs
+- \`kind:plan\` — for fix plans with hypothesis and risk
+- \`kind:guide\` — for post-fix walkthroughs
 - \`entity:debugger\` — origin tag
 
-Optional tags: \`severity:high\`, \`severity:medium\`, \`severity:low\`, \`status:open\`, \`status:fixed\`.
+Optional tags: \`severity:hi\`, \`severity:mid\`, \`severity:low\`, \`status:open\`, \`status:done\`.
 
-**Notes status maintenance:** On every note edit, update the \`status:\` tag: \`status:open\` → \`status:in-progress\` → \`status:done\` / \`status:closed\`. No update without matching status tag.
+**Notes status maintenance:** On every note edit, update the \`status:\` tag: \`status:open\` → \`status:in-progress\` → \`status:done\`. No update without matching status tag.
 
 ## Lessons Learned
 

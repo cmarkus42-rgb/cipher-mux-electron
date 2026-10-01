@@ -59,6 +59,7 @@ import type { TestcaseSection } from './notes/testcase-parser'
 import type { Persona, Workspace } from '../shared/persona-types'
 import { applyWorkspace } from './workspace/workspace-manager'
 import { NoteWatcher } from './notes/note-watcher'
+import { runTagMigrationOnce } from './notes/tag-migration'
 import { checkAll as setupCheckAll } from './setup/dependency-checker'
 import { installDependency } from './setup/dependency-installer'
 import { deployBundledVoice } from './setup/voice-bundle'
@@ -168,6 +169,27 @@ export class IpcHub {
     this.bugreportManager = new BugreportManager({ messageBus: this.messageBus })
 
     const notesDir = path.join(os.homedir(), '.config', 'cipher-mux', 'notes')
+
+    // Einmaliger Umzug der Bestands-Tags auf die Achsen. Laeuft vor TagIndex
+    // und TagClassRepo, damit beide den neuen Zustand sehen -- und bewusst ohne
+    // await: der Start soll nicht auf 958 Dateien warten, und die Notes sind
+    // waehrenddessen vollstaendig lesbar. Wirft nie (siehe tag-migration.ts).
+    void runTagMigrationOnce({
+      notesDir,
+      workspaces: (configStore.get('workspaces') ?? []) as Array<{ id: string; name?: string }>,
+    }).then(report => {
+      if (!report || report.written === 0) return
+      // tagIndex wird erst weiter unten zugewiesen. Der Rueckruf laeuft nach
+      // dem Konstruktor, also ist es da -- aber ein geworfener Fehler in der
+      // Init-Kette killt den Session-Restore still, deshalb defensiv.
+      try {
+        this.tagIndex?.rebuild()
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+      } catch (err) {
+        console.warn('[TagMigration] Index nach dem Umzug nicht neu gebaut:', err)
+      }
+    })
+
     this.noteManager = new NoteManager(notesDir)
     this.noteTagging = new NoteTagging(notesDir)
     this.noteSearchIndex = new NoteSearchIndex()
@@ -2370,6 +2392,16 @@ export class IpcHub {
 
     ipcMain.handle(IPC.NOTES_TAG_CLASS_ADD_VALUE, async (_e, { className, value }: { className: string; value: string }) => {
       const ok = this.tagClassRepo.addValue(className, value)
+      if (ok) {
+        this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
+      }
+      return { ok }
+    })
+
+    // Werte muessen sich auch entfernen lassen. Hinzufuegen gab es, Entfernen
+    // nicht -- eine Werteliste, aus der nichts herausgeht, waechst nur.
+    ipcMain.handle(IPC.NOTES_TAG_CLASS_REMOVE_VALUE, async (_e, { className, value }: { className: string; value: string }) => {
+      const ok = this.tagClassRepo.removeValue(className, value)
       if (ok) {
         this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, { action: 'tags-updated' })
       }

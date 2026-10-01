@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { toggleAxisTag, axisTagsOf, PROCESS_SET_AXES } from '../../src/shared/tag-axes'
+import { toggleTag, axisTagsOf, PROCESS_SET_AXES } from '../../src/shared/tag-axes'
 
 // ─── Tags werden ausgewaehlt, nicht getippt ─────────────────
 //
@@ -19,30 +19,30 @@ import { toggleAxisTag, axisTagsOf, PROCESS_SET_AXES } from '../../src/shared/ta
 // Ein Freitextfeld kann beides nicht: es laedt zum Erfinden ein, und genau
 // dabei sind 14 Klassen und 29 kind-Werte entstanden.
 
-describe('toggleAxisTag', () => {
+describe('toggleTag', () => {
   it('nimmt einen Wert auf, den es noch nicht gibt', () => {
-    assert.deepEqual(toggleAxisTag([], 'status:open'), ['status:open'])
+    assert.deepEqual(toggleTag([], 'status:open'), ['status:open'])
   })
 
   it('nimmt denselben Wert bei zweitem Druck wieder weg', () => {
-    assert.deepEqual(toggleAxisTag(['status:open'], 'status:open'), [])
+    assert.deepEqual(toggleTag(['status:open'], 'status:open'), [])
   })
 
   // Der eigentliche Punkt einer ausschliessenden Achse: die Auswahl wechselt,
   // sie sammelt nicht. Ohne das entstehen genau die Notes, die "open" UND
   // "done" tragen -- und das ist keine Aussage, sondern deren Abwesenheit.
   it('tauscht bei einer ausschliessenden Achse aus, statt zu sammeln', () => {
-    assert.deepEqual(toggleAxisTag(['status:open'], 'status:done'), ['status:done'])
-    assert.deepEqual(toggleAxisTag(['kind:spec'], 'kind:research'), ['kind:research'])
+    assert.deepEqual(toggleTag(['status:open'], 'status:done'), ['status:done'])
+    assert.deepEqual(toggleTag(['kind:spec'], 'kind:research'), ['kind:research'])
   })
 
   it('sammelt bei der Phase, weil eine Note zwei beruehren darf', () => {
-    const result = toggleAxisTag(['phase:coding'], 'phase:testing')
+    const result = toggleTag(['phase:coding'], 'phase:testing')
     assert.deepEqual(result.sort(), ['phase:coding', 'phase:testing'])
   })
 
   it('laesst Tags anderer Achsen unberuehrt', () => {
-    const result = toggleAxisTag(['workspace:ws-1', 'kind:spec'], 'status:open')
+    const result = toggleTag(['workspace:ws-1', 'kind:spec'], 'status:open')
     assert.ok(result.includes('workspace:ws-1'))
     assert.ok(result.includes('kind:spec'))
   })
@@ -50,21 +50,24 @@ describe('toggleAxisTag', () => {
   // Bestehende Tags sind nicht verhandelbar: was jemand selbst vergeben hat
   // oder was aus alten Runs stammt, nimmt ihm die Auswahl nicht weg.
   it('laesst Tags ausserhalb der Achsen stehen', () => {
-    const result = toggleAxisTag(['domain:trading', 'welle:3'], 'status:open')
+    const result = toggleTag(['domain:trading', 'welle:3'], 'status:open')
     assert.ok(result.includes('domain:trading'))
     assert.ok(result.includes('welle:3'))
   })
 
+  // Geprueft wird, was der Code kennt: bei einer geschlossenen Achse muss der
+  // Wert in ihrer Liste stehen. Registry-Klassen (severity, component) sind
+  // ausdruecklich offen -- siehe tag-pick-rows.test.ts.
   it('weist einen Wert zurueck, den die Achse nicht kennt', () => {
     const before = ['status:open']
-    assert.deepEqual(toggleAxisTag(before, 'status:erfunden'), before)
-    assert.deepEqual(toggleAxisTag(before, 'phase:0'), before)
+    assert.deepEqual(toggleTag(before, 'status:erfunden'), before)
+    assert.deepEqual(toggleTag(before, 'phase:0'), before)
   })
 
   it('aendert die Eingabe nicht', () => {
     const before = ['status:open']
-    toggleAxisTag(before, 'status:done')
-    assert.deepEqual(before, ['status:open'], 'toggleAxisTag arbeitet nicht auf dem Original')
+    toggleTag(before, 'status:done')
+    assert.deepEqual(before, ['status:open'], 'toggleTag arbeitet nicht auf dem Original')
   })
 })
 

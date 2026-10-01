@@ -69,7 +69,7 @@ Die Testcase-Note ist ein **bidirektionales Arbeitsdokument** zwischen dir und d
 
 ### 5. Testcase-Note sauber halten
 - In der Testcase-Note stehen **nur echte, nummerierte Testcases** (T-PREFIX.N)
-- Durchlauf-Ergebnisse, Retest-Notizen, Beobachtungen und Kommentare gehoeren in eine **separate Note** (tag: \`kind:findings-report\` oder \`kind:testing-run\`)
+- Durchlauf-Ergebnisse, Retest-Notizen, Beobachtungen und Kommentare gehoeren in eine **separate Note** (tag: \`kind:finding\` oder \`kind:report\`)
 - Wenn ein Retest einen bestehenden Case verifiziert → **Status + Kommentar am Originalcase updaten** via \`set_status\` + \`set_comment\`, keinen neuen T-RT*.* Case anlegen
 - Keine Durchlauf-Sektionen (z.B. "Retest Run 2", "Workshop-Run 3") in der Testcase-Note — diese blaehen die Testcase-Zaehlung auf und verwirren den TestcaseView
 
@@ -95,12 +95,13 @@ Tags are managed in \`~/.config/cipher-mux/notes/.tags.json\`. Always include ma
 
 **Required tags for Testing Assistant:**
 - \`kind:testcase\` — for test case lists (activates TestcaseView in UI)
-- \`kind:findings-report\` — for structured findings reports
+- \`kind:finding\` — for structured findings reports
 - \`entity:testing-assistant\` — origin tag
 
-Optional tags: \`severity:high\`, \`severity:medium\`, \`severity:low\`, \`category:adversarial\`, \`category:owasp\`, \`category:off-limits\`.
+Optional tags: \`severity:now\`, \`severity:hi\`, \`severity:mid\`, \`severity:low\`, \`phase:testing\`.
+The test category (adversarial, OWASP, off-limits) belongs in the note body — it is not a tag class.
 
-**Notes status maintenance:** Update the \`status:\` tag on every note edit: \`status:open\` → \`status:in-progress\` → \`status:done\` / \`status:closed\`. No update without matching status tag.
+**Notes status maintenance:** Update the \`status:\` tag on every note edit: \`status:open\` → \`status:in-progress\` → \`status:done\`. No update without matching status tag.
 
 ## Lessons Learned
 

@@ -56,13 +56,14 @@ Ehrlich, belegbar, ohne Beschoenigung. Bei kritischen Findings keine "kleinen Pr
 Tags werden in \`~/.config/cipher-mux/notes/.tags.json\` verwaltet. Beim Anlegen von Notes via \`mux_notes_create\` immer passende Tags mitgeben.
 
 **Pflicht-Tags fuer Audit:**
-- \`kind:audit-report\` — fuer strukturierte Audit-Reports
-- \`kind:release-empfehlung\` — fuer Release-Verdicts
+- \`kind:report\` — fuer strukturierte Audit-Reports
+- \`kind:report\` — fuer Release-Verdicts
 - \`entity:audit\` — Herkunfts-Tag
 
-Optionale Tags: \`scope:welle\`, \`scope:komplett\`, \`scope:modul\`, \`verdict:release\`, \`verdict:blockiert\`.
+Optionale Tags: \`phase:monitoring\`, \`severity:hi\`, \`severity:mid\`, \`severity:low\`.
+Der Umfang der Pruefung (Welle, Modul, komplett) und das Urteil gehoeren in den Rumpf der Note, nicht in einen Tag.
 
-**Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \`status:\`-Tag aktualisieren: \`status:open\` → \`status:in-progress\` → \`status:done\` / \`status:closed\`. Kein Update ohne passenden Status-Tag.
+**Notes-Status-Pflege:** Bei jeder Note-Bearbeitung den \`status:\`-Tag aktualisieren: \`status:open\` → \`status:in-progress\` → \`status:done\`. Kein Update ohne passenden Status-Tag.
 
 ## Lessons Learned
 

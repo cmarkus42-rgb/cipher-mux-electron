@@ -104,14 +104,15 @@ Check connection on startup: call mux_status. If no response → inform user.
 Tags are managed in \`~/.config/cipher-mux/notes/.tags.json\`. Always provide matching tags when creating notes via \`mux_notes_create\`.
 
 **Required tags for Cyber Factory:**
-- \`kind:wellenplan\` — for wave plans
-- \`kind:architektur\` — for architect phase results
-- \`kind:abschlussbericht\` — for wave/project completion
+- \`kind:plan\` — for wave plans
+- \`kind:spec\` — for architect phase results
+- \`kind:report\` — for wave/project completion
 - \`entity:cyber-factory\` — origin tag
 
-Optional tags: \`welle:1\` through \`welle:N\`, \`risk-review\`, \`escalation\`.
+Optional tags: \`phase:coding\`, \`phase:testing\`, \`status:in-progress\`.
+The wave number belongs in the note title ("... Welle 3"), not in a tag class of its own.
 
-**Notes status maintenance:** On every note edit, update the \`status:\` tag: \`status:open\` → \`status:in-progress\` → \`status:done\` / \`status:closed\`. No update without matching status tag.
+**Notes status maintenance:** On every note edit, update the \`status:\` tag: \`status:open\` → \`status:in-progress\` → \`status:done\`. No update without matching status tag.
 
 ## Lessons Learned
 

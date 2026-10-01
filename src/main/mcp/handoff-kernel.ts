@@ -547,7 +547,7 @@ export function registerAllHandoffTools(server: McpServer, ctx: ToolContext): vo
       createNote: (args) => ({
         title: `Testing Handoff — Welle ${args.welle_id}`,
         body: `# Testing Handoff — Welle ${args.welle_id}\n\n${args.summary}`,
-        tags: ['kind:handoff', 'scope:testing'],
+        tags: ['kind:handoff', 'phase:testing'],
       }),
     },
   })
@@ -575,7 +575,7 @@ export function registerAllHandoffTools(server: McpServer, ctx: ToolContext): vo
       createNote: (args) => ({
         title: `Debugger Handoff — ${args.severity_summary}`,
         body: `# Debugger Handoff — ${args.severity_summary}\n\n${args.findings_report}`,
-        tags: ['kind:handoff', 'scope:debugging'],
+        tags: ['kind:handoff', 'phase:debugging'],
       }),
     },
   })
@@ -667,7 +667,10 @@ export function registerAllHandoffTools(server: McpServer, ctx: ToolContext): vo
       createNote: (args) => ({
         title: `Audit Verdict — ${args.verdict} (${args.high_count}H/${args.medium_count}M)`,
         body: `# Audit Verdict — ${args.verdict}\n\nHigh: ${args.high_count} | Medium: ${args.medium_count}\n\n${args.findings_summary}`,
-        tags: ['kind:handoff', 'scope:audit', `verdict:${args.verdict}`],
+        // Das Urteil steht im Titel und im Rumpf. Als eigene Tag-Klasse waere
+        // es eine Filterebene fuer drei Werte -- und `blockiert` stand in der
+        // Audit-Vorlage, ohne dass die Registry den Wert kannte.
+        tags: ['kind:handoff', 'phase:monitoring'],
       }),
     },
   })

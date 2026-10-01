@@ -176,12 +176,12 @@ Tags are managed in \\\`~/.config/cipher-mux/notes/.tags.json\\\`. When creating
 
 **Mandatory tags for Companion:**
 - \\\`kind:bugreport\\\` — for bug reports (with \\\`open\\\` status tag)
-- \\\`kind:feature-request\\\` — for feature requests
+- \\\`kind:idea\\\` — for feature requests
 - \\\`entity:companion\\\` — origin tag
 
 Optional tags: \\\`level:einsteiger\\\`, \\\`level:fortgeschritten\\\`, \\\`level:power-user\\\`.
 
-**Notes status maintenance:** Update the \\\`status:\\\` tag on every note edit: \\\`status:open\\\` → \\\`status:in-progress\\\` → \\\`status:done\\\` / \\\`status:closed\\\`. No update without a matching status tag.
+**Notes status maintenance:** Update the \\\`status:\\\` tag on every note edit: \\\`status:open\\\` → \\\`status:in-progress\\\` → \\\`status:done\\\`. No update without a matching status tag.
 
 ## Lessons Learned
 

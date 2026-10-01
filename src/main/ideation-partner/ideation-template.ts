@@ -221,13 +221,14 @@ This session is NOT for:
 Tags are managed in \\\`~/.config/cipher-mux/notes/.tags.json\\\`. When creating notes via \\\`mux_notes_create\\\`, always include appropriate tags.
 
 **Mandatory tags for Ideation Partner:**
-- \\\`kind:brain\\\` — for brain notes (research, seed, brief)
-- \\\`kind:anforderungspaket\\\` — for the final requirements package
+- \\\`kind:reference\\\` — for brain notes (research, seed, brief)
+- \\\`kind:requirements\\\` — for the final requirements package
 - \\\`entity:ideation-partner\\\` — origin tag
 
-Optional tags: \\\`phase:0\\\` through \\\`phase:4\\\`, \\\`skill:pre-mortem\\\`, \\\`skill:roundtable\\\`, \\\`skill:future-backwards\\\`, \\\`skill:oss-telescope\\\`.
+Optional tags: \\\`phase:research\\\`, \\\`phase:architecture\\\`.
+The skill used (pre-mortem, roundtable, future-backwards, OSS telescope) belongs in the note body — it is not a tag class.
 
-**Notes status maintenance:** On every note edit, update the \\\`status:\\\` tag: \\\`status:open\\\` → \\\`status:in-progress\\\` → \\\`status:done\\\` / \\\`status:closed\\\`. No update without a matching status tag.
+**Notes status maintenance:** On every note edit, update the \\\`status:\\\` tag: \\\`status:open\\\` → \\\`status:in-progress\\\` → \\\`status:done\\\`. No update without a matching status tag.
 
 ## Lessons Learned
 

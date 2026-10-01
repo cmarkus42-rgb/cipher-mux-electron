@@ -1,7 +1,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { TagClassRepository, TagClass } from '../../shared/types'
-import { AXIS_VALUES, type TagAxis } from '../../shared/tag-axes'
+import { AXIS_VALUES, SEVERITY_VALUES, type TagAxis } from '../../shared/tag-axes'
 
 const TAGS_FILENAME = '.tags.json'
 
@@ -26,28 +26,47 @@ function axisSeed(axis: TagAxis, color: string, extra: readonly string[] = []): 
   return { values: [...new Set([...(AXIS_VALUES[axis] ?? []), ...extra])], color }
 }
 
+/**
+ * Klassen, deren Werte der Code besitzt.
+ *
+ * Werden bei **jedem** Start eingemischt: sie stehen in tag-axes.ts, Ansichten
+ * hängen daran, und sie sollen sich nicht wegkonfigurieren lassen.
+ *
+ * `feature-request` und `archived` standen hier, bis der Umzug am 2026-09-30
+ * sie abgebildet hat (-> kind:idea, -> status:superseded). Sie als Seed zu
+ * behalten hätte bedeutet, dass sie beim nächsten Start zurückkommen und die
+ * Vorschläge wieder Werte anbieten, die auf keiner Note stehen.
+ *
+ * `domain`, `project` und `scope` standen hier ebenfalls. Der Umzug hat sie
+ * aufgelöst: `scope`-Phasen wurden zu `phase`, `project` doppelte den
+ * Workspace, `domain` trug drei Werte. Wieder einzusäen hieße, die Klassen
+ * beim nächsten Start neu anzulegen.
+ */
 export const SEED_CLASSES: Record<string, TagClass> = {
-  // Genau die Achsenwerte, nichts daneben. `feature-request` und `archived`
-  // standen hier, bis der Umzug am 2026-09-30 sie abgebildet hat
-  // (-> kind:idea, -> status:superseded). Sie als Seed zu behalten haette
-  // bedeutet, dass sie beim naechsten Start zurueckkommen und die
-  // Freitext-Vorschlaege wieder Werte anbieten, die auf keiner Note stehen.
   kind: axisSeed('kind', '#6366f1'),
   status: axisSeed('status', '#f59e0b'),
   phase: axisSeed('phase', '#a78bfa'),
   entity: axisSeed('entity', '#22d3ee'),
-  domain: {
-    values: ['ui'],
-    color: '#10b981',
-  },
-  project: {
-    values: ['cipher-mux'],
-    color: '#8b5cf6',
-  },
-  scope: {
-    values: [],
-    color: '#64748b',
-  },
+}
+
+/**
+ * Klassen mit einer **Startbelegung**, die danach dem Benutzer gehört.
+ *
+ * Der Unterschied zu SEED_CLASSES ist der ganze Punkt: diese Werte werden nur
+ * eingesetzt, wenn die Klasse noch **gar nicht** existiert. Danach nicht mehr.
+ *
+ * Sonst wäre „editierbar" nicht wahr: wer `severity:low` im Tag-Manager
+ * entfernt, hätte es beim nächsten Start wieder, und ein Knopf, dessen Wirkung
+ * ein Neustart aufhebt, ist eine Irreführung.
+ *
+ * Festgelegt am 2026-09-30: „severity und component finde ich legitim - aber
+ * die werte müssen editierbar sein - gerade component ist dabei ja schon
+ * projektspezifisch". `component` bekommt deshalb gar keine Startbelegung —
+ * welche Bauteile ein Projekt hat, weiß der Code nicht.
+ */
+export const REGISTRY_SEED_CLASSES: Record<string, TagClass> = {
+  severity: { values: [...SEVERITY_VALUES], color: '#ef4444' },
+  component: { values: [], color: '#14b8a6' },
 }
 
 // ─── TagClassRepository ──────────────────────────────────
@@ -68,6 +87,10 @@ export class TagClassRepo {
     for (const [cls, entry] of Object.entries(SEED_CLASSES)) {
       merged[cls] = { values: [...entry.values], color: entry.color }
     }
+    // Registry-Seeds spaeter, und nur fuer Klassen, die die Datei nicht kennt
+    // -- siehe REGISTRY_SEED_CLASSES. Hier waeren sie eine Vereinigung und
+    // damit nicht mehr editierbar.
+    const persistedClassNames = new Set<string>()
 
     let synonyms: Record<string, string> = {}
 
@@ -77,6 +100,7 @@ export class TagClassRepo {
       const persisted = JSON.parse(raw) as TagClassRepository
       if (persisted.classes && typeof persisted.classes === 'object') {
         for (const [cls, entry] of Object.entries(persisted.classes)) {
+          persistedClassNames.add(cls)
           if (merged[cls]) {
             // Merge values (union), persisted color wins
             const valueSet = new Set([...merged[cls].values, ...entry.values])
@@ -95,6 +119,14 @@ export class TagClassRepo {
       }
     } catch {
       // File doesn't exist yet — use seeds only
+    }
+
+    // Startbelegung: nur fuer Klassen, die die Datei nicht kennt. Ein zweites
+    // Mal eingesetzt waere sie keine Startbelegung, sondern eine Vorschrift --
+    // und der Benutzer koennte einen Wert nicht loswerden.
+    for (const [cls, entry] of Object.entries(REGISTRY_SEED_CLASSES)) {
+      if (persistedClassNames.has(cls)) continue
+      merged[cls] = { values: [...entry.values], color: entry.color }
     }
 
     this.data = { classes: merged, synonyms }

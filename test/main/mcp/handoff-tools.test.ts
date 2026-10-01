@@ -283,6 +283,9 @@ describe('REQ-TOOLS-004: mux_cyber_factory_handoff_testing', () => {
     assert.ok(message.includes('welle-3'))
   })
 
+  // Vorher stand hier `scope:testing`. Die Klasse `scope` ist am 2026-09-30
+  // aufgeloest worden: ihre Phasen-Werte sind zu `phase` geworden. Eine
+  // Handoff-Note traegt jetzt die Phase, in der sie entstanden ist.
   it('creates a note with handoff and testing tags', async () => {
     const session = makeSession({ entityId: 'testing-assistant' as EntityId })
     const { ctx, noteCreateCalls } = makeCtx({ sessions: [session] })
@@ -298,7 +301,7 @@ describe('REQ-TOOLS-004: mux_cyber_factory_handoff_testing', () => {
     assert.equal(noteCreateCalls.length, 1)
     assert.ok(noteCreateCalls[0].title.includes('Welle welle-3'))
     assert.ok(noteCreateCalls[0].tags.includes('kind:handoff'))
-    assert.ok(noteCreateCalls[0].tags.includes('scope:testing'))
+    assert.ok(noteCreateCalls[0].tags.includes('phase:testing'))
   })
 
   it('starts testing session when none exists', async () => {
@@ -350,7 +353,7 @@ describe('REQ-TOOLS-005: mux_cyber_factory_handoff_debugger', () => {
     assert.ok(message.includes('severity_summary'))
   })
 
-  it('creates a note with debugging scope', async () => {
+  it('creates a note with the debugging phase', async () => {
     const session = makeSession({ entityId: 'debugger' as EntityId })
     const { ctx, noteCreateCalls } = makeCtx({ sessions: [session] })
     const handlers = registerAndCollect(ctx)
@@ -365,7 +368,7 @@ describe('REQ-TOOLS-005: mux_cyber_factory_handoff_debugger', () => {
     assert.equal(noteCreateCalls.length, 1)
     assert.ok(noteCreateCalls[0].title.includes('1 critical'))
     assert.ok(noteCreateCalls[0].tags.includes('kind:handoff'))
-    assert.ok(noteCreateCalls[0].tags.includes('scope:debugging'))
+    assert.ok(noteCreateCalls[0].tags.includes('phase:debugging'))
   })
 
   it('starts debugger session when none exists', async () => {
@@ -420,7 +423,11 @@ describe('REQ-TOOLS-011: mux_audit_handoff_cyber_factory', () => {
     assert.ok(message.includes('findings_summary'))
   })
 
-  it('creates a note with audit scope and verdict tag', async () => {
+  // `verdict` ist ebenfalls aufgeloest. Das Urteil steht im Titel und im Rumpf
+  // der Note -- als eigene Tag-Klasse waere es eine Filterebene fuer drei
+  // Werte, und `blockiert` aus der Audit-Vorlage kannte die Registry nicht
+  // einmal: die Note waere an der Tag-Pruefung gescheitert.
+  it('creates a note with the monitoring phase and the verdict in the title', async () => {
     const session = makeSession({ entityId: 'cyber-factory' as EntityId })
     const { ctx, noteCreateCalls } = makeCtx({ sessions: [session] })
     const handlers = registerAndCollect(ctx)
@@ -438,8 +445,9 @@ describe('REQ-TOOLS-011: mux_audit_handoff_cyber_factory', () => {
     assert.ok(noteCreateCalls[0].title.includes('blocked'))
     assert.ok(noteCreateCalls[0].title.includes('1H/3M'))
     assert.ok(noteCreateCalls[0].tags.includes('kind:handoff'))
-    assert.ok(noteCreateCalls[0].tags.includes('scope:audit'))
-    assert.ok(noteCreateCalls[0].tags.includes('verdict:blocked'))
+    assert.ok(noteCreateCalls[0].tags.includes('phase:monitoring'))
+    assert.ok(!noteCreateCalls[0].tags.some((t: string) => t.startsWith('verdict:')))
+    assert.ok(noteCreateCalls[0].body.includes('blocked'), 'das Urteil steht im Rumpf')
   })
 
   it('starts CF session when none exists', async () => {
