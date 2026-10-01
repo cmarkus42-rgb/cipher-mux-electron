@@ -29,7 +29,7 @@ The status is updated honestly and promptly. If it changes, a CHANGELOG entry an
 ### Getting Started
 
 ```bash
-git clone https://github.com/cmarkus42/cipher-mux-electron.git
+git clone https://github.com/cmarkus42-rgb/cipher-mux-electron.git
 cd cipher-mux-electron
 npm install
 npm run dev
@@ -45,7 +45,7 @@ npm run dev
 | `npm run build` | Full production build |
 | `npm run test` | Run test suite (Node.js test runner) |
 | `npm run lint` | ESLint (includes TSDoc checks) |
-| `npm run dist` | Package as DMG (macOS) or AppImage (Linux) |
+| `npm run dist` | Package as an unsigned DMG. **macOS only** — `electron-builder.yml` has no Linux target |
 | `npm run format` | Prettier formatting |
 
 ### Native Module Rebuilds
@@ -200,4 +200,4 @@ Significant technical decisions are recorded as ADRs in `docs/decisions/`. If yo
 
 ## Questions?
 
-Open a [question issue](https://github.com/cmarkus42/cipher-mux-electron/issues/new?template=question.md) or start a discussion. No question is too basic.
+Open a [question issue](https://github.com/cmarkus42-rgb/cipher-mux-electron/issues/new?template=question.md) or start a discussion. No question is too basic.

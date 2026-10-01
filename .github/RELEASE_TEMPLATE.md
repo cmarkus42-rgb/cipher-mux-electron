@@ -75,4 +75,4 @@ Verify with: `shasum -a 256 cipher-mux-*.dmg` (macOS) or `sha256sum` (Linux).
 
 Thanks to: @handle, @handle.
 
-Full changelog: [X.Y.Z-1…X.Y.Z](https://github.com/cmarkus42/cipher-mux-electron/compare/vX.Y.Z-1...vX.Y.Z)
+Full changelog: [X.Y.Z-1…X.Y.Z](https://github.com/cmarkus42-rgb/cipher-mux-electron/compare/vX.Y.Z-1...vX.Y.Z)

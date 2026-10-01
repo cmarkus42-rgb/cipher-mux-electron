@@ -1,8 +1,23 @@
 # ADR-008: Orchestrator CLAUDE.md Template
 
-**Status:** Entschieden
+**Status:** Entschieden, in Teilen überholt — siehe Nachtrag
 **Datum:** 2026-04-13
 **Betrifft:** SPEC.md Abschnitt 2 (Orchestrator-Session), Requirements (Orchestrator)
+
+> **Nachtrag 2026-10-01.** Die **Entscheidung** gilt weiter: eine koordinierende Rolle bekommt
+> ein strukturiertes Instruktionstemplate statt einer blanken Rollenzeile. Die **Namen und
+> Pfade** darin stimmen nicht mehr:
+>
+> | hier | heute |
+> |---|---|
+> | Rolle „Orchestrator" | **Workshop** (`entity-registry.ts`, `id: 'workshop'`). `ipc-hub.ts:133` wandert das alte Verzeichnis um und löscht den Rest. |
+> | `~/.config/cipher-mux/orchestrator/` | `~/.config/cipher-mux/entities/workshop/` für das Geschriebene, `runs/<workspaceId>/workshop/` für das Erzeugte |
+> | `src/main/session/orchestrator-template.ts` | existiert nicht mehr; die Rollen stehen in `entity-registry.ts`, die Inhalte unter `entity-content/` |
+> | „CLAUDE.md wird generiert" | je nach CLI `CLAUDE.md` **oder** `AGENTS.md` — es gibt drei Adapter, nicht einen |
+> | „Template-Updates erfordern App-Update" | stimmt, und ist schärfer als gedacht: `preset.md` ist **write-once**, eine korrigierte Vorlage erreicht eine bestehende Datei nie von selbst. Dafür gibt es seit heute die Erkennung (`entity-content/preset-version.ts`) und den Knopf „Vorlage übernehmen" im Preset-Editor. |
+>
+> Ein ADR ist ein Protokoll und keine Referenz — der Text unten bleibt, wie er entschieden
+> wurde. Wer wissen will, wie es heute aussieht, liest `CLAUDE.md` und `docs/HOWTO.md`.
 
 ## Kontext
 

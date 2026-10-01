@@ -87,8 +87,8 @@ Communication between main and renderer flows through typed IPC channels defined
          v                              v
 +-----------------+          +--------------------+
 |  tmux Server    |          |  External Clients   |
-|  (Sessions)     |          |  (Claude Code CLI,  |
-|                 |          |   Orchestrator)      |
+|  (Sessions)     |          |  (Claude Code,      |
+|                 |          |   Codex, opencode)  |
 +-----------------+          +--------------------+
 ```
 
@@ -157,25 +157,29 @@ Communication between main and renderer flows through typed IPC channels defined
 
 ## Entity Framework
 
-As of v0.9.103 cipher-mux uses an entity-based session model that replaces the earlier persona system.
+cipher-mux uses an entity-based session model that replaced the earlier persona system.
 
 ### EntityRegistry
 
-11 built-in entities are registered at startup:
+**10** built-in entities are registered at startup. The list is `ENTITIES` in
+`src/main/session/entity-registry.ts`; anything else named here would be a second place to get
+wrong — this table had **11** rows until 2026-10-01, with an `Orchestrator` that was renamed to
+Workshop and a `Bugreport` that is a dialog and not an entity.
 
 | Entity | Role |
 |--------|------|
-| **Launcher** | Main process orchestration, project scaffolding, session lifecycle |
-| **Orchestrator** | Multi-session coordination, task delegation |
-| **Refinement** | Requirements analysis, purpose-check, REQ-ID tracking, handoff to Cyber Factory |
-| **Cyber Factory** | Multi-session build orchestrator (replaces MPO). Decomposes specs into waves, spawns parallel workers |
-| **Companion** | Persistent memory store, user-facing advisor, scope-aware recall/search/forget |
-| **Debugger** | Post-build diagnostics: findings intake, clarification, fix planning, worker dispatch, verification |
-| **Testing Assistant** | Test execution, quality audit, adversarial probing, OWASP checks, findings reporting |
-| **Audit** | Code review, security audit, ADR consistency, cognitive debt analysis, release recommendation |
+| **Workshop** | Coordination for everyday work: task distribution, context watch, worker rotation |
+| **Cyber Factory** | Build orchestrator for large work. Decomposes specs into waves, spawns parallel workers |
+| **Launcher** | Project scaffolding and kick-off |
+| **Companion** | User-facing advisor with persistent memory; the only role holding the `companion_memory_*` tools |
+| **Refinement** | Requirements analysis, purpose check, REQ-ID tracking, handoff to Cyber Factory |
 | **Ideation Partner** | Brainstorming, skill registry, Anforderungspaket generation |
-| **Voice Relay** | Background entity that polls tmux output and routes stable responses to TTS |
-| **Bugreport** | Structured bug report creation with voice dictation support |
+| **Voice Relay** | Background role that polls tmux output and routes stable responses to TTS |
+| **Audit** | Code review, security audit, ADR consistency, release recommendation |
+| **Debugger** | Post-build diagnostics: findings intake, clarification, fix planning, verification |
+| **Testing Assistant** | Test execution, quality audit, adversarial probing, findings reporting |
+
+Eight of them you start yourself; **Launcher** and **Voice Relay** run on their own.
 
 ### EntityScanner
 

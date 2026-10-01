@@ -1,6 +1,19 @@
 # Linux Notes
 
-cipher-mux runs on Linux as an AppImage. Most features work identically to macOS. This document covers known differences and limitations.
+> **Es gibt keinen Linux-Build.** Dieses Dokument war ab seiner ersten Zeile falsch: „cipher-mux
+> runs on Linux as an AppImage" — tut es nicht. `electron-builder.yml` baut `--mac dmg` und
+> sonst nichts, es gibt kein AppImage-Target, kein Linux-Release und keinen Tag mit einem
+> Linux-Artefakt. README und Website sagen beide macOS-only.
+>
+> Was hier steht, ist **Vorarbeit** für einen Linux-Port und keine Anleitung: die bekannten
+> Unterschiede, die Stellen, an denen macOS-Eigenes steckt (`osascript`, Keychain, der
+> BT-Bridge), und was zuerst zu klären wäre. Als Rechercheakte ist es nützlich; als
+> Installationsanleitung hat es Leser in die Irre geführt. Linux ist geplant, ohne Datum.
+>
+> *(Hinweis ergänzt 2026-10-01, beim Abgleich der Doku gegen den Code.)*
+
+Dieses Dokument beschreibt die bekannten Unterschiede und Grenzen für den Fall, dass der Port
+gebaut wird.
 
 ## Requirements
 
@@ -39,7 +52,7 @@ On macOS, review files open in CotEditor. On Linux, `xdg-open` is used instead, 
 ## Building from Source
 
 ```bash
-git clone https://github.com/cmarkus42/cipher-mux-electron.git
+git clone https://github.com/cmarkus42-rgb/cipher-mux-electron.git
 cd cipher-mux-electron
 npm install
 npm run dev          # Development mode

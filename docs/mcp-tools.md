@@ -102,7 +102,7 @@ Send a message to the message bus. Optionally push-deliver to a target session v
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `topic` | string | yes | `status`, `bug`, `review`, `chat`, or `system` |
-| `sender` | string | yes | Sender identifier (e.g. "Orchestrator") |
+| `sender` | string | yes | Sender identifier (e.g. "Workshop") |
 | `text` | string | yes | Message text |
 | `sessionId` | string | no | Target session ID for push delivery |
 | `sessionName` | string | no | Target session name for push delivery |
