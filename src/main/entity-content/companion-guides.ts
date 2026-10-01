@@ -1,9 +1,16 @@
 /**
  * Companion guides deployer.
  *
- * Deploys 10 guide files for the Companion entity:
+ * Deploys 11 guide files for the Companion entity:
  * - 7 thematic guides (from verified Note content, 2026-05-11)
+ * - 1 guide on the three agent CLIs (2026-10-01, sourced from CLAUDE.md
+ *   sections "Zweite CLI: Codex" / "Dritte CLI: opencode" and from
+ *   `agent/adapters/*.getCapabilities()`)
  * - 3 prompting guides (04-06, legacy references fixed)
+ *
+ * This deployer runs on **every** Companion session start without an
+ * existsSync guard — a change here reaches existing Companion instances.
+ * `companion-preset.ts` is the opposite (write-once).
  */
 
 import * as fs from 'fs';
@@ -17,6 +24,7 @@ export function deployCompanionGuides(projectPath: string): void {
     { name: 'focus-popout.md', content: GUIDE_FOCUS },
     { name: 'sidebar.md', content: GUIDE_SIDEBAR },
     { name: 'entities.md', content: GUIDE_ENTITIES },
+    { name: 'clis.md', content: GUIDE_CLIS },
     { name: 'workspaces.md', content: GUIDE_WORKSPACES },
     { name: 'notes.md', content: GUIDE_NOTES },
     { name: 'voice.md', content: GUIDE_VOICE },
@@ -344,8 +352,142 @@ Zwei Entities sind besondere Weichen:
 
 ---
 
+## Jede Rolle hat eine CLI
+
+Eine Entity ist die Rolle — *was* jemand tut. Welche Kommandozeilen-KI die Rolle dabei ausführt, ist eine zweite, unabhängige Entscheidung: Claude Code, Codex oder opencode. Eingestellt wird sie pro Rolle im Presets-Tab, global in den Einstellungen.
+
+Das ändert nichts daran, wer welche Aufgabe hat — aber es ändert, was dabei verfügbar ist. Details und die Stolperstellen: Guide: Die drei CLIs.
+
+---
+
 **Zurück:** Guide: Workspaces — Layouts speichern und anwenden
+**Weiter:** Guide: Die drei CLIs — Claude Code, Codex, opencode
 **Verwandt:** cipher-mux Wissensbase — Vollständige Feature-Dokumentation (Detailreferenz)
+`;
+
+// Quellen für diesen Guide: CLAUDE.md, Abschnitte „Zweite CLI: Codex" und
+// „Dritte CLI: opencode", sowie `getCapabilities()` der drei Adapter unter
+// `src/main/agent/adapters/`. Nichts hier steht ohne Beleg dort — eine Aussage
+// über eine CLI, die niemand gemessen hat, wäre genau die Sorte Behauptung, die
+// ein Nutzer für geprüft hält.
+const GUIDE_CLIS = `# Guide: Die drei CLIs — Claude Code, Codex, opencode
+
+In jeder Session-Zelle läuft eine Kommandozeilen-KI. Lange war das immer Claude Code. Seit dem 1. Oktober 2026 sind es drei — und du entscheidest pro Rolle, welche.
+
+**Die Analogie:** Die Zelle ist der Arbeitsplatz, die CLI ist der Mitarbeiter, der dort sitzt. Der Schreibtisch bleibt derselbe — Grid, Notes, Sidebar, Workspaces, alles unverändert. Nur wer am Schreibtisch sitzt, kann wechseln.
+
+---
+
+## Die drei im Überblick
+
+| CLI | Kürzel | Tier | gemessen an |
+|---|---|---|---|
+| **Claude Code** | \`claude-code\` | Tier 1 | Standard, Voreinstellung |
+| **Codex CLI** | \`codex\` | Tier 2 | codex-cli 0.155.1 (2026-10-01) |
+| **opencode** | \`opencode\` | Tier 2 | opencode 1.18.34 (2026-10-01) |
+
+**Tier 1 heißt:** jede Mux-Fähigkeit ist dort gemessen. Claude Code ist die Voreinstellung — nicht aus Gewohnheit, sondern weil es die einzige CLI ist, für die das gilt.
+
+**Tier 2 heißt:** *nicht* jede Mux-Fähigkeit ist dort gemessen. Was genau, steht unten pro CLI.
+
+Ein Wort zum Unterschied zwischen „nicht gemessen" und „geht nicht": Der Mux sagt lieber „habe ich nicht geprüft" als eine Zahl anzuzeigen, die er sich ausgedacht hat. Ein nicht gemessenes Feature kann in der CLI durchaus existieren — nur hat niemand nachgewiesen, dass der Mux es sieht.
+
+---
+
+## Was bei Tier 2 fehlt
+
+### Codex CLI
+
+| Fähigkeit | Stand |
+|---|---|
+| Sub-Agents | nicht gemessen |
+
+Sonst nichts. Die **Context-Anzeige** funktioniert, nimmt aber einen anderen Weg: Codex hat keine Statusline, deshalb liest ein Hook die Nutzung aus dem Sitzungsprotokoll und schreibt sie in dieselbe Form, die der Mux ohnehin liest. Für dich sieht der Balken im Zell-Header genauso aus wie bei Claude Code.
+
+### opencode
+
+| Fähigkeit | Stand |
+|---|---|
+| Context-Anzeige | nicht gemessen — der Context-Balken bleibt leer |
+| Sub-Agents | nicht gemessen |
+
+Dazu zwei Dinge, die hier nicht schöngeredet werden:
+
+- **Rollengrenzen sind noch nicht verdrahtet.** Bei Claude Code und Codex hält ein Hook eine Rolle an ihrer Grenze auf. opencode arbeitet mit Plugin-Events statt Hook-Dateien, und dass so ein Event einen Werkzeugaufruf wirklich *ablehnen* kann, ist nicht gemessen. Eine Grenze, die geschrieben ist und nicht greift, ist schlimmer als keine — deshalb steht hier keine.
+- **Es gibt keinen Rauchtest gegen die echte CLI.** Belegt sind die Unit-Tests des Adapters, nicht ein Lauf gegen opencode selbst. Beim Codex-Adapter gibt es diesen Lauf, hier nicht.
+
+Wenn du opencode nimmst, bist du der erste echte Lauf. Das ist kein Grund, es nicht zu tun — es ist ein Grund, es zu wissen.
+
+### Claude Code
+
+Keine Lücke. Alle Fähigkeiten gemessen.
+
+---
+
+## Wie du die CLI wählst
+
+Zwei Stellen, und eine klare Reihenfolge dazwischen.
+
+**Pro Rolle:** Workspaces-Fenster → Tab **Presets** → Rolle anklicken → Feld **CLI**. Der Eintrag „Default" folgt der globalen Einstellung.
+
+Das sieht dann so aus: wählst du dort eine Tier-2-CLI, schreibt der Editor direkt darunter hin, was fehlt — *„Unter opencode fehlt: Context-Anzeige, Sub-Agents."* Du musst nichts nachschlagen, die Lücke steht vor dem Sessionstart da und nicht danach.
+
+**Global:** \`einstellungen\` → Tab **general** → **Standard-CLI**. Das gilt für jede Rolle ohne eigene Wahl — und für freie Sessions ohne Rolle, also alles, was du über den **Path**-Tab des Launchers startest.
+
+**Die Reihenfolge, von stark nach schwach:**
+
+1. deine Wahl **pro Rolle** (\`app.entityAdapters\`)
+2. der **Default der Rolle** selbst — keine eingebaute Rolle hat einen
+3. **\`agent.defaultAdapter\`**, die globale Einstellung (Startwert: Claude Code)
+
+Beides greift **ab dem nächsten Sessionstart** dieser Rolle. Eine laufende Session wechselt die CLI nicht.
+
+---
+
+## Wo die Einstellung landet
+
+\`~/Library/Application Support/cipher-mux-electron/cipher-mux-config.json\`
+
+Das ist die Datei, die der Mux liest.
+
+**Daneben existiert \`~/.config/cipher-mux/config.json\` — die liest er nicht.** Wer dort editiert, ändert nichts und sucht lange. Genau dieser Fehler ist am 2026-10-01 passiert.
+
+Im Normalfall brauchst du die Datei nie anzufassen: Preset-Editor und Einstellungen schreiben sie für dich.
+
+---
+
+## Codex: zwei Eigenheiten, die du merkst
+
+**1. Projektanweisungen heißen \`AGENTS.md\`, nicht \`CLAUDE.md\`.** Codex liest \`AGENTS.md\`, hierarchisch nach Verzeichnis, und eine direkte Anweisung im Chat schlägt die Datei. Der Mux spielt seine Sektionen deshalb dort hinein statt in die \`CLAUDE.md\`. Praktische Folge: zwei Rollen mit verschiedenen CLIs im selben Projektordner schreiben in verschiedene Dateien — zwei Rollen mit derselben CLI überschreiben sich die Sektionen gegenseitig.
+
+**2. Codex-Vertrauen fürs Arbeitsverzeichnis.** Codex lädt projektlokale Konfiguration, Hooks und Ausführungsregeln **nur** aus einem Verzeichnis, dem es vertraut — sonst fragt es in einem blockierenden Dialog nach. Der Mux trägt deshalb das Run-Verzeichnis der Rolle in \`~/.codex/config.toml\` als vertraut ein, und **nur** das: dort liegt ausschließlich, was der Mux selbst erzeugt hat. Abschaltbar über \`agent.codexTrustRunDirs\` (Startwert: an).
+
+Ohne diesen Eintrag hängt jede Codex-Session beim Start im Vertrauensdialog. Deshalb ist das Abschalten eine bewusste Entscheidung und kein Aufräumen.
+
+---
+
+## Wenn etwas nicht geht
+
+Drei Fehlschläge sind **still**: die Session läuft, sieht normal aus, und etwas fehlt trotzdem. Alle drei betreffen Codex.
+
+| Was du siehst | Was dahintersteckt | Was du tun kannst |
+|---|---|---|
+| Die Session steht am Prompt und **hat keine MCP-Werkzeuge** — kein \`mux_\`-Aufruf geht durch, der Context-Balken bleibt leer, eine Rollengrenze greift nicht | Codex hat dem Verzeichnis beim Start nicht vertraut. Ein nachträgliches „Yes" im Dialog lädt die Konfiguration **nicht** nach — die Session läuft weiter, nur eben leer | Session schließen, neu starten. \`agent.codexTrustRunDirs\` muss an sein |
+| Eine Rolle mit Grenze tut Dinge, die ihre Grenze verbietet — ohne Fehlermeldung, ohne Logzeile | Der Grenz-Hook feuert nicht. Codex überspringt einen frisch geschriebenen Hook stumm, wenn das passende Startflag fehlt, und ebenso einen, dessen Werkzeugfilter nicht passt. Beides setzt der Adapter inzwischen richtig | Wenn es trotzdem passiert: Bug melden (\`Cmd+B\`). Das ist keine Einstellung, die du drehen kannst |
+| Die Session startet nicht weiter und wartet scheinbar auf nichts | Codex zeigt Update-Hinweis und Vertrauensfrage als **Auswahldialog**, nicht als Banner. Der Dialog steht im Terminal und wartet auf eine Taste | Zelle anklicken und hinsehen. Den Update-Hinweis schaltet der Mux beim Start ab |
+
+Rollengrenzen, Codex-Vertrauen und der Usage-Hook sind Dinge, die der Mux für dich setzt. Du bemerkst sie nur, wenn eines davon fehlt.
+
+---
+
+## Eine Einschränkung, die zum Thema gehört
+
+Alle Messungen in diesem Guide gelten für die oben genannten CLI-Versionen. Eine neue Codex- oder opencode-Version kann sie kippen — eine CLI verspricht ihr Innenleben niemandem. Wenn etwas hier nicht mehr stimmt: melde es als Bug, dann wird nachgemessen statt geraten.
+
+---
+
+**Zurück:** Guide: Die Entities — Wer macht was
+**Verwandt:** Guide: Workspaces — Layouts speichern und anwenden
 `;
 
 const GUIDE_WORKSPACES = `# Guide: Workspaces — Layouts speichern und anwenden
