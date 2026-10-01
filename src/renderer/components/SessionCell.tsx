@@ -49,6 +49,21 @@ interface SessionCellProps {
   slotCol?: number
   slotRow?: number
   focusModeStyle?: Record<string, string>
+  /**
+   * Nicht sichtbar, aber am Leben.
+   *
+   * Focus Mode und der Zellen-Merge verdecken Slots. Bis zum 2026-10-01 gab
+   * `SessionGrid` fuer so einen Slot `null` zurueck — die Zelle unmountete, und
+   * mit ihr starb das Terminal der verdeckten Session: beim Zurueckkommen ein
+   * `capture-pane`-Rekonstrukt ohne Scrollback. Die Session selbst lief
+   * weiter, tmux haelt sie; verloren ging nur ihre Darstellung.
+   *
+   * `display: none` nimmt die Zelle aus dem Grid-Fluss, ohne sie abzureissen.
+   * Der Min-Size-Guard in `useTerminal` (50 px) laesst ein `fit()` auf einem
+   * Container ohne Flaeche gar nicht erst laufen, und der ResizeObserver meldet
+   * sich beim Wiederauftauchen von selbst.
+   */
+  hidden?: boolean
   onFocus: (sessionId: string) => void
   onClose: (sessionId: string) => void
   onSwitchProject: (sessionId: string) => void
@@ -72,7 +87,7 @@ interface SessionCellProps {
 
 export function SessionCell({
   session, contextUsage, focused, isWorkshop, isVoiceTarget, isVoicePinned, voiceState, isSpeaking, onToggleVoicePin, theme,
-  rowSpan, maxRows, slotCol, slotRow, focusModeStyle,
+  rowSpan, maxRows, slotCol, slotRow, focusModeStyle, hidden,
   onFocus, onClose, onSwitchProject, onToggleExpand, onShell, onFork, onSendToBackground, onDetach, onFocusMode, onDragStart, onDragOver, onDragLeave, onDrop, dragOver,
   topic, workspaceBadge, workspaceBadgeTitle,
 }: SessionCellProps) {
@@ -194,6 +209,9 @@ export function SessionCell({
   } else if (rowSpan > 1) {
     cellStyle.gridRow = `span ${rowSpan}`
   }
+  // Zuletzt und ohne Ausnahme: eine verdeckte Zelle darf keinen Platz im Grid
+  // belegen, auch nicht den, den ihr rowSpan oder Focus Mode zuweisen wuerde.
+  if (hidden) cellStyle.display = 'none'
 
   // ARIA label for the grid cell (REQ-A11Y-007)
   const ariaLabel = `Session: ${session.name}, Status: ${session.status}, Context: ${pct}%`
@@ -209,6 +227,10 @@ export function SessionCell({
       data-highlight={slotCol != null && slotRow != null ? `cell-${slotCol}-${slotRow}` : undefined}
       role="region"
       aria-label={ariaLabel}
+      // `display: none` nimmt den Knoten schon aus dem Accessibility-Tree; das
+      // hier ist die ausdrueckliche Aussage dazu, damit niemand es fuer ein
+      // Versehen haelt.
+      aria-hidden={hidden ? 'true' : undefined}
     >
       <div
         class="cell-header"

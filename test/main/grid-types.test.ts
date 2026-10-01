@@ -17,6 +17,7 @@ import {
   getFocusBlockIndices,
   canAddFocusSlot,
   getMultiFocusOverlappedSlots,
+  hiddenSlotDisposition,
 } from '../../src/shared/grid-types'
 
 describe('grid-types', () => {
@@ -103,6 +104,54 @@ describe('grid-types', () => {
       assert.ok(covered.has(2), 'row=1,col=0 covered')
       assert.ok(covered.has(4), 'row=2,col=0 covered')
       assert.strictEqual(covered.size, 2)
+    })
+  })
+
+  describe('hiddenSlotDisposition', () => {
+    // Der Unterschied zwischen "unsichtbar" und "tot". Vor dem 2026-10-01 gab
+    // es ihn nicht: jeder verdeckte Slot wurde aus dem Baum genommen, und eine
+    // Session darin verlor ihr Terminal samt Scrollback -- obwohl sie lief.
+    it('ein nicht verdeckter Slot wird normal gerendert', () => {
+      assert.equal(hiddenSlotDisposition({ sessionId: 's1', type: 'session' }, false), 'render')
+      assert.equal(hiddenSlotDisposition({ sessionId: null, type: 'session' }, false), 'render')
+    })
+
+    it('eine verdeckte Session bleibt versteckt stehen', () => {
+      assert.equal(hiddenSlotDisposition({ sessionId: 's1', type: 'session' }, true), 'keep-hidden')
+    })
+
+    it('eine verdeckte leere Zelle faellt weg', () => {
+      // Ein Launcher wird neu gebaut wie er war -- ihn stehen zu lassen waere
+      // ein unsichtbarer Knoten ohne Zweck.
+      assert.equal(hiddenSlotDisposition({ sessionId: null, type: 'session' }, true), 'drop')
+    })
+
+    it('eine verdeckte Notes-Zelle faellt weg, auch mit sessionId', () => {
+      // Notes schreiben in eine Datei; der Typ entscheidet, nicht ein
+      // moeglicherweise stehengebliebenes Feld.
+      assert.equal(hiddenSlotDisposition({ sessionId: 's1', type: 'notes' }, true), 'drop')
+      assert.equal(hiddenSlotDisposition({ sessionId: null, type: 'notes' }, true), 'drop')
+    })
+
+    it('passt zu getCoveredSlots: der ueberdeckte Slot mit Session bleibt', () => {
+      // Der Zellen-Merge, einmal durchgerechnet statt behauptet.
+      const grid = createEmptyGrid({ cols: 2, rows: 2 })
+      grid.slots[0].rowSpan = 2
+      grid.slots[0].sessionId = 'oben'
+      grid.slots[2].sessionId = 'verdeckt'
+      const covered = getCoveredSlots(grid)
+      assert.equal(hiddenSlotDisposition(grid.slots[0], covered.has(0)), 'render')
+      assert.equal(hiddenSlotDisposition(grid.slots[2], covered.has(2)), 'keep-hidden')
+    })
+
+    it('passt zu getFocusModeOverlappedSlots', () => {
+      const grid = createEmptyGrid({ cols: 3, rows: 2 })
+      grid.slots.forEach((s, i) => { s.sessionId = `s${i}` })
+      const overlapped = getFocusModeOverlappedSlots(grid, 0)
+      assert.ok(overlapped.size > 0, 'Focus Mode verdeckt ueberhaupt etwas')
+      for (const idx of overlapped) {
+        assert.equal(hiddenSlotDisposition(grid.slots[idx], true), 'keep-hidden', `Slot ${idx}`)
+      }
     })
   })
 
