@@ -780,18 +780,26 @@ Quick reference for all input methods in cipher-mux.
 
 ## Keyboard Shortcuts
 
+Read off the registrations in \`app.tsx\` (2026-10-01). Two rows here were wrong before that:
+\`Cmd+1–5\` for grid navigation does not exist, and \`Ctrl+Shift+Space\` does not toggle voice.
+
 | Shortcut | Action | Context |
 |---|---|---|
-| Cmd+N | Open Launcher-Popup | Global |
+| Cmd+N | Launcher popup in the first empty cell | Global |
 | Cmd+B | Open bugreport dialog | Global |
-| Cmd+Shift+F | Toggle Focus Mode | Session cell |
-| Ctrl+Shift+Space | Toggle voice input mode | Global (voice enabled) |
+| Cmd+Shift+F | Focus Mode on / off | Global, needs a focused session |
+| Cmd+Shift+W / A / S / D | Move focus up / left / down / right | Global |
+| Cmd+Shift+? | Show the shortcut list | Global |
 | Cmd+S | Save note + trigger auto-tagging | Notes editor |
 | Cmd+C | Copy selected text / cancel running process | Terminal |
 | Cmd+V | Paste from clipboard | Terminal |
-| Cmd+1–5 | Grid navigation (focus cell by index) | Global |
-| Escape | Close active dialog, exit Focus Mode | Any dialog / Focus |
-| Enter | Submit in dialogs | KickoffDialog, SessionDialog |
+| Escape | Exit Focus Mode, close active dialog | Global |
+| Ctrl+Shift+Space | **Push-to-talk** — hold to speak | Only while voice is active (STT or COM) |
+| Cmd+Alt+I | DevTools | Global |
+
+**\`Ctrl+Shift+Space\` does not switch voice on.** The handler returns early when voice is
+inactive (\`useVoiceSession.ts\`, \`if (!active) return\`). Voice is switched with the voice pill
+in the status bar. If a user says "the hotkey does nothing", that is the first thing to check.
 
 ---
 

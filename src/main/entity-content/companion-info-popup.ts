@@ -75,20 +75,22 @@ Zerlegt grosse Anforderungen in sequentielle Wellen (Waves). 11-Phasen-Lebenszyk
 | Kuerzel | Aktion |
 |---|---|
 | Cmd+B | Bugreport-Dialog oeffnen |
-| Cmd+N | Launcher oeffnen |
-| Cmd+Shift+F | Focus Mode umschalten |
-| Escape | Dialog schliessen |
+| Cmd+N | Launcher in der ersten leeren Zelle |
+| Cmd+Shift+F | Focus Mode an/aus |
+| Cmd+Shift+W / A / S / D | Fokus nach oben / links / unten / rechts |
+| Cmd+Shift+? | Kuerzelliste zeigen |
+| Escape | Focus Mode verlassen, Dialog schliessen |
 | Cmd+C | Kopieren / Prozess abbrechen |
 | Cmd+V | Einfuegen |
-| Ctrl+Shift+Space | Spracheingabe umschalten |
+| Ctrl+Shift+Space | **Push-to-talk** -- nur solange Voice laeuft |
 | Cmd+S | Notiz speichern + Auto-Tagging |
-| Cmd+Enter | Eingabe-Anfrage beantworten |
+| Cmd+Alt+I | DevTools |
 
 Zusaetzliche Aktionen per Klick: Zell-Header (Hoehe umschalten, Projekt wechseln, Shell oeffnen, schliessen, per Drag tauschen), Statusleiste (alle Buttons), Sidebar (abkoppeln, Notizen oeffnen, Tags filtern).
 
 ## Konfiguration
 
-Einstellungen unter "einstellungen": 6 Tabs — **general**, **sprache**, **themes**, **shortcuts**, **a11y**, **about**. Konfiguration gespeichert in \`~/Library/Application Support/cipher-mux-electron/cipher-mux-config.json\`. Die Datei \`~/.config/cipher-mux/config.json\` existiert daneben und wird **nicht** gelesen — wer dort editiert, aendert nichts.
+Einstellungen unter "einstellungen": 7 Tabs — **general**, **sprache**, **themes**, **shortcuts**, **remote**, **a11y**, **about**. Konfiguration gespeichert in \`~/Library/Application Support/cipher-mux-electron/cipher-mux-config.json\`. Die Datei \`~/.config/cipher-mux/config.json\` existiert daneben und wird **nicht** gelesen — wer dort editiert, aendert nichts.
 
 ## Einschraenkungen
 
