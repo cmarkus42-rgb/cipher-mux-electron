@@ -412,3 +412,30 @@ describe('runTagMigrationOnce', () => {
     )
   })
 })
+
+describe('Zwei Workspace-Tags', () => {
+  // Audit-Befund vom 2026-10-01: vor dem Umzug trugen 128 Notes zwei
+  // Workspace-Tags -- fast alle, weil Anzeigename und Kleinschreibung als zwei
+  // galten ("Cipher Grow KIT" und "cipher grow kit"). Der Umzug fuehrt sie
+  // zusammen, weil beide auf dieselbe ID abbilden.
+  it('fuehrt zwei Schreibweisen desselben Workspace zusammen', () => {
+    const result = tagsAfter(['workspace:Cipher Grow KIT', 'workspace:cipher grow kit'])
+    assert.deepEqual(result, ['workspace:ws-1779806802206'])
+  })
+
+  // Uebrig blieben zwei Notes mit je einem gueltigen und einem toten Workspace.
+  // Der tote kann weg, solange ein gueltiger bleibt: die Note behaelt ihre
+  // Heimat, und ein Tag auf einen geloeschten Workspace zeigt nirgendwohin.
+  it('laesst einen toten Workspace fallen, wenn ein gueltiger bleibt', () => {
+    const result = tagsAfter(['workspace:cipher-mux', 'workspace:Testinng Workspace'])
+    assert.deepEqual(result, ['workspace:ws-1777957373268'])
+  })
+
+  // Der Gegenfall ist der Grund, warum er sonst stehen bleibt: ohne gueltigen
+  // Workspace waere die Note nach dem Entfernen in JEDEM Workspace sichtbar.
+  it('behaelt einen toten Workspace, wenn er der einzige ist', () => {
+    const result = migrateTags(['workspace:Testinng Workspace'], CTX)
+    assert.deepEqual(result.tags, ['workspace:Testinng Workspace'])
+    assert.ok(result.unmapped.length > 0, 'und wird berichtet')
+  })
+})
