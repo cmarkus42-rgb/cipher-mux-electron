@@ -1,4 +1,4 @@
-# Übergabe: Tag-Modell steht, vier Punkte offen
+# Übergabe: Tag-Modell steht, fünf Punkte offen
 
 **Anker-Commit:** `8024a95` (2026-10-01) — der letzte Code-Commit, nicht der dieser Datei
 **Von:** einer langen Session, die aus den Übergabe-Notes heraus das Tag-Modell gebaut hat
@@ -48,7 +48,7 @@ schlägt Ansicht, ohne Bindung die Ansicht.
 
 ---
 
-## 2. Die vier offenen Punkte
+## 2. Die offenen Punkte
 
 ### 2.1 Sechzehn `preset.md` tragen veraltete Tag-Anweisungen — **wartet auf ein Go des Nutzers**
 
@@ -135,7 +135,23 @@ Typebene** (`any` → typisiert), nachgeprüft per Diff.
 Nicht nachgewiesen: dass der Fehler lange besteht. Wer ihn angeht, baut zuerst den Stand vor dem
 29.09. und schaut, ob er dort schon auftritt.
 
-### 2.4 Manuelle Abnahme — vom Nutzer auf „ab Freitag" gelegt
+### 2.4 Der Workspace einer Handoff-Note sollte aus `anchor_repo` kommen
+
+Gefunden beim Anlegen dieser Übergabe: die Note landete in **Cipher Grow KIT**, weil der
+Workspace gerade aktiv war — obwohl sie über cipher-mux geht. Die Regel
+(`resolveNoteWorkspaceId`) hat korrekt gearbeitet, das Ergebnis war trotzdem falsch.
+
+Der Grund: „welchen Workspace sieht der Mensch gerade an" ist ein schwaches Signal für eine Note,
+die zu einem bestimmten Repository gehört. Bei einer Handoff-Note ist das **starke** Signal
+vorhanden und wird nicht genutzt: `anchor_repo` ist der absolute Pfad des Repositories. Daraus
+den Workspace zu bestimmen — über die `projectPath`-Zuweisungen der Workspace-Cells — wäre
+richtiger als die Ansicht.
+
+Nicht gebaut, weil es die Workspace→Projekt-Zuordnung aufziehen muss und damit ein eigener
+Schnitt ist. Die Reihenfolge wäre: `anchor_repo` → Workspace, dann Verbindungsbindung, dann
+Ansicht. Die betroffene Note ist von Hand korrigiert.
+
+### 2.5 Manuelle Abnahme — vom Nutzer auf „ab Freitag" gelegt
 
 - `docs/superpowers/acceptance/2026-09-20-multi-workspace-sessions-manual.md` (10 Testfälle)
 - Handoff-Dispatch, Rollengrenzen, Spiegelung — end-to-end belegt, aber nicht vom Nutzer
