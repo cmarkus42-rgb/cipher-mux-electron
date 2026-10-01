@@ -398,6 +398,25 @@ const api = {
     setEntityPersonaOverride: (entityId: string, characterId: string | null): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.ENTITY_PERSONA_OVERRIDE_SET, entityId, characterId),
   },
 
+  // ─── Welche CLI startet was ──────────────────────────────
+  agent: {
+    /** Alle registrierten Adapter samt Capabilities — die UI zeigt damit, was fehlt. */
+    listAdapters: (): Promise<Array<{
+      id: string
+      displayName: string
+      tier: 'tier-1' | 'tier-2'
+      capabilities: Record<string, boolean> | null
+    }>> => ipcRenderer.invoke(IPC.AGENT_ADAPTERS_LIST),
+    getDefaultAdapter: (): Promise<string> => ipcRenderer.invoke(IPC.AGENT_DEFAULT_ADAPTER_GET),
+    setDefaultAdapter: (adapterId: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IPC.AGENT_DEFAULT_ADAPTER_SET, adapterId),
+    /** `null` = keine Praeferenz fuer diese Rolle, nicht „Adapter mit leerem Namen". */
+    getEntityAdapter: (entityId: string): Promise<string | null> =>
+      ipcRenderer.invoke(IPC.ENTITY_ADAPTER_GET, entityId),
+    setEntityAdapter: (entityId: string, adapterId: string | null): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IPC.ENTITY_ADAPTER_SET, entityId, adapterId),
+  },
+
   // ─── Workspaces ──────────────────────────────────────────
   workspaces: {
     list: (): Promise<Workspace[]> => ipcRenderer.invoke('cipher-mux:workspaces:list'),

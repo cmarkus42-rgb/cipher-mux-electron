@@ -35,7 +35,7 @@ Complete catalog of all user-facing features. For how to use them, see the guide
 
 **SessionGrid** — Main window area. Up to 7 columns × 3 rows = 21 cells. Each cell holds a session, a notes editor, or a launcher. Drag cells to swap positions.
 
-**Leere Zelle** — Shows a \\\`+\\\` button. Click opens the Launcher-Popup.
+**Leere Zelle** — Shows a \`+\` button. Click opens the Launcher-Popup.
 
 **SessionCell** — One terminal pane running Claude Code in tmux. Header shows session name, entity color dot, context usage bar, and 9 control buttons.
 
@@ -69,9 +69,9 @@ Complete catalog of all user-facing features. For how to use them, see the guide
 | Testing Assistant | Light Green |
 | Bugreport | Grey |
 
-**Launcher-Popup** — Opens via \\\`+\\\` in empty cell or Cmd+N. Three tabs:
+**Launcher-Popup** — Opens via \`+\` in empty cell or Cmd+N. Three tabs:
 
-- **Presets** — Entity list with color dots. Running presets show dot + "running" status. Non-singletons show \\\`+\\\` for multiple instances. Click to start or focus.
+- **Presets** — Entity list with color dots. Running presets show dot + "running" status. Non-singletons show \`+\` for multiple instances. Click to start or focus.
 - **Path** — Project folder picker. Recent paths as quick-select. Options: Shell Only, Skip Permissions, Resume, Fork.
 - **Notes** — Open or create a note in this cell.
 
@@ -89,7 +89,7 @@ Left to right:
 
 **Voice Control — 3-State Radio:**
 
-Three buttons: \\\`OFF\\\` / \\\`STT\\\` / \\\`COM\\\`
+Three buttons: \`OFF\` / \`STT\` / \`COM\`
 
 - **OFF** — Voice off
 - **STT** — Speech-to-Text: mic → text into focused session
@@ -137,10 +137,10 @@ Session expands to 2×2. Floating Focus-Bar:
 
 ## Sidebar
 
-Toggle via \\\`sidebar\\\` in status bar. LED indicates when content is available. 5 collapsible sections:
+Toggle via \`sidebar\` in status bar. LED indicates when content is available. 5 collapsible sections:
 
 ### 1. Notes
-Note browser with search and tag filter. Workspace-active → auto-filtered to \\\`workspace:<Name>\\\`.
+Note browser with search and tag filter. Workspace-active → auto-filtered to \`workspace:<Name>\`.
 - Single-click → details/preview
 - Double-click → open in grid cell
 - Drag → onto grid cell
@@ -165,12 +165,12 @@ Message Bus feed — sender, time, text.
 
 ## Workspaces & Characters
 
-**Workspaces Window** — Separate BrowserWindow. Access: status bar \\\`workspaces\\\` button. 4 tabs:
+**Workspaces Window** — Separate BrowserWindow. Access: status bar \`workspaces\` button. 4 tabs:
 
 ### Tab: Workspaces
 Grid layout editor. Visual editor with merge handles (vertical cell spanning). Cell inspector: assign preset + project + custom prompt per cell.
 
-**Workspace-level settings:** Workspace Prompt (injected into all sessions), Context Directories, Default Tags (\\\`klasse:wert\\\`), Notes Global toggle.
+**Workspace-level settings:** Workspace Prompt (injected into all sessions), Context Directories, Default Tags (\`klasse:wert\`), Notes Global toggle.
 
 **Default-Workspace:** Star button → auto-loaded on app start.
 
@@ -194,6 +194,8 @@ Custom characters: Name + color + prompt text.
 
 ### Tab: Presets
 Preset editor. Global Rules (always first entry) + all entity presets. Builtin presets are read-only — "Copy as Custom" creates editable copy. New custom preset via "+ New".
+
+Per role, a **CLI** field selects the agent CLI (see *Agent-CLIs*). "Default" follows the global setting. A Tier-2 pick names its gap right below the field; the choice applies at the next session start of that role.
 
 ### Tab: Tags
 Tag management. Tag classes and predefined tags configurable.
@@ -219,9 +221,54 @@ Tag management. Tag classes and predefined tags configurable.
 
 ---
 
+## Agent-CLIs (3)
+
+Which command-line AI runs in a cell. Independent of the entity: the entity is the role, the CLI is the executable.
+
+| CLI | Id | Tier | Measured against |
+|---|---|---|---|
+| Claude Code | \`claude-code\` | Tier 1 | default |
+| Codex CLI | \`codex\` | Tier 2 | codex-cli 0.155.1 (2026-10-01) |
+| opencode | \`opencode\` | Tier 2 | opencode 1.18.34 (2026-10-01) |
+
+**Tier 1** — every Mux capability measured. **Tier 2** — not every capability measured. \`false\` in an adapter means "unproven", not "absent".
+
+**Capability gaps:**
+
+| CLI | Not measured | Also missing |
+|---|---|---|
+| Claude Code | — | — |
+| Codex CLI | Sub-Agents | — |
+| opencode | Context display (status line), Sub-Agents | role boundaries not wired; no smoke test against the real CLI |
+
+Codex has no status line of its own — a hook reads usage from the session rollout and writes the format the existing monitor reads. The context bar looks the same to the user.
+
+**Selecting a CLI:**
+
+| Scope | Where |
+|---|---|
+| Per role | Workspaces window → Tab Presets → role → field **CLI**. Shows the gap of a Tier-2 pick inline ("Unter opencode fehlt: ..."). |
+| Global | \`einstellungen\` → general → **Standard-CLI**. Also governs sessions without a role (Path tab). |
+
+**Resolution order:** \`app.entityAdapters\` (per role) > role default (no builtin role has one) > \`agent.defaultAdapter\` (initial value: \`claude-code\`). Takes effect at the next session start of that role.
+
+**Project instructions per CLI:**
+
+| CLI | File |
+|---|---|
+| Claude Code | \`CLAUDE.md\` |
+| Codex CLI | \`AGENTS.md\` |
+| opencode | \`AGENTS.md\` (reads \`CLAUDE.md\` additionally; the Mux writes only \`AGENTS.md\`) |
+
+**Codex directory trust:** Codex loads project-local config, hooks and exec policies only from a trusted directory, and otherwise asks in a blocking dialog — a later "Yes" does not load them. The Mux therefore registers the role's run directory in \`~/.codex/config.toml\`, and only that directory. Switch: \`agent.codexTrustRunDirs\` (initial value: on).
+
+**Config file:** \`~/Library/Application Support/cipher-mux-electron/cipher-mux-config.json\`. A second file \`~/.config/cipher-mux/config.json\` exists and is **not** read by the Mux.
+
+---
+
 ## Themes (13)
 
-CSS custom property-based. Applied via \\\`body[data-theme="id"]\\\`. Theme editor accessible via theme name in status bar.
+CSS custom property-based. Applied via \`body[data-theme="id"]\`. Theme editor accessible via theme name in status bar.
 
 *Cipher Defaults:*
 | ID | Name | Character |
@@ -260,7 +307,7 @@ Theme editor: token groups, terminal font/size/line-height, preview/revert/save/
 
 **3 Voice Modes:** OFF / STT / COM
 
-**STT:** Whisper.cpp via \\\`@fugood/whisper.node\\\`. Model: \\\`~/.config/cipher-mux/models/whisper/ggml-small.bin\\\`. Runs locally, no network.
+**STT:** Whisper.cpp via \`@fugood/whisper.node\`. Model: \`~/.config/cipher-mux/models/whisper/ggml-small.bin\`. Runs locally, no network.
 
 **VAD:** Silero ONNX in browser. Detects speech start/end automatically.
 
@@ -283,7 +330,7 @@ Theme editor: token groups, terminal font/size/line-height, preview/revert/save/
 
 ## Notes Editor
 
-**NoteManager** — Filesystem CRUD. Global: \\\`~/.config/cipher-mux/notes/\\\`. Workspace-scoped: \\\`~/.config/cipher-mux/notes/workspace-<id>/\\\`.
+**NoteManager** — Filesystem CRUD. Global: \`~/.config/cipher-mux/notes/\`. Workspace-scoped: \`~/.config/cipher-mux/notes/workspace-<id>/\`.
 
 **Format** — Markdown with YAML frontmatter (gray-matter). Fields: title, tags.
 
@@ -293,11 +340,11 @@ Theme editor: token groups, terminal font/size/line-height, preview/revert/save/
 
 **Manual Save (Cmd+S)** — Writes file AND triggers Ollama auto-tagging. Model: gemma4:26b. Suggests up to 5 tags.
 
-**Tags** — Format: \\\`klasse:wert\\\`. Exclusive classes: \\\`status\\\`, \\\`kind\\\`. Tag autocomplete from repository.
+**Tags** — Format: \`klasse:wert\`. Exclusive classes: \`status\`, \`kind\`. Tag autocomplete from repository.
 
 **Delete** — Via tab bar trash icon or sidebar hover-reveal button. Both show confirmation dialog.
 
-**Testcase Notes** — Special \\\`noteType: testcase\\\` with tri-state checkboxes (open/pass/fail), comments, screenshots.
+**Testcase Notes** — Special \`noteType: testcase\` with tri-state checkboxes (open/pass/fail), comments, screenshots.
 
 ---
 
@@ -310,7 +357,7 @@ Open: Cmd+B or button in einstellungen → General.
 2. Description textarea (STT input supported)
 3. Screenshot: optional file picker
 4. Enrich: starts a Claude session that analyzes → generates structured report (title, severity, tags, steps to reproduce). Preview is editable.
-5. Submit: saves as Note with \\\`kind:bugreport\\\` tag.
+5. Submit: saves as Note with \`kind:bugreport\` tag.
 
 ---
 
@@ -329,7 +376,8 @@ Appears on startup when sessions exist. **Two phases:**
 6 tabs:
 
 ### General
-- Skip Permissions — \\\`--dangerously-skip-permissions\\\` for all new sessions
+- Skip Permissions — \`--dangerously-skip-permissions\` for all new sessions
+- **Standard-CLI** — which CLI new sessions launch when the role names none. Tier-2 picks are marked "— Tier 2" in the dropdown.
 - Keep Working — save sessions on quit (recovery on next start)
 - Bugreport button
 
@@ -358,7 +406,7 @@ Version, links (cipher-mux.dev, Docs, GitHub), credits.
 - **Max 21 sessions** — 7×3 grid limit
 - **Context warning** — orange at 80%+ usage, red at 90%+
 - **Message retention** — 7 days, auto-cleanup every 6 hours
-- **Whisper model** — must be at \\\`~/.config/cipher-mux/models/whisper/ggml-small.bin\\\`
+- **Whisper model** — must be at \`~/.config/cipher-mux/models/whisper/ggml-small.bin\`
 - **better-sqlite3 ABI** — separate rebuilds for test (Node.js) vs app (Electron)
 - **Preact, not React** — ~3KB, React-compatible API, some ecosystem libs need aliasing
 `;
@@ -373,7 +421,7 @@ All tools available via the cipher-mux MCP server. Used by the Workshop, Cyber F
 
 ### mux_create_session
 
-Create a new Claude Code session in a tmux pane.
+Create a new agent session in a tmux pane.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -385,6 +433,7 @@ Create a new Claude Code session in a tmux pane.
 **Use case:** Workshop spawning a worker for a specific task.
 **Returns:** Session object with id, name, tmuxSession.
 **Note:** After creation, wait 8-10 seconds before sending instructions (Worker-Startup Protocol).
+**Which CLI:** a session created here carries no role, so the global **Standard-CLI** (\`agent.defaultAdapter\`) decides — not necessarily Claude Code. See \`ref/features.md\`, section *Agent-CLIs*.
 
 ### mux_kill_session
 
@@ -542,7 +591,7 @@ Create a new note.
 |---|---|---|---|
 | title | string | yes | Note title |
 | body | string | yes | Markdown content |
-| tags | string[] | no | Tags (\\\`klasse:wert\\\` format) |
+| tags | string[] | no | Tags (\`klasse:wert\` format) |
 | scope | string | no | "global" or "workspace" |
 
 ### mux_notes_list
@@ -701,7 +750,7 @@ Signal that project scaffolding is finished.
 | projectName | string | yes | Project name (kebab-case) |
 | detectedStack | string | no | Detected tech stack |
 
-**Fallback:** Writing an empty \\\`.kickoff-complete\\\` file achieves the same effect.
+**Fallback:** Writing an empty \`.kickoff-complete\` file achieves the same effect.
 
 ---
 
@@ -821,7 +870,9 @@ Quick reference for all input methods in cipher-mux.
 
 const REF_SLASH_COMMANDS = `# Slash Commands — Claude Code
 
-Schnellreferenz fuer alle \\\`/\\\`-Befehle in Claude Code. Diese funktionieren in jeder Claude-Code-Session (auch innerhalb von cipher-mux).
+Schnellreferenz fuer alle \`/\`-Befehle in Claude Code. Diese funktionieren in jeder Claude-Code-Session (auch innerhalb von cipher-mux).
+
+**Geltungsbereich:** Diese Liste gilt fuer **Claude Code**. Eine Zelle kann auch mit Codex CLI oder opencode laufen (siehe \`ref/features.md\`, Abschnitt *Agent-CLIs*) — welche Slash-Befehle dort existieren, ist nicht geprueft. Nicht aus dieser Liste auf die anderen CLIs schliessen.
 
 ---
 
@@ -829,11 +880,11 @@ Schnellreferenz fuer alle \\\`/\\\`-Befehle in Claude Code. Diese funktionieren 
 
 | Befehl | Was es tut |
 |---|---|
-| \\\`/help\\\` | Hilfe und Tastenkuerzel anzeigen |
-| \\\`/status\\\` | Aktuellen Session-Status anzeigen (Modell, Kontext, Permissions) |
-| \\\`/compact\\\` | Konversation komprimieren — reduziert Token-Verbrauch, behält Kernkontext. Optional mit Custom-Prompt: \\\`/compact focus on the API changes\\\` |
-| \\\`/clear\\\` | Konversation komplett leeren (Neustart ohne Session zu beenden) |
-| \\\`/resume\\\` | Letzte Konversation dieser Session fortsetzen |
+| \`/help\` | Hilfe und Tastenkuerzel anzeigen |
+| \`/status\` | Aktuellen Session-Status anzeigen (Modell, Kontext, Permissions) |
+| \`/compact\` | Konversation komprimieren — reduziert Token-Verbrauch, behält Kernkontext. Optional mit Custom-Prompt: \`/compact focus on the API changes\` |
+| \`/clear\` | Konversation komplett leeren (Neustart ohne Session zu beenden) |
+| \`/resume\` | Letzte Konversation dieser Session fortsetzen |
 
 ---
 
@@ -841,11 +892,11 @@ Schnellreferenz fuer alle \\\`/\\\`-Befehle in Claude Code. Diese funktionieren 
 
 | Befehl | Was es tut |
 |---|---|
-| \\\`/config\\\` | Einstellungen anzeigen und aendern (Theme, Modell, etc.) |
-| \\\`/model\\\` | Aktives Modell wechseln (z.B. auf Sonnet, Haiku) |
-| \\\`/permissions\\\` | Aktuelle Tool-Permissions anzeigen und verwalten |
-| \\\`/allowed-tools\\\` | Liste aller aktuell erlaubten Tools |
-| \\\`/fast\\\` | Zwischen Standard- und Fast-Modus umschalten (gleiches Modell, schnellerer Output) |
+| \`/config\` | Einstellungen anzeigen und aendern (Theme, Modell, etc.) |
+| \`/model\` | Aktives Modell wechseln (z.B. auf Sonnet, Haiku) |
+| \`/permissions\` | Aktuelle Tool-Permissions anzeigen und verwalten |
+| \`/allowed-tools\` | Liste aller aktuell erlaubten Tools |
+| \`/fast\` | Zwischen Standard- und Fast-Modus umschalten (gleiches Modell, schnellerer Output) |
 
 ---
 
@@ -853,10 +904,10 @@ Schnellreferenz fuer alle \\\`/\\\`-Befehle in Claude Code. Diese funktionieren 
 
 | Befehl | Was es tut |
 |---|---|
-| \\\`/commit\\\` | Aenderungen committen — Claude analysiert Diff und schlaegt Commit-Message vor |
-| \\\`/pr\\\` | Pull Request erstellen — analysiert Branch-Diff, erstellt Titel + Beschreibung |
-| \\\`/review\\\` | Code-Review des aktuellen Diffs oder einer PR |
-| \\\`/init\\\` | CLAUDE.md im aktuellen Projekt initialisieren |
+| \`/commit\` | Aenderungen committen — Claude analysiert Diff und schlaegt Commit-Message vor |
+| \`/pr\` | Pull Request erstellen — analysiert Branch-Diff, erstellt Titel + Beschreibung |
+| \`/review\` | Code-Review des aktuellen Diffs oder einer PR |
+| \`/init\` | CLAUDE.md im aktuellen Projekt initialisieren |
 
 ---
 
@@ -864,9 +915,9 @@ Schnellreferenz fuer alle \\\`/\\\`-Befehle in Claude Code. Diese funktionieren 
 
 | Befehl | Was es tut |
 |---|---|
-| \\\`/memory\\\` | Projekt-Memory anzeigen und verwalten (CLAUDE.md-basiert) |
-| \\\`/cost\\\` | Token-Verbrauch und Kosten der aktuellen Session anzeigen |
-| \\\`/context\\\` | Kontextfenster-Auslastung anzeigen |
+| \`/memory\` | Projekt-Memory anzeigen und verwalten (CLAUDE.md-basiert) |
+| \`/cost\` | Token-Verbrauch und Kosten der aktuellen Session anzeigen |
+| \`/context\` | Kontextfenster-Auslastung anzeigen |
 
 ---
 
@@ -874,17 +925,17 @@ Schnellreferenz fuer alle \\\`/\\\`-Befehle in Claude Code. Diese funktionieren 
 
 | Befehl | Was es tut |
 |---|---|
-| \\\`/bug\\\` | Bug-Report an Anthropic senden |
-| \\\`/doctor\\\` | Claude Code Installation pruefen (Abhaengigkeiten, Konfiguration) |
-| \\\`/login\\\` | Authentifizierung erneuern |
-| \\\`/logout\\\` | Session abmelden |
+| \`/bug\` | Bug-Report an Anthropic senden |
+| \`/doctor\` | Claude Code Installation pruefen (Abhaengigkeiten, Konfiguration) |
+| \`/login\` | Authentifizierung erneuern |
+| \`/logout\` | Session abmelden |
 
 ---
 
 ## Tipps
 
-- **\\\`/compact\\\` ist dein bester Freund** bei langen Sessions. Wenn der Kontext voll wird, komprimiert es die Konversation und du kannst weiterarbeiten statt neu zu starten.
-- **\\\`/cost\\\`** hilft beim Ueberblick — besonders wenn mehrere Sessions parallel laufen.
-- **\\\`!\\\`-Prefix** ist kein Slash-Command, aber wichtig: \\\`! git status\\\` fuehrt den Befehl direkt in der Shell aus, ohne dass Claude ihn interpretiert.
-- **Custom Slash Commands** kannst du in \\\`.claude/commands/\\\` als Markdown-Dateien anlegen. Der Dateiname wird zum Befehl: \\\`.claude/commands/deploy.md\\\` → \\\`/deploy\\\`.
+- **\`/compact\` ist dein bester Freund** bei langen Sessions. Wenn der Kontext voll wird, komprimiert es die Konversation und du kannst weiterarbeiten statt neu zu starten.
+- **\`/cost\`** hilft beim Ueberblick — besonders wenn mehrere Sessions parallel laufen.
+- **\`!\`-Prefix** ist kein Slash-Command, aber wichtig: \`! git status\` fuehrt den Befehl direkt in der Shell aus, ohne dass Claude ihn interpretiert.
+- **Custom Slash Commands** kannst du in \`.claude/commands/\` als Markdown-Dateien anlegen. Der Dateiname wird zum Befehl: \`.claude/commands/deploy.md\` → \`/deploy\`.
 `;

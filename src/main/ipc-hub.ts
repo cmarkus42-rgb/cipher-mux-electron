@@ -43,6 +43,7 @@ import { generateCompanionClaudeMd } from './entity-content/companion-preset'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { getGlobalRules, setGlobalRules, ensureGlobalRulesFile, invalidateGlobalRulesCache } from './config/global-rules'
 import { AdapterRegistry } from './agent/registry'
+import { readEntityAdapter, withEntityAdapter } from './agent/entity-adapter-map'
 import { EntityRegistry, registerBuiltinEntities } from './session/entity-registry'
 import { CyberFactoryManager } from './cyber-factory/cyber-factory-manager'
 import { scanAndRegisterEntities } from './session/entity-scanner'
@@ -109,6 +110,24 @@ export class IpcHub {
       this.setupCompleteResolve = resolve
     })
     this.adapterRegistry = new AdapterRegistry()
+    // Der CLI-Schalter. Pro Rolle wird der Adapter schon lange aufgelöst
+    // (`entity-runtime.ts` → `resolveAdapter`); was fehlte, war der globale
+    // Default — und ein zweiter Adapter, auf den er zeigen kann.
+    //
+    // Defensiv und still: `agent.defaultAdapter` ist JSON auf der Platte und
+    // von Hand editierbar. Ein unbekannter Name darf den Start nicht kosten,
+    // also bleibt es dann bei claude-code. Ein Wurf hier würde die ganze
+    // Init-Kette killen, und das heißt beim Sessionstart: keine Sessions, ohne
+    // Fehlermeldung.
+    try {
+      const configured = configStore.get('agent').defaultAdapter
+      if (configured && configured !== this.adapterRegistry.getDefault().id) {
+        this.adapterRegistry.setDefault(configured)
+        console.log(`[IpcHub] Default-Adapter aus Config: ${configured}`)
+      }
+    } catch (err) {
+      console.warn('[IpcHub] agent.defaultAdapter nicht anwendbar — bleibe bei claude-code:', err)
+    }
     // Migrate orchestrator → workshop directory
     const oldDir = path.join(os.homedir(), '.config/cipher-mux/entities/orchestrator')
     const newDir = path.join(os.homedir(), '.config/cipher-mux/entities/workshop')
@@ -1832,6 +1851,57 @@ export class IpcHub {
       configStore.set('entityPersonaOverrides', overrides)
       return { ok: true }
     })
+
+    // ─── Welche CLI startet was ──────────────────────────────
+    //
+    // Die Auflösung ist alt, der Weg sie zu setzen ist neu. Reihenfolge wie beim
+    // Modell: `app.entityAdapters` pro Rolle > Rollen-Default > `agent.defaultAdapter`.
+
+    ipcMain.handle(IPC.AGENT_ADAPTERS_LIST, () => {
+      return this.adapterRegistry.listIds().map(id => {
+        const a = this.adapterRegistry.get(id)
+        return {
+          id,
+          displayName: a?.displayName ?? id,
+          tier: a?.tier ?? 'tier-2',
+          // Die UI zeigt damit, was eine Rolle unter dieser CLI *nicht* kann,
+          // statt es den Nutzer beim Start herausfinden zu lassen.
+          capabilities: a?.getCapabilities() ?? null,
+        }
+      })
+    })
+
+    ipcMain.handle(IPC.AGENT_DEFAULT_ADAPTER_GET, () => {
+      return configStore.get('agent').defaultAdapter ?? 'claude-code'
+    })
+
+    ipcMain.handle(IPC.AGENT_DEFAULT_ADAPTER_SET, (_e, adapterId: string) => {
+      if (!this.adapterRegistry.get(adapterId)) {
+        return { ok: false, error: `Unbekannter Adapter: ${adapterId}` }
+      }
+      configStore.set('agent', { ...configStore.get('agent'), defaultAdapter: adapterId })
+      // Sofort wirksam, nicht erst beim naechsten App-Start: der Registry-Default
+      // wird hier mitgesetzt. Ohne das waere der Schalter ein Versprechen auf
+      // spaeter, und der Nutzer sieht nicht, dass seine Auswahl noch nicht gilt.
+      this.adapterRegistry.setDefault(adapterId)
+      return { ok: true }
+    })
+
+    ipcMain.handle(IPC.ENTITY_ADAPTER_GET, (_e, entityId: string) => {
+      return readEntityAdapter(configStore.get('app').entityAdapters, entityId)
+    })
+
+    ipcMain.handle(IPC.ENTITY_ADAPTER_SET, (_e, entityId: string, adapterId: string | null) => {
+      if (adapterId && !this.adapterRegistry.get(adapterId)) {
+        return { ok: false, error: `Unbekannter Adapter: ${adapterId}` }
+      }
+      const app = { ...configStore.get('app') }
+      // Die Drei-Zustands-Disziplin steckt in `withEntityAdapter` — dort ist sie
+      // pruefbar, statt hier als Handler-Rumpf nur beim Hinsehen in der App.
+      app.entityAdapters = withEntityAdapter(app.entityAdapters, entityId, adapterId)
+      configStore.set('app', app)
+      return { ok: true }
+    })
   }
 
   /** Sync the active character's prompt as a SKILL.md to all project skills directories. */
@@ -3066,7 +3136,6 @@ ist dieses Entity fokussiert?
     notesSlots?: Array<{ slotIndex: number; notesId?: string; openNoteIds?: string[] }>,
   ): Promise<void> {
     const effectiveGrid = gridConfig ?? { cols: 1, rows: 1 }
-    const adapter = this.sessionManager['adapterRegistry'].getDefault()
 
     // Build lookup of recovered sessions by name (primary) and projectPath (fallback)
     const recoveredByName = new Map<string, typeof recovered[0]>()
@@ -3112,6 +3181,12 @@ ist dieses Entity fokussiert?
         // No matching recovered session — start new with --resume
         try {
           const escaped = entry.projectPath.replace(/'/g, "'\\''")
+          // Pro Eintrag aufloesen, nicht einmal fuer den ganzen Restore: jede
+          // wiederhergestellte Session traegt ihre eigene Rolle, und die Rolle
+          // entscheidet ueber die CLI. Ein Default fuer alle wuerde eine
+          // Codex-Rolle als `claude --resume` zurueckbringen — die Session kaeme
+          // hoch, nur mit der falschen CLI, und das sieht nach Erfolg aus.
+          const adapter = this.sessionManager.adapterForEntity(entry.entityId ?? null)
           const launchCmd = adapter.buildLaunchCommand({
             projectPath: entry.projectPath,
             sessionName: entry.name,
@@ -3120,11 +3195,16 @@ ist dieses Entity fokussiert?
           const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
           const autoLaunch = `cd '${escaped}' && clear; ${cmdStr}\n`
 
+          // `entityId` muss mit: `start()` loest daran den Adapter fuer
+          // MCP-Injektion und Status-Hook auf. Fehlt es, baut das Startkommando
+          // oben die richtige CLI, waehrend die Injektion die Dateien der
+          // falschen schreibt — die Session kommt hoch, nur ohne ihre Werkzeuge.
           const session = await this.sessionManager.start({
             name: entry.name,
             projectPath: entry.projectPath,
             autoLaunch,
             workspaceId: entry.workspaceId ?? null,
+            entityId: entry.entityId ?? null,
           })
           // Restore entity link for newly created sessions too
           if (entry.entityId) {

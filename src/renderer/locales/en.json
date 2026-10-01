@@ -346,6 +346,8 @@
   "settings.themeHint": "choose a color scheme. the app and all terminals adopt it immediately.",
   "settings.agent": "agent",
   "settings.skipPermissions": "Skip Permission Prompts",
+  "settings.defaultAdapter": "Default CLI",
+  "settings.defaultAdapterHint": "Which CLI new sessions launch when the role names none. Set per role in the Presets tab. Tier 2 means not every Mux capability has been measured there.",
   "settings.skipPermissionsWarning": "Sessions start with --dangerously-skip-permissions. All tool calls are auto-approved.",
   "settings.llmProvider": "LLM provider",
   "settings.llmProviderHint": "configure connection to Ollama for bugreport enrichment and auto-tagging.",

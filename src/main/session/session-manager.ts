@@ -38,6 +38,7 @@ import { extractCharacterBlock } from '../character/character-defaults'
 import { resolvePersonaForPreset } from './persona-resolver'
 import { ensureRunDir, resolveRunDir } from './entity-run-dir'
 import { buildMcpServerConfig } from '../mcp/workspace-header'
+import { buildBoundToken, BOUND_TOKEN_ENV_VAR } from '../mcp/bound-token'
 import { findEntitySessions, entityStartKey } from './entity-session-lookup'
 import type { Workspace } from '../../shared/persona-types'
 
@@ -276,8 +277,16 @@ export class SessionManager extends EventEmitter {
       CIPHER_MUX_SESSION_ID: id,
     }
 
-    // Resolve adapter for this session
-    const adapter = this.adapterRegistry.getDefault()
+    // Resolve adapter for this session.
+    //
+    // **Auf demselben Weg wie `queueEntityClaude`**, und das ist kein Detail:
+    // dort wird das Startkommando mit dem Rollen-Adapter gebaut
+    // (`resolveEntityRuntime` → `resolveAdapter`). Stünde hier `getDefault()`,
+    // liefen die beiden auseinander, sobald eine Rolle einen anderen Adapter
+    // traegt als der globale Default — die Session wuerde `codex` starten und
+    // danach eine `.claude/settings.local.json` samt `claude mcp add-json`
+    // bekommen. Mit nur einem Adapter war das latent; mit zwei ist es ein Fehler.
+    const adapter = this.adapterForEntity(opts.entityId ?? null)
 
     // Merge MCP env vars if config is set
     if (this.mcpConfig) {
@@ -286,6 +295,15 @@ export class SessionManager extends EventEmitter {
         ...env,
         CIPHER_MUX_MCP_URL: mcpUrl,
         CIPHER_MUX_MCP_KEY: this.mcpConfig.mcpApiKey,
+        // Derselbe Schluessel, aber mit Workspace und Rolle darin — fuer CLIs,
+        // die dem MCP-Server keine freien Header mitgeben koennen (Codex).
+        // Ohne Bindung ist das Token Zeichen fuer Zeichen der blanke Schluessel.
+        // Siehe mcp/bound-token.ts.
+        [BOUND_TOKEN_ENV_VAR]: buildBoundToken(
+          this.mcpConfig.mcpApiKey,
+          opts.workspaceId ?? null,
+          opts.entityId ?? null,
+        ),
       }
 
       // Inject MCP config via adapter (handles CLI + direct settings.json)
@@ -298,6 +316,7 @@ export class SessionManager extends EventEmitter {
             mcpApiKey: this.mcpConfig.mcpApiKey,
             sessionId: id,
             workspaceId: opts.workspaceId ?? null,
+            entityId: opts.entityId ?? null,
           })
         } catch (err) {
           console.warn('[SessionManager] Adapter MCP injection failed:', err)
@@ -1303,6 +1322,7 @@ export class SessionManager extends EventEmitter {
       ...restOpts,
       projectPath: runDir,
       workspaceId,
+      entityId,
       _entityInjected: true,
     })
 
@@ -1369,6 +1389,29 @@ export class SessionManager extends EventEmitter {
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
     this.autoLaunchedSessions.add(sessionId)
     this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
+  }
+
+  /**
+   * Adapter fuer eine Rolle, ueber dieselbe Auflösungskette wie das
+   * Startkommando: `entityAdapters` > Rollen-Default > globaler Default.
+   *
+   * Ohne Rolle — eine freie Session, kein Entity — gilt der globale Default.
+   * Ein unbekannter Rollenname ist keine Ausnahme: die Registry kennt ihn dann
+   * nicht, und es bleibt beim Default.
+   */
+  adapterForEntity(entityId: string | null): AgentAdapter {
+    if (!entityId) return this.adapterRegistry.getDefault()
+    const config = this.entityRegistry.get(entityId as EntityId)
+    if (!config) return this.adapterRegistry.getDefault()
+    try {
+      const runtime = resolveEntityRuntime(config, configStore.get('app') as EntityRuntimeConfig)
+      return this.resolveAdapter(runtime.adapterId)
+    } catch (err) {
+      // Ein Wurf hier liegt in der Init-Kette einer Session. Der Default ist
+      // immer eine gueltige Antwort; ein Abbruch waere es nicht.
+      console.warn('[SessionManager] Adapter-Auflösung fuer Rolle fehlgeschlagen:', err)
+      return this.adapterRegistry.getDefault()
+    }
   }
 
   /**
@@ -1620,7 +1663,12 @@ export class SessionManager extends EventEmitter {
       throw new Error('Source session has no Claude session ID — cannot fork')
     }
 
-    const adapter = this.adapterRegistry.getDefault()
+    // Ein Fork laeuft in derselben CLI wie die Quelle. `sessionAdapters` haelt
+    // fest, womit die Session wirklich gestartet wurde — das ist genauer als
+    // jede Neuauflösung, weil die Konfiguration sich seitdem geaendert haben
+    // kann. Die Rolle ist der Rueckfall, der globale Default der letzte.
+    const adapter = this.getAdapterForSession(sourceSessionId)
+      ?? this.adapterForEntity(source.entityId ?? null)
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: source.projectPath || os.homedir(),
       sessionName: `${source.name}-fork`,

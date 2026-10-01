@@ -1,11 +1,17 @@
 import type { AgentAdapter } from './agent-adapter'
 import { ClaudeCodeAdapter } from './adapters/claude-code'
+import { CodexAdapter } from './adapters/codex'
+import { OpenCodeAdapter } from './adapters/opencode'
 
 /**
  * AdapterRegistry — config-based adapter lookup.
  *
  * Holds all known adapters. Default is claude-code.
  * Community adapters register themselves via register().
+ *
+ * Der Default bleibt claude-code, und zwar nicht aus Gewohnheit: er ist der
+ * einzige Tier-1-Adapter, und nur fuer ihn ist jede Capability gemessen. Ein
+ * Wechsel ist eine Entscheidung des Nutzers, keine Vorgabe des Codes.
  */
 export class AdapterRegistry {
   private adapters: Map<string, AgentAdapter> = new Map()
@@ -14,6 +20,10 @@ export class AdapterRegistry {
   constructor() {
     const claude = new ClaudeCodeAdapter()
     this.adapters.set(claude.id, claude)
+    const codex = new CodexAdapter()
+    this.adapters.set(codex.id, codex)
+    const opencode = new OpenCodeAdapter()
+    this.adapters.set(opencode.id, opencode)
   }
 
   register(adapter: AgentAdapter): void {
