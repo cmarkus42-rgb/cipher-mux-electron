@@ -648,8 +648,36 @@ export function PresetEditor() {
                 ? ` (Datei v${presetStale.fileVersion}, Vorlage v${presetStale.templateVersion})`
                 : ' (Datei ohne Versionsmarker)'}.
               {' '}preset.md wird nur einmal geschrieben, damit Handarbeit überlebt — eine Korrektur
-              im Code erreicht sie deshalb nicht von selbst. Was sich geändert hat, steht im
-              Repository; übernimm es von Hand, wenn du es brauchst.
+              im Code erreicht sie deshalb nicht von selbst.
+              <div style={{ marginTop: '6px' }}>
+                <button
+                  class="btn btn--sm"
+                  onClick={async () => {
+                    // Die Rückfrage ist der Punkt, an dem write-once aufgehoben
+                    // wird. Ein Knopf ohne sie wäre dasselbe wie die Automatik,
+                    // nur mit einem Klick dazwischen.
+                    const ok = confirm(
+                      'preset.md durch die Code-Vorlage ersetzen?\n\n'
+                      + 'Eigene Änderungen in dieser Datei gehen dabei verloren. '
+                      + 'Eine Sicherung wird vorher daneben gelegt.',
+                    )
+                    if (!ok) return
+                    const res = await api.agent.presetTemplateApply(selectedId)
+                    if (!res.ok) { alert(`Nicht ersetzt: ${res.error ?? 'unbekannter Fehler'}`); return }
+                    // Editor und Hinweis müssen denselben Stand zeigen wie die
+                    // Datei — sonst speichert der nächste Klick den alten Text
+                    // zurück.
+                    const fresh = await api.presets.read(selectedId)
+                    if (fresh.ok) { setDraftContent(fresh.content); setSavedContent(fresh.content); setDirty(false) }
+                    const st = await api.agent.presetTemplateStatus(selectedId)
+                    setPresetStale(st?.stale ? { fileVersion: st.fileVersion, templateVersion: st.templateVersion } : null)
+                    if (res.unchanged) alert('Die Datei war inhaltlich schon gleich — nur der Versionsmarker fehlte.')
+                    else if (res.backupPath) alert(`Übernommen. Sicherung:\n${res.backupPath}`)
+                  }}
+                >
+                  Vorlage übernehmen
+                </button>
+              </div>
             </div>
           )}
 

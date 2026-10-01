@@ -44,7 +44,7 @@ import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { getGlobalRules, setGlobalRules, ensureGlobalRulesFile, invalidateGlobalRulesCache } from './config/global-rules'
 import { AdapterRegistry } from './agent/registry'
 import { readEntityOverride, withEntityOverride } from './agent/entity-override-map'
-import { comparePresetVersion } from './entity-content/preset-version'
+import { comparePresetVersion, presetBackupPath } from './entity-content/preset-version'
 import { presetTemplateFor } from './entity-content/preset-templates'
 import { EntityRegistry, registerBuiltinEntities } from './session/entity-registry'
 import { CyberFactoryManager } from './cyber-factory/cyber-factory-manager'
@@ -1931,6 +1931,32 @@ export class IpcHub {
         // Keine Datei heisst: die Rolle lief noch nie. Dann gibt es auch keinen
         // Rueckstand -- sie bekommt beim ersten Start die aktuelle Vorlage.
         return null
+      }
+    })
+
+    ipcMain.handle(IPC.PRESET_TEMPLATE_APPLY, (_e, entityId: string) => {
+      // Der Gegenpart zu PRESET_TEMPLATE_STATUS: dort wird der Rueckstand
+      // gemeldet, hier wird er auf Knopfdruck aufgeloest. Nie von selbst --
+      // write-once schuetzt Handarbeit, und diese Funktion hebt den Schutz
+      // bewusst auf. Deshalb zuerst die Sicherung, dann der Schreibvorgang:
+      // was nicht gesichert ist, ist nach dem Schreiben nicht mehr zu holen.
+      const template = presetTemplateFor(entityId)
+      if (template === null) return { ok: false, error: 'Diese Rolle hat keine Code-Vorlage.' }
+      const file = path.join(os.homedir(), '.config', BRAND.appName, 'entities', entityId, 'preset.md')
+      try {
+        const current = fs.readFileSync(file, 'utf-8')
+        if (current === template) return { ok: true, backupPath: null, unchanged: true }
+        const backupPath = presetBackupPath(file, new Date())
+        fs.writeFileSync(backupPath, current, 'utf-8')
+        fs.writeFileSync(file, template, 'utf-8')
+        console.log(`[IpcHub] preset.md fuer '${entityId}' aus der Vorlage ersetzt, Sicherung: ${backupPath}`)
+        return { ok: true, backupPath }
+      } catch (err) {
+        // Keine Datei heisst: die Rolle lief noch nie. Dann ist nichts zu
+        // reparieren, und sie bekommt beim ersten Start die aktuelle Vorlage.
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn(`[IpcHub] preset.md fuer '${entityId}' nicht ersetzbar:`, msg)
+        return { ok: false, error: msg }
       }
     })
 

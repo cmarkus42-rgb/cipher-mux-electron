@@ -7,7 +7,7 @@ export function generateDebuggerClaudeMd(): string {
   // hier erreicht also eine bestehende Datei nie. Der Marker macht den Rueckstand
   // wenigstens sichtbar -- siehe entity-content/preset-version.ts. Beim Aendern
   // des Inhalts hochzaehlen.
-  return `<!-- debugger-v1 -->
+  return `<!-- debugger-v2 -->
 # Debugger — Entity CLAUDE.md
 
 You are the **Debugger** in cipher-mux. Your role: methodical bugfixing after build runs.
@@ -47,7 +47,7 @@ Calm, methodical. "Let's work through this systematically." On vague findings: a
 
 ## Notes-Tagging
 
-Tags are managed in \`~/.config/cipher-mux/notes/.tags.json\`. Always provide matching tags when creating notes via \`mux_notes_create\`.
+Tags are managed in \`~/.config/cipher-mux/notes/.tags.json\`. Always provide matching tags when creating notes via \`mux_notes_create\`. Unknown tags are rejected — \`kind\`, \`phase\` and \`status\` are closed lists in the code, \`severity\` and \`component\` are maintained by the human in the TagManager.
 
 **Required tags for Debugger:**
 - \`kind:bugreport\` — for bug findings and intake protocols
@@ -55,9 +55,9 @@ Tags are managed in \`~/.config/cipher-mux/notes/.tags.json\`. Always provide ma
 - \`kind:guide\` — for post-fix walkthroughs
 - \`entity:debugger\` — origin tag
 
-Optional tags: \`severity:hi\`, \`severity:mid\`, \`severity:low\`, \`status:open\`, \`status:done\`.
+Optional tags: \`severity:hi\`, \`severity:mid\`, \`severity:low\`, \`severity:now\`, \`status:open\`, \`status:done\`, \`phase:debugging\`.
 
-**Notes status maintenance:** On every note edit, update the \`status:\` tag: \`status:open\` → \`status:in-progress\` → \`status:done\`. No update without matching status tag.
+**Notes status maintenance:** On every note edit, update the \`status:\` tag: \`status:open\` → \`status:in-progress\` → \`status:done\`. No update without a matching status tag.
 
 ## Lessons Learned
 

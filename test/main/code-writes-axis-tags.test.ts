@@ -134,4 +134,55 @@ describe('Der Code schreibt und empfiehlt nur vergebbare Tags', () => {
       + bad.map(b => `  ${b.file} -> severity:${b.value}`).join('\n'),
     )
   })
+
+  // ─── Und das Loch, das die drei Pruefungen oben hatten ──────
+  //
+  // Alle drei suchen nach `klasse:wert`. Ein Tag OHNE Klasse ist fuer sie
+  // unsichtbar -- und genau so einer stand am 2026-10-01 noch in der
+  // Companion-Vorlage: `**tags:** ["bugreport", "open"]` in den beiden
+  // Formatvorlagen fuer Bug und Feature. Die Reparatur am Morgen war auf die
+  // Sektion "Notes-Tagging" beschraenkt, und diese zwei Stellen stehen
+  // woanders in derselben Datei.
+  //
+  // Die Folge ist nicht kosmetisch: `bugreport` ist kein FLAT_MARKER und kein
+  // Klassenname, `isKnownTag` sagt false, `mux_notes_create` bricht ab. Der
+  // Companion haette seine eigene Bugreport-Anleitung befolgt und eine
+  // Fehlermeldung bekommen.
+  it('empfiehlt keine klassenlosen Tags in Tag-Arrays', async () => {
+    const sources = await collectSources(MAIN_DIR)
+    const { FLAT_MARKERS } = await import('../../src/shared/tag-axes')
+    const axes = Object.keys(AXIS_VALUES)
+    // Erlaubt ohne Klasse: die flachen Marker (programmatisch gelesen) und ein
+    // blanker Klassenname (den akzeptiert isKnownTag ausdruecklich).
+    const okBare = new Set<string>([...FLAT_MARKERS, ...axes, ...REGISTRY_CLASSES])
+
+    // Woran eine Tag-Liste zu erkennen ist: am **Wort davor**, nicht am Inhalt.
+    // Eine erste Fassung verlangte, dass mindestens ein Element Klassenform hat
+    // — und war damit blind fuer genau den Fall, den sie finden sollte:
+    // `["bugreport", "open"]` hat kein einziges. Der Kontext traegt die Aussage.
+    const ARRAY = /\[\s*((?:["'][^"'\n]*["']\s*,?\s*)+)\]/g
+    const ELEM = /["']([^"'\n]*)["']/g
+    /** `tags`, `tags:`, `**tags:**`, `tags=` … unmittelbar vor dem Array. */
+    const TAGS_BEFORE = /tags\W{0,6}$/i
+    const bad: Array<{ file: string; tag: string; array: string }> = []
+    for (const { file, text } of sources) {
+      for (const m of text.matchAll(ARRAY)) {
+        const before = text.slice(Math.max(0, m.index - 24), m.index)
+        if (!TAGS_BEFORE.test(before)) continue
+        const elems = [...m[1].matchAll(ELEM)].map(e => e[1])
+        for (const e of elems) {
+          if (e.includes(':')) continue
+          if (okBare.has(e)) continue
+          bad.push({ file, tag: e, array: m[0].slice(0, 70) })
+        }
+      }
+    }
+
+    assert.deepEqual(
+      bad, [],
+      'Tags ohne Klasse in einer Tag-Liste — isKnownTag sagt false, der Aufruf '
+      + 'bricht ab:\n'
+      + bad.map(b => `  ${b.file} -> "${b.tag}"  in ${b.array}`).join('\n'),
+    )
+  })
 })

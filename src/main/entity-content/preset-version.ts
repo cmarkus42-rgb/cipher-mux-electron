@@ -8,11 +8,18 @@
  * ohne dass es jemandem auffiel. Behoben wurde es von Hand; ein Mechanismus
  * entstand dabei nicht.
  *
- * **Was diese Datei tut und was nicht.** Sie *erkennt* den Rueckstand. Sie
- * repariert ihn nicht. Automatisch zu ueberschreiben waere genau das, was
- * write-once verhindern soll — und ein Dialog beim Sessionstart waere wieder
- * etwas, das eine unbeaufsichtigte Session aufhaelt. Der Befund gehoert dorthin,
- * wo jemand die Datei ohnehin ansieht: in den Preset-Editor.
+ * **Was diese Datei tut und was nicht.** Sie *erkennt* den Rueckstand.
+ * **Automatisch** repariert sie ihn nicht — das waere genau das, was write-once
+ * verhindern soll, und ein Dialog beim Sessionstart waere wieder etwas, das eine
+ * unbeaufsichtigte Session aufhaelt. Der Befund gehoert dorthin, wo jemand die
+ * Datei ohnehin ansieht: in den Preset-Editor.
+ *
+ * Dort steht seit dem 2026-10-01 auch ein Knopf dafuer. Der Unterschied zur
+ * Automatik ist nicht Bequemlichkeit, sondern wer entscheidet: der Knopf
+ * schreibt vorher eine Sicherung (`presetBackupPath`) und wird gedrueckt,
+ * nachdem jemand den Hinweis gelesen hat. "Von Hand uebernehmen" war der
+ * ehrliche Rat, solange es keinen gab — er hat nur niemanden erreicht, weil
+ * dazu ein Diff gegen den Quelltext gehoert.
  *
  * **Die Konvention gab es schon halb.** Drei Vorlagen tragen seit laengerem einen
  * Marker (`<!-- companion-v2 -->` und Geschwister) — ausgewertet hat ihn nie
@@ -93,4 +100,22 @@ export function comparePresetVersion(fileText: string, templateText: string): Pr
     return { status: 'voraus', fileVersion: file.version, templateVersion: template.version, stale: false }
   }
   return { status: 'aktuell', fileVersion: file.version, templateVersion: template.version, stale: false }
+}
+
+/**
+ * Den Namen der Sicherung bilden, die vor einem Ueberschreiben entsteht.
+ *
+ * Eine Sicherung ohne Zeitstempel waere nach dem zweiten Mal weg, und dann
+ * waere die Reparatur genau das irreversible Ding, das write-once verhindern
+ * soll. Der Zeitstempel kommt von aussen herein, damit die Funktion pruefbar
+ * bleibt — eine `new Date()` im Rumpf macht sie zu etwas, das man nur
+ * ungefaehr testen kann.
+ *
+ * Die Doppelpunkte einer ISO-Zeit sind in einem Dateinamen auf macOS zulaessig,
+ * im Finder aber Trenner: `.bak-2026-10-01T22:40:00` zeigt er als Pfad. Deshalb
+ * werden sie zu Bindestrichen.
+ */
+export function presetBackupPath(filePath: string, now: Date): string {
+  const stamp = now.toISOString().replace(/[:.]/g, '-').replace(/-\d{3}Z$/, 'Z')
+  return `${filePath}.bak-${stamp}`
 }

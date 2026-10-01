@@ -262,6 +262,8 @@ export const IPC = {
   // Ob eine ausgelieferte preset.md hinter ihrer Code-Vorlage zurückliegt.
   // write-once heißt: ein Vorlagen-Fix erreicht sie nie von selbst.
   PRESET_TEMPLATE_STATUS: 'cipher-mux:preset:template-status',
+  // Die Vorlage uebernehmen — nach einer Sicherung, auf Knopfdruck, nie von selbst.
+  PRESET_TEMPLATE_APPLY: 'cipher-mux:preset:template-apply',
   ENTITY_MODEL_GET: 'cipher-mux:entity:model:get',
   ENTITY_MODEL_SET: 'cipher-mux:entity:model:set',
 
