@@ -24,7 +24,6 @@
  * das tut der Aufrufer, und das macht die Abbildung prüfbar.
  */
 import {
-  AXIS_VALUES,
   ENTITY_PHASE_DEFAULT,
   ENTITY_VALUES,
   isExclusiveClass,
@@ -353,11 +352,6 @@ export function migrateTags(tags: readonly string[], ctx: MigrationContext): Mig
     || result.some((t, i) => t !== tags[i])
 
   return { tags: result, unmapped, changed }
-}
-
-/** Alle Achsenwerte, die nach dem Umzug vorkommen dürfen — für den Bericht. */
-export function axisValueCount(): number {
-  return Object.values(AXIS_VALUES).reduce((n, v) => n + (v?.length ?? 0), 0)
 }
 
 // ─── Anwendung auf ein Notes-Verzeichnis ────────────────────

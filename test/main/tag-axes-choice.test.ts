@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { toggleTag, axisTagsOf, PROCESS_SET_AXES } from '../../src/shared/tag-axes'
+import { toggleTag, PROCESS_SET_AXES } from '../../src/shared/tag-axes'
 
 // ─── Tags werden ausgewaehlt, nicht getippt ─────────────────
 //
@@ -68,18 +68,6 @@ describe('toggleTag', () => {
     const before = ['status:open']
     toggleTag(before, 'status:done')
     assert.deepEqual(before, ['status:open'], 'toggleTag arbeitet nicht auf dem Original')
-  })
-})
-
-describe('axisTagsOf', () => {
-  it('liest die Werte einer Achse heraus', () => {
-    const tags = ['phase:coding', 'phase:testing', 'kind:spec', 'domain:x']
-    assert.deepEqual(axisTagsOf(tags, 'phase').sort(), ['coding', 'testing'])
-    assert.deepEqual(axisTagsOf(tags, 'kind'), ['spec'])
-  })
-
-  it('gibt eine leere Liste, wenn die Achse fehlt', () => {
-    assert.deepEqual(axisTagsOf(['kind:spec'], 'status'), [])
   })
 })
 
