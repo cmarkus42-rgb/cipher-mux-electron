@@ -214,11 +214,15 @@ is not a guess — it is the set of `false` entries in the adapter's own `getCap
 UI names it either way. Grid, presets, personas, workspaces, notes, voice, the MCP server, and
 the message bus work under all three.
 
-One difference deserves naming outright: **opencode has no role boundaries and no smoke test
-against the real CLI.** opencode exposes plugin events (`tool.execute.before` and friends)
-instead of hook files, and whether those can actually deny a tool call has not been measured — so
-the adapter writes no boundary. A boundary that looks like one and does not fire is worse than
-none. The opencode adapter is backed by unit tests, not by a run against the CLI.
+Two differences deserve naming outright. **Role boundaries use a different mechanism per CLI:**
+Claude Code and Codex enforce them through a `PreToolUse` hook, opencode through a plugin on
+`tool.execute.before`. All three were proven to deny selectively against the live CLI — the
+mechanism differs, the guarantee does not. The shell gap is shared: `Bash` carries no path, so a
+file can still be changed through the shell. The boundary is a guardrail against mistakes, not a
+sandbox.
+
+And **opencode needs an authenticated provider.** Without one it starts, reaches its prompt, and
+then does nothing on any input. No flag removes this — it is a precondition, not a dialog.
 
 ### Choosing a CLI
 

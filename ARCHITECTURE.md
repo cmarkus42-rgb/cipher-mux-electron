@@ -111,7 +111,7 @@ Communication between main and renderer flows through typed IPC channels defined
 | **ConfigStore** | `config/` | App settings persistence via JSON (electron-store pattern). Grid layout, theme, scan paths. |
 | **ProjectScanner** | `project/` | Discovers projects by scanning configured directories for marker files (`CLAUDE.md`, `AGENTS.md`). Powers the cockpit project card grid. |
 | **KickoffManager** | `project/` | Project scaffolding and session spawn. Handles the "launch a new project" flow with optional requirements interview. |
-| **StatusLineMonitor** | `monitoring/` | Reads real-time context/token usage via the statusLine hook. Claude Code writes that JSON itself; for Codex, `monitoring/codex-usage-hook.ts` derives the same shape from the `token_usage_record` entries in the rollout JSONL — a second writer, not a second reader. opencode has no measured path and declares `status-line: false`. See [ADR-003](docs/decisions/ADR-003-statusline-integration.md). |
+| **StatusLineMonitor** | `monitoring/` | Reads real-time context/token usage via the statusLine hook. Claude Code writes that JSON itself; for Codex, `monitoring/codex-usage-hook.ts` derives the same shape from the `token_usage_record` entries in the rollout JSONL — a second writer, not a second reader. opencode derives the same shape from a plugin `event` hook, which sees token counts per assistant message. See [ADR-003](docs/decisions/ADR-003-statusline-integration.md). |
 | **TaskManager** | `task/` | SQLite-backed task outbox. State machine (inbox -> in-progress -> done/parked/dropped). Watcher, hooks, MCP tool integration. |
 | **NoteManager** | `notes/note-manager.ts` | Note CRUD + full-text search. SQLite-backed. Powers `mux_notes_*` MCP tools. |
 | **NoteTagging** | `notes/note-tagging.ts` | Ollama-powered auto-tagging for notes. |
@@ -264,7 +264,7 @@ interface AgentAdapter {
 
 The reference stub is not registered; it is the file you copy.
 
-**Beyond the capability flags, opencode carries no role boundary and no smoke test against the real CLI.** Both are stated here rather than encoded as a capability, because `AdapterFeature` has no flag for either. The opencode adapter's evidence is its unit tests; Claude Code and Codex were each run against the live CLI.
+**Beyond the capability flags, all three were run against their live CLI, and all three enforce role boundaries.** This is stated here rather than encoded as a capability because `AdapterFeature` has no flag for "was actually run" — and that distinction earned its place: the Codex boundary was configured, tested, and documented while never being passed in. It was found by auditing opencode, not by auditing Codex.
 
 ### Where the three CLIs diverge structurally
 
@@ -278,7 +278,7 @@ Two places in the contract are not differences of degree but of mechanism. Every
 **2. Role boundaries.** A role's limits are enforced, not merely prompted (see `src/main/session/entity-boundaries.ts`).
 
 - *Claude Code and Codex* both take a dependency-free Node script in the run directory wired as a **`PreToolUse` hook**. Codex carries the Claude Code hook protocol verbatim — `hookSpecificOutput.permissionDecision`, `permissionDecisionReason`, exit 2 plus stderr — and a `deny` takes effect even under `--dangerously-bypass-approvals-and-sandbox`. Two Codex specifics are measured and silent when missed: without `--dangerously-bypass-hook-trust` a freshly written hook does not fire at all, and the hook input reports `tool_name: "Bash"` even though the output shows `exec`, so a `matcher = "shell"` matches nothing. The adapter therefore sets both flags together and writes **no** matcher, filtering inside the hook script instead.
-- *opencode has no hook files.* It exposes plugin events — `tool.execute.before`, `tool.execute.after`, `permission.ask`, `chat.message`, `chat.params`. Whether `tool.execute.before` can actually *deny* a call has not been measured, so **the opencode adapter wires no boundary at all.** A boundary that looks like one and does not fire is worse than none.
+- *opencode has no hook files.* It exposes plugin events, and **`tool.execute.before` is the only one that can stop a call** — a throw there prevents execution, proven in `opencode run` and in the TUI. The documented `permission.ask` **never fires**: the binary triggers every other hook name but not that one. A boundary built on it would have been written and dead.
 
 A third Codex-only obstacle sits outside the contract and is worth knowing before debugging a hung session: Codex loads project-local config, hooks and exec policies **only from a trusted directory** and otherwise blocks on a dialog, and a belated "Yes" does not load them after the fact. Of the workarounds, only an entry in the global `~/.codex/config.toml` works — `src/main/agent/adapters/codex-trust.ts` writes it, and only for paths under `~/.config/cipher-mux/runs/`, checked on the resolved path. The justification is in that file's header: the dialog protects against foreign content, and a run directory has none — everything under it was generated by the Mux. Switchable off via `agent.codexTrustRunDirs`.
 
@@ -349,7 +349,7 @@ Claude Code CLI                    Codex CLI
                       -> ActivityRail + PaneHeader update
 ```
 
-opencode does not appear here: no measured way writes that JSON per session, so the adapter declares `status-line: false` and the UI shows `---` rather than a number it does not have.
+opencode writes the same JSON from a plugin `event` hook on `message.updated`, which carries `sessionID`, `modelID` and `tokens`. Its context-window size stays an estimate and says so — `/api/model` returns an empty list without an authenticated provider.
 
 ### Companion Memory
 
