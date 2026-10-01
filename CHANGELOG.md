@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **The adapter is now resolved per role everywhere** — at launch, at fork, and per entry during the Keep-Working restore. It previously diverged across three call sites, so a role on Codex under a global default of `claude-code` launched `codex` and was then handed Claude Code's config files. Latent with one adapter, a bug with three.
-- **Role boundaries** run through `PreToolUse` hooks for Claude Code *and* Codex. **opencode has none:** it exposes plugin events instead of hook files, and whether `tool.execute.before` can actually deny a call has not been measured. A boundary that looks like one and does not fire is worse than none.
+- **Role boundaries** run through `PreToolUse` hooks for Claude Code and Codex, and through a plugin on `tool.execute.before` for opencode. All three were proven to deny selectively against the live CLI. Two findings came out of it: opencode's documented `permission.ask` hook **never fires** — a boundary built on it would have been written and dead — and Codex carries no `file_path` in its tool input, so its boundary parses the `apply_patch` envelope instead (`adapters/codex-boundary.ts`).
 
 ### Documentation
 - README, ARCHITECTURE and CONTRIBUTING rewritten for three adapters: capability matrix per adapter, the two structural divergences (MCP binding, role boundaries), the per-role CLI selection, and the measurement discipline for new adapters.
@@ -24,8 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/website-update-2026-10-01.md` — proposed text for the eleven places on cipher-mux.dev that the three adapters made wrong or incomplete. A proposal, not a deployment.
 
 ### Known gaps
-- **opencode has no smoke test against the real CLI.** Its evidence is unit tests, not a run.
-- `sub-agents` is `false` for both Tier-2 adapters, and `status-line` is `false` for opencode. In each case that means *unmeasured*, not *impossible*.
+- **The shell gap is open in all three.** `Bash` carries no path, so a file can still be changed through the shell. Closing it would mean parsing shell syntax, and a half-hearted parser is another boundary that only looks like one. The boundary is a guardrail against mistakes, not a sandbox.
+- `sub-agents` is `false` for both Tier-2 adapters. That means *unmeasured*, not *impossible*.
+- **opencode needs an authenticated provider.** Without one it reaches its prompt and then does nothing on any input. No flag removes this — it is a precondition, not a dialog.
 - The **CLI** field in the preset editor is built, typechecked and unit-tested, but has not been visually accepted.
 
 ## [0.9.104] — 2026-05-17

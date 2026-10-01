@@ -141,7 +141,7 @@ cipher-mux supports pluggable agent adapters. Three ship today:
 | Codex CLI | `codex` | Tier-2 | `sub-agents` |
 | opencode | `opencode` | Tier-2 | `status-line`, `sub-agents` |
 
-Beyond those flags, **opencode has no role boundary wired and no smoke test against the real CLI** — its evidence is unit tests. Worth knowing before you use it as a template: the Codex adapter is the more complete Tier-2 example.
+Beyond those flags, both Tier-2 adapters were run against their real CLI, and both enforce role boundaries — Codex through a `PreToolUse` hook, opencode through a plugin on `tool.execute.before`. Either is a usable template. What `opencode` demonstrates and `codex` does not is that the boundary has to be generated **where the file that registers it is written**: Codex shipped for half a day with a boundary that was configured but never passed in.
 
 To write a new adapter:
 
