@@ -20,6 +20,7 @@ import { mayUseCompanionMemory } from './entity-header'
 import { dispatchHandoffNote } from '../notes/handoff-dispatch'
 import type { EntityId } from '../../shared/types'
 import { processTagsFor } from '../../shared/tag-axes'
+import { resolveNoteWorkspaceId } from '../notes/note-workspace'
 
 /**
  * Obergrenze fuer von Hand mitgegebene Tags.
@@ -763,13 +764,17 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
             if (!tags.includes(t)) tags.push(t)
           }
 
+          // Bindung schlaegt Ansicht: eine Rolle, die in Workspace A arbeitet,
+          // darf ihre Note nicht nach B schreiben, nur weil der Mensch dorthin
+          // schaut. Siehe notes/note-workspace.ts.
+          const noteWorkspaceId = resolveNoteWorkspaceId(ctx.workspaceId, ws?.id)
           if (ws) {
             // notesGlobal: skip workspace scope tag so note is visible in all workspaces
-            if (!ws.notesGlobal) {
+            if (!ws.notesGlobal && noteWorkspaceId) {
               // Die ID, nicht der Anzeigename. Aus `ws.name` sind die
               // Schreibweisen-Dubletten entstanden ("Cipher Grow KIT" neben
               // "cipher grow kit"); die Leseseite akzeptiert beide Formen.
-              tags.push(`workspace:${ws.id}`)
+              tags.push(`workspace:${noteWorkspaceId}`)
             }
             // User-configured cross-workspace tags
             if (ws.defaultTags?.length) {
@@ -1172,6 +1177,9 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           anchorCommit = await resolveAnchorCommit(anchorRepo)
         }
 
+        const { getActiveWorkspace: getActiveWs } = await import('../workspace/workspace-utils')
+        const activeWorkspaceId = getActiveWs()?.id ?? null
+
         const note = await ctx.noteManager.createHandoff(
           args.title,
           `# ${args.title}\n\n${args.body}`,
@@ -1180,7 +1188,12 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           {
             ...(anchorCommit ? { anchorCommit } : {}),
             ...(anchorRepo ? { anchorRepo } : {}),
-            workspaceId: ctx.workspaceId ?? null,
+            // Wie bei mux_notes_create: Bindung schlaegt Ansicht, ohne
+            // Bindung die Ansicht. Vorher stand hier `ctx.workspaceId ?? null`,
+            // und eine Verbindung ohne X-Mux-Workspace-Kopf erzeugte damit eine
+            // Uebergabe-Note ohne Workspace -- sichtbar in JEDEM.
+            workspaceId: resolveNoteWorkspaceId(ctx.workspaceId, activeWorkspaceId),
+            entityId: ctx.entityId,
           },
         )
 

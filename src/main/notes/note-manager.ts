@@ -6,6 +6,7 @@ import { ulid } from 'ulidx'
 import type { NoteInfo, NoteContent, HandoffStatus } from '../../shared/types'
 import { readMirrorSource } from './mirror-drift'
 import { deriveTypeFromTags } from './note-type-tags'
+import { processTagsFor } from '../../shared/tag-axes'
 
 // ─── NoteManager ────────────────────────────────────────────
 // All notes stored in a flat directory: {notesDir}/{id}.md
@@ -474,17 +475,33 @@ export class NoteManager {
     body: string,
     fromSession: string,
     toEntity: string = 'any',
-    opts?: { anchorCommit?: string; anchorRepo?: string; workspaceId?: string | null },
+    opts?: {
+      anchorCommit?: string
+      anchorRepo?: string
+      workspaceId?: string | null
+      /** Rolle, die die Uebergabe schreibt — setzt entity: und die abgeleitete Phase. */
+      entityId?: string | null
+    },
   ): Promise<NoteInfo> {
     const id = ulid()
     const now = new Date().toISOString()
     await fs.mkdir(this.notesDir, { recursive: true })
 
-    const tags = ['handoff']
+    // Zwei Tags mit zwei Bedeutungen, und beide werden gebraucht:
+    // `handoff` ist das Signal "hier wartet eine Uebergabe" --
+    // mux_notes_handoff_search filtert darauf. `kind:handoff` ist der TYP auf
+    // der Achse; ohne ihn hat die Note keinen und faellt aus jeder Filterung
+    // nach Typ heraus. Bis zum 2026-10-01 fehlte er.
+    const tags = ['handoff', 'kind:handoff']
     const workspaceId = opts?.workspaceId ?? null
     if (workspaceId) {
       const wsTag = `workspace:${workspaceId}`
       if (!tags.includes(wsTag)) tags.push(wsTag)
+    }
+    // Herkunft, soweit bekannt: die Rolle und die Phase, die sich aus ihr
+    // ergibt. Dieselbe Ableitung wie in mux_notes_create.
+    for (const t of processTagsFor({ entityId: opts?.entityId })) {
+      if (!tags.includes(t)) tags.push(t)
     }
 
     const anchorCommit = opts?.anchorCommit ?? null
