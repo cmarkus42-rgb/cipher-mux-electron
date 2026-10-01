@@ -44,6 +44,8 @@ import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { getGlobalRules, setGlobalRules, ensureGlobalRulesFile, invalidateGlobalRulesCache } from './config/global-rules'
 import { AdapterRegistry } from './agent/registry'
 import { readEntityOverride, withEntityOverride } from './agent/entity-override-map'
+import { comparePresetVersion } from './entity-content/preset-version'
+import { presetTemplateFor } from './entity-content/preset-templates'
 import { EntityRegistry, registerBuiltinEntities } from './session/entity-registry'
 import { CyberFactoryManager } from './cyber-factory/cyber-factory-manager'
 import { scanAndRegisterEntities } from './session/entity-scanner'
@@ -1913,6 +1915,22 @@ export class IpcHub {
         // fuer etwas, das die Arbeit nicht aufhaelt.
         console.warn(`[IpcHub] Modellliste fuer '${adapterId}' nicht abrufbar:`, err)
         return []
+      }
+    })
+
+    ipcMain.handle(IPC.PRESET_TEMPLATE_STATUS, (_e, entityId: string) => {
+      // Nur erkennen, nicht reparieren. Automatisch zu ueberschreiben waere
+      // genau das, was write-once verhindern soll; ein Dialog beim Sessionstart
+      // waere wieder etwas, das eine unbeaufsichtigte Session aufhaelt.
+      const template = presetTemplateFor(entityId)
+      if (template === null) return null
+      try {
+        const file = path.join(os.homedir(), '.config', BRAND.appName, 'entities', entityId, 'preset.md')
+        return comparePresetVersion(fs.readFileSync(file, 'utf-8'), template)
+      } catch {
+        // Keine Datei heisst: die Rolle lief noch nie. Dann gibt es auch keinen
+        // Rueckstand -- sie bekommt beim ersten Start die aktuelle Vorlage.
+        return null
       }
     })
 

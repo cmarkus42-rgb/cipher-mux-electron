@@ -184,6 +184,13 @@ export function PresetEditor() {
   const [models, setModels] = useState<AdapterModelInfo[]>([])
   const [modelOverride, setModelOverride] = useState<string>('')
 
+  // Ob diese preset.md hinter ihrer Code-Vorlage liegt. `preset.md` ist
+  // write-once -- ein Vorlagen-Fix erreicht sie nie von selbst.
+  const [presetStale, setPresetStale] = useState<{
+    fileVersion: number | null
+    templateVersion: number | null
+  } | null>(null)
+
   // Injected sections modal
   const [showInjected, setShowInjected] = useState(false)
   const [injectedSections, setInjectedSections] = useState<InjectedSection[]>([])
@@ -230,6 +237,11 @@ export function PresetEditor() {
     api.agent.getEntityModel(selectedId).then((m: string | null) => {
       setModelOverride(m ?? '')
     }).catch(() => setModelOverride(''))
+    api.agent.presetTemplateStatus(selectedId).then((st: {
+      stale: boolean; fileVersion: number | null; templateVersion: number | null
+    } | null) => {
+      setPresetStale(st?.stale ? { fileVersion: st.fileVersion, templateVersion: st.templateVersion } : null)
+    }).catch(() => setPresetStale(null))
     api.presets.read(selectedId).then((res: { ok: boolean; content: string }) => {
       if (res.ok) {
         setDraftContent(res.content)
@@ -625,6 +637,21 @@ export function PresetEditor() {
               })()}
             </div>
           </div>
+
+          {presetStale && (
+            <div
+              class="pp-hint"
+              style={{ marginTop: '6px', marginBottom: '2px', padding: '6px 8px', border: '1px solid var(--color-warning, var(--color-border))', color: 'var(--color-warning, var(--color-text))' }}
+            >
+              Diese Datei liegt hinter ihrer Code-Vorlage
+              {presetStale.fileVersion !== null && presetStale.templateVersion !== null
+                ? ` (Datei v${presetStale.fileVersion}, Vorlage v${presetStale.templateVersion})`
+                : ' (Datei ohne Versionsmarker)'}.
+              {' '}preset.md wird nur einmal geschrieben, damit Handarbeit überlebt — eine Korrektur
+              im Code erreicht sie deshalb nicht von selbst. Was sich geändert hat, steht im
+              Repository; übernimm es von Hand, wenn du es brauchst.
+            </div>
+          )}
 
           {/* CLAUDE.md editor — full content */}
           <div class="pp-field" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
