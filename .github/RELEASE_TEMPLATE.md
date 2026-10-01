@@ -7,7 +7,7 @@ Copy this structure into the GitHub release body when publishing a new version. 
 ## cipher-mux vX.Y.Z — <one-line theme, e.g. "voice pipeline hardening">
 
 **Platform support:** macOS (DMG) · Linux (AppImage)
-**Requires:** tmux, Claude Code CLI
+**Requires:** tmux and at least one agent CLI — Claude Code (Tier 1, the default), Codex CLI or opencode (both Tier 2)
 **Release date:** YYYY-MM-DD
 
 ### Highlights
@@ -64,7 +64,7 @@ Verify with: `shasum -a 256 cipher-mux-*.dmg` (macOS) or `sha256sum` (Linux).
 
 - From the previous minor: drop-in replacement, config is backward-compatible.
 - From ≥ 2 versions back: read [CHANGELOG.md](../CHANGELOG.md) for the intermediate steps.
-- Config location unchanged: `~/Library/Application Support/cipher-mux/` (macOS), `~/.config/cipher-mux/` (Linux).
+- Config location unchanged: `~/Library/Application Support/cipher-mux-electron/cipher-mux-config.json` (macOS; that is `app.getPath('userData')`). Note that `~/.config/cipher-mux/config.json` also exists and is **not** read — it holds content (`entities/`, `runs/`, voice models), not settings.
 
 ### Known issues
 
