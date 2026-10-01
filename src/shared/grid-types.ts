@@ -72,6 +72,29 @@ export function getCoveredSlots(state: GridState): Set<number> {
   return covered
 }
 
+/**
+ * Was mit einem verdeckten Slot passiert: versteckt halten oder wegwerfen.
+ *
+ * Verdeckt wird ein Slot von einem `rowSpan` darueber oder von der
+ * Focus-Mode-Expansion. Bis zum 2026-10-01 wurde er in beiden Faellen aus dem
+ * Baum genommen — und eine Session darin verlor ihr Terminal samt Scrollback,
+ * obwohl tmux sie weiterlief. Sichtbar wurde das erst beim Zurueckkommen, als
+ * ein `capture-pane`-Rekonstrukt dort stand.
+ *
+ * `'keep-hidden'` gilt nur fuer eine Session: sie hat etwas zu verlieren. Ein
+ * Launcher wird neu gebaut wie er war, und eine Notes-Zelle schreibt in eine
+ * Datei. Dass das hier eine Funktion ist und nicht eine Bedingung im JSX, liegt
+ * an der Pruefbarkeit — die Zelle selbst laesst sich ohne DOM nicht befragen.
+ */
+export function hiddenSlotDisposition(
+  slot: Pick<GridSlot, 'sessionId' | 'type'>,
+  isCovered: boolean,
+): 'render' | 'keep-hidden' | 'drop' {
+  if (!isCovered) return 'render'
+  if (slot.type !== 'notes' && slot.sessionId) return 'keep-hidden'
+  return 'drop'
+}
+
 /** Find the index of the first empty slot, or -1 if grid is full. */
 export function findFirstEmptySlot(state: GridState): number {
   const covered = getCoveredSlots(state)

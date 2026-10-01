@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo, ContextUsage, EntityId } from '../../shared/types'
-import { computeGridStyle, getCoveredSlots, getFocusModePlacement, findNavigationTarget } from '../../shared/grid-types'
+import { computeGridStyle, getCoveredSlots, getFocusModePlacement, findNavigationTarget, hiddenSlotDisposition } from '../../shared/grid-types'
 import type { GridState, ThemeName } from '../../shared/grid-types'
 import { computeWorkspaceBadge, type WorkspaceBadgeLookup } from '../../shared/workspace-badge'
 import { SessionCell } from './SessionCell'
@@ -269,12 +269,21 @@ export function SessionGrid({
     <div class="session-grid-area">
       <div class={`session-grid${hasFocusMode ? ' session-grid--focus-mode' : ''}`} style={gridStyle} onDragEnd={handleDragEnd}>
         {grid.slots.map((slot, idx) => {
-          // Skip cells covered by a rowSpan above
-          if (covered.has(idx)) return null
-
-          // Hide cells overlapped by focus mode
-          const isOverlapped = focusModeOverlapped?.has(idx)
-          if (isOverlapped) return null
+          // Verdeckt: von einem rowSpan darueber, oder von der
+          // Focus-Mode-Expansion. Beides heisst "nimm keinen Platz ein" --
+          // und bis zum 2026-10-01 hiess es auch "verschwinde".
+          //
+          // Fuer eine **Session** ist das der Unterschied zwischen unsichtbar
+          // und tot: `null` unmountet die SessionCell, `useTerminal` disposed,
+          // und beim Zurueckkommen steht dort ein capture-pane-Rekonstrukt
+          // ohne Scrollback. Die Session lief die ganze Zeit weiter -- tmux
+          // haelt sie --, verloren ging nur das, was der Mensch gesehen hat.
+          //
+          // Ein Launcher und eine leere Zelle haben nichts zu verlieren, eine
+          // Notes-Zelle schreibt in eine Datei. Nur die Session-Zelle bleibt
+          // also versteckt stehen; alles andere faellt weiter weg.
+          const isHidden = covered.has(idx) || (focusModeOverlapped?.has(idx) ?? false)
+          if (hiddenSlotDisposition(slot, isHidden) === 'drop') return null
 
           const isFocusModeTarget = focusModeSlots?.has(idx) ?? false
           const focusPlacement = isFocusModeTarget ? getFocusModePlacement(cols, rows, idx) : null
@@ -333,6 +342,7 @@ export function SessionGrid({
                 slotCol={idx % cols}
                 slotRow={Math.floor(idx / cols)}
                 focusModeStyle={isFocusModeTarget ? focusStyle : undefined}
+                hidden={isHidden}
                 onFocus={onFocusSession}
                 onClose={onCloseSession}
                 onSwitchProject={onSwitchProject}

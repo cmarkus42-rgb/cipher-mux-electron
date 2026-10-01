@@ -202,6 +202,16 @@ Der Schlüssel in `SessionGrid` ist `slot.sessionId` (Zeile 320) und damit stabi
 **Verschieben** im Grid remountet nicht, es verschiebt den DOM-Knoten. Das ist richtig so.
 Das Problem ist das Ausblenden per `null`, nicht die Reihenfolge.
 
+> **Behoben für Focus Mode und Zellen-Merge** (2026-10-01, v0.11.3): eine verdeckte
+> Session-Zelle rendert jetzt mit `display: none`, statt zu verschwinden —
+> `hiddenSlotDisposition` in `shared/grid-types.ts`, Begründung und die drei geprüften
+> Nebenbedingungen in Abschnitt 10.
+>
+> **Die beiden anderen Wege stehen weiter offen.** „Grid verkleinern" wirft einen Slot
+> wirklich weg und ist kein Ausblenden — dort ist das Terminal auch logisch nicht mehr am
+> Platz; was dort richtig wäre, ist eine Produktfrage und keine Reparatur. Der Themewechsel
+> ist seit Befund 1 erledigt.
+
 ---
 
 ## 5. Befund: Das Fenster darf breiter als der Bildschirm werden — belegt
@@ -346,16 +356,47 @@ nicht; es gibt nur `fitGrid` aus dem Main.
 
 ## 10. Was behoben ist
 
-| Commit | Was | Belegt durch |
+| Was | Wie | Belegt durch |
 |---|---|---|
 | Themewechsel baut kein Terminal mehr neu | `theme` aus dem Dependency-Array, in ein Ref; Kommentar nennt den Grund | Befund 1 — Dependency-Array, `ui.theme = nord` vs. `DEFAULT_THEME`, MutationObserver deckt alle drei Themewege ab |
 | Renderer-Fehler nennen ihre Herkunft | `sourceId:line` im Weiterleiter für Level `error` | Befund 2.4 — die Parameter kamen an und wurden verworfen |
+| Umgebrochene Zeilen bleiben eine Zeile | `capture-pane -J` | Befund 3 — 95 Zeichen in 40 Spalten: 40+40+15 ohne `-J`, 95 mit. Gegen echtes tmux in `test/main/capture-pane-join.test.ts` |
+| Erzwungenes Scrollen endet beim Eingriff | `userScrolledUp()` beendet das Intervall, statt es auszusetzen | Befund 6 — ein ausgesetzter Tick hätte beim nächsten wieder zugegriffen |
+| Das Fenster bleibt auf dem Bildschirm | `minWidth: Math.min(gridWidth, screenWidth)`, Grid scrollt horizontal | Befund 5 — `minWidth` schlug die Konstruktorbreite und machte das `Math.min` darüber wirkungslos |
+| **Verdeckte Terminals leben weiter** | `hiddenSlotDisposition` in `shared/grid-types.ts`; eine verdeckte **Session**-Zelle rendert mit `display: none` statt `null` zurückzugeben | Befund 4 — siehe unten |
 
-**Nicht angefasst**, mit Begründung oben: der Resync-Pfad (Befund 3), das Ausblenden per
-`null` in `SessionGrid` (Befund 4), `minWidth` (Befund 5), das 8-Sekunden-Scrollen
-(Befund 6).
+### Zu Befund 4, im Detail
 
-**Nachprüfen:** 2220 Tests grün, beide Typechecks null Fehler, `npx eslint` auf beiden
-geänderten Dateien sauber. Dass der `dimensions`-Fehler weg ist, ist damit **nicht**
-belegt — das zeigt erst der nächste Start, und zwar daran, dass in einem Lauf mit
-vier wiederhergestellten Sessions keine vier Meldungen mehr stehen.
+Der Unterschied ist "unsichtbar" gegen "tot". Verdeckt wird ein Slot von einem `rowSpan`
+darüber oder von der Focus-Mode-Expansion; `display: none` nimmt ihn aus dem Grid-Fluss,
+ohne die Zelle abzureißen. Das Terminal bleibt samt Scrollback stehen, und beim
+Wiederauftauchen gibt es kein `capture-pane`-Rekonstrukt mehr — womit auch die Folgen aus
+Befund 3 und das Dispose-Fenster aus Befund 2 für diesen Weg entfallen.
+
+Drei Dinge, die dabei geprüft wurden und nicht offensichtlich sind:
+
+1. **Ein `fit()` auf einer Fläche von null läuft nicht.** Der Min-Size-Guard in
+   `useTerminal` (`MIN_FIT_DIMENSION = 50`) greift, bevor `fitAddon.fit()` dran ist. Ohne
+   ihn wäre die Zelle beim Verstecken auf eine Zeile geschrumpft — und tmux mit ihr.
+2. **Keine doppelten Keys.** Der Key in `SessionGrid` ist `slot.sessionId`. Eine verdeckte
+   Session steht weiter in der Sidebar als Hintergrund-Session (`app.tsx:363`, bewusst so:
+   sonst wäre sie im Focus Mode nirgends erreichbar). Wird sie von dort in eine sichtbare
+   Zelle geholt, räumen `handlePlacementSelect` und `handleDropSession` den alten Slot
+   **vorher** — ein Verschieben, kein zweiter Eintrag.
+3. **Nur die Session-Zelle bleibt.** Ein Launcher wird neu gebaut wie er war, eine
+   Notes-Zelle schreibt in eine Datei. Ein unsichtbarer Knoten ohne etwas zu verlieren
+   wäre Ballast.
+
+**Nicht angefasst**, mit Begründung oben: der Resync-Pfad in seinen beiden anderen Teilen
+(Befund 3 — der Vollbild-Schnappschuss gegen den cursor-relativen Livestream und die
+ungesicherte Reihenfolge gegen tmux; beides braucht die Unterscheidung „TUI im Alternate
+Screen vs. gewöhnliche Shell" und damit eine Messung am laufenden Programm) und der 15-px-Rand
+(Befund 7).
+
+**Nachprüfen:** 2249 Tests grün (467 Suiten), beide Typechecks null Fehler, `npx eslint` auf
+den geänderten Dateien ohne neue Probleme. Dass der `dimensions`-Fehler weg ist, ist damit
+**nicht** belegt — das zeigt erst der nächste Start, und zwar daran, dass in einem Lauf mit
+vier wiederhergestellten Sessions keine vier Meldungen mehr stehen. Dass ein verdecktes
+Terminal seinen Scrollback behält, ist **auf der Logikseite** belegt (sechs Tests zu
+`hiddenSlotDisposition`) und an der laufenden App noch nicht: dazu gehört Focus Mode an und
+aus mit sichtbarem Scrollback davor und danach.

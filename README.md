@@ -18,15 +18,15 @@
 
 <p align="center">
   <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cmarkus42-rgb/cipher-mux-electron/ci.yml?branch=main&label=CI&style=flat-square&labelColor=000000&color=F5F5EC"></a>
-  <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.11.2-0088A0?style=flat-square&labelColor=000000"></a>
-  <a href="#built-with-itself"><img alt="Tests" src="https://img.shields.io/badge/tests-2239%20green-00FF88?style=flat-square&labelColor=000000"></a>
+  <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.11.3-0088A0?style=flat-square&labelColor=000000"></a>
+  <a href="#built-with-itself"><img alt="Tests" src="https://img.shields.io/badge/tests-2249%20green-00FF88?style=flat-square&labelColor=000000"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="#install"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS%2012%2B-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="CONTRIBUTING.md#maintenance-status"><img alt="Maintenance" src="https://img.shields.io/badge/maintenance-active-00FF88?style=flat-square&labelColor=000000"></a>
   <a href="#install"><img alt="Open Beta" src="https://img.shields.io/badge/status-open%20beta-0088A0?style=flat-square&labelColor=000000"></a>
 </p>
 
-<p align="center"><sub><b>v0.11.2</b> · open beta · feedback via <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/issues">Issues</a></sub></p>
+<p align="center"><sub><b>v0.11.3</b> · open beta · feedback via <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/issues">Issues</a></sub></p>
 
 ---
 
@@ -394,7 +394,7 @@ tests, hands findings to the Debugger, and the cycle runs without a manual trigg
 | 6 | 1,050 | Handoff, Voice |
 | 7 | 1,207 | Audit, Pre-Release |
 | 8 | 1,509 | Detach, Tags, test cleanup |
-| **now** | **2,239** | three CLIs · 465 suites · ~91 s · 0 fail |
+| **now** | **2,249** | three CLIs · 467 suites · ~91 s · 0 fail |
 
 668 of the first 1,509 tests came out of waves 6 through 8 — produced by the process itself.
 **0 high-severity findings** in the final audit.
