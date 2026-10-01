@@ -79,10 +79,16 @@ export class WindowManager {
 
     // Forward renderer console to main process for debugging
     // Wrapped in try/catch to survive EPIPE when stdout pipe is broken
-    this.mainWindow.webContents.on('console-message', (_event, level, message) => {
+    //
+    // `sourceId:line` wird mitgeschrieben, weil ein geworfener Renderer-Fehler
+    // sonst nur als Satz im Log steht. Der Satz allein liess den offenen
+    // `Cannot read properties of undefined (reading 'dimensions')` wochenlang
+    // nicht zuordnen — mit Datei und Zeile ist die Stelle im Bundle nachlesbar.
+    this.mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
       try {
         const prefix = ['[renderer:verbose]','[renderer:info]','[renderer:warn]','[renderer:error]'][level] || '[renderer]'
-        console.log(`${prefix} ${message}`)
+        const where = sourceId ? ` (${sourceId}:${line ?? 0})` : ''
+        console.log(`${prefix} ${message}${level >= 3 ? where : ''}`)
       } catch { /* EPIPE — stdout gone, ignore silently */ }
     })
 
