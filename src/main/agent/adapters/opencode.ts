@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import type {
   AgentAdapter,
+  AdapterModel,
   LaunchCommand,
   LaunchOpts,
   AdapterContext,
@@ -19,6 +20,8 @@ import {
   writeOpenCodeUsagePlugin,
   OPENCODE_USAGE_PLUGIN_FILENAME,
 } from '../../monitoring/opencode-usage-plugin'
+import { parseOpenCodeModels } from '../adapter-models'
+import { runCommand } from '../../util/exec-util'
 
 /**
  * opencode-Adapter — Tier-2.
@@ -516,6 +519,24 @@ export class OpenCodeAdapter implements AgentAdapter {
     // Wie bei den anderen beiden: Klartext via tmux send-keys, das macht der
     // SessionManager.
     throw new Error('sendPrompt should be called via SessionManager.sendKeys')
+  }
+
+  /**
+   * `opencode models` listet, was **angemeldet** ist.
+   *
+   * Ohne angemeldeten Anbieter kommen nur die freien `opencode/*` zurueck —
+   * gemessen: acht. Das ist kein Mangel der Abfrage, sondern die Wahrheit ueber
+   * diese Installation: mehr ist dort gerade nicht benutzbar.
+   *
+   * Scheitert der Aufruf, kommt eine leere Liste. Siehe CodexAdapter.
+   */
+  async listModels(): Promise<AdapterModel[]> {
+    try {
+      const out = await runCommand('opencode', ['models'], { timeout: 25_000 })
+      return parseOpenCodeModels(out)
+    } catch {
+      return []
+    }
   }
 
   buildWorkshopPromptFragment(lang: 'de' | 'en'): string {

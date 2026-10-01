@@ -255,6 +255,12 @@ export const IPC = {
   ENTITY_ADAPTER_GET: 'cipher-mux:entity:adapter:get',
   ENTITY_ADAPTER_SET: 'cipher-mux:entity:adapter:set',
 
+  // Welches Modell eine Rolle fährt. Dieselbe Auflösungskette wie die CLI —
+  // `app.entityModels` > Rollen-Default > was die CLI selbst entscheidet.
+  AGENT_MODELS_LIST: 'cipher-mux:agent:models:list',
+  ENTITY_MODEL_GET: 'cipher-mux:entity:model:get',
+  ENTITY_MODEL_SET: 'cipher-mux:entity:model:set',
+
   // UI Control (Companion Demo Mode)
   UI_HIGHLIGHT: 'cipher-mux:ui:highlight',
   UI_OPEN: 'cipher-mux:ui:open',

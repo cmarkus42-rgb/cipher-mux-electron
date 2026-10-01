@@ -415,6 +415,21 @@ const api = {
       ipcRenderer.invoke(IPC.ENTITY_ADAPTER_GET, entityId),
     setEntityAdapter: (entityId: string, adapterId: string | null): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke(IPC.ENTITY_ADAPTER_SET, entityId, adapterId),
+    /**
+     * Was die CLI an Modellen anbietet. Leere Liste heisst: nicht auflistbar
+     * oder Aufruf gescheitert — dann bleibt das Freitextfeld.
+     */
+    listModels: (adapterId: string): Promise<Array<{
+      id: string
+      label: string
+      contextWindow?: number
+      description?: string
+    }>> => ipcRenderer.invoke(IPC.AGENT_MODELS_LIST, adapterId),
+    /** `null` = keine Praeferenz, die CLI entscheidet selbst. */
+    getEntityModel: (entityId: string): Promise<string | null> =>
+      ipcRenderer.invoke(IPC.ENTITY_MODEL_GET, entityId),
+    setEntityModel: (entityId: string, model: string | null): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IPC.ENTITY_MODEL_SET, entityId, model),
   },
 
   // ─── Workspaces ──────────────────────────────────────────

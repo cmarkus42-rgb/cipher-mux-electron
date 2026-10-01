@@ -1,5 +1,5 @@
 /**
- * Die Rollen→CLI-Zuordnung, als reine Funktionen.
+ * Rollen-Overrides als reine Funktionen — dieselbe Form fuer CLI und Modell.
  *
  * Sie stand als Handler-Rumpf in `ipc-hub.ts` und war damit nur zu pruefen,
  * indem man die App startet und hinsieht. Das ist bei einer Zuordnung, deren
@@ -13,8 +13,8 @@
  * namens `""` zurueck — und der ist in keiner Registry.
  */
 
-/** Die Zuordnung, wie sie in `app.entityAdapters` liegt. */
-export type EntityAdapterMap = Readonly<Record<string, string>>
+/** Die Zuordnung, wie sie in `app.entityAdapters` bzw. `app.entityModels` liegt. */
+export type EntityOverrideMap = Readonly<Record<string, string>>
 
 /**
  * Liest die Praeferenz einer Rolle.
@@ -22,7 +22,7 @@ export type EntityAdapterMap = Readonly<Record<string, string>>
  * `null` heisst „keine" — und zwar auch fuer einen leeren oder nur aus
  * Leerzeichen bestehenden Eintrag, denn so raeumt eine UI ein Feld.
  */
-export function readEntityAdapter(map: EntityAdapterMap | undefined, entityId: string): string | null {
+export function readEntityOverride(map: EntityOverrideMap | undefined, entityId: string): string | null {
   if (!map || typeof map !== 'object') return null
   const raw = (map as Record<string, unknown>)[entityId]
   if (typeof raw !== 'string') return null
@@ -37,13 +37,13 @@ export function readEntityAdapter(map: EntityAdapterMap | undefined, entityId: s
  * Eingabe bleibt unveraendert, damit ein Aufrufer die alte Fassung noch hat,
  * wenn das Schreiben scheitert.
  */
-export function withEntityAdapter(
-  map: EntityAdapterMap | undefined,
+export function withEntityOverride(
+  map: EntityOverrideMap | undefined,
   entityId: string,
-  adapterId: string | null,
+  value: string | null,
 ): Record<string, string> {
   const next: Record<string, string> = { ...(map ?? {}) }
-  const trimmed = adapterId?.trim() ?? ''
+  const trimmed = value?.trim() ?? ''
   if (trimmed === '') delete next[entityId]
   else next[entityId] = trimmed
   return next

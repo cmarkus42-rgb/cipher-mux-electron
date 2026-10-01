@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import type {
   AgentAdapter,
+  AdapterModel,
   LaunchCommand,
   LaunchOpts,
   AdapterContext,
@@ -12,6 +13,8 @@ import type { AdapterFeature, AdapterCapabilities, ContextUsage } from '../../..
 import { writeCodexUsageHookScript, CODEX_USAGE_HOOK_FILENAME } from '../../monitoring/codex-usage-hook'
 import { BOUND_TOKEN_ENV_VAR } from '../../mcp/bound-token'
 import { trustRunDirectory } from './codex-trust'
+import { parseCodexModels } from '../adapter-models'
+import { runCommand } from '../../util/exec-util'
 import { writeCodexBoundaryScript } from './codex-boundary'
 import { getEntityBoundary } from '../../session/entity-boundaries'
 
@@ -333,6 +336,23 @@ export class CodexAdapter implements AgentAdapter {
   async sendPrompt(_tmuxTarget: string, _prompt: string, _opts?: SendOpts): Promise<void> {
     // Wie Claude Code: Klartext via tmux send-keys, das macht der SessionManager.
     throw new Error('sendPrompt should be called via SessionManager.sendKeys')
+  }
+
+  /**
+   * `codex debug models` liefert den Katalog als JSON.
+   *
+   * Scheitert der Aufruf — CLI nicht installiert, kein Login, Zeitueberschreitung —
+   * kommt eine leere Liste zurueck, kein Wurf. Die UI zeigt dann nur das
+   * Freitextfeld, und das ist der brauchbare Zustand: ein Modellname laesst sich
+   * auch ohne Liste eintippen.
+   */
+  async listModels(): Promise<AdapterModel[]> {
+    try {
+      const out = await runCommand('codex', ['debug', 'models'], { timeout: 15_000 })
+      return parseCodexModels(out)
+    } catch {
+      return []
+    }
   }
 
   buildWorkshopPromptFragment(lang: 'de' | 'en'): string {

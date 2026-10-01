@@ -46,6 +46,14 @@ interface PresetInfo {
  * dieser CLI **nicht** kann — das beim Sessionstart herauszufinden ist der
  * teurere Weg.
  */
+/** Ein Modell, wie es der Main-Prozess meldet. */
+interface AdapterModelInfo {
+  id: string
+  label: string
+  contextWindow?: number
+  description?: string
+}
+
 interface AdapterInfo {
   id: string
   displayName: string
@@ -53,11 +61,22 @@ interface AdapterInfo {
   capabilities: Record<string, boolean> | null
 }
 
-/** Welche Capabilities die UI benennt, wenn sie fehlen. Reihenfolge = Anzeigereihenfolge. */
+/**
+ * Welche Capabilities die UI benennt, wenn sie fehlen.
+ *
+ * **Nur die beiden, die im Mux wirklich etwas schalten.** `status-line`
+ * entscheidet ueber die Context-Anzeige und den Fork-Knopf, `mcp-injection`
+ * darueber, ob `postLaunchInjection` ueberhaupt laeuft. Die uebrigen fuenf
+ * Flaggen (`skip-permissions`, `project-instructions`,
+ * `message-bus-participant`, `companion-mcp`, `sub-agents`) hat am 2026-10-01
+ * **kein einziger Leser** im Code — sie sind Aussagen ueber die CLI, keine
+ * Schalter.
+ *
+ * Sie hier zu nennen hiesse, dem Nutzer eine Folge anzukuendigen, die nicht
+ * eintritt. Wer eine davon verdrahtet, traegt sie hier nach.
+ */
 const NAMED_CAPABILITIES: ReadonlyArray<[string, string]> = [
   ['status-line', 'Context-Anzeige'],
-  ['companion-mcp', 'Companion-Memory'],
-  ['sub-agents', 'Sub-Agents'],
   ['mcp-injection', 'MCP-Werkzeuge'],
 ]
 
@@ -160,6 +179,11 @@ export function PresetEditor() {
   const [defaultAdapterId, setDefaultAdapterId] = useState<string>('claude-code')
   const [adapterOverrideId, setAdapterOverrideId] = useState<string | null>(null)
 
+  // Welches Modell diese Rolle faehrt. Leer = keine Praeferenz, die CLI
+  // entscheidet selbst — dieselbe Drei-Zustands-Disziplin wie bei der CLI.
+  const [models, setModels] = useState<AdapterModelInfo[]>([])
+  const [modelOverride, setModelOverride] = useState<string>('')
+
   // Injected sections modal
   const [showInjected, setShowInjected] = useState(false)
   const [injectedSections, setInjectedSections] = useState<InjectedSection[]>([])
@@ -203,6 +227,9 @@ export function PresetEditor() {
     api.agent.getEntityAdapter(selectedId).then((id: string | null) => {
       setAdapterOverrideId(id)
     }).catch(() => setAdapterOverrideId(null))
+    api.agent.getEntityModel(selectedId).then((m: string | null) => {
+      setModelOverride(m ?? '')
+    }).catch(() => setModelOverride(''))
     api.presets.read(selectedId).then((res: { ok: boolean; content: string }) => {
       if (res.ok) {
         setDraftContent(res.content)
@@ -211,6 +238,20 @@ export function PresetEditor() {
       }
     }).catch(() => {})
   }, [selectedId])
+
+  // Die Modellliste haengt an der **wirksamen** CLI, nicht an der gewaehlten:
+  // steht die Rolle auf „Default", gilt der globale Adapter.
+  const effectiveAdapterId = adapterOverrideId ?? defaultAdapterId
+  useEffect(() => {
+    if (!effectiveAdapterId) return
+    let abgebrochen = false
+    api.agent.listModels(effectiveAdapterId)
+      .then((list: AdapterModelInfo[]) => { if (!abgebrochen) setModels(list) })
+      .catch(() => { if (!abgebrochen) setModels([]) })
+    // Ein Wechsel der CLI kann die Liste leeren, waehrend eine alte Antwort noch
+    // unterwegs ist. Ohne das Abbruchkennzeichen ueberschreibt sie die neue.
+    return () => { abgebrochen = true }
+  }, [effectiveAdapterId])
 
   const selectPreset = (id: string) => {
     if (dirty) {
@@ -540,6 +581,50 @@ export function PresetEditor() {
               </div>
             </div>
           )}
+
+          {/* Modell — Liste UND Freitext: die Liste ist nie vollstaendig */}
+          <div class="pp-field" style={{ paddingBottom: '4px', paddingTop: '4px' }}>
+            <label style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-text-dim)' }}>
+              Modell
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="text"
+                list="pp-model-list"
+                value={modelOverride}
+                placeholder="Default — die CLI entscheidet"
+                onChange={(e) => setModelOverride((e.target as HTMLInputElement).value)}
+                onBlur={async (e) => {
+                  // Beim Verlassen speichern, nicht bei jedem Tastendruck: sonst
+                  // schreibt jede Zwischenstufe eines getippten Namens in die Config.
+                  const raw = (e.target as HTMLInputElement).value.trim()
+                  const res = await api.agent.setEntityModel(selectedId, raw === '' ? null : raw)
+                  if (res.ok) setModelOverride(raw)
+                }}
+                style={{ flex: 1, padding: '4px 8px', fontSize: '12px', background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
+              />
+              <datalist id="pp-model-list">
+                {models.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.label !== m.id ? m.label : ''}
+                  </option>
+                ))}
+              </datalist>
+            </div>
+            <div class="pp-hint" style={{ marginTop: '2px' }}>
+              {(() => {
+                const eff = adapters.find(a => a.id === effectiveAdapterId)
+                const cli = eff?.displayName ?? 'der CLI'
+                if (models.length === 0) {
+                  // Kein Mangel, sondern eine Tatsache ueber die CLI: Claude Code
+                  // hat kein Kommando dafuer, und ein nicht angemeldetes opencode
+                  // kennt nichts. Beides lässt sich eintippen.
+                  return `Leer lassen heisst: ${cli} entscheidet selbst. Diese CLI listet keine Modelle — vollen Namen eintippen.`
+                }
+                return `Leer lassen heisst: ${cli} entscheidet selbst. ${models.length} Modelle vorgeschlagen; ein voller Name ausserhalb der Liste geht auch.`
+              })()}
+            </div>
+          </div>
 
           {/* CLAUDE.md editor — full content */}
           <div class="pp-field" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>

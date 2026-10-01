@@ -3,6 +3,7 @@ import * as path from 'path'
 import * as os from 'os'
 import type {
   AgentAdapter,
+  AdapterModel,
   LaunchCommand,
   LaunchOpts,
   AdapterContext,
@@ -12,6 +13,7 @@ import type {
 import type { AdapterFeature, AdapterCapabilities } from '../../../shared/types'
 import { runCommand } from '../../util/exec-util'
 import { buildMcpServerConfig } from '../../mcp/workspace-header'
+import { CLAUDE_CODE_MODEL_ALIASES } from '../adapter-models'
 
 /** Minimal interface for reading the agent config section. */
 export interface AgentConfigReader {
@@ -199,6 +201,17 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     // SessionManager handles the actual send — this method exists for adapters
     // that need custom prompt framing (e.g. JSON-RPC).
     throw new Error('sendPrompt should be called via SessionManager.sendKeys')
+  }
+
+  /**
+   * Die dokumentierten Aliase — mehr ist nicht belegbar.
+   *
+   * Die CLI hat kein Kommando, das Modelle auflistet. `--help` nennt drei
+   * Aliase als Beispiel und sagt dazu, dass auch ein voller Modellname geht.
+   * Genau das steht hier: die drei, und sonst nichts Erfundenes.
+   */
+  async listModels(): Promise<AdapterModel[]> {
+    return [...CLAUDE_CODE_MODEL_ALIASES]
   }
 
   buildWorkshopPromptFragment(lang: 'de' | 'en'): string {
