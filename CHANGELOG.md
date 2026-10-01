@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.2] — 2026-10-01
+
+### Fixed
+- **`capture-pane` split long lines permanently.** The call ran without `-J`, so a logical line wider than the pane came back as several physical lines; the caller turned those into `\r\n` and the xterm buffer kept them as separate lines, which no later reflow rejoins. Measured in a 40-column pane: 95 characters return as 40 + 40 + 15 without `-J`, as one line of 95 with it. The known side effect — a previously wrapped line keeps its trailing space — is invisible in a terminal, and a line that was never wrapped is unchanged. `test/main/capture-pane-join.test.ts` holds both against real tmux rather than a mock, because the claim is one about tmux.
+- **Eight seconds in which you could not scroll up.** After every mount an interval pulled the viewport to the bottom every 200 ms. Scrolling up was undone within 200 ms. The forced scrolling now **ends** as soon as you scroll up — not pauses: a skipped tick would have caught you again on the next one. Its purpose survives as long as nobody intervenes.
+- **The window was allowed to be wider than the screen.** `minWidth` carried the uncapped `gridWidth` and beat the constructor width in Electron, which made the `Math.min` above it pointless — 2956 px at four columns, regardless of the display. Together with `will-resize` → `preventDefault` it could not be corrected by hand either. The grid now scrolls horizontally when it no longer fits; a window that neither fits nor can be touched is worse than a scrollbar.
+
+### Still open, documented
+- The other two thirds of the resync finding (a full-screen snapshot written against a cursor-relative live stream, and the unguarded ordering against tmux) need the distinction "TUI in the alternate screen vs. ordinary shell", and that needs a measurement against the running program.
+- Focus Mode and cell merge drop hidden slots with `return null`, which kills the terminals of the covered sessions. Changing that to "hidden, not removed" is a UI behaviour change that wants to be seen running first.
+
 ## [0.11.1] — 2026-10-01
 
 ### Fixed
