@@ -88,6 +88,21 @@ export interface SendOpts {
   newline?: boolean
 }
 
+/**
+ * Ein Modell, das eine CLI anbietet.
+ *
+ * `id` ist, was als `--model` durchgereicht wird. `label` ist, was der Mensch
+ * liest — bei Codex der `display_name`, sonst dieselbe Zeichenkette.
+ */
+export interface AdapterModel {
+  id: string
+  label: string
+  /** Kontextfenster in Tokens, wenn die CLI es nennt. */
+  contextWindow?: number
+  /** Kurzbeschreibung, wenn die CLI eine liefert. */
+  description?: string
+}
+
 export interface AgentAdapter {
   readonly id: string
   readonly displayName: string
@@ -126,4 +141,20 @@ export interface AgentAdapter {
   buildLauncherPromptFragment(lang: 'de' | 'en'): string
   /** Agent-specific instructions injected into the Cyber Factory template. */
   buildCyberFactoryPromptFragment(lang: 'de' | 'en'): string
+
+  // --- models ---
+  /**
+   * Welche Modelle diese CLI anbietet.
+   *
+   * Optional, weil die drei es verschieden koennen (gemessen am 2026-10-01):
+   * Codex und opencode zaehlen auf Zuruf auf, Claude Code hat kein Kommando
+   * dafuer und kennt nur dokumentierte Aliase. Ein Adapter, der es nicht weiss,
+   * laesst die Methode weg — die UI bietet dann nur Freitext an, und das ist
+   * ehrlicher als eine erfundene Liste.
+   *
+   * **Die Liste ist nie vollstaendig.** Alle drei CLIs nehmen auch einen vollen
+   * Modellnamen entgegen, der nicht darin steht. Wer sie anzeigt, muss Freitext
+   * danebenstellen.
+   */
+  listModels?(): Promise<AdapterModel[]>
 }

@@ -43,7 +43,7 @@ import { generateCompanionClaudeMd } from './entity-content/companion-preset'
 import { TASK_SCHEMA_SQL } from './task/task-schema'
 import { getGlobalRules, setGlobalRules, ensureGlobalRulesFile, invalidateGlobalRulesCache } from './config/global-rules'
 import { AdapterRegistry } from './agent/registry'
-import { readEntityAdapter, withEntityAdapter } from './agent/entity-adapter-map'
+import { readEntityOverride, withEntityOverride } from './agent/entity-override-map'
 import { EntityRegistry, registerBuiltinEntities } from './session/entity-registry'
 import { CyberFactoryManager } from './cyber-factory/cyber-factory-manager'
 import { scanAndRegisterEntities } from './session/entity-scanner'
@@ -1888,7 +1888,46 @@ export class IpcHub {
     })
 
     ipcMain.handle(IPC.ENTITY_ADAPTER_GET, (_e, entityId: string) => {
-      return readEntityAdapter(configStore.get('app').entityAdapters, entityId)
+      return readEntityOverride(configStore.get('app').entityAdapters, entityId)
+    })
+
+    // Modellliste pro Adapter. Zwischengespeichert fuer die Laufzeit der App:
+    // `codex debug models` und `opencode models` starten je einen Unterprozess,
+    // und ein Dropdown, das beim Aufklappen eine Sekunde haengt, benutzt niemand.
+    // Die Liste kann sich aendern (opencode zeigt nur angemeldete Anbieter) —
+    // ein Neustart holt sie neu, und das ist die ehrlichere Grenze als ein
+    // Zwischenspeicher, der raet, wann er veraltet ist.
+    const modelCache = new Map<string, Array<{ id: string; label: string; contextWindow?: number; description?: string }>>()
+    ipcMain.handle(IPC.AGENT_MODELS_LIST, async (_e, adapterId: string) => {
+      const cached = modelCache.get(adapterId)
+      if (cached) return cached
+      const adapter = this.adapterRegistry.get(adapterId)
+      if (!adapter?.listModels) return []
+      try {
+        const models = await adapter.listModels()
+        modelCache.set(adapterId, models)
+        return models
+      } catch (err) {
+        // Eine fehlende Liste ist kein Fehlerfall fuer den Nutzer: er tippt
+        // den Modellnamen eben selbst. Ein Wurf hier waere ein roter Dialog
+        // fuer etwas, das die Arbeit nicht aufhaelt.
+        console.warn(`[IpcHub] Modellliste fuer '${adapterId}' nicht abrufbar:`, err)
+        return []
+      }
+    })
+
+    ipcMain.handle(IPC.ENTITY_MODEL_GET, (_e, entityId: string) => {
+      return readEntityOverride(configStore.get('app').entityModels, entityId)
+    })
+
+    ipcMain.handle(IPC.ENTITY_MODEL_SET, (_e, entityId: string, model: string | null) => {
+      // Kein Abgleich gegen die Liste: alle drei CLIs nehmen auch einen vollen
+      // Modellnamen, der nicht darin steht. Eine Pruefung hier wuerde genau die
+      // Faelle abweisen, fuer die das Freitextfeld da ist.
+      const app = { ...configStore.get('app') }
+      app.entityModels = withEntityOverride(app.entityModels, entityId, model)
+      configStore.set('app', app)
+      return { ok: true }
     })
 
     ipcMain.handle(IPC.ENTITY_ADAPTER_SET, (_e, entityId: string, adapterId: string | null) => {
@@ -1898,7 +1937,7 @@ export class IpcHub {
       const app = { ...configStore.get('app') }
       // Die Drei-Zustands-Disziplin steckt in `withEntityAdapter` — dort ist sie
       // pruefbar, statt hier als Handler-Rumpf nur beim Hinsehen in der App.
-      app.entityAdapters = withEntityAdapter(app.entityAdapters, entityId, adapterId)
+      app.entityAdapters = withEntityOverride(app.entityAdapters, entityId, adapterId)
       configStore.set('app', app)
       return { ok: true }
     })

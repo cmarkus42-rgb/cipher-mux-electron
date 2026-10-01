@@ -126,8 +126,13 @@ export function SessionCell({
     }
   }, [session.id])
 
-  // Fork only available for Claude Code sessions (have adapter capabilities)
-  const isClaudeSession = session.capabilities?.['status-line'] === true
+  // Fork haengt daran, dass die Session-ID der CLI bekannt ist — und die
+  // liefert der Statusline-Pfad. Deshalb `status-line` als Bedingung, nicht als
+  // Stellvertreter fuer „ist Claude Code": seit v0.10.0 melden Codex und
+  // opencode dieselbe Faehigkeit, und beide koennen forken (`codex fork`,
+  // `opencode --fork`). Der alte Name behauptete eine CLI, gemeint war die
+  // Voraussetzung.
+  const canFork = session.capabilities?.['status-line'] === true
 
   const dotClass = pct >= 85 ? 'neon-dot--error' : pct >= 60 ? 'neon-dot--warn' : 'neon-dot--ok'
 
@@ -269,7 +274,7 @@ export function SessionCell({
               aria-label={isAtMax ? t('sessionCell.collapseHeight') : t('sessionCell.expandHeight')}
             >{isAtMax ? <ChevronUp size={ICON_SIZE} /> : <ChevronDown size={ICON_SIZE} />}</button>
           )}
-          {isClaudeSession && (
+          {canFork && (
             <button class="cell-btn" onClick={handleFork} title={t('sessionCell.forkSession')} aria-label={t('sessionCell.forkSession')}><GitBranch size={ICON_SIZE} /></button>
           )}
           <button class="cell-btn" onClick={handleScreenshot} title={t('sessionCell.screenshot', 'Screenshot')} aria-label="Screenshot"><Camera size={ICON_SIZE} /></button>
