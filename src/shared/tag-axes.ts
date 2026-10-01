@@ -184,12 +184,6 @@ export function filterToAxes(tags: readonly string[]): string[] {
   return result
 }
 
-/** Werte einer Achse aus einer Tag-Liste lesen — ohne Klassenpräfix. */
-export function axisTagsOf(tags: readonly string[], axis: TagAxis): string[] {
-  const prefix = `${axis}:`
-  return tags.filter(t => t.toLowerCase().startsWith(prefix)).map(t => t.slice(prefix.length))
-}
-
 /**
  * Tags, die der Prozess beim Anlegen einer Note setzt.
  *

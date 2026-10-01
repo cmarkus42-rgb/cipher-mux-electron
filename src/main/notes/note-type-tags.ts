@@ -1,4 +1,4 @@
-import { PROCESS_SET_AXES } from '../../shared/tag-axes'
+import { filterToAxes } from '../../shared/tag-axes'
 
 /**
  * Tags that carry a note's type — and survive auto-tagging.
@@ -50,11 +50,21 @@ export function deriveTypeFromTags(tags: readonly string[]): string | undefined 
  * make the type ambiguous, and the one the note was created with wins over one
  * a model guessed.
  *
- * Die Prozess-Achsen werden **abgeleitet**, nicht aufgezählt. Vorher stand hier
- * `t.startsWith('workspace:')`, und als am 2026-09-30 `entity` als Achse dazukam,
- * war die Liste sofort unvollständig — das Auto-Tagging hätte die Herkunft
- * überschrieben. Eine Liste, die beim Hinzufügen einer Achse gepflegt werden
- * muss, ist beim nächsten Mal wieder unvollständig.
+ * **Die Regel ist umgedreht, und das ist der Punkt:** erhalten wird, was das
+ * Auto-Tagging überhaupt nicht *vorschlagen* kann. Das entscheidet
+ * `filterToAxes`, und damit ist es keine Liste, die jemand pflegen müsste.
+ *
+ * Dieselbe Falle ist dreimal zugeschnappt, jedes Mal als Aufzählung:
+ *
+ *  1. Die Erhaltungsliste nannte nur `kind:testcase` — jeder andere Notentyp
+ *     ging beim Auto-Tagging verloren.
+ *  2. Sie nannte `workspace:`, und als `entity` als Achse dazukam, hätte das
+ *     Tagging die Herkunft überschrieben.
+ *  3. Sie nannte die Prozess-Achsen, und `severity` und `component` standen
+ *     nicht drin — also genau die Werte, die ein Mensch von Hand gewählt hat.
+ *
+ * Eine Liste, die beim Hinzufügen einer Klasse gepflegt werden muss, ist beim
+ * nächsten Mal wieder unvollständig. Die Umkehrung kann nicht veralten.
  *
  * Preserved tags come first so a downstream tag limit truncates the
  * replaceable ones rather than the structural ones.
@@ -64,9 +74,12 @@ export function preserveTypeTags(
   autoTags: readonly string[],
 ): string[] {
   const preserved = existing.filter(t =>
+    // Der Typ bleibt immer: zwei kind-Tags machen den Typ mehrdeutig.
     isTypeCarryingTag(t)
-    || PROCESS_SET_AXES.some(axis => t.toLowerCase().startsWith(`${axis}:`))
-    || t === 'handoff',
+    // Und alles, was das Tagging nicht vorschlagen kann — Workspace und Entity
+    // (Prozess-Tatsachen), severity und component (Registry-Klassen), freie
+    // Schlagworte, der flache `handoff`-Marker.
+    || filterToAxes([t]).length === 0,
   )
   const hasType = preserved.some(isTypeCarryingTag)
   const incoming = hasType

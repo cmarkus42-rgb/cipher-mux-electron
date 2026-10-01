@@ -5,7 +5,7 @@ import {
   isTypeCarryingTag,
   preserveTypeTags,
 } from '../../src/main/notes/note-type-tags'
-import { PROCESS_SET_AXES } from '../../src/shared/tag-axes'
+import { PROCESS_SET_AXES, filterToAxes } from '../../src/shared/tag-axes'
 
 // ─── Type-carrying tags survive auto-tagging ────────────────
 //
@@ -61,14 +61,26 @@ describe('preserveTypeTags', () => {
     assert.ok(result.includes('kind:journal'))
   })
 
-  it('keeps workspace binding and the handoff marker', () => {
+  // Zwischenstand war: ein Tag ohne Klasse ("alt") darf ersetzt werden. Der
+  // Audit vom 2026-10-01 hat das umgedreht -- ersetzbar ist, was das Tagging
+  // VORSCHLAGEN kann, und ein freies Schlagwort kann es nicht. Es weiter
+  // ersetzen zu lassen hiesse, dass jeder Tagging-Lauf still Schlagworte
+  // loescht, die ein Mensch vergeben hat.
+  it('keeps workspace binding, the handoff marker and a free keyword', () => {
     const result = preserveTypeTags(
-      ['workspace:ws-1', 'handoff', 'alt'],
-      ['project:x'],
+      ['workspace:ws-1', 'handoff', 'raspberry-pi'],
+      ['phase:coding'],
     )
     assert.ok(result.includes('workspace:ws-1'))
     assert.ok(result.includes('handoff'))
-    assert.ok(!result.includes('alt'), 'an ordinary tag may be replaced')
+    assert.ok(result.includes('raspberry-pi'), 'nicht vorschlagbar, also erhalten')
+    assert.ok(result.includes('phase:coding'), 'der Vorschlag kommt dazu')
+  })
+
+  it('replaces an axis tag the tagging can propose', () => {
+    const result = preserveTypeTags(['status:open'], ['status:done'])
+    assert.ok(result.includes('status:done'))
+    assert.ok(!result.includes('status:open'))
   })
 
   it('does not duplicate a tag that is in both lists', () => {
@@ -108,6 +120,49 @@ describe('preserveTypeTags — Prozess-Tatsachen', () => {
         preserveTypeTags([tag], ['status:open']).includes(tag),
         `${axis} muss erhalten bleiben`,
       )
+    }
+  })
+})
+
+describe('preserveTypeTags — die Umkehrung', () => {
+  // Befund des Audits vom 2026-10-01: die Erhaltungsliste war eine Aufzaehlung
+  // (Typ + Prozess-Achsen + handoff), und `severity` und `component` standen
+  // nicht drin. Das Auto-Tagging haette sie geloescht -- also genau die Werte,
+  // die ein Mensch von Hand gewaehlt hat. Dritte Fassung derselben Falle: erst
+  // fehlte `kind:spec`, dann `entity:`, dann diese zwei.
+  //
+  // Die Regel ist deshalb umgedreht: erhalten wird, was das Auto-Tagging
+  // ueberhaupt nicht VORSCHLAGEN kann. Das ist nicht zu pflegen, weil es keine
+  // Liste ist -- filterToAxes entscheidet es.
+  it('behaelt eine von Hand gewaehlte Schwere und ein Bauteil', () => {
+    const result = preserveTypeTags(
+      ['kind:finding', 'severity:now', 'component:grid'],
+      ['phase:debugging', 'status:open'],
+    )
+    assert.ok(result.includes('severity:now'), 'severity ist keine Achse und bleibt')
+    assert.ok(result.includes('component:grid'), 'component ebenso')
+  })
+
+  it('behaelt ein freies Schlagwort', () => {
+    const result = preserveTypeTags(['raspberry-pi'], ['status:open'])
+    assert.ok(result.includes('raspberry-pi'))
+  })
+
+  // Der Gegenfall: was das Tagging vorschlagen KANN, darf es auch ersetzen.
+  // Sonst waere die Note nach dem ersten Lauf fuer immer festgeschrieben.
+  it('laesst Phase und Zustand ersetzen', () => {
+    const result = preserveTypeTags(['phase:coding'], ['phase:testing', 'status:done'])
+    assert.ok(result.includes('phase:testing'))
+    assert.ok(result.includes('status:done'))
+    assert.ok(!result.includes('phase:coding'), 'eine Phase ist vorschlagbar und damit ersetzbar')
+  })
+
+  it('erhaelt jeden Tag, den filterToAxes verwirft', () => {
+    for (const tag of ['severity:hi', 'component:xterm', 'workspace:ws-1',
+      'entity:debugger', 'handoff', 'eigenes-schlagwort']) {
+      assert.equal(filterToAxes([tag]).length, 0, `${tag} ist nicht vorschlagbar`)
+      assert.ok(preserveTypeTags([tag], ['status:open']).includes(tag),
+        `${tag} muss erhalten bleiben`)
     }
   })
 })
