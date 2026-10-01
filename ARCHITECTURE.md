@@ -8,7 +8,7 @@ If you want to build a new adapter, see [CONTRIBUTING.md](CONTRIBUTING.md#writin
 
 cipher-mux is an Electron application with a classic two-process architecture: a **main process** (Node.js) that manages tmux sessions, a SQLite database, an MCP server, and all system integrations; and a **renderer process** (Preact) that displays the terminal grid, chatroom, and cockpit UI.
 
-As of v0.11.2 the system supports **10 roles** (Workshop, Cyber Factory, Launcher, Companion, Refinement, Ideation Partner, Voice Relay, Audit, Debugger, Testing Assistant) that replace the old persona-based session model. The MCP server registers **57 tools** covering session management, message bus, tasks, notes, companion memory, voice, grid navigation, UI choreography, handoffs, and more. Key subsystems added since v0.9.6 include:
+As of v0.11.2 the system supports **10 roles** (Workshop, Cyber Factory, Launcher, Companion, Refinement, Ideation Partner, Voice Relay, Audit, Debugger, Testing Assistant) that replace the old persona-based session model. The MCP server registers **67 tools** in twelve categories, covering session management, message bus, tasks, notes, companion memory, voice, grid navigation, UI choreography, handoffs, and more. Key subsystems added since v0.9.6 include:
 
 - **Companion memory store** — per-entity SQLite FTS5 memory with recall/search/forget via MCP.
 - **Notes system** — full CRUD + search + Ollama auto-tagging, exposed as MCP tools (`mux_notes_*`).

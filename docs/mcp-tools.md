@@ -1,9 +1,18 @@
 # MCP Tools Reference
 
-cipher-mux exposes 37 MCP tools via its Streamable HTTP server. All tools are available to any session with MCP access (entities with `features: ['mcp']`).
+cipher-mux exposes **67 MCP tools** via its Streamable HTTP server, in twelve categories.
+Most are available to any session with MCP access (entities with `features: ['mcp']`); the
+four `companion_memory_*` tools are registered **only** for the Companion and for connections
+without a role — that is the app itself.
 
 **Server:** `http://localhost:{port}/mcp` (port auto-assigned, see `.mcp-connection.md`)
-**Auth:** Bearer token (auto-injected into `.mcp.json` per entity)
+**Auth:** Bearer token (auto-injected into `.mcp.json` per entity). Codex sends no custom
+headers, so its workspace and role travel inside the token — `src/main/mcp/bound-token.ts`.
+
+> **Counting them from the code undercounts.** A grep for `registerMuxTool(` finds 57, because
+> the ten entity handoff tools are generated inside `registerAllHandoffTools`
+> (`src/main/mcp/handoff-kernel.ts`) rather than written out one by one. The authority is what
+> a connected client is offered: 67.
 
 ---
 
@@ -52,9 +61,40 @@ Get context window usage for sessions (from StatusLine monitor).
 
 **Returns:** `{ usedPercentage, remainingPercentage, totalInputTokens, modelId, ... }`
 
+All three adapters report usage in this shape. Claude Code writes it from a statusline hook,
+Codex from the rollout JSONL, opencode from a plugin on the event bus — three writers, one
+reader.
+
+### `mux_entity_start`
+Start an entity session — the same code path as the preset button in the UI. Use this for
+Workshop, Cyber Factory, Refinement, Ideation Partner, Testing Assistant, Debugger, Audit.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `entityId` | string | yes | Entity identifier, e.g. `"cyber-factory"`, `"refinement"`, `"debugger"` |
+| `projectPath` | string | no | Project directory handed to the entity **as context** — not its working directory. That is always its run directory. Appears under Context Directories in its CLAUDE.md. |
+| `name` | string | no | Override the display name |
+
+The entity's CLI, model and role boundary are resolved at this point, per role. A role already
+running under `singleInstance` is returned rather than started twice — and `singleInstance`
+counts **per workspace**.
+
+### `mux_readiness_stats`
+Which signal reported sessions as ready? The readiness check has two: the session's own report
+through its statusline hook, and the visible prompt as a fallback. The fallback stays until the
+self-report is proven to carry — these statistics are the evidence.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | number | no | How many of the most recent entries to list in addition (default 0) |
+
 ---
 
 ## Messaging
+
+> **The message bus is deprecated.** `mux_send` / `mux_read` still work and still write to
+> SQLite, but they are not the way to say something to a session — that is `tmux send-keys`.
+> What the module still carries is the database behind the TaskManager.
 
 ### `mux_send`
 Send a message to the message bus. Optionally push-deliver to a target session via tmux send-keys.
@@ -141,17 +181,35 @@ Get a task by ID, including its children.
 ## Notes
 
 ### `mux_notes_create`
-Create a new note. The title is prepended as a `# heading` to the body automatically. When a workspace is active, a `workspace:<name>` tag is automatically added.
+Create a new note. The title is prepended as a `# heading` to the body automatically.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `title` | string | yes | Note title |
 | `body` | string | yes | Markdown body (without the title heading) |
-| `tags` | string[] | no | Tags for categorization (max 5, lowercase). Workspace tag added automatically. |
+| `tags` | string[] | no | Tags, lowercase, as `class:value`. **Only registered values are accepted — an unknown tag fails the call.** |
+
+**Tags are an axis model, not free text.** Seven classes: five axes defined in code
+(`src/shared/tag-axes.ts`), two whose values are editable in the Tag Manager. You choose from
+five of them; two are set by the Mux from the connection.
+
+| Axis | Values | Who sets it |
+|------|--------|-------------|
+| `kind` | testcase, finding, spec, requirements, research, bugreport, handoff, journal, reference, todo, idea, plan, report, guide | you, exclusive |
+| `phase` | research, architecture, coding, testing, debugging, automation, monitoring | you |
+| `status` | open, in-progress, blocked, verify, done, superseded | you, exclusive |
+| `severity` | low, mid, hi, now (editable in the Tag Manager) | you, exclusive |
+| `component` | project-specific, editable in the Tag Manager | you |
+| `workspace` | the active workspace **ID** | the Mux, from the connection |
+| `entity` | the calling role | the Mux, from the connection |
+
+Do **not** pass `workspace:` or `entity:` — the Mux sets those. Five tags is a recommendation,
+not a limit: above it the call returns a warning and keeps every tag. It used to truncate
+silently at five, which cost a handoff note its origin.
 
 **Example:**
 ```json
-{ "title": "BUG: Grid flicker on resize", "body": "## Steps\n1. Resize grid...", "tags": ["bugreport", "open"] }
+{ "title": "BUG: Grid flicker on resize", "body": "## Steps\n1. Resize grid...", "tags": ["kind:bugreport", "status:open", "severity:mid"] }
 ```
 
 ### `mux_notes_list`
@@ -176,8 +234,11 @@ Partial update of a note (title, body, tags, handoff_status).
 | `id` | string | yes | Note ID (ULID) |
 | `title` | string | no | New title (updates the `# heading` in body) |
 | `body` | string | no | New body (replaces entire body) |
-| `tags` | string[] | no | New tags (max 5, replaces existing) |
+| `tags` | string[] | no | New tags — **replaces** all existing ones, so pass what you want to keep, including `workspace:` and `entity:` |
 | `handoff_status` | enum | no | `"pending"` or `"consumed"` (for handoff notes) |
+
+Read the note first if you only mean to add one tag. The body of a **testcase** note cannot be
+replaced here — use `mux_testcase_update`.
 
 ### `mux_notes_search`
 Full-text search over notes. Max 50 results, title matches ranked first.
@@ -212,9 +273,68 @@ Search for handoff notes. Returns newest first.
 | `to_entity` | string | no | Filter by target entity |
 | `status` | enum | no | `"pending"` or `"consumed"` (default: `"pending"`) |
 
+### `mux_notes_handoff_dispatch`
+Deliver a handoff note into a target session, with the **current** world state computed and
+prepended. Finds or starts the target session, sends the state block plus the note body, and
+marks the note consumed.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `note_id` | string | yes | ID of the handoff note to deliver |
+| `to_entity` | string | no | Target entity — overrides the note's own (required if that is `"any"`) |
+| `project_path` | string | no | Repository the delta is computed against — overrides the note's `anchor_repo` |
+| `force` | boolean | no | Deliver again even if already consumed (default false) |
+
+**Why the state is computed and not stored:** a handoff note carries an anchor commit. Branch,
+commits and diff since that anchor are derived at dispatch time, so a note that sat for three
+days describes the repository as it is now, not as it was when written.
+
+### `mux_notes_open`
+Open a note in the grid as a NotesCell. If it is already open, focuses that cell.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | yes | Note ID (ULID) |
+| `highlight` | boolean | no | Also highlight the note in the sidebar (default false) |
+
+### `mux_testcase_update`
+Structured update for testcase notes. Use this instead of `mux_notes_update` — the parser needs
+the exact `- [ ] **T-ID** description` format, and a body replacement would break it.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `noteId` | string | yes | Note ID (ULID) of the testcase note |
+| `operations` | array | yes | Operations applied in order (see below) |
+
+| `op` | Fields | Effect |
+|------|--------|--------|
+| `set_status` | `itemId`, `status`: open \| pass \| fail | Set the checkbox state |
+| `set_comment` | `itemId`, `comment` | Replace the item's comment |
+| `add_item` | `section`, `id`, `description` | Append an item to a section |
+| `add_section` | `title` | Append a new `## Section` |
+| `set_resolution` | `itemId`, `resolution`: unresolved \| in_review \| addressed \| fixed \| wont_fix | Only valid on failed items |
+
+### `mux_mirror_sync`
+Mirror markdown files from a repository as typed notes. Repeatable — already mirrored files are
+updated, not duplicated.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `repo_path` | string | yes | Absolute path of the repository |
+| `directories` | string[] | yes | Directories relative to the repo, e.g. `["docs/superpowers/specs"]` |
+| `note_type` | enum | no | `spec`, `requirements` or `research` (default: `spec`) |
+| `workspace_id` | string | no | Workspace the notes inherit — otherwise this connection's binding |
+
+**The Mux mirrors, not the role.** A role can forget, and then visibility depends on whether
+somebody remembered. Drift between note and file is shown rather than claimed away
+(`src/main/notes/mirror-drift.ts`).
+
 ---
 
 ## Companion Memory
+
+Registered **only** for the Companion and for connections without a role. Removing a permission
+would not have been enough: a permission produces a prompt, it does not withhold a tool.
 
 ### `companion_memory_write`
 Write a memory to the companion memory store. When a workspace is active and no explicit scope is provided, memories are automatically scoped to the workspace (`scope_kind=workspace`).
@@ -346,7 +466,10 @@ Set the active UI theme.
 |-----------|------|----------|-------------|
 | `theme` | string | yes | Theme ID |
 
-**Valid IDs:** `cipher-ivory`, `cipher-dark`, `blueprint`, `warm-paper`, `gruvbox-dark`, `nord`, `synthwave`, `matrix`, `brutalist`, `high-contrast`
+**Valid IDs** (13, the list in `src/shared/grid-types.ts`): `cipher-ivory` (default),
+`cipher-dark`, `blueprint`, `warm-paper`, `gruvbox-dark`, `nord`, `synthwave`, `matrix`,
+`brutalist`, `high-contrast`, `cvd-deuteranopia`, `cvd-tritanopia`, `cvd-achromatopsia`.
+Custom themes made in the theme editor are addressed by their own ID.
 
 ### `mux_ui_choreography`
 Play a timeline of UI actions client-side with precise timing. One call replaces many sequential `mux_theme_set` / `mux_ui_highlight` calls. Actions execute in the renderer with no network roundtrip between steps. Max 100 steps, max 30s total duration.
@@ -402,6 +525,173 @@ Speak text aloud via TTS. Use this to read responses to the user. Only speak key
 
 ---
 
+## Entity Pipeline — Runs
+
+A run is the state a role keeps across its own session: what it is working on, what it found,
+and what it may hand on. The handoff tools in the next section read it.
+
+### `mux_testing_run_start`
+Start a Testing Assistant run against a project.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `projectPath` | string | yes | Absolute path to the project |
+| `testCommand` | string | no | Override the test command (default: from CLAUDE.md) |
+| `cyberFactoryRunId` | string | no | Associated Cyber Factory run |
+| `welleId` | string | no | Associated wave |
+| `workspaceId` | string | no | Workspace scope |
+
+### `mux_testing_run_complete`
+Mark a testing run complete and get the handoff recommendation.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `runId` | string | yes | Testing run ID |
+
+### `mux_audit_run_start`
+Start an audit run.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `projectPath` | string | yes | Project to audit |
+| `scope` | enum | no | `welle`, `komplett` or `modul` (default: `welle`) |
+| `scopeDetail` | string | no | Detail for the scope — a git range for `welle`, a directory for `modul` |
+| `workspaceId` | string | no | Workspace scope |
+
+### `mux_audit_run_complete`
+Complete an audit run and generate the release recommendation.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `runId` | string | yes | Audit run ID |
+
+### `mux_debugger_findings_intake`
+Submit structured findings to the Debugger. Creates a run and names the clarification gaps.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `symptom` | string | yes | What is happening |
+| `reproduction` | string | yes | Steps to reproduce |
+| `severity` | enum | yes | `high`, `medium` or `low` |
+| `projectPath` | string | yes | Project path for the run |
+| `suspectedCause` | string | no | Hypothesis about the root cause |
+| `affectedAreas` | string[] | no | File paths likely involved |
+| `source` | enum | no | `testing-assistant`, `bugreport` or `manual` (default: `manual`) |
+| `bugReportId` | string | no | Link to an existing bugreport |
+
+### `mux_cyber_factory_diagnose`
+Health report for a Cyber Factory run: run status, waves, workers, escalation backlog.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `run_id` | string | yes | Cyber Factory run ID |
+
+### `mux_ideation_skill_run`
+Run an ideation skill with the current brain as context. Returns the skill markdown for
+execution.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `skillId` | string | yes | e.g. `"pre-mortem"`, `"persona-roundtable"`, `"oss-telescope"` |
+| `skillsDir` | string | no | Skills directory (default `~/.config/cipher-mux/skills/ideation/`) |
+
+---
+
+## Entity Pipeline — Handoffs
+
+Ten tools, generated from one definition in `src/main/mcp/handoff-kernel.ts`. Each starts or
+finds the target session, delivers a structured payload, and names the sender. This is why a
+grep for `registerMuxTool(` undercounts the total by exactly ten.
+
+| Tool | From → to | Required fields |
+|------|-----------|-----------------|
+| `mux_ideation_handoff_refinement` | Ideation → Refinement | `anforderungspaketPath`; `projectPath` optional |
+| `mux_refinement_handoff_cyber_factory` | Refinement → Cyber Factory | `detailSpecPath`, `projectPath`; `lifecyclePhase` optional (default `architect`) |
+| `mux_refinement_handoff_ideation` | Refinement → Ideation | `reason`, `gaps[]`; `projectPath` optional — the way back when the requirements have systematic gaps |
+| `mux_cyber_factory_handoff_testing` | Cyber Factory → Testing | `run_id`, `welle_id`, `summary` |
+| `mux_cyber_factory_handoff_debugger` | Cyber Factory → Debugger | `run_id`, `findings_report`, `severity_summary` |
+| `mux_cyber_factory_handoff_audit` | Cyber Factory → Audit | `run_id`, `projectPath`, `scope` |
+| `mux_testing_handoff_cyber_factory` | Testing → Cyber Factory | `runId`, `results`, `passRate` (0–100) |
+| `mux_testing_findings_handoff_debugger` | Testing → Debugger | `runId` — the findings come from the run, not from the call |
+| `mux_debugger_handoff_cyber_factory` | Debugger → Cyber Factory | `findings`, `recommendations[]` |
+| `mux_debugger_handoff_testing` | Debugger → Testing | `fixSummary`, `affectedFiles[]` |
+| `mux_audit_handoff_cyber_factory` | Audit → Cyber Factory | `run_id`, `verdict`, `findings_summary`, `high_count`, `medium_count` |
+
+`projectPath` is always the directory handed to the target **as context** — never its working
+directory. An entity session always works in its own run directory under
+`~/.config/cipher-mux/runs/<workspaceId>/<entityId>/`.
+
+---
+
+## Hub Migration
+
+Seven tools for moving an existing project into the CIPHER-MUX Hub. The order is the safety
+property: inventory → plan → apply → verify → release, with rollback available until release.
+
+### `mux_hub_integrate`
+Copy an existing project into the Hub. Excludes build artifacts. **The original stays
+untouched** — that is the fallback guarantee.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `sourcePath` | string | yes | Absolute path to the source project |
+| `projectName` | string | no | Name in the Hub (default: directory name) |
+| `excludeBuildArtifacts` | boolean | no | Exclude `node_modules`, `dist`, `.cache` … (default true) |
+
+### `mux_hub_inventory`
+Read-only brownfield inventory: stack, structure, specs, tests.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `projectName` | string | yes | Project name in the Hub |
+
+### `mux_hub_migration_plan`
+Generate a three-section plan from the inventory: unchanged, extended, new.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `projectName` | string | yes | Project name in the Hub |
+| `mode` | enum | no | `voll` or `pack-light` (default: `voll`) |
+| `components` | string[] | no | Components, for `pack-light` |
+
+### `mux_hub_apply`
+Execute the plan's steps. Idempotent — already applied steps are skipped.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `projectName` | string | yes | Project name in the Hub |
+| `planPath` | string | no | Path to the plan file (default: latest) |
+| `dryRun` | boolean | no | Preview only (default false) |
+
+### `mux_hub_verify`
+Run build and test suite in the Hub copy. **The gate before release: no green verify, no
+release.**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `projectName` | string | yes | Project name in the Hub |
+| `installDeps` | boolean | no | Install dependencies (default true) |
+| `runBuild` | boolean | no | Run the build (default true) |
+| `runTests` | boolean | no | Run the tests (default true) |
+
+### `mux_hub_release`
+Mark the project released: push-lock on the original, write `MIGRATED.md`, update
+`ARCHIV-VERWEIS.md`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `projectName` | string | yes | Project name in the Hub |
+
+### `mux_hub_rollback`
+Point the workspace back at the original path, remove the push-lock, delete `MIGRATED.md`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `projectName` | string | yes | Project name in the Hub |
+| `removeHubCopy` | boolean | no | Delete the Hub copy — destructive, needs confirmation |
+
+---
+
 ## Other
 
 ### `kickoff_complete`
@@ -423,14 +713,3 @@ Resolve a bugreport (move from outbox to inbox).
 | `summary` | string | yes | What was done |
 | `branchName` | string | no | Git branch with the fix |
 | `filesChanged` | string[] | no | List of changed files |
-
-### `mux_input_request_create`
-Create an input request for the MPO sidebar (bubble question).
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `projectId` | string | yes | Project identifier |
-| `question` | string | yes | The question to ask |
-| `context` | string | no | Background context (2-3 sentences) |
-| `options` | array | no | Array of `{ key, label, description? }` (max 4) |
-| `recommendation` | string | no | Recommended option key |
