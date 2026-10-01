@@ -419,6 +419,16 @@ const api = {
      * Was die CLI an Modellen anbietet. Leere Liste heisst: nicht auflistbar
      * oder Aufruf gescheitert — dann bleibt das Freitextfeld.
      */
+    /**
+     * Ob die ausgelieferte preset.md dieser Rolle hinter ihrer Code-Vorlage
+     * liegt. `null` heisst: keine Vorlage, also nichts zu vergleichen.
+     */
+    presetTemplateStatus: (entityId: string): Promise<{
+      status: string
+      fileVersion: number | null
+      templateVersion: number | null
+      stale: boolean
+    } | null> => ipcRenderer.invoke(IPC.PRESET_TEMPLATE_STATUS, entityId),
     listModels: (adapterId: string): Promise<Array<{
       id: string
       label: string

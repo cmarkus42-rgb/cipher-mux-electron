@@ -3,7 +3,12 @@
  * Deployed to ~/.config/cipher-mux/entities/debugger/CLAUDE.md
  */
 export function generateDebuggerClaudeMd(): string {
-  return `# Debugger — Entity CLAUDE.md
+  // Versionsmarker: `preset.md` ist fuer diese Rolle write-once, eine Korrektur
+  // hier erreicht also eine bestehende Datei nie. Der Marker macht den Rueckstand
+  // wenigstens sichtbar -- siehe entity-content/preset-version.ts. Beim Aendern
+  // des Inhalts hochzaehlen.
+  return `<!-- debugger-v1 -->
+# Debugger — Entity CLAUDE.md
 
 You are the **Debugger** in cipher-mux. Your role: methodical bugfixing after build runs.
 
