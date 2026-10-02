@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.5] — 2026-10-02
+
+One fix, and it corrects the direction this bug had been chased in since April.
+
+### Fixed
+- **"The lines fall apart" was the glyph atlas, not the content.** On a cell's first use, the
+  Claude Code logo and the 82-character separator lines came out as rows of diamonds. What was
+  *right* about that picture is the key: the colours. Pink for the logo, grey for the lines —
+  colour comes from the cell attribute, the glyph from the renderer's texture atlas. Only the
+  glyph was wrong. `scripts/zerfall-beweis.sh` captured both sides at the same moment, and tmux
+  held exactly the right codepoints (`U+2588`, `U+259B`, `U+2590`, `U+259D` for the logo, 82×
+  `U+2500` per line). What proves it is the repair: nudging the font size one step **fixes it
+  instantly**. Setting `term.options.fontSize` makes xterm re-measure, discard the atlas and
+  re-rasterise — without touching the buffer. A corrupt buffer could not be repaired by
+  re-rasterising. The fix does that one part directly: `clearTextureAtlas()` once per terminal,
+  after `document.fonts.ready` and one frame later.
+
+  **Stated plainly: the cause of the bad atlas was not found.** Seven reproductions failed to
+  trigger it — cold font start with a deliberately delayed woff2, an atlas filled with 1400
+  glyphs, theme and font-size changes on a live terminal, construction inside a 40×30 container,
+  WebGL/Canvas/DOM, Electron 34 as well as Chrome, DPR 1. This addresses the measured symptom,
+  not a proven cause. If the garbling returns, the atlas goes stale *later*, and the question is
+  then which event does that. There is deliberately **no test reproducing the garbling** — it
+  would be invented. The four guards hold the wiring instead, each seen red against its own
+  reverted defect.
+
+### Added
+- **`scripts/zerfall-beweis.sh`** — captures, in one moment, what tmux holds and what is on
+  screen. Without that simultaneity "drawn wrong" cannot be told apart from "wrong content in the
+  buffer", and that was exactly the open question.
+
 ## [0.11.4] — 2026-10-02
 
 Two terminal fixes plus the documentation and CI work from the night before. The fixes are
