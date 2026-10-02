@@ -125,6 +125,62 @@ describe('die Aufrufstellen geben die Tiefe mit', () => {
   })
 })
 
+describe('der Resync wartet den Resize ab', () => {
+  // Die Invariante: **nie erfassen, bevor tmux die neue Breite hat.** Sonst
+  // liefert `capture-pane` den Inhalt in der alten Breite, er wird in ein
+  // Terminal der neuen geschrieben, und der falsche Umbruch bleibt bis zum
+  // naechsten Resize stehen — `lastSizeRef` ist dann schon aktualisiert, ein
+  // zweiter Resync kommt also nicht. Vor dem 2026-10-02 wurde das mit 200 ms
+  // geraten, weil die Resize-IPC ein `send` ohne Rueckgabe war.
+  //
+  // Geprueft wird der Quelltext, weil die drei Stellen auf drei Ebenen liegen
+  // (Preload, IPC-Handler, Hook) und keine davon ohne Electron laeuft. Eine
+  // halbe Rueckkehr faellt ohnehin laut auf: mit `send` gibt das Preload
+  // `undefined` zurueck und `resized.finally` wirft. Still waere nur die
+  // vollstaendige — und genau die faengt das hier.
+
+  it('das Preload gibt ein Promise zurueck, kein send', () => {
+    const src = readFileSync(path.join(__dirname, '../../src/main/preload.ts'), 'utf-8')
+    const m = src.match(/resize:[^\n]*\n?[^\n]*TERMINAL_RESIZE/)
+    assert.ok(m, 'resize-Eintrag im Preload nicht gefunden')
+    assert.match(
+      m[0],
+      /ipcRenderer\.invoke/,
+      'terminal.resize muss `invoke` sein — mit `send` kann der Aufrufer nicht warten',
+    )
+  })
+
+  it('der Main-Handler ist handle, nicht on', () => {
+    const src = readFileSync(path.join(__dirname, '../../src/main/ipc-hub.ts'), 'utf-8')
+    assert.match(
+      src,
+      /ipcMain\.handle\(IPC\.TERMINAL_RESIZE/,
+      'TERMINAL_RESIZE braucht `handle` — `on` hat keine Rueckgabe',
+    )
+    assert.doesNotMatch(src, /ipcMain\.on\(IPC\.TERMINAL_RESIZE/)
+  })
+
+  it('jeder scheduleResync-Aufruf haengt an der Resize-Zusage', () => {
+    const src = readFileSync(path.join(__dirname, '../../src/renderer/hooks/useTerminal.ts'), 'utf-8')
+    // Aufrufe, nicht Erwaehnungen: `scheduleResync(` mit Klammer. Die Definition
+    // (`const scheduleResync = useCallback(`) und das Dependency-Array tragen
+    // keine, fallen also von selbst heraus.
+    const istKommentar = (text: string) => /^\s*(\/\/|\*|\/\*)/.test(text)
+    const zeilen = src
+      .split('\n')
+      .map((text, i) => ({ nr: i + 1, text }))
+      .filter(({ text }) => /scheduleResync\(\)/.test(text) && !istKommentar(text))
+    assert.ok(zeilen.length >= 2, `erwartet: mindestens zwei Aufrufe, waren ${zeilen.length}`)
+    for (const { nr, text } of zeilen) {
+      assert.match(
+        text,
+        /\.finally\(\s*\(\)\s*=>\s*scheduleResync\(\)\s*\)/,
+        `Zeile ${nr} ruft scheduleResync ohne auf den Resize zu warten: ${text.trim()}`,
+      )
+    }
+  })
+})
+
 describe('capture-pane, Scrollback und reine Hoehenaenderung', { skip: tmuxAvailable() ? false : 'tmux nicht verfuegbar' }, () => {
   before(() => {
     try { tmux('kill-session', '-t', SESSION) } catch { /* lief nicht */ }

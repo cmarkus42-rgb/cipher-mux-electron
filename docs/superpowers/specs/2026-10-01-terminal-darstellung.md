@@ -298,14 +298,26 @@ Vorgang, der ihn erzeugt.
 
 Zwei Ursachen sind übrig, und sie sind unterschiedlich schwer:
 
-**(a) Der Schnappschuss in der alten Breite.** `api().terminal.resize(...)` ist im Preload ein
-`ipcRenderer.send` — **ohne Rückgabe, also nicht abwartbar** (`preload.ts:59`). Der Renderer
-wartet stattdessen 200 ms und erfasst dann. Kommt die Resize-IPC in dieser Zeit nicht durch,
-liefert `capture-pane` Inhalt in der **alten** Breite, der in ein Terminal der **neuen** Breite
-geschrieben wird — und es folgt kein zweiter Resync, weil `lastSizeRef` schon aktualisiert ist.
-Der falsche Umbruch bleibt bis zum nächsten Resize stehen. Nach M3 ist die Frist dafür nicht
-einmal nötig: nach Rückkehr des tmux-Kommandos ist `capture-pane` **sofort** richtig. Die 200 ms
-sind also eine Schätzung an der Stelle, an der eine Kausalkette zu haben wäre.
+**(a) Der Schnappschuss in der alten Breite — behoben am 2026-10-02.**
+`api().terminal.resize(...)` war im Preload ein `ipcRenderer.send`, **ohne Rückgabe und damit
+nicht abwartbar**. Der Renderer wartete stattdessen 200 ms und erfasste dann. Kam die Resize-IPC
+in dieser Zeit nicht durch, lieferte `capture-pane` Inhalt in der **alten** Breite, der in ein
+Terminal der **neuen** geschrieben wurde — und es folgte kein zweiter Resync, weil `lastSizeRef`
+schon aktualisiert war. Der falsche Umbruch blieb bis zum nächsten Resize stehen.
+
+Nach M3 war die Frist dafür nicht einmal nötig: nach Rückkehr des tmux-Kommandos ist
+`capture-pane` **sofort** richtig. Es gab also nichts einzuschwingen, nur eine Reihenfolge
+einzuhalten. Jetzt ist der Kanal `invoke`/`handle` statt `send`/`on`, und der Resync hängt als
+`resized.finally(() => scheduleResync())` an der Zusage. Die 200 ms bleiben stehen, haben aber
+eine andere Aufgabe: sie **fassen zusammen**, was in schneller Folge kommt — Ziehen am Fenster,
+Focus Mode, Zellen-Merge — statt eine Reihenfolge zu raten.
+
+Der Handler wirft einen gescheiterten Resize ausdrücklich **nicht** weiter, sondern loggt ihn wie
+vorher; der Aufrufer bekommt nur die Zusage, dass der Versuch durch ist, und erfasst per
+`finally` auch dann. Drei Quelltext-Wächter halten die Invariante über die drei Ebenen
+(`terminal-resync.test.ts`), und **jeder ist an seinem eigenen zurückgedrehten Defekt rot gesehen
+worden**. Eine halbe Rückkehr fällt ohnehin laut auf: mit `send` gibt das Preload `undefined`
+zurück und `resized.finally` wirft.
 
 **(b) Die Reihenfolge gegen den Livestream.** Was zwischen dem Erfassen und dem `term.reset()`
 über den Livestream eintrifft, wird in den Puffer geschrieben, vom `reset()` verworfen und steht
@@ -328,9 +340,10 @@ Rumpf, der sendet und `''` zurückgibt, mit dem Kommentar
 `TODO: implement proper begin/end response matching`. **Das ist der Bau, der ansteht** — kein
 neuer Mechanismus, sondern ein offenes Ende.
 
-> **Reihenfolge der Arbeit:** (a) zuerst. Es ist die kleinere Änderung, es ist nach M3 die
-> wahrscheinlichere Ursache für den Rest, den der Nutzer sieht, und es nimmt eine Frist weg
-> statt eine zweite dazuzustellen.
+> **Stand:** (a) ist erledigt, (b) steht. Ob der Rest, den der Nutzer sieht, damit weg ist, lässt
+> sich hier nicht entscheiden — das ist eine Beobachtung am laufenden Programm und gehört in die
+> Abnahme. (b) zu bauen, ohne vorher zu wissen, ob (a) gereicht hat, wäre eine Änderung in der
+> empfindlichsten Schicht auf Verdacht.
 
 ---
 

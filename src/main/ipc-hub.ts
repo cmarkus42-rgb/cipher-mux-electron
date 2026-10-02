@@ -856,10 +856,17 @@ export class IpcHub {
       })
     })
 
-    ipcMain.on(IPC.TERMINAL_RESIZE, (_e, { paneId, cols, rows }: { paneId: string; cols: number; rows: number }) => {
-      this.sessionManager.resize(paneId, cols, rows).catch((err) => {
+    // `handle`, nicht `on`: der Renderer muss den Resize abwarten koennen, bevor er
+    // den Pane erfasst — Begruendung an `resize` im Preload. Ein Fehler wird hier
+    // geloggt und **nicht** weitergeworfen, damit ein gescheiterter Resize im
+    // Renderer keine unbehandelte Ablehnung wird; der Aufrufer bekommt wie vorher
+    // nur die Zusage, dass der Versuch durch ist.
+    ipcMain.handle(IPC.TERMINAL_RESIZE, async (_e, { paneId, cols, rows }: { paneId: string; cols: number; rows: number }) => {
+      try {
+        await this.sessionManager.resize(paneId, cols, rows)
+      } catch (err) {
         console.error('terminal resize error:', err)
-      })
+      }
     })
 
     ipcMain.handle(IPC.TERMINAL_SPLIT, async (_e, { paneId, direction }: { paneId: string; direction: string }) => {

@@ -56,8 +56,23 @@ const api = {
   terminal: {
     write: (paneId: string, data: string) =>
       ipcRenderer.send(IPC.TERMINAL_WRITE, { paneId, data }),
-    resize: (paneId: string, cols: number, rows: number) =>
-      ipcRenderer.send(IPC.TERMINAL_RESIZE, { paneId, cols, rows }),
+    /**
+     * **`invoke`, nicht `send`** — der Aufrufer muss warten koennen.
+     *
+     * Der Resync nach einem Resize erfasst den Pane mit `capture-pane`, und das
+     * darf erst passieren, wenn tmux die neue Breite hat. Mit `send` gab es dafuer
+     * keine Rueckgabe und der Renderer wartete stattdessen 200 ms blind; kam die
+     * IPC nicht durch, erfasste er Inhalt in der **alten** Breite und schrieb ihn
+     * in ein Terminal der neuen -- der falsche Umbruch blieb dann bis zum naechsten
+     * Resize stehen, weil `lastSizeRef` schon aktualisiert war.
+     *
+     * Gemessen am 2026-10-02: nach Rueckkehr des tmux-Kommandos ist `capture-pane`
+     * **sofort** richtig (geprueft bei 0, 50, 200, 500 ms und 2 s, alle identisch).
+     * Es gibt also keine Einschwingzeit abzuwarten, nur eine Reihenfolge
+     * einzuhalten.
+     */
+    resize: (paneId: string, cols: number, rows: number): Promise<void> =>
+      ipcRenderer.invoke(IPC.TERMINAL_RESIZE, { paneId, cols, rows }),
     split: (paneId: string, direction: string) =>
       ipcRenderer.invoke(IPC.TERMINAL_SPLIT, { paneId, direction }),
     capture: (paneId: string, lines?: number) =>
