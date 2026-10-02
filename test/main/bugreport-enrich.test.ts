@@ -4,7 +4,7 @@ import * as http from 'node:http'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { gatewayChat, readGatewayKey, LiteLlmError, DEFAULT_TIER } from '../../src/main/llm/litellm-client'
+import { gatewayChat, readGatewayKey, readGatewayUrl, normalisiereBasis, waehleBasis, LiteLlmError, DEFAULT_TIER, KEY_NAMEN } from '../../src/main/llm/litellm-client'
 import { enrichBugreport, baueReportText, SYSTEM_PROMPT, ERWARTETE_FELDER } from '../../src/main/bugreport/enrich'
 
 /**
@@ -310,5 +310,83 @@ describe('Die Notiz-Ablage wird spaet ausgewertet', () => {
       assert.match(t, erlaubt, `Tag "${t}" gehoert zu keiner bekannten Achse`)
     }
     fs.rmSync(tmp, { recursive: true, force: true })
+  })
+})
+
+
+describe('Basis-URL normalisieren', () => {
+  // Beide Funde stammen aus dem ersten Rauchtest gegen das echte Gateway am
+  // 2026-10-02. Gegen den Testserver oben war nichts davon zu sehen: der nimmt
+  // jeden Pfad an und kennt jeden Schluesselnamen, den man ihm gibt.
+
+  it('ergaenzt /v1, wenn es fehlt', () => {
+    // Die Env-Datei traegt `http://…:4000`, die Config `http://…:4000/v1`.
+    // Ohne /v1 landet die Anfrage auf /chat/completions, und litellm antwortet
+    // dort GAR NICHT — der Aufruf laeuft in die Frist statt in einen 404. Ein
+    // 45-Sekunden-Timeout sieht aus wie ein ueberlastetes Gateway, nicht wie ein
+    // Pfadfehler; genau daran ist der erste Rauchtest gescheitert.
+    assert.equal(normalisiereBasis('http://host:4000'), 'http://host:4000/v1')
+    assert.equal(normalisiereBasis('http://host:4000/'), 'http://host:4000/v1')
+  })
+
+  it('laesst ein vorhandenes /v1 in Ruhe', () => {
+    assert.equal(normalisiereBasis('http://host:4000/v1'), 'http://host:4000/v1')
+    assert.equal(normalisiereBasis('http://host:4000/v1/'), 'http://host:4000/v1')
+  })
+
+  it('verdoppelt auch eine andere Versionsnummer nicht', () => {
+    assert.equal(normalisiereBasis('http://host:4000/v2'), 'http://host:4000/v2')
+  })
+})
+
+describe('Schluessel- und URL-Namen in der Env-Datei', () => {
+  const tmp = path.join(os.tmpdir(), `litellm-namen-${process.pid}`)
+  after(() => { try { fs.rmSync(tmp, { recursive: true, force: true }) } catch { /* egal */ } })
+  const schreibe = (inhalt: string) => {
+    fs.mkdirSync(tmp, { recursive: true })
+    const f = path.join(tmp, '.cipher-litellm.env')
+    fs.writeFileSync(f, inhalt)
+    return f
+  }
+
+  it('LITELLM_MASTER_KEY wird erkannt', () => {
+    // So ist die Datei tatsaechlich geschrieben, und so heisst der Schluessel
+    // auch im Betriebslog von topic-briefings. Der Klient kannte zunaechst nur
+    // LLM_API_KEY und fand deshalb nichts — gegen einen Mock waere das nie
+    // aufgefallen.
+    assert.equal(readGatewayKey(schreibe('LITELLM_MASTER_KEY=geheim\n')), 'geheim')
+  })
+
+  it('LITELLM_MASTER_KEY steht an erster Stelle der akzeptierten Namen', () => {
+    assert.equal(KEY_NAMEN[0], 'LITELLM_MASTER_KEY')
+  })
+
+  it('LITELLM_BASE_URL wird als Basis-URL gelesen', () => {
+    const f = schreibe('LITELLM_BASE_URL=http://host:4000\nLITELLM_MASTER_KEY=k\n')
+    assert.equal(readGatewayUrl(f), 'http://host:4000')
+    assert.equal(readGatewayKey(f), 'k')
+  })
+
+  it('ein aehnlich benannter Schluessel wird nicht verwechselt', () => {
+    // `MEIN_LITELLM_MASTER_KEY_BACKUP` ist nicht der Schluessel.
+    assert.equal(readGatewayKey(schreibe('MEIN_LITELLM_MASTER_KEY_BACKUP=x\n')), null)
+  })
+})
+
+
+describe('Vorrang der Basis-URL', () => {
+  it('die Env-Datei schlaegt die Config', () => {
+    // Dort steht der Schluessel. Haette die Config Vorrang, liefen Adresse und
+    // Schluessel auseinander — mit einem Fehlerbild, das nach "Schluessel
+    // ungueltig" aussieht, obwohl nur die Adresse alt ist.
+    assert.equal(waehleBasis(undefined, 'http://env:4000', 'http://config:4000/v1'), 'http://env:4000')
+  })
+
+  it('ohne Env-Datei gilt die Config', () => {
+    assert.equal(waehleBasis(undefined, null, 'http://config:4000/v1'), 'http://config:4000/v1')
+  })
+
+  it('ein ausdrueckliches Argument schlaegt beides', () => {
+    assert.equal(waehleBasis('http://test:1', 'http://env:4000', 'http://config:4000'), 'http://test:1')
   })
 })

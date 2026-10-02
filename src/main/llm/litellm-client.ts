@@ -48,14 +48,13 @@ export class LiteLlmError extends Error {
 }
 
 /**
- * Den Schluessel aus `~/.cipher-litellm.env` lesen.
+ * Einen Wert aus einer Env-Datei lesen.
  *
- * Akzeptiert `LLM_API_KEY=wert` und `LITELLM_API_KEY=wert`, mit oder ohne
- * Anfuehrungszeichen, Kommentarzeilen werden uebersprungen. Gibt `null` zurueck,
- * wenn die Datei fehlt oder keinen Schluessel traegt — **nie** eine Fehlermeldung,
- * die den Inhalt enthaelt.
+ * Die Datei wird **nie** als Ganzes zurueckgegeben, geloggt oder in eine
+ * Fehlermeldung aufgenommen — nur der eine gesuchte Wert verlaesst diese
+ * Funktion.
  */
-export function readGatewayKey(file: string = KEY_FILE): string | null {
+function leseEnvWert(file: string, namen: readonly string[]): string | null {
   let roh: string
   try {
     roh = fs.readFileSync(file, 'utf-8')
@@ -65,12 +64,47 @@ export function readGatewayKey(file: string = KEY_FILE): string | null {
   for (const zeile of roh.split('\n')) {
     const t = zeile.trim()
     if (!t || t.startsWith('#')) continue
-    const m = t.match(/^(?:export\s+)?(LLM_API_KEY|LITELLM_API_KEY)\s*=\s*(.*)$/)
-    if (!m) continue
+    const m = t.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/)
+    if (!m || !namen.includes(m[1])) continue
     const wert = m[2].trim().replace(/^["']|["']$/g, '')
     if (wert) return wert
   }
   return null
+}
+
+/**
+ * Schluesselnamen, die akzeptiert werden.
+ *
+ * **`LITELLM_MASTER_KEY` steht zuerst, weil die Datei so geschrieben ist.** Es
+ * ist der Master-Key des Gateways, und genau so heisst er auch im Betriebslog von
+ * `topic-briefings`. Die anderen beiden sind geduldete Schreibweisen — ein
+ * Rauchtest gegen das echte Gateway ist am 2026-10-02 daran gescheitert, dass der
+ * Klient nur `LLM_API_KEY` kannte. Gegen einen Mock waere das nie aufgefallen.
+ */
+export const KEY_NAMEN = ['LITELLM_MASTER_KEY', 'LLM_API_KEY', 'LITELLM_API_KEY'] as const
+
+/** Namen fuer die Basis-URL in derselben Datei. */
+export const URL_NAMEN = ['LITELLM_BASE_URL', 'LLM_BASE_URL'] as const
+
+/**
+ * Den Schluessel aus `~/.cipher-litellm.env` lesen.
+ *
+ * Gibt `null` zurueck, wenn die Datei fehlt oder keinen Schluessel traegt —
+ * **nie** eine Fehlermeldung, die den Inhalt enthaelt.
+ */
+export function readGatewayKey(file: string = KEY_FILE): string | null {
+  return leseEnvWert(file, KEY_NAMEN)
+}
+
+/**
+ * Die Basis-URL aus derselben Datei lesen.
+ *
+ * **Sie schlaegt die Config.** Wer das Gateway umzieht, aendert dann genau eine
+ * Datei, und Schluessel und Adresse bleiben beieinander — eine Adresse in der
+ * Config und ein Schluessel daneben laufen sonst auseinander.
+ */
+export function readGatewayUrl(file: string = KEY_FILE): string | null {
+  return leseEnvWert(file, URL_NAMEN)
 }
 
 /** Basis-URL und Tier aus der Config, mit Defaults. */
@@ -86,6 +120,44 @@ function getGatewayConfig(): { baseUrl: string; tier: string } {
   } catch {
     return { baseUrl: DEFAULT_GATEWAY_URL, tier: DEFAULT_TIER }
   }
+}
+
+/**
+ * Basis-URL auf die OpenAI-Form bringen.
+ *
+ * **`/v1` wird ergaenzt, wenn es fehlt.** Die Env-Datei des Nutzers traegt
+ * `http://…:4000`, die Config `http://…:4000/v1` — beide meinen dasselbe Gateway.
+ * Ohne diese Normalisierung landet die Anfrage auf `/chat/completions` statt
+ * `/v1/chat/completions`, und litellm antwortet dort **gar nicht**: der Aufruf
+ * laeuft in die Frist statt in einen 404. Genau so ist der erste Rauchtest am
+ * 2026-10-02 gescheitert, und ein 45-Sekunden-Timeout sieht aus wie ein
+ * ueberlastetes Gateway, nicht wie ein Pfadfehler.
+ */
+export function normalisiereBasis(baseUrl: string): string {
+  const ohneSchraegstrich = baseUrl.replace(/\/+$/, '')
+  return /\/v\d+$/.test(ohneSchraegstrich) ? ohneSchraegstrich : ohneSchraegstrich + '/v1'
+}
+
+/**
+ * Welche Basis-URL gilt.
+ *
+ * Reihenfolge: ausdrueckliches Argument (nur Tests) > **Env-Datei** > Config.
+ *
+ * **Die Env-Datei schlaegt die Config mit Absicht.** Dort steht der Schluessel,
+ * und wer das Gateway umzieht, aendert dann genau eine Datei. Haette die Config
+ * Vorrang, liefen Adresse und Schluessel auseinander — mit einem Fehlerbild, das
+ * nach „Schluessel ungueltig" aussieht, obwohl nur die Adresse alt ist.
+ *
+ * Als eigene Funktion, weil sich die Reihenfolge sonst nicht pruefen laesst:
+ * `gatewayChat` liest die Datei aus dem Home, und ein Test kann die nicht
+ * verschieben.
+ */
+export function waehleBasis(
+  explizit: string | undefined,
+  ausEnvDatei: string | null,
+  ausConfig: string,
+): string {
+  return explizit ?? ausEnvDatei ?? ausConfig
 }
 
 interface ChatAntwort {
@@ -112,18 +184,18 @@ export async function gatewayChat(opts: {
   apiKey?: string | null
 }): Promise<string> {
   const cfg = getGatewayConfig()
-  const baseUrl = opts.baseUrl ?? cfg.baseUrl
+  const baseUrl = waehleBasis(opts.baseUrl, readGatewayUrl(), cfg.baseUrl)
   const tier = opts.tier ?? cfg.tier
   const key = opts.apiKey !== undefined ? opts.apiKey : readGatewayKey()
 
   if (!key) {
     throw new LiteLlmError(
-      `Kein Gateway-Schluessel. Erwartet wird LLM_API_KEY in ${KEY_FILE}.`,
+      `Kein Gateway-Schluessel. Erwartet wird ${KEY_NAMEN[0]} in ${KEY_FILE}.`,
       true,
     )
   }
 
-  const url = new URL(baseUrl.replace(/\/+$/, '') + '/chat/completions')
+  const url = new URL(normalisiereBasis(baseUrl) + '/chat/completions')
   const koerper = JSON.stringify({
     model: tier,
     messages: [
