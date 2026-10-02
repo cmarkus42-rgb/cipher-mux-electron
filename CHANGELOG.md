@@ -7,11 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Documentation and CI only — no application behaviour changed, so no version was cut. The
-Companion's reference files are the exception: `deployCompanionRef` rewrites them at every
-session start, so the corrections below reach an installed copy without a new build.
+Two terminal fixes plus the documentation and CI work from the night before. **The terminal
+fixes need a new build to be visible** — they are renderer and main code. The Companion's
+reference files are the exception the other way round: `deployCompanionRef` rewrites them at
+every session start, so those corrections reach an installed copy without one.
 
 ### Fixed
+- **Resizing a cell no longer costs the scrollback.** After pulling a cell to double height and
+  back, scrolling up was impossible — the resync wiped the buffer. Three links, each measured:
+  a resize changed `rows` and triggered the resync; `capture-pane` without `-S` returns **only
+  the visible area** (80×15 pane with 488 lines of history → 15 lines back, starting at "487";
+  with `-S -2000` → 503); and `term.reset()` *replaces* the scrollback rather than clearing it
+  (`BufferSet.reset()` allocates `new Buffer(...)`, xterm 5.5.0). The `lines` parameter existed
+  along the entire path — tmux manager, IPC handler, preload — and the renderer never passed it.
+  Now: no resync at all when only the height changed (a rows-only change re-wraps nothing —
+  measured at 15 → 30 → 15 columns constant: tmux moves lines between history and the visible
+  area and line "472" stays line "472"), and when it does run it carries 1000 lines of history,
+  matching xterm's `scrollback` default. Same for the mount restore, which until now put a
+  recovered session on screen with no history at all.
+- **The resync waits for the resize instead of guessing 200 ms.** `terminal.resize` was an
+  `ipcRenderer.send` with no return value, so the renderer could not wait; it slept 200 ms and
+  captured. If the IPC had not landed by then, `capture-pane` returned the **old** width,
+  written into a terminal at the new one — and no second resync followed, because `lastSizeRef`
+  was already updated, so the wrong wrapping stayed until the next resize. Measured: after the
+  tmux command returns, `capture-pane` is correct **immediately** (0, 50, 200, 500 ms and 2 s —
+  all five identical), so there was no settling time to wait for, only an order to keep. The
+  channel is now `invoke`/`handle` and the resync hangs off the promise. The 200 ms remain, with
+  a different job: coalescing rapid resizes.
 - **The Companion taught two keys that do not exist.** `Cmd+1–5` for grid navigation (the real
   ones are `Cmd+Shift+W/A/S/D`, and they were missing entirely), and `Ctrl+Shift+Space` as a
   voice toggle — it is push-to-talk and returns immediately when voice is off
