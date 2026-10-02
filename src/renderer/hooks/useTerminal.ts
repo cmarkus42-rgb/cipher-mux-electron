@@ -173,13 +173,20 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
                 const last = lastSizeRef.current
                 if (cols !== last.cols || rows !== last.rows) {
                   lastSizeRef.current = { cols, rows }
-                  api().terminal.resize(sessionId, cols, rows)
+                  // Bewusst **ohne** Resync: wir stehen gerade in einem. Ein zweiter
+                  // direkt hinterher wuerde den Puffer erneut neu schreiben.
+                  void api().terminal.resize(sessionId, cols, rows).catch(() => { /* ignore */ })
                 }
               } catch { /* ignore */ }
             }
           })
         }
       }).catch(() => { /* session may not be ready */ })
+      // Die 200 ms sind seit dem 2026-10-02 **nur noch Zusammenfassung**, keine
+      // Schaetzung mehr: der Aufrufer wartet den Resize ab, bevor er hierher kommt
+      // (`resized.finally`). Gebraucht wird der Timer dafuer, mehrere Resizes in
+      // schneller Folge -- Ziehen am Fenster, Focus Mode, Zellen-Merge -- zu einem
+      // Resync zusammenzufassen; jeder Aufruf raeumt den vorigen weg.
     }, 200)
   }, [sessionId])
 
@@ -223,7 +230,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       if (cols !== last.cols || rows !== last.rows) {
         const resync = needsReflowResync(last, { cols, rows })
         lastSizeRef.current = { cols, rows }
-        api().terminal.resize(sessionId, cols, rows)
+        const resized = api().terminal.resize(sessionId, cols, rows)
         // Re-sync with tmux after resize to fix xterm.js/tmux reflow mismatch —
         // aber **nur bei Spaltenwechsel**. Eine reine Hoehenaenderung bricht keine
         // Zeile um, es gibt also keinen Unterschied auszugleichen; der Resync
@@ -231,7 +238,15 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
         // den Scrollback. Das ist der Griff, der in der Praxis vorkommt: eine
         // Zelle auf doppelte Hoehe und zurueck. Messung in
         // `shared/terminal-resync.ts`.
-        if (resync) scheduleResync()
+        //
+        // **Erst nach dem Resize erfassen, nicht nach einer Frist.** Vorher lief
+        // `scheduleResync()` unmittelbar los und wartete 200 ms darauf, dass die
+        // Resize-IPC durch ist. War sie es nicht, erfasste `capture-pane` die
+        // **alte** Breite, und der falsche Umbruch blieb bis zum naechsten Resize
+        // stehen -- `lastSizeRef` ist hier schon aktualisiert, ein zweiter Resync
+        // kommt also nicht. `finally`, nicht `then`: schlaegt der Resize fehl, wird
+        // trotzdem erfasst, wie vorher.
+        if (resync) resized.finally(() => scheduleResync())
       }
       return true
     } catch {
@@ -342,9 +357,14 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
         const { cols, rows } = term
         const last = lastSizeRef.current
         if (cols !== last.cols || rows !== last.rows) {
+          // Dieselbe Weiche und dieselbe Reihenfolge wie in `fitAndSync` — eine
+          // Schriftgroessenaenderung aendert in der Regel beide Masse, aber wenn
+          // ausnahmsweise nur die Zeilen kippen, gibt es nichts auszugleichen.
+          const resync = needsReflowResync(last, { cols, rows })
           lastSizeRef.current = { cols, rows }
-          api().terminal.resize(sessionId, cols, rows)
-          scheduleResync()
+          const resized = api().terminal.resize(sessionId, cols, rows)
+          if (resync) resized.finally(() => scheduleResync())
+          else void resized.catch(() => { /* ignore */ })
         }
       }
     }) as EventListener
