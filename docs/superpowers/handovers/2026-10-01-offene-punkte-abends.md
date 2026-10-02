@@ -16,7 +16,7 @@
 > zurück; das ist gleichzeitig die Gelegenheit für Abnahmepunkt A.2 (null `dimensions`-Fehler im
 > Log).
 
-**Tag:** `v0.11.3` · **Suite:** 2249 pass / 0 fail / 467 Suiten
+**Tag:** `v0.11.4` · **Suite:** 2263 pass / 0 fail / 472 Suiten
 **CI: grün** — alle sieben Jobs, erstmals seit dem 14. Mai.
 **Alles gepusht.** Branch `main`, Arbeitsbaum sauber. Website deployt.
 
