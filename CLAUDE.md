@@ -16,8 +16,8 @@ MCP-Server und Projekt-Kick-off. Zielbild und Begründung:
    vorgeschalteten `rebuild:node` fehlt die better-sqlite3-ABI, und es fallen schlagartig über
    150 Tests um — alle in SQLite-gestützten Suiten (TaskManager, MessageBus, MemoryStore,
    CyberFactory, Debugger, Audit). Das Fehlerbild ist eindeutig: viele Fehler, alle dort.
-3. **Die Suite ist grün und soll grün bleiben.** Stand: **2263 Tests, 2263 pass, 0 fail,
-   0 cancelled**, 472 Suiten, rund 91 s (gemessen 2026-10-02). Ältere Dokumente nennen „vier vorbestehend rote Suiten" —
+3. **Die Suite ist grün und soll grün bleiben.** Stand: **2267 Tests, 2267 pass, 0 fail,
+   0 cancelled**, 473 Suiten, rund 91 s (gemessen 2026-10-02). Ältere Dokumente nennen „vier vorbestehend rote Suiten" —
    das galt bis zum 2026-09-30 und ist erledigt; keiner der Fälle war ein Flake. Ein roter
    Lauf ist ab jetzt eine echte Regression.
 4. **`npm run lint` ist projektweit rot** (830 Probleme, 478 Fehler) und war es vorher schon.
@@ -63,11 +63,11 @@ Alle Projekte liegen unter `hubPath/projects/`. Pfadauflösung zentral in
 
 ## Aktueller Stand
 
-Version **0.11.4**. Multi-Workspace-Sessions (Paket A) ist gemergt: jede Session trägt ihren
+Version **0.11.5**. Multi-Workspace-Sessions (Paket A) ist gemergt: jede Session trägt ihren
 Workspace, Presets laufen parallel in mehreren Workspaces. Die manuelle Abnahme dazu steht
 noch aus — `docs/superpowers/acceptance/2026-09-20-multi-workspace-sessions-manual.md`.
 
-Alle Tags von `v0.9.104` bis `v0.11.4` haben inzwischen ein GitHub-Release mit DMG. Die
+Alle Tags von `v0.9.104` bis `v0.11.5` haben inzwischen ein GitHub-Release mit DMG. Die
 Release-Liste hörte bis zum 2026-10-01 bei `v0.9.103` auf, obwohl die Tags da waren.
 
 **Übergaben (2026-09-30, Branch `handoff-notes-delta`):** Eine Handoff-Note trägt einen
