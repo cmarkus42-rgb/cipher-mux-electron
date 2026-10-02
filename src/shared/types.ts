@@ -295,6 +295,22 @@ export interface AppConfig {
     ollamaPort: number
     /** Ollama model for enrichment/tagging (default gemma4:26b). */
     ollamaModel: string
+    /**
+     * Basis-URL des litellm-Tier-Gateways, OpenAI-kompatibel.
+     *
+     * Das Gateway haelt die Modelltabelle **einmal** fuer alle Anwendungen im
+     * Haus; der Mux waehlt daraus nur eine Preis- und Qualitaetsklasse. Ein
+     * Modellwechsel am Gateway erreicht ihn damit ohne Codeaenderung.
+     */
+    gatewayUrl?: string
+    /**
+     * Tier fuer das Aufraeumen diktierter Bugreports.
+     *
+     * `t1`/`t2` laufen lokal auf ms01 und kosten nichts, taugen aber nicht zum
+     * Formulieren; `t4`/`t5` koennen es und sind dafuer zu teuer. `t3` ist das
+     * Arbeitstier.
+     */
+    gatewayTier?: string
   }
   windows: {
     main: { x: number; y: number; width: number; height: number }

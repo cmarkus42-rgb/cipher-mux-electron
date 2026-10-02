@@ -187,7 +187,7 @@ export class IpcHub {
       projectlauncherPath: appConfig?.projectlauncherPath || BRAND.projectLauncherDir,
       timeoutMs: ((appConfig?.kickoffTimeoutMinutes ?? 15) * 60_000),
     })
-    this.bugreportManager = new BugreportManager({ messageBus: this.messageBus })
+    this.bugreportManager = new BugreportManager({ messageBus: this.messageBus, noteManager: () => this.noteManager })
 
     const notesDir = path.join(os.homedir(), '.config', 'cipher-mux', 'notes')
 

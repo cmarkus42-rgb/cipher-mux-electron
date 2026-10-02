@@ -434,6 +434,35 @@ sieht, ist ungeprüft" — nicht „gibt es nicht".
    benutzbar ist — aber es heißt, dass die Liste eine Momentaufnahme ist und kein Katalog.
    Zwischengespeichert wird pro App-Lauf; ein Neustart holt sie neu.
 
+## LLM-Aufrufe: das Gateway, nicht der eigene Zoo
+
+Seit dem 2026-10-02 gehen Modellaufrufe an das **litellm-Tier-Gateway auf ms01**
+(`http://100.67.95.13:4000/v1`, OpenAI-kompatibel), nicht mehr an einen im Mux gepflegten
+Ollama-Katalog. Der Grund ist nicht Bequemlichkeit: Jede Anwendung im Haus, die Host, Port und
+Modellnamen selbst hält, pflegt dieselbe Tabelle noch einmal — und sie altert in jeder einzeln.
+Das Gateway hat sie einmal (`CIPHER-MUX/projects/DGX/litellm-ms01/config.yaml`).
+
+**Tiers statt Modellnamen.** `t1`/`t2` laufen lokal auf ms01 und kosten nichts, taugen aber nicht
+zum Formulieren; `t3` ist das Arbeitstier (MiniMax M3); `t4`/`t5` sind Sonnet und Opus. Wer hier
+wählt, wählt eine **Preis- und Qualitätsklasse**, kein Modell — ein Modellwechsel am Gateway
+erreicht den Mux ohne Codeänderung.
+
+**Drei Dinge, die hier leicht kaputtgehen:**
+
+1. **Der Schlüssel steht in `~/.cipher-litellm.env`, nicht in der Config.** Eine Config wandert in
+   Backups, Logs und Fehlerberichte. `readGatewayKey` liest die Datei, und keine Fehlermeldung
+   des Klienten enthält den Wert — `test/main/bugreport-enrich.test.ts` hält das fest.
+2. **`node:http`, nicht `fetch`.** Dieselbe Falle wie beim Ollama-Klienten: `fetch` im
+   Main-Prozess geht über Electrons Chromium-Netzstack und fällt dort über
+   System-Proxy-Einstellungen.
+3. **Der Prompt und `parseEnrichedOutput` müssen dieselben Feldnamen nennen.** Der Parser liest
+   zeilenweise `name:` und erkennt Listen an `- `; nennt der Prompt ein Feld anders, fällt es
+   **still** auf seinen Default zurück. `ERWARTETE_FELDER` und ein Test halten die Naht.
+
+**Der Bugreport nutzt das als erster:** Diktat rein, aufgeräumter Report raus, Original bleibt
+wörtlich erhalten, Ausfall blockiert nichts. Dazu Panezustand (`capture-pane`, Pane-Maße,
+`alternate_on`) und Anker-Commit im Report, plus eine Notiz, die die outbox-Datei spiegelt.
+
 ## Entities, MCP, Voice
 
 - **Entities** sind Rollen mit eigenem Verzeichnis, eigener CLAUDE.md und Recovery-Fähigkeit:
