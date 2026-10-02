@@ -149,9 +149,14 @@ Nebenbedingungen in Abschnitt 10 von
 
 ## Was bleibt
 
-### A. Abnahme am installierten 0.11.3
+### A. Abnahme am installierten Stand
 
-Das DMG liegt unter `out/cipher-mux-0.11.3-arm64.dmg` und am Release. Drei Dinge wollen am
+> **Achtung, der Stand hat sich am 2026-10-02 verschoben.** Die zwei Terminal-Fixes von heute
+> sind Renderer- und Main-Code und stecken **nicht** im 0.11.3-DMG. Für Punkt 4 und 5 unten
+> braucht es ein neues `npm run dist` (im **Vordergrund**, siehe Fallen) — und für die drei
+> alten Punkte ist das installierte 0.11.3 weiterhin das Richtige.
+
+Das 0.11.3-DMG liegt unter `out/cipher-mux-0.11.3-arm64.dmg` und am Release. Fünf Dinge wollen am
 laufenden Programm gesehen werden:
 
 1. **Verdecktes Terminal behält seinen Scrollback.** Session mit viel Ausgabe, hochscrollen,
@@ -162,12 +167,35 @@ laufenden Programm gesehen werden:
    Datei und Zeile.
    `/Applications/cipher-mux.app/Contents/MacOS/cipher-mux 2>&1 | tee /tmp/kw-test.log`
 3. **„Vorlage übernehmen"** im Preset-Editor für Companion und Debugger.
+4. **Scrollback nach dem Zellen-Resize** — der Fix von heute. Eine Session mit viel Ausgabe,
+   hochscrollen, Zelle auf doppelte Höhe ziehen, zurück: der Scrollback muss noch da sein. Das
+   ist der Griff, den du häufig machst, und der ihn vorher jedes Mal gekostet hat.
+5. **Zerfallene Zeilen bei Breitenänderung** — ob der Rest davon weg ist. Breite ändern heißt
+   hier: Gridspalten dazu oder weg, oder Fenster neu bemessen. Wenn es bleibt, ist Teil 1 aus
+   Abschnitt B der nächste Bau; wenn nicht, erspart sich der.
 
-### B. Resync, Teile 1 und 3 (Terminal-Befund 3)
+### B. Resync, Teile 1 und 3 (Terminal-Befund 3) — gemessen am 2026-10-02, teils behoben
 
-Vollbild-Schnappschuss gegen cursorrelativen Livestream, und die ungesicherte Reihenfolge gegen
-tmux. Braucht die Unterscheidung „TUI im Alternate Screen / gewöhnliche Shell" — und die braucht
-eine **Messung am laufenden Programm**, kein Quelltextlesen.
+**Die Messung ist gemacht und sie hat die Fragestellung umgeworfen.** Alles in Abschnitt 3.1 bis
+3.3 der Spec, kurz:
+
+- `alternate_on` ist als Weiche **falsch**. Claude Code zeichnet sich bei `alternate_on=0`
+  selbst neu — belegt an einem Prosaabsatz, der bei 80, 50 und 70 Spalten jedes Mal an
+  **Wortgrenzen** neu umbricht, was tmux' Reflow nicht kann. Eine Weiche darauf ließe genau die
+  Claude-Sessions auf dem schädlichen Pfad.
+- **Behoben: der Scrollback-Verlust.** Ein Resize warf die Historie weg (`term.reset()` ersetzt
+  den Puffer, `capture-pane` lieferte nur den sichtbaren Bereich). Jetzt: kein Resync bei reiner
+  Höhenänderung, und wenn er läuft, mit 1000 Zeilen Historie.
+- **Behoben: Teil 3**, die ungesicherte Reihenfolge. Der Kanal ist `invoke`/`handle`, der Resync
+  hängt an der Zusage. Die 200 ms fassen jetzt zusammen, statt zu raten.
+- **Offen: Teil 1**, der Livestream gegen die Neuschrift. Was zwischen Erfassen und `reset()`
+  eintrifft, ist verloren; es nachzuspielen würde verdoppeln, was schon im Schnappschuss steht.
+  Exakt lösbar über die Control-Mode-Verbindung — die Teile liegen da, `TmuxManager.command()`
+  ist der Rumpf, der die `%begin`/`%end`-Zuordnung noch nicht macht.
+
+**Bevor Teil 1 gebaut wird, gehört die Abnahme von Teil 3 davor.** Es kann sein, dass der Rest,
+den du siehst, damit weg ist — dann wäre der Bau eine Änderung in der empfindlichsten Schicht
+auf Verdacht.
 
 ### C. Drei Produktentscheidungen
 
