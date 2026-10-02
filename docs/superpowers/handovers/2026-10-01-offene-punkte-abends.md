@@ -1,5 +1,21 @@
 # Stand 2026-10-01, Nacht — was erledigt ist und was bleibt
 
+> **Wiederaufnahme nach dem Neustart am 2026-10-02.** Alles ist committet und gepusht, `main` und
+> `origin/main` identisch, CI grün. Letzter Commit `49372fe`. Nichts ist halb fertig.
+>
+> **Der nächste Schritt ist entschieden und noch nicht getan: 0.11.4 schneiden.** Dazu gehören
+> `package.json`, die drei Nennungen in `ARCHITECTURE.md`, zwei in `README.md`, die Versionszeile
+> in `CLAUDE.md`, und der gesamte `[Unreleased]`-Abschnitt des CHANGELOG wandert unter
+> `## [0.11.4] — 2026-10-02`. Danach Tag, `npm run dist` **im Vordergrund**, GitHub-Release mit
+> DMG. Vorbild ist der Commit `806e10e` (0.11.2).
+>
+> Was im Build drin ist: die zwei Terminal-Fixes von heute (Scrollback bleibt beim Zellen-Resize,
+> Resync wartet den Resize ab) plus die Doku- und CI-Arbeit der Nacht.
+>
+> **Der Neustart beendet die tmux-Sessions.** Keep Working holt sie beim nächsten App-Start
+> zurück; das ist gleichzeitig die Gelegenheit für Abnahmepunkt A.2 (null `dimensions`-Fehler im
+> Log).
+
 **Tag:** `v0.11.3` · **Suite:** 2249 pass / 0 fail / 467 Suiten
 **CI: grün** — alle sieben Jobs, erstmals seit dem 14. Mai.
 **Alles gepusht.** Branch `main`, Arbeitsbaum sauber. Website deployt.
