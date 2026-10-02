@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Diktierte Bugreports werden beim Absenden aufgeräumt.** Hineinsprechen, abschicken, fertig —
+  ein Modell macht aus dem Diktat Titel, Severity, Tags, Reproduktionsschritte und
+  Erwartet/Tatsächlich. **Das Diktat bleibt wörtlich im Report**, unter `## Original`: ein Modell,
+  das eine Beobachtung glättet oder eine Vermutung als Tatsache formuliert, darf nicht die
+  einzige Quelle sein. Scheitert die Aufbereitung, geht der Report **trotzdem** raus, roh und mit
+  sichtbarem Vermerk — ein Bugreport, der an seiner Veredelung scheitert, wäre der schlechteste
+  Fall.
+- **Jeder Report trägt den Panezustand im Moment der Meldung** — `capture-pane` der aktiven
+  Sessions, Pane-Maße, `alternate_on`, `history_size` — und den **Anker-Commit**. Ohne diese
+  Gleichzeitigkeit lässt sich „falsch gezeichnet" nicht von „falscher Inhalt" trennen; genau
+  daran hing am 2026-10-02 die Diagnose der zerfallenden Zeilen, und dafür musste ein Skript von
+  Hand im richtigen Moment gestartet werden. Das nimmt der Report jetzt selbst mit.
+- **Der Report landet zusätzlich als Notiz im Mux** (`kind:bugreport`, `status:open`,
+  `severity:…`), die die Datei in der outbox **spiegelt** — `mirrors_file` plus `mirror_commit`,
+  womit das Notes-System spätere Drift sichtbar macht statt sie zu verschweigen.
+
+### Changed
+- **LLM-Aufrufe gehen an das litellm-Tier-Gateway statt an einen eigenen Modellzoo.** Der Mux
+  hatte angefangen, Host, Port und Modellnamen selbst zu verwalten; jede Anwendung im Haus, die
+  das tut, pflegt dieselbe Tabelle noch einmal und lässt sie einzeln altern. Das Gateway hat sie
+  genau einmal und benennt Modelle als **Tiers** — der Mux wählt eine Preis- und
+  Qualitätsklasse (`t3`), kein Modell, und ein Modellwechsel am Gateway erreicht ihn ohne
+  Codeänderung. Der Schlüssel steht in `~/.cipher-litellm.env`, **nicht** in der Config: eine
+  Config wandert in Backups und Logs.
+
 ## [0.11.5] — 2026-10-02
 
 One fix, and it corrects the direction this bug had been chased in since April.
