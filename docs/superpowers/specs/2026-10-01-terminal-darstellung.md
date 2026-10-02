@@ -187,9 +187,150 @@ die zu prüfen ist.
 > Gleichheit zu fordern, die tmux nicht zusagt.
 
 **Teile 1 und 3 offen.** Relativ-gegen-absolut und die ungesicherte Reihenfolge brauchen
-die Unterscheidung „TUI im Alternate-Screen / gewöhnliche Shell" — und die braucht eine
-Messung am laufenden Programm, keinen Diff auf Zuruf. Der dauerhafte Zerfall ist damit
-weg, das Flackern während der Neuschrift nicht.
+die Unterscheidung „TUI im Alternate-Screen / gewöhnliche Shell". Der dauerhafte Zerfall ist
+mit `-J` weg, das Flackern während der Neuschrift nicht.
+
+### 3.1 Die Messung dazu — und sie wirft die Fragestellung um
+
+Gemessen am **2026-10-02** gegen tmux 3.7c, teils an eigenen Mess-Sessions, teils lesend an
+den sechzehn laufenden Sessions der installierten App (`display-message -p`, kein `send-keys`).
+
+**M1 — `alternate_on` ist ablesbar und kippt zuverlässig.** `#{alternate_on}` steht in einer
+gewöhnlichen zsh auf `0`, wechselt beim Start von `less` auf `1` und beim Verlassen zurück auf
+`0`. `#{pane_in_mode}` ist etwas anderes (tmux' eigener Copy-Mode) und bleibt dabei `0`. An den
+laufenden Sessions: **Codex durchgängig `0`, opencode `1`, Claude Code beides** — in einer
+Session `1`, in der nächsten `0`, bei derselben Version 2.1.287.
+
+**M2 — Claude Code zeichnet sich bei `alternate_on=0` selbst neu.** Ein idle Claude Code am
+Prompt steht zehn Sekunden lang durchgehend auf `0`, also auf dem Normalbildschirm. Zieht man
+den Pane dann auf 80, 50 und 70 Spalten, bricht derselbe Prosaabsatz jedes Mal **an
+Wortgrenzen** neu um:
+
+```
+80: Quick safety check: Is this a project you created or one you trust? (Like your
+50: Quick safety check: Is this a project you
+70: Quick safety check: Is this a project you created or one you trust?
+```
+
+Das kann tmux' Reflow nicht leisten — der fügt nur zusammen und trennt, was er selbst als
+umgebrochen markiert hat, und er kennt keine Wortgrenzen. Den Umbruch hat die Anwendung
+gemacht, nach SIGWINCH, auf dem Normalbildschirm.
+
+> **Damit ist `alternate_on` das falsche Unterscheidungsmerkmal.** Die Frage, die der Resync
+> beantworten muss, ist nicht „steht hier eine TUI im Alternate-Screen", sondern „zeichnet
+> diese Anwendung sich nach SIGWINCH selbst neu". Für Claude Code fallen die beiden Antworten
+> **auseinander**: `alternate_on` sagt „gewöhnliche Shell", das Verhalten sagt „malt selbst".
+> Eine Weiche auf `alternate_on` ließe also genau die Sessionklasse auf dem schädlichen Pfad,
+> um die es in `BUG-2026-04-22-TNDXR0` geht — die Claude-Sessions. Die ursprüngliche
+> Fragestellung dieses Abschnitts ist beantwortet, und die Antwort ist: so nicht.
+
+**M3 — die 200 ms sind nicht nur geschätzt, sie sind unnötig.** Nach `resize-window` +
+`resize-pane` meldet `capture-pane` die neue Breite **sofort**, gemessen bei 0, 50, 200, 500 ms
+und 2 s — alle fünf Messungen identisch. tmux' Kommandowarteschlange erledigt das synchron zum
+Rückkehren des Kommandos. Es gibt also keine Einschwingzeit, die abzuwarten wäre; ungesichert
+ist allein, dass der Renderer `api().terminal.resize(...)` **nicht erwartet**
+(`useTerminal.ts:218`) und 200 ms später blind erfasst. Eine Kausalkette ist hier billiger und
+genauer als jede Frist.
+
+**M4 — `capture-pane` erfasst nur den sichtbaren Bereich, und das fällt beim Verkleinern auf.**
+Eine Zeile mit 95 Zeichen in einem 80 Spalten breiten Pane mit 12 Zeilen kommt mit `-J` als 95
+zurück. Nach dem Verkleinern auf 40 Spalten sind es **55** — die fehlenden 40 sind in den
+Scrollback gerutscht, weil die reflowte Zeile jetzt drei Zeilen braucht statt zwei. Der
+Schnappschuss enthält dann eine logische Zeile, die mitten im Wort beginnt und mit `-J` wie eine
+vollständige aussieht. Das ist **kein neuer Defekt** — tmux zeigt an dieser Stelle dasselbe, der
+Schnappschuss ist also treu. Es ist der Grund, warum `-S` beim Resync keine Verbesserung wäre,
+die man einfach nachtragen kann: mehr Scrollback mitzunehmen heißt, `term.reset()` mit fremdem
+Verlauf zu füllen.
+
+### 3.2 Der Resync warf den Scrollback weg — behoben am 2026-10-02
+
+Das ist die Beschwerde, die der Nutzer beim Lesen der Messungen gemeldet hat, und sie ist eine
+andere als „die Zeilen zerfallen": **nach dem Vergrößern einer Zelle auf doppelte Höhe und
+zurück lässt sich nicht mehr hochscrollen.** Im gewöhnlichen Terminal passiert das nicht, trotz
+Resize.
+
+Die Kette, Glied für Glied belegt:
+
+| Glied | Beleg |
+|---|---|
+| Resize ändert `rows` → `scheduleResync()` | `useTerminal.ts:218` (vorher ohne Bedingung) |
+| `capture-pane` **ohne `-S`** liefert nur den sichtbaren Bereich | gemessen: 80×15-Pane, 488 Zeilen Historie → **15** Zeilen zurück, beginnend bei „487"; mit `-S -2000` **503** |
+| `term.reset()` ersetzt den Scrollback | `BufferSet.reset()` legt `this._normal = new Buffer(...)` an — xterm 5.5.0, kein Leeren, ein neues Objekt |
+| Ergebnis | Puffer = ein Bildschirm, Scrollback = 0 |
+
+Der Parameter war auf dem **ganzen** Weg vorhanden — `capturePane(target, lines)` im
+tmux-Manager, `lines` im IPC-Handler (`ipc-hub.ts:873`), `capture(paneId, lines?)` im Preload —
+und wurde vom Renderer an beiden Aufrufstellen nie mitgegeben. Ein Aufruf ohne zweites Argument
+sieht völlig in Ordnung aus.
+
+**Zwei Änderungen, und die erste ist die wichtigere:**
+
+1. **Kein Resync bei reiner Höhenänderung** (`needsReflowResync`). Der Zweck des Resync ist der
+   Reflow-Unterschied, und der entsteht nur bei einem **Spalten**wechsel. Gemessen bei 15 → 30 →
+   15 Zeilen und konstanter Breite: tmux holt 15 Zeilen aus der Historie in den sichtbaren
+   Bereich (`history_size` 488 → 473) und schiebt sie beim Zurück wieder hinein; Zeile „472"
+   bleibt Zeile „472", **nichts wird umgebrochen**. xterm tut mit seinem eigenen Scrollback
+   dasselbe. Es gibt dort also nichts auszugleichen — und das ist genau der Griff, den der
+   Nutzer häufig macht.
+2. **Läuft er doch, trägt er die Historie** (`RESYNC_SCROLLBACK_LINES = 1000`, so groß wie
+   xterms `scrollback`-Default). Dasselbe gilt für den Mount-Restore beim App-Start, der bis
+   dahin eine wiederhergestellte Session ohne jede Historie hinstellte. Kosten gemessen am
+   Worst Case — 120×30-Pane, 1976 Zeilen gefärbte Historie: **72 kB in 530 Zeilen, 11 ms** für
+   den tmux-Aufruf; an den tatsächlich laufenden Sessions 1,2 bis 2 kB, weil die drei CLIs an
+   Ort und Stelle malen und kaum Scrollback erzeugen.
+
+`test/main/terminal-resync.test.ts` hält beide Hälften: die Entscheidung als reine Funktion, die
+tmux-Behauptungen gegen das echte tmux, und einen Quelltext-Wächter darauf, dass die
+Aufrufstellen die Tiefe mitgeben — die Stelle ist ohne DOM nicht ausführbar, aber lesbar.
+**Beide Wächter sind am zurückgedrehten Defekt rot gesehen worden**, nicht nur grün am
+reparierten Code.
+
+> **Was das nicht behebt:** das Zerfallen bei **Breiten**änderung. Der Nutzer bestätigt, dass
+> `-J` es besser gemacht hat und dass es manchmal bleibt. Dort läuft der Resync weiter und muss
+> es, siehe 3.3.
+
+### 3.3 Was bei Breitenänderung bleibt — und wie weit es reicht
+
+Der Nutzer beschreibt es so: „dass die Zeilen auseinanderfallen bleibt auch wahr … ist besser
+geworden, aber manchmal ist es noch so — und da war die Breite zumindest auch ein Faktor." Das
+deckt sich mit dem Befund: `-J` hat den **dauerhaften** Zerfall weggenommen, nicht den
+Vorgang, der ihn erzeugt.
+
+Zwei Ursachen sind übrig, und sie sind unterschiedlich schwer:
+
+**(a) Der Schnappschuss in der alten Breite.** `api().terminal.resize(...)` ist im Preload ein
+`ipcRenderer.send` — **ohne Rückgabe, also nicht abwartbar** (`preload.ts:59`). Der Renderer
+wartet stattdessen 200 ms und erfasst dann. Kommt die Resize-IPC in dieser Zeit nicht durch,
+liefert `capture-pane` Inhalt in der **alten** Breite, der in ein Terminal der **neuen** Breite
+geschrieben wird — und es folgt kein zweiter Resync, weil `lastSizeRef` schon aktualisiert ist.
+Der falsche Umbruch bleibt bis zum nächsten Resize stehen. Nach M3 ist die Frist dafür nicht
+einmal nötig: nach Rückkehr des tmux-Kommandos ist `capture-pane` **sofort** richtig. Die 200 ms
+sind also eine Schätzung an der Stelle, an der eine Kausalkette zu haben wäre.
+
+**(b) Die Reihenfolge gegen den Livestream.** Was zwischen dem Erfassen und dem `term.reset()`
+über den Livestream eintrifft, wird in den Puffer geschrieben, vom `reset()` verworfen und steht
+nicht im Schnappschuss — es ist **verloren**. Eine Lücke im Strom sieht aus wie zerfallene
+Zeilen. Die Lücke einfach nachzuspielen genügt nicht: Daten, die uns vor dem Erfassen erreichten,
+stehen schon im Schnappschuss, und sie ein zweites Mal zu schreiben verdoppelt Zeilen statt sie
+zu retten. Zwischen „verlieren" und „verdoppeln" liegt keine Frist, die beides vermeidet.
+
+**Exakt lösbar ist (b) über die Control-Mode-Verbindung, und die Teile liegen schon da.** Jede
+Session hat ihren eigenen `tmux -C`-Client (`watchSession`), gestartet mit
+`stdio: ['pipe','pipe','pipe']` — **stdin ist beschreibbar**. Ein `capture-pane` auf *diesem*
+Strom gesendet kommt als Antwort auf demselben Strom zurück, auf dem auch die
+`%output`-Ereignisse laufen: damit ist die Reihenfolge **total** statt geschätzt. Alles, was vor
+dem `%begin` kam, steht im Schnappschuss; alles nach dem `%end` nicht. Der Parser kennt `%begin`,
+`%end` und `%error` samt Kommandonummer bereits (`tmux-parser.ts:101-131`), und die Rumpfzeilen
+einer Antwort kommen als `{type:'unknown', line}` durch — sie lassen sich also sammeln.
+
+Was fehlt, ist die Zuordnung von Antwort zu Anfrage: `TmuxManager.command()` ist heute ein
+Rumpf, der sendet und `''` zurückgibt, mit dem Kommentar
+`TODO: implement proper begin/end response matching`. **Das ist der Bau, der ansteht** — kein
+neuer Mechanismus, sondern ein offenes Ende.
+
+> **Reihenfolge der Arbeit:** (a) zuerst. Es ist die kleinere Änderung, es ist nach M3 die
+> wahrscheinlichere Ursache für den Rest, den der Nutzer sieht, und es nimmt eine Frist weg
+> statt eine zweite dazuzustellen.
 
 ---
 
@@ -372,6 +513,7 @@ nicht; es gibt nur `fitGrid` aus dem Main.
 | Erzwungenes Scrollen endet beim Eingriff | `userScrolledUp()` beendet das Intervall, statt es auszusetzen | Befund 6 — ein ausgesetzter Tick hätte beim nächsten wieder zugegriffen |
 | Das Fenster bleibt auf dem Bildschirm | `minWidth: Math.min(gridWidth, screenWidth)`, Grid scrollt horizontal | Befund 5 — `minWidth` schlug die Konstruktorbreite und machte das `Math.min` darüber wirkungslos |
 | **Verdeckte Terminals leben weiter** | `hiddenSlotDisposition` in `shared/grid-types.ts`; eine verdeckte **Session**-Zelle rendert mit `display: none` statt `null` zurückzugeben | Befund 4 — siehe unten |
+| **Ein Resize kostet den Scrollback nicht mehr** | `needsReflowResync` + `RESYNC_SCROLLBACK_LINES` in `shared/terminal-resync.ts`: kein Resync bei reiner Höhenänderung, und wenn er läuft, mit Historie | Befund 3.2 — siehe unten |
 
 ### Zu Befund 4, im Detail
 

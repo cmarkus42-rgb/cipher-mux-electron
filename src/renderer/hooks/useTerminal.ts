@@ -9,6 +9,7 @@ import type { ThemeName } from '../../shared/grid-types'
 import type { TerminalThemeColors } from '../../shared/terminal-theme'
 import { registerTerminal, unregisterTerminal, setMarker } from '../terminal-registry'
 import { getTerminalFontSize } from '../a11y/terminal-font-size'
+import { RESYNC_SCROLLBACK_LINES, needsReflowResync } from '../../shared/terminal-resync'
 
 const api = () => window.cipherMux
 
@@ -128,6 +129,12 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
    * Called after resize to fix reflow mismatch: xterm.js reflows its buffer
    * internally when cols change, but tmux reflows differently. Without re-sync,
    * lines fragment and text appears garbled (T-LC.7).
+   *
+   * **Mit Scrollback-Tiefe, nicht nur dem sichtbaren Bereich.** `term.reset()`
+   * ersetzt den Scrollback durch einen neuen Puffer; was der Schnappschuss nicht
+   * enthaelt, ist danach weg. Ohne `RESYNC_SCROLLBACK_LINES` kostete jeder Resync
+   * die Historie — hochscrollen ging danach nicht mehr. Begruendung und Messungen
+   * in `shared/terminal-resync.ts`.
    */
   const scheduleResync = useCallback(() => {
     if (resyncTimerRef.current) clearTimeout(resyncTimerRef.current)
@@ -141,7 +148,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       const wasAtBottom = buf.viewportY >= buf.baseY
       const savedViewportY = buf.viewportY
 
-      api().terminal.capture(sessionId).then((content: string) => {
+      api().terminal.capture(sessionId, RESYNC_SCROLLBACK_LINES).then((content: string) => {
         if (!term || !termRef.current) return
         if (content?.trim()) {
           term.reset()
@@ -214,10 +221,17 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       const { cols, rows } = term
       const last = lastSizeRef.current
       if (cols !== last.cols || rows !== last.rows) {
+        const resync = needsReflowResync(last, { cols, rows })
         lastSizeRef.current = { cols, rows }
         api().terminal.resize(sessionId, cols, rows)
-        // Re-sync with tmux after resize to fix xterm.js/tmux reflow mismatch
-        scheduleResync()
+        // Re-sync with tmux after resize to fix xterm.js/tmux reflow mismatch —
+        // aber **nur bei Spaltenwechsel**. Eine reine Hoehenaenderung bricht keine
+        // Zeile um, es gibt also keinen Unterschied auszugleichen; der Resync
+        // wuerde dort nur den Puffer neu schreiben und kostete bis zum 2026-10-02
+        // den Scrollback. Das ist der Griff, der in der Praxis vorkommt: eine
+        // Zelle auf doppelte Hoehe und zurueck. Messung in
+        // `shared/terminal-resync.ts`.
+        if (resync) scheduleResync()
       }
       return true
     } catch {
@@ -449,7 +463,11 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
           fitAndSync()
           // Phase 2: capture after tmux has processed the resize
           setTimeout(() => {
-            api().terminal.capture(sessionId).then((content: string) => {
+            // Mit Scrollback-Tiefe: eine wiederhergestellte Session hatte bis zum
+            // 2026-10-02 nach dem App-Start ueberhaupt keine Historie, weil hier
+            // derselbe sichtbare Bereich in einen zuruckgesetzten Puffer geschrieben
+            // wurde wie im Resync.
+            api().terminal.capture(sessionId, RESYNC_SCROLLBACK_LINES).then((content: string) => {
               if (content?.trim() && term) {
                 term.reset()
                 term.write(content.replace(/\n/g, '\r\n'), () => {
