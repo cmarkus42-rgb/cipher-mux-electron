@@ -1,20 +1,11 @@
 # Stand 2026-10-01, Nacht — was erledigt ist und was bleibt
 
-> **Wiederaufnahme nach dem Neustart am 2026-10-02.** Alles ist committet und gepusht, `main` und
-> `origin/main` identisch, CI grün. Letzter Commit `49372fe`. Nichts ist halb fertig.
+> **0.11.4 ist draussen** (2026-10-02). Tag, DMG und GitHub-Release stehen, DMG-Groesse am
+> Release byte-identisch mit der lokalen, `v0.11.4` ist Latest. Website in beiden Sprachen live
+> gegengeprueft. Mux-CI gruen.
 >
-> **Der nächste Schritt ist entschieden und noch nicht getan: 0.11.4 schneiden.** Dazu gehören
-> `package.json`, die drei Nennungen in `ARCHITECTURE.md`, zwei in `README.md`, die Versionszeile
-> in `CLAUDE.md`, und der gesamte `[Unreleased]`-Abschnitt des CHANGELOG wandert unter
-> `## [0.11.4] — 2026-10-02`. Danach Tag, `npm run dist` **im Vordergrund**, GitHub-Release mit
-> DMG. Vorbild ist der Commit `806e10e` (0.11.2).
->
-> Was im Build drin ist: die zwei Terminal-Fixes von heute (Scrollback bleibt beim Zellen-Resize,
-> Resync wartet den Resize ab) plus die Doku- und CI-Arbeit der Nacht.
->
-> **Der Neustart beendet die tmux-Sessions.** Keep Working holt sie beim nächsten App-Start
-> zurück; das ist gleichzeitig die Gelegenheit für Abnahmepunkt A.2 (null `dimensions`-Fehler im
-> Log).
+> **Damit ist alles, was ohne dich geht, gemacht.** Was bleibt, steht unten: einmal installieren
+> und die fuenf Punkte in Abschnitt A ansehen, dazu die Entscheidungen in C und D.
 
 **Tag:** `v0.11.4` · **Suite:** 2263 pass / 0 fail / 472 Suiten
 **CI: grün** — alle sieben Jobs, erstmals seit dem 14. Mai.
@@ -167,13 +158,11 @@ Nebenbedingungen in Abschnitt 10 von
 
 ### A. Abnahme am installierten Stand
 
-> **Achtung, der Stand hat sich am 2026-10-02 verschoben.** Die zwei Terminal-Fixes von heute
-> sind Renderer- und Main-Code und stecken **nicht** im 0.11.3-DMG. Für Punkt 4 und 5 unten
-> braucht es ein neues `npm run dist` (im **Vordergrund**, siehe Fallen) — und für die drei
-> alten Punkte ist das installierte 0.11.3 weiterhin das Richtige.
+> **Das DMG dafür ist `out/cipher-mux-0.11.4-arm64.dmg`** (auch am Release). Es enthält alle fünf
+> Punkte — die drei alten aus 0.11.3 und die zwei Terminal-Fixes vom 2026-10-02. Einmal
+> installieren genügt also.
 
-Das 0.11.3-DMG liegt unter `out/cipher-mux-0.11.3-arm64.dmg` und am Release. Fünf Dinge wollen am
-laufenden Programm gesehen werden:
+Fünf Dinge wollen am laufenden Programm gesehen werden:
 
 1. **Verdecktes Terminal behält seinen Scrollback.** Session mit viel Ausgabe, hochscrollen,
    Focus Mode auf eine **andere** Zelle, zurück — der Scrollback muss noch da sein, nicht ein
