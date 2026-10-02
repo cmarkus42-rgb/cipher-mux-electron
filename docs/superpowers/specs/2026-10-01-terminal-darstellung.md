@@ -550,11 +550,15 @@ Drei Dinge, die dabei geprüft wurden und nicht offensichtlich sind:
    Notes-Zelle schreibt in eine Datei. Ein unsichtbarer Knoten ohne etwas zu verlieren
    wäre Ballast.
 
-**Nicht angefasst**, mit Begründung oben: der Resync-Pfad in seinen beiden anderen Teilen
-(Befund 3 — der Vollbild-Schnappschuss gegen den cursor-relativen Livestream und die
-ungesicherte Reihenfolge gegen tmux; beides braucht die Unterscheidung „TUI im Alternate
-Screen vs. gewöhnliche Shell" und damit eine Messung am laufenden Programm) und der 15-px-Rand
-(Befund 7).
+**Nicht angefasst**, mit Begründung oben: der 15-px-Rand (Befund 7).
+
+> **Nachtrag vom 2026-10-02.** Hier stand, der Resync-Pfad brauche in seinen beiden anderen
+> Teilen „die Unterscheidung „TUI im Alternate Screen vs. gewöhnliche Shell" und damit eine
+> Messung am laufenden Programm". **Die Messung ist gemacht, und sie hat diese Fragestellung
+> umgeworfen** — `alternate_on` wäre als Weiche falsch, weil Claude Code sich auch bei
+> `alternate_on=0` selbst neu zeichnet. Die ungesicherte Reihenfolge ist seither behoben, ebenso
+> der Scrollback-Verlust, den die Messung erst sichtbar gemacht hat; offen ist allein der
+> Livestream gegen die Neuschrift. Alles in 3.1 bis 3.3.
 
 **Nachprüfen:** 2249 Tests grün (467 Suiten), beide Typechecks null Fehler, `npx eslint` auf
 den geänderten Dateien ohne neue Probleme. Dass der `dimensions`-Fehler weg ist, ist damit

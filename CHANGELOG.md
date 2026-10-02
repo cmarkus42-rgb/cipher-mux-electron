@@ -7,10 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Two terminal fixes plus the documentation and CI work from the night before. **The terminal
-fixes need a new build to be visible** — they are renderer and main code. The Companion's
-reference files are the exception the other way round: `deployCompanionRef` rewrites them at
-every session start, so those corrections reach an installed copy without one.
+## [0.11.4] — 2026-10-02
+
+Two terminal fixes plus the documentation and CI work from the night before. The fixes are
+renderer and main code, which is why they got their own number: otherwise a build with different
+code would sit next to an installed one carrying the same version. The Companion's reference
+files are the exception the other way round — `deployCompanionRef` rewrites them at every session
+start, so those corrections reached an installed copy without a build.
 
 ### Fixed
 - **Resizing a cell no longer costs the scrollback.** After pulling a cell to double height and
