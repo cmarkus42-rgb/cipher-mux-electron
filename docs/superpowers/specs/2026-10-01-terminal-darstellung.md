@@ -347,6 +347,61 @@ neuer Mechanismus, sondern ein offenes Ende.
 
 ---
 
+## 3.4 Befund: Der Zerfall war gar kein Reflow — der Glyphen-Atlas war es
+
+**Das ist die Korrektur an der ganzen bisherigen Richtung dieses Abschnitts.** Was der Nutzer
+seit `BUG-2026-04-22-TNDXR0` „die Zeilen zerfallen" nennt, ist — jedenfalls in dem Fall, den er
+am 2026-10-02 belegt hat — **kein Inhaltsproblem**. Es ist falsches Zeichnen.
+
+**Das Bild.** Beim ersten Aufruf einer Zelle steht statt des Claude-Code-Logos und der 82 Zeichen
+breiten Trennlinien eine Reihe von Rauten. Entscheidend ist, was dabei **stimmt**: die Farben.
+Das Logo ist rosa, die Linien sind grau — Farbe kommt aus dem Zellattribut, die Glyphe aus dem
+Textur-Atlas. Falsch ist nur die Glyphe.
+
+**Der Gegenbeweis zum Inhalt.** `scripts/zerfall-beweis.sh` nimmt im selben Moment beides auf.
+tmux hatte zur Zeit des Bildes exakt das Richtige: `U+2588 █`, `U+259B ▛`, `U+2590 ▐`, `U+259D ▝`
+für das Logo und **82× `U+2500 ─`** für jede der beiden Linien. Gesendet wurde also das Richtige.
+
+**Der Beweis, dass es die Rasterung ist.** Die Schriftgröße einen Schritt zu ändern **behebt es
+sofort** (Nutzer, 2026-10-02). `term.options.fontSize` zu setzen tut in xterm dreierlei:
+Zeichenmaße neu messen, Atlas verwerfen, neu rastern — und lässt den Puffer unangetastet. Wäre
+der Pufferinhalt kaputt, könnte Neurastern nichts reparieren.
+
+**Was ausgeschlossen ist.** Elf Ursachen, jede gegen die echten Bytes aus der laufenden Session
+geprüft, alle mit korrektem Ergebnis:
+
+| Geprüft | Ergebnis |
+|---|---|
+| Fira Code (mitgeliefert) | hat **alle 160** Box-Drawing- und Block-Zeichen |
+| xterms `customGlyphs` | deckt dieselben 160/160 selbst ab — Schrift doppelt abgesichert |
+| WebGL / Canvas / DOM | alle drei korrekt |
+| Font-Swap-Rennen | nachgestellt, auch mit künstlich verzögerter woff2 — korrekt |
+| Pixeldichte | DPR 1 auf beiden Seiten |
+| Electron 34 / Chromium 132 | eigene Mini-App — korrekt |
+| CSS-Zoom, Electron-Zoom | gibt es nicht |
+| Atlas mit 1400 Glyphen gefüllt | korrekt |
+| Themewechsel am laufenden Terminal | korrekt |
+| Schriftgrößenwechsel am laufenden Terminal | korrekt |
+| WebGL-Kontextverlust | wird abgefangen, Umschalten auf Canvas |
+
+**Die Ursache des falschen Atlas ist damit nicht gefunden.** Sieben Nachstellungen lösten ihn
+nicht aus. Was eingebaut ist, behebt deshalb das **gemessene Symptom**, nicht eine nachgewiesene
+Ursache: `term.clearTextureAtlas()` einmal pro Terminal, nach `document.fonts.ready` und einen
+Frame später. Das ist derselbe Griff, den der Nutzer von Hand macht, nur ohne den Umweg über die
+Schriftgröße.
+
+> **Woran man merkt, dass das nicht reicht:** taucht der Zerfall nach dem Einbau erneut auf, dann
+> veraltet der Atlas **später** noch einmal, und ein einmaliges Verwerfen ist die falsche Stelle.
+> Dann ist die nächste Frage, welches Ereignis ihn veralten lässt — und nicht, ob öfter zu
+> verwerfen hilft.
+
+`test/main/terminal-glyph-atlas.test.ts` hält die Verdrahtung, nicht die Wirkung: dass der Aufruf
+da ist, genau einmal, in der `fonts.ready`-Kette, hinter einer Frame-Grenze und abgesichert.
+Alle vier sind am jeweils zurückgedrehten Defekt rot gesehen worden. Einen Test, der den Zerfall
+nachstellt, gibt es **nicht** — er wäre erfunden.
+
+---
+
 ## 4. Befund: Vier Wege, auf denen die UI Terminals wegwirft — belegt
 
 Jeder davon endet in `term.dispose()` und beim Wiederkommen in einem

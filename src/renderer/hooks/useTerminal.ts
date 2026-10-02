@@ -337,6 +337,39 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
     fitAddonRef.current = fitAddon
     registerTerminal(sessionId, term)
 
+    // **Den Glyphen-Atlas nach dem Aufbau einmal verwerfen.**
+    //
+    // Beim ersten Aufruf einer Zelle kamen Block- und Rahmenzeichen falsch heraus:
+    // statt des Claude-Code-Logos und der 82 Zeichen breiten Trennlinien standen dort
+    // Rauten. Die **Farben** stimmten dabei, nur die Glyphen nicht — Farbe kommt aus
+    // dem Zellattribut, die Glyphe aus dem Textur-Atlas des Renderers. Und am Inhalt
+    // lag es nicht: `capture-pane` zeigte zur selben Zeit U+2588/U+259B fuer das Logo
+    // und 82x U+2500 fuer die Linien, also genau das Richtige.
+    //
+    // Belegt ist das an der Reparatur: **die Schriftgroesse einen Schritt zu aendern
+    // behebt es sofort** (Nutzer, 2026-10-02). `term.options.fontSize` zu setzen tut
+    // in xterm dreierlei — Zeichenmasse neu messen, Atlas verwerfen, neu rastern. Der
+    // Puffer wird dabei nicht angefasst. Waere der Inhalt kaputt, koennte Neurastern
+    // nichts reparieren.
+    //
+    // `clearTextureAtlas` ist davon der Teil, der hier gebraucht wird. Einmal pro
+    // Terminal, nach `document.fonts.ready` (die Schriften kommen per
+    // `font-display: swap` asynchron, und niemand wartet sonst darauf) und einen Frame
+    // spaeter, damit das erste Rendern durch ist.
+    //
+    // **Ehrlich dazu:** die Ursache des falschen Atlas ist nicht gefunden. Sieben
+    // Nachstellungen — kalter Schriftstart mit verzoegerter woff2, Atlas mit 1400
+    // Glyphen gefuellt, Themewechsel am laufenden Terminal, Aufbau in einem
+    // 40x30-Container, WebGL/Canvas/DOM, Electron 34 wie Chrome, DPR 1 — zeigten den
+    // Fehler **nicht**. Dieser Aufruf behebt also das gemessene Symptom, nicht eine
+    // nachgewiesene Ursache. Taucht der Zerfall erneut auf, ist das der Hinweis, dass
+    // der Atlas spaeter nochmal veraltet und ein einmaliges Verwerfen nicht reicht.
+    void document.fonts.ready.then(() => {
+      requestAnimationFrame(() => {
+        try { termRef.current?.clearTextureAtlas() } catch { /* Renderer ohne Atlas */ }
+      })
+    })
+
     // Listen for theme-editor live preview (style changes) and theme switch (data-theme).
     // IMPORTANT: MutationObserver.observe() replaces previous observations on the same
     // target, so both filters must be in a single observe() call.
