@@ -7,7 +7,7 @@ import '@xterm/xterm/css/xterm.css'
 import { getTerminalTheme as getGeneratedTerminalTheme } from './useTheme'
 import type { ThemeName } from '../../shared/grid-types'
 import type { TerminalThemeColors } from '../../shared/terminal-theme'
-import { registerTerminal, unregisterTerminal, setMarker } from '../terminal-registry'
+import { registerTerminal, unregisterTerminal, setMarker, clearAllTextureAtlases } from '../terminal-registry'
 import { getTerminalFontSize } from '../a11y/terminal-font-size'
 import { RESYNC_SCROLLBACK_LINES, needsReflowResync } from '../../shared/terminal-resync'
 
@@ -364,10 +364,12 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
     // Fehler **nicht**. Dieser Aufruf behebt also das gemessene Symptom, nicht eine
     // nachgewiesene Ursache. Taucht der Zerfall erneut auf, ist das der Hinweis, dass
     // der Atlas spaeter nochmal veraltet und ein einmaliges Verwerfen nicht reicht.
+    //
+    // **Nur fuer alle Terminals zusammen** (2026-10-05). Der Atlas ist zwischen
+    // Terminals gleicher Schrift geteilt; verwarf ihn eines allein, zeigten alle
+    // anderen sichtbaren Panes fremde Glyphen. Siehe `clearAllTextureAtlases`.
     void document.fonts.ready.then(() => {
-      requestAnimationFrame(() => {
-        try { termRef.current?.clearTextureAtlas() } catch { /* Renderer ohne Atlas */ }
-      })
+      requestAnimationFrame(() => clearAllTextureAtlases())
     })
 
     // Listen for theme-editor live preview (style changes) and theme switch (data-theme).

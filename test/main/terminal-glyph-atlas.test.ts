@@ -22,18 +22,36 @@ import path from 'path'
  * Dieser Test faengt deshalb den Fall, der real ist: dass jemand den Aufruf
  * entfernt oder aus der `fonts.ready`-Kette loest, und der Zerfall still
  * zurueckkommt.
+ *
+ * **Und den Fall, den der erste Fix selbst ausgeloest hat (2026-10-05).** xterm
+ * teilt den Atlas zwischen allen Terminals gleicher Schrift, Groesse, Theme und
+ * DPR (`CharAtlasCache.acquireTextureAtlas`). `clearTextureAtlas()` an *einem*
+ * Terminal leert den gemeinsamen Atlas, setzt aber nur das eigene Render-Modell
+ * zurueck — alle anderen sichtbaren Terminals zeigten danach fremde Glyphen an
+ * ihren alten Texturkoordinaten. Verworfen wird deshalb nur fuer alle zusammen.
  */
 
 const HOOK = path.join(__dirname, '../../src/renderer/hooks/useTerminal.ts')
 
 describe('Glyphen-Atlas nach dem Aufbau', () => {
-  it('wird genau einmal verworfen', () => {
+  it('wird nie fuer ein einzelnes Terminal verworfen', () => {
+    // Der Atlas ist geteilt; ein Terminal allein laesst die anderen zerfallen.
     const src = readFileSync(HOOK, 'utf-8')
     const treffer = [...src.matchAll(/clearTextureAtlas\(\)/g)]
     assert.equal(
       treffer.length,
+      0,
+      `erwartet: kein clearTextureAtlas() im Hook, waren ${treffer.length} — der Atlas ist zwischen Terminals geteilt`,
+    )
+  })
+
+  it('wird genau einmal fuer alle zusammen verworfen', () => {
+    const src = readFileSync(HOOK, 'utf-8')
+    const treffer = [...src.matchAll(/clearAllTextureAtlases\(\)/g)]
+    assert.equal(
+      treffer.length,
       1,
-      `erwartet: genau ein clearTextureAtlas(), waren ${treffer.length} — mehrfach pro Terminal kostet bei jedem Aufruf eine komplette Neurasterung`,
+      `erwartet: genau ein clearAllTextureAtlases(), waren ${treffer.length} — jeder Aufruf kostet eine komplette Neurasterung`,
     )
   })
 
@@ -42,16 +60,16 @@ describe('Glyphen-Atlas nach dem Aufbau', () => {
     // niemand auf sie. Ein Verwerfen davor traefe den Atlas, den die Schrift gleich
     // wieder veralten laesst.
     const src = readFileSync(HOOK, 'utf-8')
-    const kette = src.match(/document\.fonts\.ready[\s\S]{0,400}?clearTextureAtlas\(\)/)
+    const kette = src.match(/document\.fonts\.ready[\s\S]{0,400}?clearAllTextureAtlases\(\)/)
     assert.ok(
       kette,
-      'clearTextureAtlas() steht nicht in der document.fonts.ready-Kette',
+      'clearAllTextureAtlases() steht nicht in der document.fonts.ready-Kette',
     )
   })
 
   it('wartet einen Frame, damit das erste Rendern durch ist', () => {
     const src = readFileSync(HOOK, 'utf-8')
-    const kette = src.match(/document\.fonts\.ready[\s\S]{0,400}?clearTextureAtlas\(\)/)
+    const kette = src.match(/document\.fonts\.ready[\s\S]{0,400}?clearAllTextureAtlases\(\)/)
     assert.ok(kette)
     assert.match(
       kette[0],
@@ -60,12 +78,4 @@ describe('Glyphen-Atlas nach dem Aufbau', () => {
     )
   })
 
-  it('faengt einen Renderer ohne Atlas ab', () => {
-    // Im DOM-Renderer gibt es keinen Textur-Atlas; der Aufruf darf dort nicht
-    // die Terminal-Erzeugung mitreissen.
-    const src = readFileSync(HOOK, 'utf-8')
-    const kette = src.match(/requestAnimationFrame[\s\S]{0,200}?clearTextureAtlas\(\)[\s\S]{0,120}/)
-    assert.ok(kette)
-    assert.match(kette[0], /try\s*\{[\s\S]*?\}\s*catch/, 'Aufruf nicht abgesichert')
-  })
 })

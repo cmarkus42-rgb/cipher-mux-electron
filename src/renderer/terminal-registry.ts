@@ -25,6 +25,22 @@ export function getAllTerminals(): Map<string, Terminal> {
   return terminals
 }
 
+/**
+ * Den Glyphen-Atlas fuer **alle** Terminals zugleich verwerfen.
+ *
+ * xterm teilt einen Atlas zwischen allen Terminals gleicher Schrift, Groesse, Theme
+ * und DPR (`CharAtlasCache.acquireTextureAtlas`). `clearTextureAtlas()` leert diesen
+ * gemeinsamen Atlas, setzt aber nur das Render-Modell des aufrufenden Terminals
+ * zurueck. Jedes andere behaelt seine Texturkoordinaten, und an denen liegen nach dem
+ * Neurastern fremde Glyphen. Deshalb nie fuer eines allein: der erste Aufruf leert
+ * den Atlas, jeder weitere setzt nur noch sein Modell zurueck und zeichnet neu.
+ */
+export function clearAllTextureAtlases(): void {
+  for (const term of terminals.values()) {
+    try { term.clearTextureAtlas() } catch { /* Renderer ohne Atlas */ }
+  }
+}
+
 /** Store the scrollback line number at the moment of user submission. */
 export function setMarker(sessionId: string, line: number): void {
   markers.set(sessionId, line)

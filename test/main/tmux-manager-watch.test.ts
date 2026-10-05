@@ -26,11 +26,26 @@ import { TmuxManager } from '../../src/main/tmux/tmux-manager';
 const TMUX_TMPDIR = fs.mkdtempSync(path.join(os.tmpdir(), 'cmux-tmux-test-'));
 const SESSION = 'cmux-watch-test';
 
+/**
+ * Environment for the isolated test server.
+ *
+ * `TMUX` must go: inside a tmux pane it is set, and tmux then takes the socket
+ * from it and **ignores `TMUX_TMPDIR`**. Run from a cipher-mux pane, this test
+ * reached the user's real server, and the `kill-server` below ended every mux
+ * session (2026-10-05, twice). Measured: `TMUX_TMPDIR=<empty dir> tmux ls` inside
+ * a pane lists the real sessions.
+ */
+function isolatedEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env, TMUX_TMPDIR };
+  delete env.TMUX;
+  return env;
+}
+
 /** Run a tmux CLI command against the isolated test server. */
 function tmux(args: string[]): { status: number; stdout: string; stderr: string } {
   const res = spawnSync('tmux', args, {
     encoding: 'utf-8',
-    env: { ...process.env, TMUX_TMPDIR },
+    env: isolatedEnv(),
   });
   return { status: res.status ?? -1, stdout: res.stdout ?? '', stderr: res.stderr ?? '' };
 }
@@ -56,23 +71,39 @@ async function waitFor(pred: () => boolean, timeoutMs = 5000): Promise<boolean> 
 describe('TmuxManager.watchSession', { skip: !tmuxAvailable() && 'tmux not installed' }, () => {
   let mgr: TmuxManager;
   let prevTmpdir: string | undefined;
+  let prevTmux: string | undefined;
+  let isolated = false;
 
   before(() => {
     // TmuxManager spawns `tmux` with process.env — point it at the isolated server
-    // so the test never touches the user's real tmux sessions.
+    // so the test never touches the user's real tmux sessions. Without removing
+    // TMUX, TMUX_TMPDIR is ignored inside a tmux pane (see isolatedEnv).
     prevTmpdir = process.env.TMUX_TMPDIR;
+    prevTmux = process.env.TMUX;
     process.env.TMUX_TMPDIR = TMUX_TMPDIR;
+    delete process.env.TMUX;
+
+    // Refuse to run if the isolation does not hold — `kill-server` in `after`
+    // would otherwise end the user's real sessions.
+    const probe = tmux(['display-message', '-p', '#{socket_path}']);
+    assert.ok(
+      probe.status !== 0 || probe.stdout.startsWith(fs.realpathSync(TMUX_TMPDIR)),
+      `tmux is not isolated, socket: ${probe.stdout.trim()}`,
+    );
+    isolated = true;
 
     mgr = new TmuxManager();
     tmux(['new-session', '-d', '-s', SESSION, '-x', '200', '-y', '50']);
   });
 
   after(() => {
-    mgr.unwatchSession(SESSION);
-    mgr.disconnect();
-    tmux(['kill-server']);
+    mgr?.unwatchSession(SESSION);
+    mgr?.disconnect();
+    // `after` runs even when `before` failed — never kill a server we did not prove is ours.
+    if (isolated) tmux(['kill-server']);
     if (prevTmpdir === undefined) delete process.env.TMUX_TMPDIR;
     else process.env.TMUX_TMPDIR = prevTmpdir;
+    if (prevTmux !== undefined) process.env.TMUX = prevTmux;
     fs.rmSync(TMUX_TMPDIR, { recursive: true, force: true });
   });
 
