@@ -1,9 +1,15 @@
 import { describe, it, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
+import type { Terminal } from '@xterm/xterm'
 import {
   registerTerminal, unregisterTerminal, getTerminal,
-  setMarker, getMarker, clearMarker,
+  setMarker, getMarker, clearMarker, clearAllTextureAtlases,
 } from '../../src/renderer/terminal-registry'
+
+/** Terminal-Attrappe, die nur `clearTextureAtlas` traegt. */
+function atlasStub(clear: () => unknown): Terminal {
+  return { clearTextureAtlas: clear } as unknown as Terminal
+}
 
 // Minimal Terminal stub — only the fields the registry cares about
 function makeTermStub() {
@@ -54,5 +60,24 @@ describe('terminal-registry', () => {
     setMarker('s1', 10)
     setMarker('s1', 99)
     assert.equal(getMarker('s1'), 99)
+  })
+
+  // xterm teilt den Glyphen-Atlas zwischen allen Terminals gleicher Schrift, Groesse,
+  // Theme und DPR. Verwirft ihn eines allein, behalten die anderen ihre alten
+  // Texturkoordinaten und zeigen fremde Glyphen. Deshalb nur alle zusammen.
+  it('verwirft den Atlas fuer jedes registrierte Terminal', () => {
+    const aufrufe: string[] = []
+    registerTerminal('s1', atlasStub(() => aufrufe.push('s1')))
+    registerTerminal('s2', atlasStub(() => aufrufe.push('s2')))
+    clearAllTextureAtlases()
+    assert.deepEqual(aufrufe.sort(), ['s1', 's2'])
+  })
+
+  it('ein Terminal ohne Atlas haelt die anderen nicht auf', () => {
+    const aufrufe: string[] = []
+    registerTerminal('s1', atlasStub(() => { throw new Error('kein Atlas') }))
+    registerTerminal('s2', atlasStub(() => aufrufe.push('s2')))
+    assert.doesNotThrow(() => clearAllTextureAtlases())
+    assert.deepEqual(aufrufe, ['s2'])
   })
 })
