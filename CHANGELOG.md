@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.7] — 2026-10-05
+
+### Fixed
+- **Zerfallene Zeichen in allen anderen Terminals, sobald eines neu aufgebaut wurde.** Der
+  Atlas-Fix aus 0.11.5 hat das selbst ausgelöst. xterm teilt den Glyphen-Atlas zwischen allen
+  Terminals gleicher Schrift, Größe, Theme und DPR. `clearTextureAtlas()` an einem Terminal
+  leert diesen gemeinsamen Atlas, setzt aber nur das eigene Render-Modell zurück. Jedes andere
+  sichtbare Pane behielt seine Texturkoordinaten und zeigte an ihnen fremde Glyphen, in
+  plausiblen Farben und an der richtigen Stelle. Zeilen, die danach neu gezeichnet wurden, waren
+  wieder lesbar, älterer Text war Salat. Verworfen wird jetzt nur noch für alle Terminals
+  zusammen (`clearAllTextureAtlases` in `terminal-registry.ts`).
+- **Die Testsuite konnte die laufenden Mux-Sessions beenden.** `tmux-manager-watch.test.ts`
+  isolierte seinen tmux-Server über `TMUX_TMPDIR` und rief am Ende `kill-server` auf. Innerhalb
+  eines tmux-Panes ist aber `TMUX` gesetzt, und dann ignoriert tmux `TMUX_TMPDIR`. Lief die Suite
+  aus einem Mux-Pane, traf sie den echten Server: Alle Sessions waren weg, und im Mux ließ sich
+  nichts mehr eintippen. Der Test entfernt jetzt `TMUX`, prüft vor dem Start den Socket-Pfad und
+  beendet nur einen Server, dessen Isolation er nachgewiesen hat.
+
 ## [0.11.6] — 2026-10-02
 
 ### Added
