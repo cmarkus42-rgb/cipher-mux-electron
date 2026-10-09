@@ -87,17 +87,20 @@ export function endVersuch(
 ): Lauf {
   const h = lauf.haeppchen.find(x => x.nummer === nummer)
   if (!h || h.versuche.length === 0) return lauf
+  if (h.status !== 'laeuft') return lauf
   const versuche = [...h.versuche]
   versuche[versuche.length - 1] = { ...versuche[versuche.length - 1], ...patch, beendet: now }
-  const fehlschlaege = versuche.filter(v => v.verdict === 'rot' || v.verdict === 'haengt').length
   const status: HaeppchenStatus =
-    patch.verdict === 'gruen' ? 'wartet' : fehlschlaege >= MAX_VERSUCHE ? 'eskaliert' : 'wartet'
+    patch.verdict === 'gruen' ? 'wartet' : versuche.length >= MAX_VERSUCHE ? 'eskaliert' : 'wartet'
   return replaceH(lauf, { ...h, versuche, status })
 }
 
 export function markAbgenommen(lauf: Lauf, nummer: number): Lauf {
   const h = lauf.haeppchen.find(x => x.nummer === nummer)
-  return h ? replaceH(lauf, { ...h, status: 'abgenommen' }) : lauf
+  if (!h || h.status !== 'wartet') return lauf
+  const lastVersuch = h.versuche[h.versuche.length - 1]
+  if (!lastVersuch || lastVersuch.verdict !== 'gruen') return lauf
+  return replaceH(lauf, { ...h, status: 'abgenommen' })
 }
 
 export function countWeckruf(lauf: Lauf): Lauf {
@@ -124,14 +127,23 @@ export function parseLauf(raw: unknown): Lauf | null {
     if (!x || typeof x !== 'object') continue
     const h = x as Record<string, unknown>
     if (typeof h.nummer !== 'number' || typeof h.ziel !== 'string') continue
+    const versuche: Versuch[] = []
+    if (Array.isArray(h.versuche)) {
+      for (let i = 0; i < h.versuche.length; i++) {
+        const v = h.versuche[i]
+        if (v && typeof v === 'object' && typeof (v as Versuch).nr === 'number') {
+          versuche.push(v as Versuch)
+        } else {
+          versuche.push({ nr: i + 1, gestartet: 0, verdict: 'haengt' })
+        }
+      }
+    }
     haeppchen.push({
       nummer: h.nummer,
       ziel: h.ziel,
       // Ohne Status weiß niemand, was daraus wurde — „abgebrochen" behauptet am wenigsten.
       status: STATUS.includes(h.status as HaeppchenStatus) ? (h.status as HaeppchenStatus) : 'abgebrochen',
-      versuche: Array.isArray(h.versuche)
-        ? (h.versuche.filter(v => v && typeof v === 'object' && typeof (v as Versuch).nr === 'number') as Versuch[])
-        : [],
+      versuche,
     })
   }
   return { id: r.id, projekt: r.projekt, erstellt: num(r.erstellt, 0), weckrufe: num(r.weckrufe, 0), haeppchen }

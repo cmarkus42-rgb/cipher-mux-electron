@@ -63,6 +63,54 @@ describe('Lauf-Zustand', () => {
   it('countWeckruf zählt hoch', () => {
     assert.equal(countWeckruf(newLauf('L', '/p', 0)).weckrufe, 1)
   })
+
+  it('endVersuch auf eskaliert: bleibt eskaliert auch mit grün-Verdict', () => {
+    let l = ok(beginVersuch(newLauf('L', '/p', 0), { ziel: 'a', now: 1 })).lauf
+    l = endVersuch(l, 1, { verdict: 'rot' }, 2)
+    l = ok(beginVersuch(l, { nummer: 1, ziel: 'a', now: 3 })).lauf
+    l = endVersuch(l, 1, { verdict: 'haengt' }, 4)
+    assert.equal(l.haeppchen[0].status, 'eskaliert')
+    l = endVersuch(l, 1, { verdict: 'gruen' }, 5)
+    assert.equal(l.haeppchen[0].status, 'eskaliert')
+  })
+
+  it('markAbgenommen auf laeuft: unverändert', () => {
+    const l = ok(beginVersuch(newLauf('L', '/p', 0), { ziel: 'a', now: 1 })).lauf
+    assert.equal(l.haeppchen[0].status, 'laeuft')
+    const marked = markAbgenommen(l, 1)
+    assert.equal(marked.haeppchen[0].status, 'laeuft')
+  })
+
+  it('markAbgenommen nach rot-Verdict (nicht grün): unverändert', () => {
+    let l = ok(beginVersuch(newLauf('L', '/p', 0), { ziel: 'a', now: 1 })).lauf
+    l = endVersuch(l, 1, { verdict: 'rot' }, 2)
+    assert.equal(l.haeppchen[0].status, 'wartet')
+    const marked = markAbgenommen(l, 1)
+    assert.equal(marked.haeppchen[0].status, 'wartet')
+  })
+
+  it('abgebrochen + Versuch rot → eskaliert, kein Versuch möglich', () => {
+    let l = ok(beginVersuch(newLauf('L', '/p', 0), { ziel: 'a', now: 1 })).lauf
+    l = abortRunning(l)
+    assert.equal(l.haeppchen[0].status, 'abgebrochen')
+    const r = ok(beginVersuch(l, { nummer: 1, ziel: 'a', now: 2 }))
+    l = endVersuch(r.lauf, 1, { verdict: 'rot' }, 3)
+    assert.equal(l.haeppchen[0].status, 'eskaliert')
+    assert.ok('error' in beginVersuch(l, { nummer: 1, ziel: 'a', now: 4 }))
+  })
+
+  it('parseLauf mit gemischten versuche: alle behalten, ungültige durch Stub ersetzen', () => {
+    const l = parseLauf({
+      id: 'L',
+      projekt: '/p',
+      haeppchen: [{ nummer: 1, ziel: 'a', versuche: [{ nr: 1, gestartet: 100 }, 'kaputt'] }],
+    })!
+    assert.equal(l.haeppchen[0].versuche.length, 2)
+    assert.deepEqual(l.haeppchen[0].versuche[0], { nr: 1, gestartet: 100 })
+    assert.deepEqual(l.haeppchen[0].versuche[1], { nr: 2, gestartet: 0, verdict: 'haengt' })
+    const r = beginVersuch(l, { nummer: 1, ziel: 'a', now: 1 })
+    assert.ok('error' in r)
+  })
 })
 
 describe('parseLauf / loadLauf defensiv', () => {
