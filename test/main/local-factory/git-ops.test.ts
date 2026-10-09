@@ -6,7 +6,7 @@ import * as path from 'path'
 import { execFileSync } from 'child_process'
 import {
   runShell, dirtyFiles, headCommit, commitPaths, commitAll, changedSince,
-  checksums, savePatchAndReset, toRepoRelative, currentBranch,
+  checksums, savePatchAndReset, toRepoRelative, currentBranch, loginShell,
 } from '../../../src/main/local-factory/git-ops'
 
 let repo: string
@@ -144,5 +144,12 @@ describe('git-ops', () => {
     assert.equal(toRepoRelative('/p', '/p/test/x.ts'), 'test/x.ts')
     assert.equal(toRepoRelative('/p', 'test/x.ts'), 'test/x.ts')
     assert.equal(toRepoRelative('/p', './test/x.ts'), 'test/x.ts')
+  })
+})
+
+describe('loginShell', () => {
+  it('zsh, wo es sie gibt; sonst /bin/sh (Linux-CI hat keine zsh)', () => {
+    assert.equal(loginShell(() => true), '/bin/zsh')
+    assert.equal(loginShell(() => false), '/bin/sh')
   })
 })
