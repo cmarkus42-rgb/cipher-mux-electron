@@ -1,0 +1,75 @@
+import * as path from 'path'
+
+/**
+ * Der Auftrag an den Worker. Pflichtfelder statt Freitext, weil in Keel Regeln
+ * nur im Schema hielten (Spec §3). Die Gate-Ausgabe eines Fehlversuchs geht
+ * wörtlich mit — nacherzählt verlor sie in Keel den Fehlerort.
+ */
+
+export interface AuftragInput {
+  projekt: string
+  ziel: string
+  dateien: string[]
+  akzeptanzkriterium: string
+  geschuetzteTests: string[]
+  testBefehl: string
+  nichtZiele: string[]
+}
+
+/** Testausgaben enden mit dem Wichtigen; gekürzt wird vorne. */
+export const MAX_GATE_OUTPUT_CHARS = 6000
+
+const blank = (s: unknown): boolean => typeof s !== 'string' || s.trim() === ''
+
+export function validateAuftrag(a: AuftragInput): string[] {
+  const errs: string[] = []
+  if (blank(a.projekt) || !path.isAbsolute(a.projekt)) errs.push('projekt: absoluter Pfad erforderlich')
+  if (blank(a.ziel)) errs.push('ziel: leer')
+  if (blank(a.akzeptanzkriterium)) errs.push('akzeptanzkriterium: leer')
+  if (blank(a.testBefehl)) errs.push('testBefehl: leer')
+  if (!Array.isArray(a.geschuetzteTests) || a.geschuetzteTests.length === 0) {
+    errs.push('geschuetzteTests: mindestens ein Abnahmetest')
+  } else if (!blank(a.projekt) && path.isAbsolute(a.projekt)) {
+    for (const t of a.geschuetzteTests) {
+      const abs = path.resolve(a.projekt, t)
+      if (!abs.startsWith(path.resolve(a.projekt) + path.sep)) {
+        errs.push(`geschuetzteTests: ${t} liegt außerhalb des Projekts`)
+      }
+    }
+  }
+  if (!Array.isArray(a.dateien)) errs.push('dateien: Liste erforderlich')
+  if (!Array.isArray(a.nichtZiele)) errs.push('nichtZiele: Liste erforderlich')
+  return errs
+}
+
+function tail(s: string): string {
+  return s.length <= MAX_GATE_OUTPUT_CHARS ? s : '… (gekürzt)\n' + s.slice(-MAX_GATE_OUTPUT_CHARS)
+}
+
+const list = (xs: string[]): string => (xs.length ? xs.map(x => `- ${x}`).join('\n') : '- (keine)')
+
+export function buildAuftragMd(
+  a: AuftragInput,
+  opts: { nummer: number; versuch: number; vorherigesGate?: { reasons: string[]; testOutput: string } },
+): string {
+  const parts = [
+    `# Auftrag #${opts.nummer} — Versuch ${opts.versuch}`,
+    '',
+    `**Projekt:** \`${a.projekt}\``,
+    '',
+    `## Ziel\n\n${a.ziel}`,
+    `## Akzeptanzkriterium\n\n${a.akzeptanzkriterium}`,
+    `## Dateien\n\n${list(a.dateien)}`,
+    `## Abnahmetests — gesperrt, bestehen statt ändern\n\n${list(a.geschuetzteTests)}`,
+    `## Testbefehl (im Projekt ausführen)\n\n\`\`\`\n${a.testBefehl}\n\`\`\``,
+    `## Nicht-Ziele\n\n${list(a.nichtZiele)}`,
+  ]
+  if (opts.vorherigesGate) {
+    parts.push(
+      `## Der vorige Versuch ist durchgefallen\n\n${list(opts.vorherigesGate.reasons)}\n\n`
+      + `Ausgabe des Testbefehls, wörtlich:\n\n\`\`\`\n${tail(opts.vorherigesGate.testOutput)}\n\`\`\``,
+    )
+  }
+  parts.push('## Zum Schluss\n\nSchreibe `REPORT.md` in dein Arbeitsverzeichnis. Nicht committen.')
+  return parts.join('\n\n') + '\n'
+}
