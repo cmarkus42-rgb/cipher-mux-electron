@@ -11,7 +11,7 @@ import {
 import { classifyWorker, IDLE_SIGNAL_FILENAME } from './worker-done'
 import {
   runShell, dirtyFiles, headCommit, commitPaths, commitAll, changedSince,
-  checksums, savePatchAndReset, toRepoRelative, isRepoRoot,
+  checksums, savePatchAndReset, toRepoRelative, isRepoRoot, currentBranch,
 } from './git-ops'
 import { PROTECTED_PATHS_FILENAME } from '../session/entity-boundaries'
 
@@ -22,7 +22,11 @@ import { PROTECTED_PATHS_FILENAME } from '../session/entity-boundaries'
  */
 
 export interface WorkerHost {
-  endpointReachable(): Promise<boolean>
+  /**
+   * Bereitschaft (Ruling R15): null = bereit, sonst der Grund, warum nicht —
+   * nicht konfiguriert, skipPermissions aus, Endpunkt antwortet nicht mit 2xx.
+   */
+  workerReady(): Promise<string | null>
   startFreshWorker(projekt: string): Promise<{ runDir: string; sessionId: string }>
   sendToWorker(sessionId: string, line: string): Promise<void>
   stopWorker(sessionId: string): Promise<void>
@@ -52,9 +56,24 @@ export interface DispatchArgs extends AuftragInput {
 
 export type DispatchAccepted = { ok: true; laufId: string; nummer: number; versuch: number; laufPfad: string }
 export type DispatchRejected = { ok: false; error: string }
+export type AcceptResult = { ok: true } | { ok: false; error: string }
+
+/** Höchstlänge einer Weckzeile. Sie geht per send-keys in ein Eingabefeld. */
+export const MAX_WECKZEILE = 400
+
+/**
+ * Eine Weckzeile ist genau eine Zeile: ein Zeilenumbruch darin (aus ziel oder
+ * einem Fehlertext) schickte per send-keys eine Teilzeile ab.
+ */
+export function oneLine(s: string, max = MAX_WECKZEILE): string {
+  const flat = s.replace(/\s+/g, ' ').trim()
+  return flat.length > max ? flat.slice(0, max - 1) + '…' : flat
+}
+
+const LAUF_ID = /^[A-Za-z0-9_-]{1,64}$/
 
 interface Attempt {
-  args: DispatchArgs; prot: string[]; base: string; sumsBefore: Record<string, string>
+  args: DispatchArgs; prot: string[]; base: string; branch: string; sumsBefore: Record<string, string>
   laufId: string; laufPfad: string; nummer: number; versuch: number
   vorherigesGate?: { reasons: string[]; testOutput: string }
 }
@@ -88,16 +107,34 @@ export class LocalFactoryRunner {
     return path.join(this.o.laufDir, laufId, 'lauf.json')
   }
 
-  accept(laufId: string, nummer: number): void {
+  /** Ehrlicher Status: ok nur, wenn tatsächlich etwas abgenommen wurde. */
+  accept(laufId: string, nummer: number): AcceptResult {
+    if (!LAUF_ID.test(laufId)) return { ok: false, error: 'laufId ungültig.' }
     const f = this.laufFile(laufId)
     const lauf = loadLauf(f)
-    if (lauf) saveLauf(f, markAbgenommen(lauf, nummer))
+    if (!lauf) return { ok: false, error: `Lauf ${laufId} unbekannt.` }
+    const next = markAbgenommen(lauf, nummer)
+    if (next === lauf) {
+      const h = lauf.haeppchen.find(x => x.nummer === nummer)
+      return {
+        ok: false,
+        error: h
+          ? `Häppchen #${nummer} ist nicht grün-wartend (Status ${h.status}, letztes Urteil ${h.versuche.at(-1)?.verdict ?? 'keins'}).`
+          : `Häppchen #${nummer} gibt es in Lauf ${laufId} nicht.`,
+      }
+    }
+    saveLauf(f, next)
+    return { ok: true }
+  }
+
+  private wake(line: string): Promise<void> {
+    return this.o.host.wakeArchitect(oneLine(line))
   }
 
   async dispatch(args: DispatchArgs): Promise<DispatchAccepted | DispatchRejected> {
     const errs = validateAuftrag(args)
     if (errs.length) return { ok: false, error: `Auftrag ungültig: ${errs.join('; ')}` }
-    if (args.laufId !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(args.laufId)) {
+    if (args.laufId !== undefined && !LAUF_ID.test(args.laufId)) {
       return { ok: false, error: 'laufId ungültig: nur A-Z, a-z, 0-9, _ und -, höchstens 64 Zeichen.' }
     }
     if (this.busy) return { ok: false, error: 'Es läuft bereits ein Worker. Nacheinander (Spec E2).' }
@@ -117,9 +154,10 @@ export class LocalFactoryRunner {
     if (!(await isRepoRoot(args.projekt))) {
       return { ok: false, error: `projekt ist nicht die Wurzel eines git-Repos: ${args.projekt}` }
     }
-    if (!(await this.o.host.endpointReachable())) {
-      await this.o.host.wakeArchitect('[local-factory] Endpunkt nicht erreichbar — kein Versuch gezählt.')
-      return { ok: false, error: 'Endpunkt des lokalen Modells nicht erreichbar. Kein Versuch gezählt.' }
+    const nichtBereit = await this.o.host.workerReady()
+    if (nichtBereit !== null) {
+      await this.wake(`[local-factory] Nicht bereit: ${nichtBereit} — kein Versuch gezählt.`)
+      return { ok: false, error: oneLine(`Nicht bereit: ${nichtBereit}. Kein Versuch gezählt.`) }
     }
 
     const projekt = args.projekt
@@ -129,7 +167,15 @@ export class LocalFactoryRunner {
     const dirty = await dirtyFiles(projekt)
     const fremd = dirty.filter(f => !prot.includes(f))
     if (fremd.length) {
-      return { ok: false, error: `Arbeitsbaum nicht sauber, außer den Abnahmetests offen: ${fremd.join(', ')}` }
+      // Ein „laeuft“ im Lauf heißt: ein Versuch wurde unterbrochen (App-Neustart),
+      // und die offenen Dateien sind sehr wahrscheinlich seine Reste.
+      const rest = args.laufId !== undefined
+        ? loadLauf(this.laufFile(args.laufId))?.haeppchen.find(h => h.status === 'laeuft')
+        : undefined
+      const hinweis = rest
+        ? ` — vermutlich Rest eines unterbrochenen Versuchs #${rest.nummer} — Patch sichern oder Baum zurücksetzen`
+        : ''
+      return { ok: false, error: `Arbeitsbaum nicht sauber, außer den Abnahmetests offen: ${fremd.join(', ')}${hinweis}` }
     }
     const fehlend = prot.filter(f => !fs.existsSync(path.join(projekt, f)))
     if (fehlend.length) return { ok: false, error: `Abnahmetest fehlt: ${fehlend.join(', ')}` }
@@ -153,6 +199,7 @@ export class LocalFactoryRunner {
     const offeneTests = dirty.filter(f => prot.includes(f))
     if (offeneTests.length) await commitPaths(projekt, offeneTests, `lf: Abnahmetest #${begun.nummer}`)
     const base = await headCommit(projekt)
+    const branch = await currentBranch(projekt)
     const sumsBefore = checksums(projekt, prot)
     saveLauf(laufPfad, begun.lauf)
 
@@ -169,10 +216,10 @@ export class LocalFactoryRunner {
     }
 
     this.running = this.runAttempt({
-      args, prot, base, sumsBefore, laufId, laufPfad,
+      args, prot, base, branch, sumsBefore, laufId, laufPfad,
       nummer: begun.nummer, versuch: begun.versuch, vorherigesGate,
     })
-      .catch(err => this.o.host.wakeArchitect(`[local-factory] #${begun.nummer} Läuferfehler: ${String(err)}`).catch(() => {}))
+      .catch(err => this.wake(`[local-factory] #${begun.nummer} Läuferfehler: ${String(err)}`).catch(() => {}))
       .finally(() => { this.busy = false })
 
     return { ok: true, laufId, nummer: begun.nummer, versuch: begun.versuch, laufPfad }
@@ -190,7 +237,10 @@ export class LocalFactoryRunner {
       try {
         const dir = path.dirname(a.laufPfad)
         const patch = path.join(dir, `versuch-${a.nummer}-${a.versuch}.patch`)
-        await savePatchAndReset(a.args.projekt, a.base, patch)
+        // Auf einem fremden Branch kein reset --hard: er zöge diesen Branch auf die Basis.
+        if ((await currentBranch(a.args.projekt)) === a.branch) {
+          await savePatchAndReset(a.args.projekt, a.base, patch)
+        }
       } catch { /* Patch/Reset best effort */ }
       try {
         const lauf = loadLauf(a.laufPfad)
@@ -238,17 +288,28 @@ export class LocalFactoryRunner {
     await host.stopWorker(sessionId)
     started.sessionId = undefined
 
-    const test = state === 'fertig'
+    // Branch gewechselt: reset --soft/--hard würde den fremden Branch auf die
+    // Basis ziehen, ein checkout zurück kann an offenen Dateien scheitern oder
+    // sie mitnehmen. Konservativ: rot, nichts anfassen, Grund nennen.
+    const branchJetzt = await currentBranch(projekt)
+    const branchGewechselt = branchJetzt !== a.branch
+
+    const test = state === 'fertig' && !branchGewechselt
       ? await runShell(a.args.testBefehl, projekt, this.o.testTimeoutMs)
       : { exitCode: null, output: '' }
-    const gate = decideGate({
-      workerFinished: state === 'fertig',
-      testExitCode: test.exitCode,
-      checksumsBefore: a.sumsBefore,
-      checksumsAfter: checksums(projekt, a.prot),
-      changedFiles: await changedSince(projekt, a.base),
-      protectedFiles: a.prot,
-    })
+    const gate: GateResult = branchGewechselt
+      ? {
+          verdict: 'rot',
+          reasons: [`Worker hat den Branch gewechselt (${a.branch} → ${branchJetzt}). Nichts zurückgesetzt — Baum von Hand prüfen.`],
+        }
+      : decideGate({
+          workerFinished: state === 'fertig',
+          testExitCode: test.exitCode,
+          checksumsBefore: a.sumsBefore,
+          checksumsAfter: checksums(projekt, a.prot),
+          changedFiles: await changedSince(projekt, a.base),
+          protectedFiles: a.prot,
+        })
 
     const dir = path.dirname(a.laufPfad)
     const gatePfad = path.join(dir, `gate-${a.nummer}-${a.versuch}.json`)
@@ -256,9 +317,14 @@ export class LocalFactoryRunner {
 
     let commit: string | undefined
     let patchPfad: string | undefined
-    if (gate.verdict === 'gruen') {
-      commit = await commitAll(projekt, `lf: ${a.args.ziel}`)
+    if (branchGewechselt) {
       started.settled = true
+    } else if (gate.verdict === 'gruen') {
+      await commitAll(projekt, a.base, `lf: ${oneLine(a.args.ziel, 200)}`)
+      // Direkt nach dem commit, vor jedem weiteren await: ab hier ist der
+      // Versuch entschieden; ein Fehler in headCommit darf nicht zum Reset führen.
+      started.settled = true
+      commit = await headCommit(projekt)
     } else {
       patchPfad = path.join(dir, `versuch-${a.nummer}-${a.versuch}.patch`)
       await savePatchAndReset(projekt, a.base, patchPfad)
@@ -274,13 +340,15 @@ export class LocalFactoryRunner {
     saveLauf(a.laufPfad, lauf)
 
     const h = lauf.haeppchen.find(x => x.nummer === a.nummer)
-    const kopf = `[local-factory] #${a.nummer} „${a.args.ziel}“`
+    // ziel gekappt, damit Gate- bzw. Laufpfad am Ende der Zeile nicht abgeschnitten wird.
+    const kopf = `[local-factory] #${a.nummer} „${oneLine(a.args.ziel, 120)}“`
     const zahl = `Versuch ${a.versuch}/${MAX_VERSUCHE}`
     const line = gate.verdict === 'gruen'
       ? `${kopf}: GRÜN, ${zahl}, Commit ${commit!.slice(0, 8)}, Lauf: ${a.laufPfad}`
       : `${kopf}: ${gate.verdict === 'rot' ? 'ROT' : 'HÄNGT'}, ${zahl}, Gate: ${gatePfad}`
+        + (branchGewechselt ? ' — Worker hat den Branch gewechselt, Baum nicht zurückgesetzt' : '')
         + (h?.status === 'eskaliert' ? ' — ESKALIERT, an den User melden' : '')
-    await host.wakeArchitect(line)
+    await this.wake(line)
   }
 
   private cfg() {

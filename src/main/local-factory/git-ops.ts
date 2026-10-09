@@ -54,33 +54,51 @@ const git = (projekt: string, args: string[]): Promise<string> =>
 
 const lines = (s: string): string[] => s.split('\n').map(l => l.trim()).filter(Boolean)
 
+// core.quotepath=off: sonst maskiert git Nicht-ASCII-Namen als "\303\244.txt",
+// und der Vergleich mit den geschützten Pfaden schlägt still fehl.
+const NO_QUOTE = ['-c', 'core.quotepath=off']
+
 export async function dirtyFiles(projekt: string): Promise<string[]> {
-  const tracked = lines(await git(projekt, ['diff', '--name-only', '--no-renames', 'HEAD']))
-  const untracked = lines(await git(projekt, ['ls-files', '--others', '--exclude-standard']))
+  const tracked = lines(await git(projekt, [...NO_QUOTE, 'diff', '--name-only', '--no-renames', 'HEAD']))
+  const untracked = lines(await git(projekt, [...NO_QUOTE, 'ls-files', '--others', '--exclude-standard']))
   return [...new Set([...tracked, ...untracked])]
+}
+
+/** Ausgecheckter Branch; „HEAD“ bei losgelöstem HEAD. */
+export async function currentBranch(projekt: string): Promise<string> {
+  return git(projekt, ['rev-parse', '--abbrev-ref', 'HEAD'])
 }
 
 export async function headCommit(projekt: string): Promise<string> {
   return git(projekt, ['rev-parse', 'HEAD'])
 }
 
+// --no-verify (Ruling R14): Hooks des Ziel-Repos (z. B. husky mit Tests) würden
+// den absichtlich roten Abnahmetest-Commit blockieren. Die Qualitätsprüfung ist
+// der Gate, nicht der Hook.
 export async function commitPaths(projekt: string, paths: string[], message: string): Promise<string> {
   await git(projekt, ['add', '--', ...paths])
-  await git(projekt, ['commit', '-q', '-m', message, '--', ...paths])
+  await git(projekt, ['commit', '-q', '--no-verify', '-m', message, '--', ...paths])
   return headCommit(projekt)
 }
 
-export async function commitAll(projekt: string, message: string): Promise<string> {
+/**
+ * Grüner Abschluss (R14): alles seit `base` — auch Commits, die der Worker
+ * selbst gemacht hat — wird zu genau einem Commit. Gibt bewusst keinen Hash
+ * zurück: der Läufer muss den Versuch direkt nach dem erfolgreichen commit als
+ * entschieden markieren, bevor ein weiterer Aufruf (headCommit) scheitern kann.
+ */
+export async function commitAll(projekt: string, base: string, message: string): Promise<void> {
+  await git(projekt, ['reset', '-q', '--soft', base])
   await git(projekt, ['add', '-A'])
-  await git(projekt, ['commit', '-q', '-m', message])
-  return headCommit(projekt)
+  await git(projekt, ['commit', '-q', '--no-verify', '-m', message])
 }
 
 export async function changedSince(projekt: string, base: string): Promise<string[]> {
   // --no-renames: ein umbenannter Test erscheint sonst nur mit dem Zielpfad,
   // und der Gate übersähe, dass ein geschützter Pfad verschwunden ist.
-  const tracked = lines(await git(projekt, ['diff', '--name-only', '--no-renames', base]))
-  const untracked = lines(await git(projekt, ['ls-files', '--others', '--exclude-standard']))
+  const tracked = lines(await git(projekt, [...NO_QUOTE, 'diff', '--name-only', '--no-renames', base]))
+  const untracked = lines(await git(projekt, [...NO_QUOTE, 'ls-files', '--others', '--exclude-standard']))
   return [...new Set([...tracked, ...untracked])]
 }
 
@@ -116,13 +134,17 @@ export async function savePatchAndReset(projekt: string, base: string, patchFile
   // Untracked erst in den Index (intent-to-add), damit der Patch sie enthält.
   await git(projekt, ['add', '-N', '.'])
   // Eigener Aufruf: großer Puffer, --binary, unbeschnitten.
+  // encoding 'buffer': der Patch wird roh geschrieben. Ein UTF-8-Umweg machte
+  // aus jedem Nicht-UTF-8-Byte (Latin-1-Text) ein U+FFFD, und der Patch ließe
+  // sich nicht mehr anwenden.
   const { stdout } = await execFileP('git', ['diff', '--binary', base], {
     cwd: projekt,
     maxBuffer: 256 * 1024 * 1024,
     env: { ...process.env, PATH: getEnhancedPath() },
+    encoding: 'buffer',
   })
   fs.mkdirSync(path.dirname(patchFile), { recursive: true })
-  fs.writeFileSync(patchFile, stdout, 'utf-8')
+  fs.writeFileSync(patchFile, stdout)
   await git(projekt, ['reset', '-q', '--hard', base])
   await git(projekt, ['clean', '-fdq'])
 }
