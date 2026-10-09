@@ -27,18 +27,53 @@ export function validateAuftrag(a: AuftragInput): string[] {
   if (blank(a.ziel)) errs.push('ziel: leer')
   if (blank(a.akzeptanzkriterium)) errs.push('akzeptanzkriterium: leer')
   if (blank(a.testBefehl)) errs.push('testBefehl: leer')
+
+  // geschuetzteTests: Element-Validierung
   if (!Array.isArray(a.geschuetzteTests) || a.geschuetzteTests.length === 0) {
     errs.push('geschuetzteTests: mindestens ein Abnahmetest')
-  } else if (!blank(a.projekt) && path.isAbsolute(a.projekt)) {
-    for (const t of a.geschuetzteTests) {
-      const abs = path.resolve(a.projekt, t)
-      if (!abs.startsWith(path.resolve(a.projekt) + path.sep)) {
-        errs.push(`geschuetzteTests: ${t} liegt außerhalb des Projekts`)
+  } else {
+    for (let i = 0; i < a.geschuetzteTests.length; i++) {
+      const t = a.geschuetzteTests[i]
+      if (blank(t)) {
+        errs.push(`geschuetzteTests[${i}]: kein Text`)
+      }
+    }
+    // Pfad-Prüfung nur auf gültigen Strings, wenn projekt valide ist
+    if (!blank(a.projekt) && path.isAbsolute(a.projekt)) {
+      for (let i = 0; i < a.geschuetzteTests.length; i++) {
+        const t = a.geschuetzteTests[i]
+        if (!blank(t)) {
+          const abs = path.resolve(a.projekt, t)
+          if (!abs.startsWith(path.resolve(a.projekt) + path.sep)) {
+            errs.push(`geschuetzteTests[${i}]: ${t} liegt außerhalb des Projekts`)
+          }
+        }
       }
     }
   }
-  if (!Array.isArray(a.dateien)) errs.push('dateien: Liste erforderlich')
-  if (!Array.isArray(a.nichtZiele)) errs.push('nichtZiele: Liste erforderlich')
+
+  // dateien: Element-Validierung
+  if (!Array.isArray(a.dateien)) {
+    errs.push('dateien: Liste erforderlich')
+  } else {
+    for (let i = 0; i < a.dateien.length; i++) {
+      if (blank(a.dateien[i])) {
+        errs.push(`dateien[${i}]: kein Text`)
+      }
+    }
+  }
+
+  // nichtZiele: Element-Validierung
+  if (!Array.isArray(a.nichtZiele)) {
+    errs.push('nichtZiele: Liste erforderlich')
+  } else {
+    for (let i = 0; i < a.nichtZiele.length; i++) {
+      if (blank(a.nichtZiele[i])) {
+        errs.push(`nichtZiele[${i}]: kein Text`)
+      }
+    }
+  }
+
   return errs
 }
 
