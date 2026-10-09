@@ -7,6 +7,7 @@ import type {
   LaunchOpts,
   AdapterContext,
   ProjectInstructions,
+  InstructionsTarget,
   SendOpts,
 } from '../agent-adapter'
 import type { AdapterFeature, AdapterCapabilities, ContextUsage } from '../../../shared/types'
@@ -44,10 +45,11 @@ import {
  * drei davon liessen die Session hochkommen und aussehen wie Erfolg. Was hier
  * steht, steht in keinem Diff und kann mit der naechsten CLI-Version kippen.
  *
- * 1. **`AGENTS.md` ist die Projektanweisung**, `CLAUDE.md` wird zusaetzlich zur
- *    Vertraeglichkeit gelesen. Dieselbe Injektionsmechanik wie bei Claude Code
- *    und Codex traegt also — Workspace-Prompt und Context-Paths koennen als
- *    Sektionen in eine Datei wandern und ueberleben ein `/clear`.
+ * 1. **`AGENTS.md` ist die Projektanweisung, `CLAUDE.md` nur der Ersatz.**
+ *    Gemessen am 2026-10-09 (1.18.35): liegt nur eine CLAUDE.md im Verzeichnis,
+ *    liest opencode sie; liegt eine AGENTS.md daneben, liest es **nur** die —
+ *    nicht „zusaetzlich", wie es hier bis dahin stand. Die Injektionsmechanik
+ *    traegt, aber nur in die richtige Datei: siehe `instructionsTarget`.
  *
  * 2. **MCP mit freien HTTP-Headern funktioniert.** Gegen einen Horchposten
  *    belegt: `authorization`, `x-mux-workspace` und `x-mux-entity` kamen alle an,
@@ -485,15 +487,23 @@ export class OpenCodeAdapter implements AgentAdapter {
     return specs
   }
 
+  /**
+   * Gemessen am 2026-10-09 (1.18.35): liegt nur CLAUDE.md im Verzeichnis, liest
+   * opencode sie; liegt eine AGENTS.md daneben, liest es **nur** die. Der Mux
+   * schreibt dorthin, wo opencode tatsaechlich liest — und legt keine AGENTS.md
+   * an, die die CLAUDE.md verdecken wuerde.
+   */
+  instructionsTarget(present: { agentsMd: boolean; claudeMd: boolean }): InstructionsTarget {
+    return { file: present.agentsMd ? 'AGENTS.md' : 'CLAUDE.md' }
+  }
+
   getProjectMarkers(): string[] {
     return ['AGENTS.md', 'opencode.json', '.opencode']
   }
 
   async readProjectInstructions(projectPath: string): Promise<ProjectInstructions | null> {
-    // Nur `AGENTS.md`. opencode liest `CLAUDE.md` zusaetzlich zur
-    // Vertraeglichkeit, aber die Datei, in die der Mux **schreibt**, muss
-    // eindeutig sein — sonst injizieren zwei Adapter in dasselbe Projekt und
-    // ueberschreiben sich gegenseitig die Sektionen.
+    // Nur `AGENTS.md` — die Datei, die opencode bevorzugt. Wohin der Mux bei
+    // einer Ordner-Session schreibt, entscheidet `instructionsTarget`.
     const filePath = path.join(projectPath, 'AGENTS.md')
     try {
       const content = fs.readFileSync(filePath, 'utf-8')

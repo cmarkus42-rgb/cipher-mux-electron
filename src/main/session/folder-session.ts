@@ -14,10 +14,11 @@
  *    `claude …`, waehrend der Main-Prozess MCP fuer die Default-CLI einrichtete.
  *    Jetzt baut sie der Adapter, der auch injiziert.
  */
-import type { LaunchCommand } from '../agent/agent-adapter'
+import type { LaunchCommand, InstructionsTarget } from '../agent/agent-adapter'
 
 export interface WorkspaceSectionSource {
   id: string
+  name?: string
   workspacePrompt?: string
   contextPaths?: string[]
 }
@@ -32,6 +33,9 @@ export interface WorkspaceSectionRequest {
 export interface WorkspaceSections {
   /** false = CLAUDE.md nicht anfassen. true = Sektionen genau auf diesen Stand bringen. */
   reconcile: boolean
+  /** Set when the session belongs to a known workspace — named in the section. */
+  workspaceId?: string
+  workspaceName?: string
   workspacePrompt?: string
   contextPaths?: string[]
 }
@@ -50,25 +54,62 @@ export function resolveWorkspaceSections(
   req: WorkspaceSectionRequest,
   workspaces: readonly WorkspaceSectionSource[] | null | undefined,
 ): WorkspaceSections {
+  // Die Liste kommt ungeprueft aus der Config — defensiv lesen.
+  const ws = typeof req.workspaceId === 'string' && Array.isArray(workspaces)
+    ? workspaces.find(w => w?.id === req.workspaceId)
+    : undefined
+  const identity = ws
+    ? { workspaceId: ws.id, ...(ws.name?.trim() ? { workspaceName: ws.name.trim() } : {}) }
+    : {}
+
   if (req.workspacePrompt?.trim() || req.contextPaths?.length) {
     return {
       reconcile: true,
+      ...identity,
       ...(req.workspacePrompt?.trim() ? { workspacePrompt: req.workspacePrompt.trim() } : {}),
       ...(req.contextPaths?.length ? { contextPaths: req.contextPaths } : {}),
     }
   }
   if (req.workspaceId === undefined) return { reconcile: false }
-  if (req.workspaceId === null) return { reconcile: true }
+  if (!ws) return { reconcile: true }
 
-  // Die Liste kommt ungeprueft aus der Config — defensiv lesen.
-  const ws = Array.isArray(workspaces) ? workspaces.find(w => w?.id === req.workspaceId) : undefined
-  const prompt = ws?.workspacePrompt?.trim()
-  const paths = Array.isArray(ws?.contextPaths) && ws.contextPaths.length ? ws.contextPaths : undefined
+  const prompt = ws.workspacePrompt?.trim()
+  const paths = Array.isArray(ws.contextPaths) && ws.contextPaths.length ? ws.contextPaths : undefined
   return {
     reconcile: true,
+    ...identity,
     ...(prompt ? { workspacePrompt: prompt } : {}),
     ...(paths ? { contextPaths: paths } : {}),
   }
+}
+
+/**
+ * Der Text der Sektion `## Workspace Prompt`. Eine Ordner-Session erfuhr bis
+ * 0.12.1 nur, was der Workspace-Prompt sagte — hatte der Workspace keinen, wusste
+ * sie nicht, dass es ihn gibt. Rollen tragen dafuer `## Session Identity`.
+ * `undefined` = Sektion entfernen.
+ */
+export function formatWorkspacePrompt(
+  s: Pick<WorkspaceSections, 'workspaceId' | 'workspaceName' | 'workspacePrompt'>,
+): string | undefined {
+  const who = s.workspaceId
+    ? `Du arbeitest im Workspace **${s.workspaceName ?? s.workspaceId}** (\`${s.workspaceId}\`).`
+    : undefined
+  const parts = [who, s.workspacePrompt?.trim() || undefined].filter((p): p is string => !!p)
+  return parts.length ? parts.join('\n\n') : undefined
+}
+
+/**
+ * Inhalt einer Anweisungsdatei, die der Mux neu anlegt. Der Verweis ist der
+ * Grund, warum das Anlegen vertretbar ist: liegt eine AGENTS.md im Projekt, liest
+ * opencode die CLAUDE.md nicht mehr (gemessen) — ohne den Satz verloere es die
+ * eigentlichen Projektanweisungen, sobald einmal eine Codex-Session dort lief.
+ */
+export function newInstructionsFile(target: InstructionsTarget): string {
+  if (!target.pointerTo) return '# Projektanweisungen\n'
+  return '# Projektanweisungen\n\n'
+    + `Die eigentlichen Projektanweisungen stehen in \`${target.pointerTo}\` in diesem Verzeichnis. `
+    + 'Lies sie zu Beginn der Session vollstaendig; was dort steht, gilt hier genauso.\n'
 }
 
 function shellQuote(s: string): string {

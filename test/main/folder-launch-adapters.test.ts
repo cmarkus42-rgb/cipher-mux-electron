@@ -85,3 +85,32 @@ describe('Ordner-Start: Rueckfragen pro Start statt global', () => {
     assert.ok(args.includes('--dangerously-bypass-hook-trust'))
   })
 })
+
+// Gemessen am 2026-10-09 (opencode 1.18.35, dgx/qwen3.8-27b, ohne Werkzeugaufruf):
+// liegt nur CLAUDE.md im Verzeichnis, liest opencode sie; liegt AGENTS.md
+// daneben, liest es **nur** AGENTS.md. Codex liest ausschliesslich AGENTS.md.
+describe('instructionsTarget — in welche Datei der Mux fuer eine CLI schreibt', () => {
+  const none = { agentsMd: false, claudeMd: false }
+  const onlyClaude = { agentsMd: false, claudeMd: true }
+  const onlyAgents = { agentsMd: true, claudeMd: false }
+  const both = { agentsMd: true, claudeMd: true }
+
+  it('Claude Code: immer CLAUDE.md', () => {
+    for (const p of [none, onlyClaude, onlyAgents, both]) {
+      assert.deepEqual(claude(false).instructionsTarget!(p), { file: 'CLAUDE.md' })
+    }
+  })
+
+  it('opencode: AGENTS.md, wenn es eine gibt — sonst liest es die CLAUDE.md', () => {
+    assert.deepEqual(opencode(false).instructionsTarget!(both), { file: 'AGENTS.md' })
+    assert.deepEqual(opencode(false).instructionsTarget!(onlyAgents), { file: 'AGENTS.md' })
+    assert.deepEqual(opencode(false).instructionsTarget!(onlyClaude), { file: 'CLAUDE.md' })
+    assert.deepEqual(opencode(false).instructionsTarget!(none), { file: 'CLAUDE.md' })
+  })
+
+  it('Codex: immer AGENTS.md; neu angelegt mit Verweis, wenn eine CLAUDE.md daneben liegt', () => {
+    assert.deepEqual(codex(false).instructionsTarget!(onlyClaude), { file: 'AGENTS.md', pointerTo: 'CLAUDE.md' })
+    assert.deepEqual(codex(false).instructionsTarget!(none), { file: 'AGENTS.md' })
+    assert.deepEqual(codex(false).instructionsTarget!(both), { file: 'AGENTS.md' })
+  })
+})

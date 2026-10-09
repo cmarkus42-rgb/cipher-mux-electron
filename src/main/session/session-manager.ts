@@ -42,7 +42,13 @@ import { buildMcpServerConfig } from '../mcp/workspace-header'
 import { buildBoundToken, BOUND_TOKEN_ENV_VAR } from '../mcp/bound-token'
 import { findEntitySessions, entityStartKey } from './entity-session-lookup'
 import type { Workspace } from '../../shared/persona-types'
-import { resolveWorkspaceSections, buildFolderAutoLaunch, restoreAdapterId } from './folder-session'
+import {
+  resolveWorkspaceSections,
+  buildFolderAutoLaunch,
+  restoreAdapterId,
+  formatWorkspacePrompt,
+  newInstructionsFile,
+} from './folder-session'
 import type { WorkspaceSectionSource } from './folder-session'
 import { generateLocalFactoryPreset, generateLocalWorkerPreset, LOCAL_WORKER_DISPATCH_TOOL } from '../local-factory/presets'
 
@@ -350,6 +356,18 @@ export class SessionManager extends EventEmitter {
     // Workspace startet, entfernt die Sektionen. Bis 0.12.0 blieb dort stehen,
     // was der letzte Workspace-Start geschrieben hatte. Wer `workspaceId` gar
     // nicht setzt (Shell aus dem Zellenkopf), laesst die Datei weiter in Ruhe.
+    // Die Datei, die die CLI wirklich liest. Nur fuer einen Ordner-Start mit
+    // CLI — eine Shell aus dem Zellenkopf startet nichts, das eine neu angelegte
+    // AGENTS.md lesen wuerde, und bleibt bei der CLAUDE.md wie bisher.
+    let instructionsFile = 'CLAUDE.md'
+    if (opts.projectPath && !opts._entityInjected && opts.folderLaunch && !opts.folderLaunch.shellOnly) {
+      try {
+        instructionsFile = this.prepareInstructionsFile(opts.projectPath, adapter)
+      } catch (err) {
+        console.warn('[SessionManager] Instructions file preparation failed:', err)
+      }
+    }
+
     if (opts.projectPath && !opts._entityInjected) {
       try {
         const sections = resolveWorkspaceSections(
@@ -357,7 +375,12 @@ export class SessionManager extends EventEmitter {
           configStore.get('workspaces') as WorkspaceSectionSource[] | undefined,
         )
         if (sections.reconcile) {
-          this.injectWorkspaceSections(opts.projectPath, sections.workspacePrompt, sections.contextPaths)
+          this.injectWorkspaceSections(
+            opts.projectPath,
+            formatWorkspacePrompt(sections),
+            sections.contextPaths,
+            instructionsFile,
+          )
         }
       } catch (err) {
         console.warn('[SessionManager] Workspace section injection failed:', err)
@@ -367,7 +390,7 @@ export class SessionManager extends EventEmitter {
     // REQ-GLOBAL-002: Inject global rules into manual (non-entity) sessions.
     // Entity sessions are handled in startEntity() before this point.
     if (opts.projectPath && !opts._entityInjected) {
-      try { this.injectGlobalRulesSection(opts.projectPath) } catch (e) {
+      try { this.injectGlobalRulesSection(opts.projectPath, instructionsFile) } catch (e) {
         console.warn('[SessionManager] Failed to inject global rules:', e)
       }
     }
@@ -989,15 +1012,32 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
+   * The instructions file this session's CLI reads, created if the CLI needs
+   * one that is missing (Codex: AGENTS.md, with a pointer to an existing
+   * CLAUDE.md so opencode does not lose it). Returns the file name.
+   */
+  private prepareInstructionsFile(projectPath: string, adapter: AgentAdapter): string {
+    const present = {
+      agentsMd: fs.existsSync(path.join(projectPath, 'AGENTS.md')),
+      claudeMd: fs.existsSync(path.join(projectPath, 'CLAUDE.md')),
+    }
+    const target = adapter.instructionsTarget?.(present) ?? { file: 'CLAUDE.md' as const }
+    if (target.file === 'AGENTS.md' && !present.agentsMd && fs.existsSync(projectPath)) {
+      fs.writeFileSync(path.join(projectPath, 'AGENTS.md'), newInstructionsFile(target), 'utf-8')
+    }
+    return target.file
+  }
+
+  /**
    * Inject global rules (Layer 1) into a project's CLAUDE.md.
    * REQ-GLOBAL-002: Content from ~/.config/cipher-mux/global-rules.md is injected
    * as ## Global Rules section before persona/entity content.
    */
-  private injectGlobalRulesSection(projectPath: string): void {
+  private injectGlobalRulesSection(projectPath: string, fileName = 'CLAUDE.md'): void {
     const globalRules = getCachedGlobalRules()
     if (!globalRules.trim()) return
 
-    const claudeMdPath = path.join(projectPath, 'CLAUDE.md')
+    const claudeMdPath = path.join(projectPath, fileName)
     if (!fs.existsSync(claudeMdPath)) return
 
     const content = fs.readFileSync(claudeMdPath, 'utf-8')
@@ -1067,8 +1107,13 @@ export class SessionManager extends EventEmitter {
    * Inject workspace prompt and context directories into a project's CLAUDE.md.
    * Called during workspace apply for project-path cells.
    */
-  injectWorkspaceSections(projectPath: string, workspacePrompt?: string, contextPaths?: string[]): void {
-    const claudeMdPath = path.join(projectPath, 'CLAUDE.md')
+  injectWorkspaceSections(
+    projectPath: string,
+    workspacePrompt?: string,
+    contextPaths?: string[],
+    fileName = 'CLAUDE.md',
+  ): void {
+    const claudeMdPath = path.join(projectPath, fileName)
     let content = ''
     try {
       content = fs.readFileSync(claudeMdPath, 'utf-8')
