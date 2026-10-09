@@ -3,7 +3,8 @@ import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { ToolContext } from './mcp-tools'
 import { registerMuxTool } from './register-tool'
-import { LocalFactoryRunner, type DispatchArgs } from '../local-factory/runner'
+import { LocalFactoryRunner } from '../local-factory/runner'
+import { handleLocalFactoryCall, type ToolArgs } from '../local-factory/tool-call'
 import { createWorkerHost } from '../local-factory/worker-host'
 import { resolveRunDir } from '../session/entity-run-dir'
 import { LOCAL_WORKER_DISPATCH_TOOL } from '../local-factory/presets'
@@ -24,8 +25,6 @@ export function getRunner(ctx: ToolContext): LocalFactoryRunner {
   return r
 }
 
-type ToolArgs = DispatchArgs & { accept?: boolean }
-
 const text = (v: unknown) => [{ type: 'text' as const, text: JSON.stringify(v) }]
 
 export function registerLocalFactoryTool(server: McpServer, ctx: ToolContext): void {
@@ -35,28 +34,26 @@ export function registerLocalFactoryTool(server: McpServer, ctx: ToolContext): v
       + 'Write the acceptance test first (must be red); do not commit it. Returns immediately; '
       + 'you are woken with one line "[local-factory] #N ..." when the gate has run. Do not poll. '
       + 'Retry: same laufId + haeppchen. Max 2 attempts, then escalate to the user. '
-      + 'accept=true marks a green item as accepted after you reviewed the commit.',
+      + 'accept=true with laufId and haeppchen (and nothing else required) marks a green item as accepted '
+      + 'after you reviewed the commit. All other fields are required for a dispatch.',
     inputSchema: {
-      projekt: z.string().describe('Absolute path of the target git repo'),
-      ziel: z.string(),
-      dateien: z.array(z.string()),
-      akzeptanzkriterium: z.string(),
-      geschuetzteTests: z.array(z.string()).describe('Acceptance tests, repo-relative or absolute'),
-      testBefehl: z.string().describe('Shell command run in the repo; exit 0 = green'),
-      nichtZiele: z.array(z.string()),
-      laufId: z.string().optional(),
-      haeppchen: z.number().int().positive().optional(),
+      // Optional im Schema, Pflicht beim Dispatch (validateAuftrag) — ein accept braucht sie nicht.
+      projekt: z.string().optional().describe('Dispatch: absolute path of the target git repo'),
+      ziel: z.string().optional().describe('Dispatch: required'),
+      dateien: z.array(z.string()).optional().describe('Dispatch: required'),
+      akzeptanzkriterium: z.string().optional().describe('Dispatch: required'),
+      geschuetzteTests: z.array(z.string()).optional()
+        .describe('Dispatch: acceptance tests plus every file the test command depends on, repo-relative or absolute'),
+      testBefehl: z.string().optional().describe('Dispatch: shell command run in the repo; exit 0 = green'),
+      nichtZiele: z.array(z.string()).optional().describe('Dispatch: required (may be empty)'),
+      laufId: z.string().optional().describe('Returned by the first dispatch; pass it on every later item and retry'),
+      haeppchen: z.number().int().positive().optional().describe('Item number; pass it for a retry and for accept'),
       accept: z.boolean().optional(),
     },
   }, async (args: ToolArgs) => {
     try {
-      const runner = getRunner(ctx)
-      if (args.accept && args.laufId && args.haeppchen) {
-        runner.accept(args.laufId, args.haeppchen)
-        return { content: text({ ok: true, abgenommen: args.haeppchen }) }
-      }
-      const res = await runner.dispatch(args)
-      return { content: text(res), ...(res.ok ? {} : { isError: true }) }
+      const { result, isError } = await handleLocalFactoryCall(getRunner(ctx), args)
+      return { content: text(result), ...(isError ? { isError: true } : {}) }
     } catch (err) {
       return { content: text({ ok: false, error: String(err) }), isError: true }
     }
