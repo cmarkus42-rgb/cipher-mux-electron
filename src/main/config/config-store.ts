@@ -67,6 +67,9 @@ const defaults: AppConfig = {
     // einem Vertrauensdialog. Vertraut wird ausschliesslich das generierte
     // Run-Verzeichnis, nie ein Projektverzeichnis des Nutzers.
     codexTrustRunDirs: true,
+    // Local Cyber Factory: ohne Eintrag kein lokaler Worker. Siehe
+    // local-factory/local-provider.ts.
+    localWorker: null,
   },
   llm: {
     ollamaHost: '127.0.0.1',

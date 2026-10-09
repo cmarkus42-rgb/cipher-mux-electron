@@ -189,6 +189,23 @@ export interface AppState {
 
 // ─── Config ────────────────────────────────────────────────
 
+/**
+ * Configuration for the local worker model (Local Cyber Factory).
+ * Used by the 'local-worker' role to run opencode against a local ollama endpoint.
+ */
+export interface LocalWorkerConfig {
+  /** Base URL of the local ollama endpoint, e.g. 'http://localhost:11434/v1'. */
+  baseUrl: string
+  /** Model name available at the endpoint, e.g. 'qwen'. */
+  model: string
+  /** Context window size for the model in tokens. */
+  contextWindow: number
+  /** Maximum output tokens for the model. */
+  maxOutputTokens: number
+  /** Optional timeout for requests in minutes. */
+  timeoutMinutes?: number
+}
+
 export interface AppConfig {
   personas: import('./persona-types').Persona[]
   workspaces: import('./persona-types').Workspace[]
@@ -286,6 +303,13 @@ export interface AppConfig {
      * persists. Default: true.
      */
     codexTrustRunDirs: boolean
+    /**
+     * Lokales Modell für die Rolle `local-worker` (Local Cyber Factory).
+     * null = nicht eingerichtet; dann startet der Läufer keinen Worker.
+     * Gelesen über `readLocalWorkerConfig`, nie direkt — ein halber Eintrag
+     * gilt als keiner. Kein Schlüssel hier.
+     */
+    localWorker: LocalWorkerConfig | null
   }
   /** LLM provider configuration (Ollama, external APIs). */
   llm: {
