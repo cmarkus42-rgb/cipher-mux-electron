@@ -191,10 +191,14 @@ export interface AppState {
 
 /**
  * Configuration for the local worker model (Local Cyber Factory).
- * Used by the 'local-worker' role to run opencode against a local ollama endpoint.
+ * Used by the 'local-worker' role to run opencode against a local model.
  */
 export interface LocalWorkerConfig {
-  /** Base URL of the local ollama endpoint, e.g. 'http://localhost:11434/v1'. */
+  /**
+   * OpenAI-kompatibler Endpunkt (z. B. vLLM, LM Studio), samt `/v1`,
+   * z. B. 'http://localhost:8000/v1'. Die Bereitschaftsprobe ruft `<baseUrl>/models`
+   * und zählt nur 2xx.
+   */
   baseUrl: string
   /** Model name available at the endpoint, e.g. 'qwen'. */
   model: string
