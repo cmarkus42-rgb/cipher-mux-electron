@@ -11,6 +11,7 @@ import {
   buildBoundaryHookSettings,
   buildOpenCodeBoundaryPlugin,
   OPENCODE_EDIT_TOOLS,
+  PROTECTED_PATHS_FILENAME,
 } from '../../src/main/session/entity-boundaries'
 
 // ─── Role boundaries as a constraint ────────────────────────
@@ -235,5 +236,40 @@ describe('buildBoundaryHookSettings', () => {
     const settings = buildBoundaryHookSettings('/run/dir/.claude/boundary.js')
     const cmd = settings.PreToolUse[0].hooks[0].command
     assert.ok(cmd.includes('/run/dir/.claude/boundary.js'))
+  })
+})
+
+describe('Local Cyber Factory boundaries', () => {
+  it('local-factory darf keinen Produktionscode schreiben', () => {
+    const b = getEntityBoundary('local-factory')!
+    assert.ok(isPathDenied('/p/src/app.ts', b.denyPathPatterns))
+    assert.ok(isPathDenied('/p/lib/main.dart', b.denyPathPatterns))
+    assert.ok(!isPathDenied('/p/test/app.test.ts', b.denyPathPatterns))
+  })
+
+  it('local-worker hat eine dynamische Sperrliste und sperrt AUFTRAG.md', () => {
+    const b = getEntityBoundary('local-worker')!
+    assert.equal(b.denyListFile, PROTECTED_PATHS_FILENAME)
+    assert.ok(isPathDenied('/run/AUFTRAG.md', b.denyPathPatterns))
+  })
+
+  it('das opencode-Plugin liest die Sperrliste zur Aufrufzeit', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-boundary-'))
+    const listFile = path.join(dir, PROTECTED_PATHS_FILENAME)
+    const pluginPath = path.join(dir, 'p.mjs')
+    fs.writeFileSync(pluginPath, buildOpenCodeBoundaryPlugin(['/AUFTRAG.md'], 'R', listFile))
+    const mod = await import(pluginPath)
+    const hooks = await mod.default()
+    const call = (filePath: string) =>
+      hooks['tool.execute.before']({ tool: 'edit' }, { args: { filePath } })
+
+    // ohne Datei: nur die statische Regel
+    await call('/p/test/accept.test.ts')
+    fs.writeFileSync(listFile, JSON.stringify(['/p/test/accept.test.ts']))
+    await assert.rejects(call('/p/test/accept.test.ts'), /R/)
+    await call('/p/src/ok.ts')
+    // kaputte Datei blockiert nicht pauschal
+    fs.writeFileSync(listFile, '{kaputt')
+    await call('/p/test/accept.test.ts')
   })
 })
