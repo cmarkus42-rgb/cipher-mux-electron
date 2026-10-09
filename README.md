@@ -377,6 +377,26 @@ That is `app.getPath('userData')`.
 > but no app settings. You should not need to touch either file: everything above is settable in
 > the UI.
 
+### Local Cyber Factory: Claude slices, a local model codes
+
+Since 0.12.0. Two roles and a runner. The architect (`local-factory`, Claude Code) cuts work into
+small slices and writes an acceptance test for each; a role boundary keeps it out of production
+code. The worker (`local-worker`, opencode) writes the code against any OpenAI-compatible
+endpoint set under `agent.localWorker`, gets a fresh session per attempt, and may not touch the
+acceptance tests. Between them, a runner with no model checks that the test is red and the tree
+clean, then gates the result on the test command, a checksum and a git diff of the protected
+tests. Green is committed; red is saved as a patch and reset. Two attempts per slice, then it
+escalates to you.
+
+First real run: `qwen3.8-27b` on a DGX Spark, four slices, all green on the first attempt,
+100–180 s each.
+
+Limits: needs `agent.skipPermissions`, or opencode hangs in its permission prompt (the Mux refuses
+to start and says so). A local model that hits its output limit stops silently; the runner counts
+that as a failed attempt. Only tests the architect lists are protected. The worker does not write
+its own unit tests yet. Slices run one at a time. Design and measurements:
+`docs/superpowers/specs/2026-10-09-local-cyber-factory-design.md`.
+
 ---
 
 ## Built with Itself
