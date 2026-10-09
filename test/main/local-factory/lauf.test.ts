@@ -137,3 +137,12 @@ describe('parseLauf / loadLauf defensiv', () => {
     assert.equal(loadLauf(path.join(dir, 'fehlt.json')), null)
   })
 })
+
+describe('Lauf — Branch', () => {
+  it('newLauf übernimmt den Branch, parseLauf liest ihn defensiv', () => {
+    assert.equal(newLauf('L', '/p', 0, 'main').branch, 'main')
+    assert.equal(parseLauf({ id: 'L', projekt: '/p', branch: 'main' })!.branch, 'main')
+    assert.equal(parseLauf({ id: 'L', projekt: '/p' })!.branch, undefined)
+    assert.equal(parseLauf({ id: 'L', projekt: '/p', branch: 42 })!.branch, undefined)
+  })
+})

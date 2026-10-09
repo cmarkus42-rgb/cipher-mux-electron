@@ -187,6 +187,8 @@ Kontextnutzung sind eine Näherung — genug für einen Trend, kein Euro-Betrag.
 | Abgeschnittene Ausgabe | erscheint als kaputter Edit, Gate rot, Versuch gezählt |
 | Baum beim Dispatch nicht sauber | Ablehnung mit Begründung |
 | Abnahmetest vor der Arbeit grün | Ablehnung: der Test prüft nichts |
+| Worker wechselt den Branch | Versuch rot, **kein** Reset (fremder Branch). Der Lauf ist an den Branch seines ersten Dispatch gebunden; jeder weitere Dispatch auf einem anderen Branch wird abgelehnt, sonst würde ein dort geschwächter Abnahmetest zur neuen Basis |
+| Losgelöster HEAD / `laufId` eines anderen Projekts | Ablehnung, kein Lauf geschrieben |
 | Mux-Neustart im Lauf | laufendes Häppchen in `lauf.json` als `abgebrochen`; keine Wiederaufnahme in v1 |
 | Wecken trifft beschäftigten Architekten | Annahme: Claude Code reiht die Eingabe ein. **Im Rauchtest prüfen** |
 

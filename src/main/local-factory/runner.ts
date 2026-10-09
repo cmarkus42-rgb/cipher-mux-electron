@@ -154,6 +154,30 @@ export class LocalFactoryRunner {
     if (!(await isRepoRoot(args.projekt))) {
       return { ok: false, error: `projekt ist nicht die Wurzel eines git-Repos: ${args.projekt}` }
     }
+
+    // Branch-Bindung: Ein Lauf bleibt auf dem Branch, auf dem er begann. Ein
+    // Worker, der den Branch wechselt, hinterlässt dort womöglich einen
+    // geschwächten Abnahmetest; der Gate wird dann rot ohne Reset (fremder
+    // Branch). Ohne diese Prüfung würde der nächste Dispatch genau diesen Stand
+    // als neue Basis nehmen.
+    const branchJetzt = await currentBranch(args.projekt)
+    if (branchJetzt === 'HEAD') {
+      return { ok: false, error: 'HEAD ist losgelöst — ein Lauf braucht einen ausgecheckten Branch.' }
+    }
+    if (args.laufId !== undefined) {
+      const vorhanden = loadLauf(this.laufFile(args.laufId))
+      if (vorhanden && path.resolve(vorhanden.projekt) !== path.resolve(args.projekt)) {
+        return { ok: false, error: `Lauf ${args.laufId} gehört zu einem anderen Projekt: ${vorhanden.projekt}` }
+      }
+      if (vorhanden?.branch && vorhanden.branch !== branchJetzt) {
+        return {
+          ok: false,
+          error: `Lauf ${args.laufId} gehört zu Branch ${vorhanden.branch}, ausgecheckt ist ${branchJetzt}. `
+            + `Vermutlich hat der Worker den Branch gewechselt — zurück auf ${vorhanden.branch} `
+            + `und den Branch ${branchJetzt} von Hand prüfen.`,
+        }
+      }
+    }
     const nichtBereit = await this.o.host.workerReady()
     if (nichtBereit !== null) {
       await this.wake(`[local-factory] Nicht bereit: ${nichtBereit} — kein Versuch gezählt.`)
@@ -187,7 +211,9 @@ export class LocalFactoryRunner {
 
     const laufId = args.laufId ?? ulid()
     const laufPfad = this.laufFile(laufId)
-    let lauf0: Lauf = loadLauf(laufPfad) ?? newLauf(laufId, projekt, this.o.now())
+    let lauf0: Lauf = loadLauf(laufPfad) ?? newLauf(laufId, projekt, this.o.now(), branchJetzt)
+    // Läufe aus älteren Fassungen tragen keinen Branch: ab jetzt gilt der aktuelle.
+    if (!lauf0.branch) lauf0 = { ...lauf0, branch: branchJetzt }
     // busy war beim Eintritt frei: ein „laeuft“ ohne lebenden Durchlauf in diesem Prozess ist ein Rest eines App-Neustarts (Spec §9).
     if (lauf0.haeppchen.some(h => h.status === 'laeuft')) {
       lauf0 = abortRunning(lauf0)
@@ -199,7 +225,7 @@ export class LocalFactoryRunner {
     const offeneTests = dirty.filter(f => prot.includes(f))
     if (offeneTests.length) await commitPaths(projekt, offeneTests, `lf: Abnahmetest #${begun.nummer}`)
     const base = await headCommit(projekt)
-    const branch = await currentBranch(projekt)
+    const branch = branchJetzt
     const sumsBefore = checksums(projekt, prot)
     saveLauf(laufPfad, begun.lauf)
 

@@ -38,10 +38,17 @@ export interface Lauf {
   erstellt: number
   weckrufe: number
   haeppchen: Haeppchen[]
+  /**
+   * Branch, auf dem der Lauf begann. Ein späterer Dispatch auf einem anderen
+   * Branch wird abgelehnt — sonst setzt ein Worker, der den Branch gewechselt
+   * und dort den Abnahmetest geschwächt hat, die neue Basis.
+   * Fehlt in Läufen aus älteren Fassungen.
+   */
+  branch?: string
 }
 
-export function newLauf(id: string, projekt: string, now: number): Lauf {
-  return { id, projekt, erstellt: now, weckrufe: 0, haeppchen: [] }
+export function newLauf(id: string, projekt: string, now: number, branch?: string): Lauf {
+  return { id, projekt, erstellt: now, weckrufe: 0, haeppchen: [], ...(branch ? { branch } : {}) }
 }
 
 const replaceH = (lauf: Lauf, h: Haeppchen): Lauf => ({
@@ -146,7 +153,10 @@ export function parseLauf(raw: unknown): Lauf | null {
       versuche,
     })
   }
-  return { id: r.id, projekt: r.projekt, erstellt: num(r.erstellt, 0), weckrufe: num(r.weckrufe, 0), haeppchen }
+  return {
+    id: r.id, projekt: r.projekt, erstellt: num(r.erstellt, 0), weckrufe: num(r.weckrufe, 0), haeppchen,
+    ...(typeof r.branch === 'string' && r.branch ? { branch: r.branch } : {}),
+  }
 }
 
 export function loadLauf(file: string): Lauf | null {
