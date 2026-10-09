@@ -23,6 +23,11 @@ export interface PersistedSession {
    * unattended entity session would sit forever. Absent in older stores.
    */
   claudeSessionId?: string | null
+  /**
+   * The CLI the session was started with. Read back for folder sessions, which
+   * have no role to resolve one from. Absent in stores before 0.12.1.
+   */
+  adapterId?: string | null
 }
 
 export interface PersistedGridState {
@@ -180,6 +185,7 @@ export function toPersistedSession(
     projectPath: string | null
     workspaceId?: string | null
     claudeSessionId?: string | null
+    adapterId?: string | null
   },
   gridSlot: number | null,
 ): PersistedSession {
@@ -190,6 +196,7 @@ export function toPersistedSession(
     entityId: (session.entityId as EntityId) ?? null,
     projectPath: session.projectPath,
     ...(session.claudeSessionId ? { claudeSessionId: session.claudeSessionId } : {}),
+    ...(session.adapterId ? { adapterId: session.adapterId } : {}),
     gridSlot,
     status: gridSlot === null ? 'background' : 'active',
     workspaceId: session.workspaceId ?? null,

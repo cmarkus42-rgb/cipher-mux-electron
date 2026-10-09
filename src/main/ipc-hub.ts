@@ -53,6 +53,7 @@ import { resolvePersonaForPreset } from './session/persona-resolver'
 import { resolveSessionTopic } from './session/resolve-session-topic'
 import { resolveRestoredWorkspaceId } from './session/resolve-restored-workspace'
 import { pruneRunDirs, liveWorkspaceIds } from './session/entity-run-dir'
+import { restoreAdapterId } from './session/folder-session'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST, MAX_MANUAL_TAGS } from '../shared/constants'
 import { BRAND } from '../shared/brand'
@@ -3220,7 +3221,7 @@ ist dieses Entity fokussiert?
    * persisted ui.grid config.
    */
   private async restoreKeepWorkingFromRecovery(
-    snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string; workspaceId?: string | null }>,
+    snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string; workspaceId?: string | null; adapterId?: string | null }>,
     gridConfig: { cols: number; rows: number } | undefined,
     recovered: Array<{ id: string; name: string; projectPath: string | null; entityId?: string; workspaceId?: string | null }>,
     notesSlots?: Array<{ slotIndex: number; notesId?: string; openNoteIds?: string[] }>,
@@ -3276,7 +3277,12 @@ ist dieses Entity fokussiert?
           // entscheidet ueber die CLI. Ein Default fuer alle wuerde eine
           // Codex-Rolle als `claude --resume` zurueckbringen — die Session kaeme
           // hoch, nur mit der falschen CLI, und das sieht nach Erfolg aus.
-          const adapter = this.sessionManager.adapterForEntity(entry.entityId ?? null)
+          //
+          // Eine Ordner-Session hat keine Rolle — fuer sie zaehlt die CLI, mit
+          // der sie lief (`restoreAdapterId`).
+          const savedAdapterId = restoreAdapterId(entry, (aid) => !!this.adapterRegistry.get(aid))
+          const adapter = (savedAdapterId ? this.adapterRegistry.get(savedAdapterId) : undefined)
+            ?? this.sessionManager.adapterForEntity(entry.entityId ?? null)
           const launchCmd = adapter.buildLaunchCommand({
             projectPath: entry.projectPath,
             sessionName: entry.name,
@@ -3295,6 +3301,7 @@ ist dieses Entity fokussiert?
             autoLaunch,
             workspaceId: entry.workspaceId ?? null,
             entityId: entry.entityId ?? null,
+            adapterId: adapter.id,
           })
           // Restore entity link for newly created sessions too
           if (entry.entityId) {
@@ -3360,7 +3367,7 @@ ist dieses Entity fokussiert?
     const sessions = this.sessionManager.list().filter(s => s.status === 'active')
     if (sessions.length === 0) return
     const allTasks = this.taskManager ? this.taskManager.list() : []
-    const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string; workspaceId?: string | null }> = []
+    const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string; workspaceId?: string | null; adapterId?: string | null }> = []
     for (const s of sessions) {
       const slotIdx = grid.slots.findIndex(slot => slot.sessionId === s.id)
       if (!s.projectPath || slotIdx < 0) continue
@@ -3375,6 +3382,7 @@ ist dieses Entity fokussiert?
         entityId: s.entityId,
         topic: resolveSessionTopic(s, allTasks, capture),
         workspaceId: s.workspaceId ?? null,
+        adapterId: s.adapterId ?? null,
       })
     }
     // Collect notes slots for restoration
@@ -3430,7 +3438,7 @@ ist dieses Entity fokussiert?
       const gridState = this.sessionManager.getSessionStore().getGridState()
       if (sessions.length > 0 && gridState) {
         const allTasks = this.taskManager ? this.taskManager.list() : []
-        const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string; workspaceId?: string | null }> = []
+        const snapshot: Array<{ name: string; projectPath: string; gridSlot: number; entityId?: string; topic?: string; workspaceId?: string | null; adapterId?: string | null }> = []
         for (const s of sessions) {
           const slotIdx = gridState.slots.findIndex(slot => slot.sessionId === s.id)
           if (!s.projectPath || slotIdx < 0) continue
@@ -3445,6 +3453,7 @@ ist dieses Entity fokussiert?
             entityId: s.entityId,
             topic: resolveSessionTopic(s, allTasks, capture),
             workspaceId: s.workspaceId ?? null,
+            adapterId: s.adapterId ?? null,
           })
         }
         // Collect notes slots for restoration

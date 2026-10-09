@@ -100,6 +100,7 @@ function mockAdapter() {
 function mockRegistry() {
   return {
     getDefault: () => mockAdapter(),
+    get: (id: string) => (id === 'test' ? mockAdapter() : undefined),
     register: () => {},
     list: () => [mockAdapter()],
   }
@@ -313,5 +314,62 @@ describe('SP-5: ClaudeCodeAdapter.buildLaunchCommand', () => {
     })
     assert.ok(!cmd.args.includes('--resume'))
     assert.ok(!cmd.args.includes('--fork-session'))
+  })
+})
+
+// ─── Ordner-Start ───────────────────────────────────────────
+
+function pendingCommand(sm: unknown, id: string): string {
+  return (sm as { pendingLaunch: Map<string, { command: string }> }).pendingLaunch.get(id)!.command
+}
+
+describe('Ordner-Start: Workspace-Sektionen und Startzeile', () => {
+  const STALE = '# Projekt\n\nText\n\n## Workspace Prompt\n\nalter Prompt\n\n## Context Directories\n\n- `/alt`\n'
+  let tmux: MockTmuxManager
+  let dir: string
+
+  beforeEach(() => {
+    tmux = new MockTmuxManager()
+    dir = fsSyncIso.mkdtempSync(pathIso.join(osIso.tmpdir(), 'ordner-start-'))
+    fsSyncIso.writeFileSync(pathIso.join(dir, 'CLAUDE.md'), STALE)
+  })
+
+  it('ausdruecklich ohne Workspace: der alte Prompt verschwindet', async () => {
+    const sm = createSessionManager(tmux)
+    await sm.start({ name: 'ordner', projectPath: dir, workspaceId: null, folderLaunch: {} })
+    const md = fsSyncIso.readFileSync(pathIso.join(dir, 'CLAUDE.md'), 'utf-8')
+    assert.ok(!md.includes('## Workspace Prompt'), md)
+    assert.ok(!md.includes('alter Prompt'))
+    assert.ok(!md.includes('## Context Directories'))
+    assert.ok(md.includes('# Projekt'), 'der eigene Inhalt bleibt')
+  })
+
+  it('ohne Angabe (Shell aus dem Zellenkopf): die Datei bleibt, wie sie ist', async () => {
+    const sm = createSessionManager(tmux)
+    await sm.start({ name: 'Shell', projectPath: dir })
+    const md = fsSyncIso.readFileSync(pathIso.join(dir, 'CLAUDE.md'), 'utf-8')
+    assert.ok(md.includes('alter Prompt'))
+  })
+
+  it('folderLaunch: die Startzeile kommt vom Adapter der Session', async () => {
+    const sm = createSessionManager(tmux)
+    const s = await sm.start({ name: 'ordner', projectPath: dir, workspaceId: null, folderLaunch: { resume: true } })
+    const cmd = pendingCommand(sm, s.id)
+    assert.equal(cmd, `cd '${dir}' && clear; claude\n`)
+  })
+
+  it('folderLaunch nur Shell: kein CLI-Start', async () => {
+    const sm = createSessionManager(tmux)
+    const s = await sm.start({ name: 'ordner', projectPath: dir, workspaceId: null, folderLaunch: { shellOnly: true } })
+    const cmd = pendingCommand(sm, s.id)
+    assert.equal(cmd, `cd '${dir}' && clear\n`)
+  })
+
+  it('der Fork laeuft unter der CLI der Quelle, auch fuer die Injektion', async () => {
+    const sm = createSessionManager(tmux)
+    const source = await sm.start({ name: 'Original', projectPath: dir })
+    sm.updateClaudeSessionId(source.id, 'abc')
+    const forked = await sm.forkSession(source.id)
+    assert.equal(forked.adapterId, 'test')
   })
 })

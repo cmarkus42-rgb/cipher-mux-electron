@@ -118,6 +118,10 @@ export class CodexAdapter implements AgentAdapter {
     // forken will, will keine Fortsetzung derselben Unterhaltung.
     if (opts.forkFromClaudeSessionId) {
       args.push('fork', opts.forkFromClaudeSessionId)
+    } else if (opts.forkLatest) {
+      // Ohne ID oeffnet `fork` den Picker; `--last` nimmt die juengste
+      // Unterhaltung (gemessen an codex-cli 0.160.1, `codex fork --help`).
+      args.push('fork', '--last')
     } else if (opts.resumeClaudeSessionId) {
       args.push('resume', opts.resumeClaudeSessionId)
     } else if (opts.resume) {
@@ -127,7 +131,7 @@ export class CodexAdapter implements AgentAdapter {
       args.push('resume', '--last')
     }
 
-    if (this.configReader.getSkipPermissions()) {
+    if (opts.skipPermissions ?? this.configReader.getSkipPermissions()) {
       args.push('--dangerously-bypass-approvals-and-sandbox')
       // Siehe Kopfkommentar Punkt 3: ohne dieses Flag ist eine Rollengrenze
       // geschrieben und wirkungslos, ohne jede Meldung.

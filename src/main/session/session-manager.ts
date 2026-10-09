@@ -42,6 +42,8 @@ import { buildMcpServerConfig } from '../mcp/workspace-header'
 import { buildBoundToken, BOUND_TOKEN_ENV_VAR } from '../mcp/bound-token'
 import { findEntitySessions, entityStartKey } from './entity-session-lookup'
 import type { Workspace } from '../../shared/persona-types'
+import { resolveWorkspaceSections, buildFolderAutoLaunch, restoreAdapterId } from './folder-session'
+import type { WorkspaceSectionSource } from './folder-session'
 import { generateLocalFactoryPreset, generateLocalWorkerPreset, LOCAL_WORKER_DISPATCH_TOOL } from '../local-factory/presets'
 
 /**
@@ -291,7 +293,10 @@ export class SessionManager extends EventEmitter {
     // traegt als der globale Default — die Session wuerde `codex` starten und
     // danach eine `.claude/settings.local.json` samt `claude mcp add-json`
     // bekommen. Mit nur einem Adapter war das latent; mit zwei ist es ein Fehler.
-    const adapter = this.adapterForEntity(opts.entityId ?? null)
+    // Eine ausdrueckliche Wahl (Ordner-Start, Fork) schlaegt die Rolle.
+    const adapter = opts.adapterId
+      ? this.resolveAdapter(opts.adapterId)
+      : this.adapterForEntity(opts.entityId ?? null)
 
     // Merge MCP env vars if config is set
     if (this.mcpConfig) {
@@ -340,9 +345,20 @@ export class SessionManager extends EventEmitter {
 
     // Inject workspace prompt + context directories into project CLAUDE.md.
     // Entity sessions handle this in assembleEntityClaudeMd (no regex — pure append).
-    if (opts.projectPath && !opts._entityInjected && (opts.workspacePrompt || opts.contextPaths?.length)) {
+    //
+    // Abgleichen, nicht nur hinzufuegen: eine Session, die ausdruecklich ohne
+    // Workspace startet, entfernt die Sektionen. Bis 0.12.0 blieb dort stehen,
+    // was der letzte Workspace-Start geschrieben hatte. Wer `workspaceId` gar
+    // nicht setzt (Shell aus dem Zellenkopf), laesst die Datei weiter in Ruhe.
+    if (opts.projectPath && !opts._entityInjected) {
       try {
-        this.injectWorkspaceSections(opts.projectPath, opts.workspacePrompt, opts.contextPaths)
+        const sections = resolveWorkspaceSections(
+          { workspaceId: opts.workspaceId, workspacePrompt: opts.workspacePrompt, contextPaths: opts.contextPaths },
+          configStore.get('workspaces') as WorkspaceSectionSource[] | undefined,
+        )
+        if (sections.reconcile) {
+          this.injectWorkspaceSections(opts.projectPath, sections.workspacePrompt, sections.contextPaths)
+        }
       } catch (err) {
         console.warn('[SessionManager] Workspace section injection failed:', err)
       }
@@ -388,11 +404,25 @@ export class SessionManager extends EventEmitter {
     // Start output watcher — emits terminal data with session ULID as ID
     this.tmux.watchSession(tmuxName, id)
 
+    // Ordner-Start: die Zeile baut derselbe Adapter, der oben injiziert hat.
+    const autoLaunch = opts.autoLaunch ?? (opts.folderLaunch
+      ? buildFolderAutoLaunch(opts.projectPath || os.homedir(), opts.folderLaunch.shellOnly
+        ? null
+        : adapter.buildLaunchCommand({
+          projectPath: opts.projectPath || os.homedir(),
+          sessionName: opts.name,
+          resume: opts.folderLaunch.resume,
+          forkLatest: opts.folderLaunch.forkLatest,
+          skipPermissions: opts.folderLaunch.skipPermissions,
+          model: opts.model,
+        }))
+      : undefined)
+
     // Queue auto-launch (e.g. `claude --...`) to fire once the renderer
     // reports the real terminal size, so TUIs start at the correct dims.
-    if (opts.autoLaunch) {
+    if (autoLaunch) {
       this.autoLaunchedSessions.add(id)
-      this.setPendingLaunch(id, opts.autoLaunch)
+      this.setPendingLaunch(id, autoLaunch)
     } else if (opts.forkFromClaudeSessionId) {
       // Build auto-launch with fork flag via adapter
       this.autoLaunchedSessions.add(id)
@@ -616,6 +646,13 @@ export class SessionManager extends EventEmitter {
             workspaceId: ps.workspaceId ?? null,
             // Defensive: absent in stores written before this field existed.
             ...(ps.claudeSessionId ? { claudeSessionId: ps.claudeSessionId } : {}),
+          }
+          // Defensiv: eine unbekannte oder fehlende CLI ist kein Fehler, sondern
+          // „Rolle bzw. Default entscheidet" — ein Wurf hier kostete den Restore.
+          const restoredAdapterId = restoreAdapterId(ps, (aid) => !!this.adapterRegistry.get(aid))
+          if (restoredAdapterId) {
+            session.adapterId = restoredAdapterId
+            this.sessionAdapters.set(session.id, this.adapterRegistry.get(restoredAdapterId)!)
           }
           this.sessions.set(session.id, session)
           this.tmux.watchSession(ps.tmuxSession, session.id)
@@ -1694,6 +1731,9 @@ export class SessionManager extends EventEmitter {
     const newSession = await this.start({
       name: `${source.name}-fork`,
       projectPath: source.projectPath || '',
+      // Sonst richtet start() MCP fuer die Default-CLI ein, waehrend die Zeile
+      // unten die CLI der Quelle startet.
+      adapterId: adapter.id,
     })
 
     this.setPendingLaunch(newSession.id, `clear; ${cmdStr}\n`)

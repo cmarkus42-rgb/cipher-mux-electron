@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Ordner-Sessions bekommen ein Feld „Workspace“ und ein Feld „CLI“** im Launcher. Workspace
+  steht auf „ohne“, solange man nichts wählt; CLI auf der Standard-CLI. Die Startzeile baut jetzt
+  der Main-Prozess über den Adapter — derselbe, der MCP einrichtet. Die CLI einer Ordner-Session
+  überlebt einen Neustart (`sessions.json` und Keep-Working-Snapshot tragen `adapterId`).
+
+### Fixed
+- **Eine Session ohne Workspace las einen fremden Workspace-Prompt.** Die Sektionen
+  `## Workspace Prompt` und `## Context Directories` wurden nur geschrieben, wenn ein Prompt
+  mitkam; ohne blieb stehen, was der letzte Workspace-Start hinterlassen hatte. Eine Ordner-Session
+  gleicht sie jetzt an ihren Workspace an und entfernt sie ohne. Die Shell aus dem Zellenkopf lässt
+  die Datei weiter unangetastet.
+- **„Abzweigen“ im Ordner-Start startete keine Session.** Der Renderer hängte `--fork` an, und
+  Claude Code bricht mit `unknown option '--fork'` ab. Jetzt `--continue --fork-session`, bei
+  Codex `fork --last`, bei opencode `--continue --fork`.
+- **Start und MCP-Einrichtung liefen unter zwei CLIs**, wenn die Standard-CLI nicht Claude Code
+  war: der Ordner-Start tippte fest `claude`, eingerichtet wurde für die Standard-CLI. Dasselbe beim
+  Fork einer Session, deren CLI von der Standard-CLI abwich.
+
 ## [0.12.0] — 2026-10-09
 
 ### Added

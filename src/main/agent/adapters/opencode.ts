@@ -336,6 +336,9 @@ export class OpenCodeAdapter implements AgentAdapter {
     // statt es aus „die letzte" zu erraten.
     if (opts.forkFromClaudeSessionId) {
       args.push('--session', opts.forkFromClaudeSessionId, '--fork')
+    } else if (opts.forkLatest) {
+      // Die andere der beiden gueltigen Formen: `--fork` mit `--continue`.
+      args.push('--continue', '--fork')
     } else if (opts.resumeClaudeSessionId) {
       args.push('--session', opts.resumeClaudeSessionId)
     } else if (opts.resume) {
@@ -353,7 +356,7 @@ export class OpenCodeAdapter implements AgentAdapter {
       args.push('--model', opts.model)
     }
 
-    if (this.configReader.getSkipPermissions()) {
+    if (opts.skipPermissions ?? this.configReader.getSkipPermissions()) {
       // Das Gegenstueck zu `--dangerously-skip-permissions`: Permissions
       // werden automatisch erlaubt. Ohne das bleibt eine Entity-Session an der
       // ersten Rueckfrage stehen, und niemand antwortet.

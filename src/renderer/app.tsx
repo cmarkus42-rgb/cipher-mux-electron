@@ -1033,23 +1033,23 @@ export function App() {
   const handlePathStart = useCallback(async (dirPath: string, opts: PathStartOpts, slotIndex: number) => {
     try {
       const name = dirPath.split('/').filter(Boolean).pop() ?? 'session'
-      // Shell-escape the path for cd (single-quote with escaped inner quotes)
-      const escaped = dirPath.replace(/'/g, "'\\''")
-      let autoLaunch: string | undefined
-      if (!opts.shellOnly) {
-        const parts = [`cd '${escaped}' && clear; claude`]
-        if (opts.skipPermissions) parts.push('--dangerously-skip-permissions')
-        if (opts.resume) parts.push('--resume')
-        if (opts.fork) parts.push('--fork')
-        autoLaunch = parts.join(' ') + '\n'
-      } else {
-        // Shell-only: ensure cwd is correct even without claude
-        autoLaunch = `cd '${escaped}' && clear\n`
-      }
+      // Die Startzeile baut der Main-Prozess ueber den Adapter, der auch MCP
+      // einrichtet. Bis 0.12.0 stand hier fest `claude …` — unter einer anderen
+      // Default-CLI liefen Start und Injektion auseinander, und `--fork` kannte
+      // Claude Code gar nicht.
       const session = await startSession({
         name,
         projectPath: dirPath,
-        autoLaunch,
+        // undefined, wenn der Aufrufer keine Wahl anbietet: dann bleibt die
+        // CLAUDE.md wie bisher unangetastet.
+        ...(opts.workspaceId !== undefined ? { workspaceId: opts.workspaceId } : {}),
+        ...(opts.adapterId ? { adapterId: opts.adapterId } : {}),
+        folderLaunch: {
+          shellOnly: opts.shellOnly,
+          resume: opts.resume,
+          forkLatest: opts.fork,
+          skipPermissions: opts.skipPermissions,
+        },
       })
       setSessionAtSlot(slotIndex, session.id)
       setFocusedSessionId(session.id)

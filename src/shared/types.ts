@@ -120,6 +120,25 @@ export interface StartSessionOpts {
   entityId?: string | null
   /** Model override — passed as --model <id> to the agent CLI. */
   model?: string
+  /**
+   * Agent CLI for this session. Absent = the role's adapter, or the default
+   * one. Decides both the launch command (`folderLaunch`) and the MCP
+   * injection — they must never run under two different CLIs.
+   */
+  adapterId?: string
+  /**
+   * Folder start from the launcher: the main process builds the launch line
+   * through the adapter. Ignored when `autoLaunch` is set.
+   */
+  folderLaunch?: {
+    /** Only `cd` into the directory, start no CLI. */
+    shellOnly?: boolean
+    resume?: boolean
+    /** Fork the most recent conversation of the directory. */
+    forkLatest?: boolean
+    /** Undefined = the global `agent.skipPermissions`. */
+    skipPermissions?: boolean
+  }
   /** Internal flag: global rules already injected by startEntity(). */
   _entityInjected?: boolean
 }
@@ -366,6 +385,8 @@ export interface AppConfig {
       entityId?: string
       topic?: string
       workspaceId?: string | null
+      /** CLI of a folder session. Absent in snapshots before 0.12.1. */
+      adapterId?: string | null
     }>
     gridConfig?: { cols: number; rows: number }
     notesSlots?: Array<{ slotIndex: number; notesId?: string; openNoteIds?: string[] }>

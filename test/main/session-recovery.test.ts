@@ -87,6 +87,7 @@ function mockAdapter() {
 function mockRegistry() {
   return {
     getDefault: () => mockAdapter(),
+    get: (id: string) => (id === 'test' ? mockAdapter() : undefined),
     register: () => {},
     list: () => [mockAdapter()],
   }
@@ -208,6 +209,34 @@ describe('SessionManager.recover()', () => {
     assert.equal(result.recovered.length, 1)
     assert.equal(result.recovered[0].status, 'active')
     assert.equal(result.orphaned.length, 0)
+  })
+
+  it('Ordner-Session: die gespeicherte CLI kommt mit zurueck', async () => {
+    const sm = createSessionManager(tmux)
+    tmux.sessions = [
+      { id: '$1', name: 'cmux-ordner', width: 80, height: 24, created: 1000, paneCwd: '/tmp' },
+    ]
+    ;(sm as unknown as { sessionStore: { upsertSession(ps: unknown): void } }).sessionStore.upsertSession({
+      id: 'ordner-id', name: 'ordner', tmuxSession: 'cmux-ordner', entityId: null,
+      projectPath: '/tmp', gridSlot: 0, status: 'active', workspaceId: null, adapterId: 'test',
+    })
+    const result = await sm.recover()
+    assert.equal(result.recovered[0].adapterId, 'test')
+    assert.equal(sm.getAdapterForSession('ordner-id')?.id, 'test')
+  })
+
+  it('unbekannte gespeicherte CLI: kein Wurf, die Session kommt trotzdem zurueck', async () => {
+    const sm = createSessionManager(tmux)
+    tmux.sessions = [
+      { id: '$1', name: 'cmux-ordner', width: 80, height: 24, created: 1000, paneCwd: '/tmp' },
+    ]
+    ;(sm as unknown as { sessionStore: { upsertSession(ps: unknown): void } }).sessionStore.upsertSession({
+      id: 'ordner-id', name: 'ordner', tmuxSession: 'cmux-ordner', entityId: null,
+      projectPath: '/tmp', gridSlot: 0, status: 'active', workspaceId: null, adapterId: 'weg',
+    })
+    const result = await sm.recover()
+    assert.equal(result.recovered.length, 1)
+    assert.equal(sm.getAdapterForSession('ordner-id'), undefined)
   })
 
   it('restores orchestrator and MPO links from recovered sessions', async () => {
