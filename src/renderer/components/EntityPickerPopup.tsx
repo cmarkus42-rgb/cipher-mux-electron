@@ -18,6 +18,14 @@ export interface PathStartOpts {
   fork?: boolean
   resume?: boolean
   skipPermissions?: boolean
+  /**
+   * Only set where the launcher shows the fields (`allowWorkspaceChoice`).
+   * `null` = ausdruecklich ohne Workspace, der Standard. Absent = the caller
+   * offers no choice (cell-assignment editor), nothing changes there.
+   */
+  workspaceId?: string | null
+  /** Absent = the default CLI. */
+  adapterId?: string
 }
 
 type TabMode = 'presets' | 'path' | 'notes'
@@ -101,6 +109,11 @@ export function EntityPickerPopup({
   const [fork, setFork] = useState(false)
   const [resume, setResume] = useState(false)
   const [recentPaths, setRecentPaths] = useState<string[]>([])
+  // Ordner-Start: Workspace (Standard: ohne) und CLI (Standard: die globale)
+  const [pathWorkspaceId, setPathWorkspaceId] = useState<string>('')
+  const [pathAdapterId, setPathAdapterId] = useState<string>('')
+  const [adapters, setAdapters] = useState<Array<{ id: string; displayName: string }>>([])
+  const [defaultAdapterId, setDefaultAdapterId] = useState<string>('')
 
   // Notes
   const { notes } = useNotes()
@@ -132,6 +145,17 @@ export function EntityPickerPopup({
 
   const workspaces = workspacesProp ?? loadedWorkspaces
 
+  // CLI-Liste fuer den Ordner-Start. Faellt still aus, wenn das Backend sie
+  // nicht kennt — dann bleibt das Feld unsichtbar und es gilt der Default.
+  useEffect(() => {
+    if (!allowWorkspaceChoice) return
+    const agent = cipherApi().agent
+    Promise.all([agent.listAdapters(), agent.getDefaultAdapter()]).then(([list, def]) => {
+      setAdapters((list ?? []).map((a: { id: string; displayName: string }) => ({ id: a.id, displayName: a.displayName })))
+      setDefaultAdapterId(def ?? '')
+    }).catch(() => { /* older backend */ })
+  }, [allowWorkspaceChoice])
+
   // Escape to close
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -147,7 +171,13 @@ export function EntityPickerPopup({
   const handlePathStart = useCallback(() => {
     const p = path.trim()
     if (!p) return
-    onSelectPath(p, { shellOnly, fork, resume, skipPermissions: !shellOnly && skipPermissions })
+    onSelectPath(p, {
+      shellOnly, fork, resume, skipPermissions: !shellOnly && skipPermissions,
+      ...(allowWorkspaceChoice ? {
+        workspaceId: pathWorkspaceId || null,
+        ...(pathAdapterId ? { adapterId: pathAdapterId } : {}),
+      } : {}),
+    })
     // Save to recent paths
     cipherApi().config.get('app').then((cfg: any) => {
       const existing: string[] = cfg?.recentPaths ?? []
@@ -155,7 +185,7 @@ export function EntityPickerPopup({
       cipherApi().config.set('app', { ...cfg, recentPaths: updated }).catch(() => {})
     }).catch(() => {})
     setPath('')
-  }, [path, shellOnly, fork, resume, skipPermissions, onSelectPath])
+  }, [path, shellOnly, fork, resume, skipPermissions, onSelectPath, allowWorkspaceChoice, pathWorkspaceId, pathAdapterId])
 
   const handlePathKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -323,6 +353,39 @@ export function EntityPickerPopup({
                     {rp.split('/').filter(Boolean).pop()} <span class="unified-dialog__recent-path">{rp}</span>
                   </button>
                 ))}
+              </div>
+            )}
+
+            {allowWorkspaceChoice && (
+              <div class="unified-dialog__fields">
+                <label class="unified-dialog__field">
+                  <span>{t('unified.workspace')}</span>
+                  <select
+                    value={pathWorkspaceId}
+                    onChange={(e) => setPathWorkspaceId((e.target as HTMLSelectElement).value)}
+                  >
+                    <option value="">{t('unified.workspaceNone')}</option>
+                    {workspaces.map(w => (
+                      <option key={w.id} value={w.id}>{w.name}{w.id === activeWorkspaceId ? ' ●' : ''}</option>
+                    ))}
+                  </select>
+                </label>
+                {!shellOnly && adapters.length > 1 && (
+                  <label class="unified-dialog__field">
+                    <span>{t('unified.cli')}</span>
+                    <select
+                      value={pathAdapterId}
+                      onChange={(e) => setPathAdapterId((e.target as HTMLSelectElement).value)}
+                    >
+                      <option value="">{t('unified.cliDefault', {
+                        name: adapters.find(a => a.id === defaultAdapterId)?.displayName ?? defaultAdapterId,
+                      })}</option>
+                      {adapters.map(a => (
+                        <option key={a.id} value={a.id}>{a.displayName}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               </div>
             )}
 

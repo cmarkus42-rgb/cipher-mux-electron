@@ -51,6 +51,17 @@ export interface LaunchOpts {
    * outright. Takes precedence over `resume` when known.
    */
   resumeClaudeSessionId?: string
+  /**
+   * Fork the most recent conversation of this directory, without knowing its id.
+   * The launcher's "Abzweigen". `forkFromClaudeSessionId` takes precedence; this
+   * takes precedence over `resume` — whoever forks does not want to continue.
+   */
+  forkLatest?: boolean
+  /**
+   * Per-launch choice from the launcher. Undefined = the global
+   * `agent.skipPermissions`, which is all entity sessions ever use.
+   */
+  skipPermissions?: boolean
   /** Model override (e.g. 'haiku', 'sonnet', 'opus') — passed as --model <id> */
   model?: string
 }

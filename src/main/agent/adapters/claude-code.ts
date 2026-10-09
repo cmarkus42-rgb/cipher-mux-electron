@@ -69,8 +69,17 @@ export class ClaudeCodeAdapter implements AgentAdapter {
 
   buildLaunchCommand(opts: LaunchOpts): LaunchCommand {
     const args: string[] = []
-    if (this.configReader.getSkipPermissions()) {
+    if (opts.skipPermissions ?? this.configReader.getSkipPermissions()) {
       args.push('--dangerously-skip-permissions')
+    }
+    // Die letzte Unterhaltung abzweigen. `--fork-session` gilt nur zusammen mit
+    // `--continue` oder `--resume`; ein `--fork` kennt die CLI nicht und bricht
+    // mit „unknown option" ab (gemessen an 2.1.295) — genau das hat der
+    // Ordner-Start bis 0.12.0 erzeugt.
+    if (opts.forkLatest && !opts.forkFromClaudeSessionId) {
+      args.push('--continue', '--fork-session')
+      if (opts.model) args.push('--model', opts.model)
+      return { cmd: 'claude', args }
     }
     // Resuming is what Keep Working is built on, so it stays. Naming the
     // conversation is the part that matters: `--resume <id>` continues exactly
