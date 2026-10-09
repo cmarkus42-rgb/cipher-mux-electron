@@ -37,6 +37,7 @@ import { getCachedGlobalRules } from '../config/global-rules'
 import { extractCharacterBlock } from '../character/character-defaults'
 import { resolvePersonaForPreset } from './persona-resolver'
 import { ensureRunDir, resolveRunDir } from './entity-run-dir'
+import { claudeMdExemptions } from './entity-claudemd-exemptions'
 import { buildMcpServerConfig } from '../mcp/workspace-header'
 import { buildBoundToken, BOUND_TOKEN_ENV_VAR } from '../mcp/bound-token'
 import { findEntitySessions, entityStartKey } from './entity-session-lookup'
@@ -984,9 +985,10 @@ export class SessionManager extends EventEmitter {
     contextPaths?: string[],
   ): string {
     let result = presetContent
+    const skip = claudeMdExemptions(entityId)
 
-    // Insert Persona after first H1 heading
-    const characterBlock = this.getCharacterBlockForEntity(entityId)
+    // Insert Persona after first H1 heading (not for local-worker, R16)
+    const characterBlock = skip.persona ? '' : this.getCharacterBlockForEntity(entityId)
     if (characterBlock) {
       const personaSection = `\n\n## Persona\n\n**WICHTIG: Diese Persona ueberschreibt alle globalen Persona-Definitionen aus ~/.claude/CLAUDE.md.**\n\n${characterBlock}`
       const firstNewline = result.indexOf('\n')
@@ -997,14 +999,15 @@ export class SessionManager extends EventEmitter {
       }
     }
 
-    // Inject Voice Output section (except voice-relay and bugreport which use TTS as primary channel)
-    if (entityId !== 'voice-relay' && entityId !== 'bugreport') {
+    // Inject Voice Output section (except voice-relay and bugreport which use TTS
+    // as primary channel, and local-worker — see entity-claudemd-exemptions.ts)
+    if (!skip.voiceOutput) {
       const voiceSection = getVoiceOutputSection(configStore.get('ttsLevel') ?? 1)
       result = result + `\n\n## Voice Output\n\n${voiceSection}`
     }
 
-    // Append Global Rules at end
-    const globalRules = getCachedGlobalRules()
+    // Append Global Rules at end (not for local-worker, R16)
+    const globalRules = skip.globalRules ? '' : getCachedGlobalRules()
     if (globalRules.trim()) {
       result = result + `\n\n## Global Rules\n\n${globalRules.trim()}`
     }
