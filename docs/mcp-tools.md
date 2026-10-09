@@ -1,6 +1,6 @@
 # MCP Tools Reference
 
-cipher-mux exposes **67 MCP tools** via its Streamable HTTP server, in twelve categories.
+cipher-mux exposes **68 MCP tools** via its Streamable HTTP server, in twelve categories.
 Most are available to any session with MCP access (entities with `features: ['mcp']`); the
 four `companion_memory_*` tools are registered **only** for the Companion and for connections
 without a role — that is the app itself.
@@ -12,7 +12,7 @@ headers, so its workspace and role travel inside the token — `src/main/mcp/bou
 > **Counting them from the code undercounts.** A grep for `registerMuxTool(` finds 57, because
 > the ten entity handoff tools are generated inside `registerAllHandoffTools`
 > (`src/main/mcp/handoff-kernel.ts`) rather than written out one by one. The authority is what
-> a connected client is offered: 67.
+> a connected client is offered: 68.
 
 ---
 
@@ -585,6 +585,26 @@ Health report for a Cyber Factory run: run status, waves, workers, escalation ba
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `run_id` | string | yes | Cyber Factory run ID |
+
+### `mux_local_worker_dispatch`
+Local Cyber Factory: starts a fresh local worker (opencode + local model) on one work item
+and returns at once; the architect is woken with one `[local-factory] #N …` line when the
+gate has run. With `accept: true` plus `laufId` and `haeppchen` it marks a green item as
+accepted instead. **Nur für die Rolle `local-factory` registriert** — keine andere Rolle und
+keine rollenlose Verbindung bekommt es.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `projekt` | string | yes | Absolute path of the target git repo |
+| `ziel` | string | yes | Goal of the work item |
+| `dateien` | string[] | yes | Files to work on |
+| `akzeptanzkriterium` | string | yes | Acceptance criterion |
+| `geschuetzteTests` | string[] | yes | Acceptance tests (repo-relative or absolute) |
+| `testBefehl` | string | yes | Shell command; exit 0 = green |
+| `nichtZiele` | string[] | yes | What stays untouched |
+| `laufId` | string | no | Existing run (retry) |
+| `haeppchen` | number | no | Work item number (retry / accept) |
+| `accept` | boolean | no | Mark the item as accepted |
 
 ### `mux_ideation_skill_run`
 Run an ideation skill with the current brain as context. Returns the skill markdown for
