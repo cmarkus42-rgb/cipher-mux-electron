@@ -168,6 +168,8 @@ export function SessionCell({
     debugger: 'var(--entity-color-9, #ff7043)',
     'testing-assistant': 'var(--entity-color-10, #2ecc71)',
     bugreport: 'var(--entity-color-11, #78909c)',
+    'local-factory': '#8e24aa',
+    'local-worker': '#6d4c41',
   }
   const entityColor = session.entityId ? ENTITY_COLORS[session.entityId] : undefined
   const isEntity = !!session.entityId

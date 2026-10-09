@@ -90,15 +90,15 @@ describe('EntityRegistry', () => {
 })
 
 describe('registerBuiltinEntities()', () => {
-  it('registers all 10 builtin entities', () => {
+  it('registers all 12 builtin entities', () => {
     const registry = new EntityRegistry()
     registerBuiltinEntities(registry)
     const entities = registry.list()
-    assert.strictEqual(entities.length, 10)
+    assert.strictEqual(entities.length, 12)
     const ids = entities.map((e: any) => e.id).sort()
     assert.deepStrictEqual(ids, [
       'audit', 'companion', 'cyber-factory', 'debugger',
-      'ideation-partner', 'launcher', 'refinement',
+      'ideation-partner', 'launcher', 'local-factory', 'local-worker', 'refinement',
       'testing-assistant', 'voice-relay', 'workshop',
     ])
   })
@@ -129,5 +129,18 @@ describe('registerBuiltinEntities()', () => {
     assert.ok(workshop?.projectPath.endsWith('/entities/workshop'))
     const cf = registry.get('cyber-factory')
     assert.ok(cf?.projectPath.endsWith('/entities/cyber-factory'))
+  })
+})
+
+describe('Local Cyber Factory im Registry', () => {
+  it('registriert local-factory (claude) und local-worker (opencode, singleInstance)', () => {
+    const r = new EntityRegistry()
+    registerBuiltinEntities(r)
+    const f = r.get('local-factory')!
+    const w = r.get('local-worker')!
+    assert.ok(f.features.includes('mcp'))
+    assert.equal(f.singleInstance, true)
+    assert.equal(w.adapterId, 'opencode')
+    assert.equal(w.singleInstance, true)
   })
 })
