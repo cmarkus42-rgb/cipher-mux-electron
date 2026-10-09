@@ -173,4 +173,43 @@ describe('LocalFactoryRunner', () => {
     assert.equal(h.versuche.length, 2)
     assert.equal(h.versuche[0].gestartet, 5)
   })
+  it('Race: zwei parallele dispatch -> genau einer ok, ein Arbeitscommit', async () => {
+    const host = fakeHost('brav')
+    const r = fast(host)
+    const [a, b] = await Promise.all([r.dispatch(args()), r.dispatch(args())]) as any[]
+    assert.equal([a, b].filter(x => x.ok).length, 1)
+    const rej = [a, b].find(x => !x.ok)
+    assert.match(rej.error, /Es läuft bereits ein Worker/)
+    await r.whenIdle()
+    assert.equal(git('log', '--format=%s').split('\n').filter(l => l.startsWith('lf: ') && !l.startsWith('lf: Abnahmetest')).length, 1)
+  })
+
+  it('sendToWorker wirft: Worker gestoppt, Häppchen nicht laeuft, Baum auf Basis, Läuferfehler-Weckzeile', async () => {
+    const host = fakeHost('brav')
+    let stopped = 0
+    host.stopWorker = async () => { stopped++ }
+    host.sendToWorker = async () => { fs.writeFileSync(path.join(repo, 'impl.txt'), 'kaputt\n'); throw new Error('boom') }
+    const r = fast(host)
+    const res: any = await r.dispatch(args())
+    await r.whenIdle()
+    assert.ok(stopped >= 1)
+    assert.notEqual(loadLauf(res.laufPfad)!.haeppchen[0].status, 'laeuft')
+    assert.equal(fs.readFileSync(path.join(repo, 'impl.txt'), 'utf-8'), 'nein\n')
+    assert.ok(host.wakes.some(w => w.includes('Läuferfehler')))
+  })
+
+  it('projekt ist Unterverzeichnis -> Ablehnung, nichts geschrieben', async () => {
+    fs.mkdirSync(path.join(repo, 'sub'))
+    const res: any = await fast(fakeHost('brav')).dispatch({ ...args(), projekt: path.join(repo, 'sub') })
+    assert.equal(res.ok, false)
+    assert.match(res.error, /nicht die Wurzel/)
+    assert.equal(fs.readdirSync(laufDir).length, 0)
+  })
+
+  it('laufId mit Pfadanteilen -> Ablehnung', async () => {
+    const res: any = await fast(fakeHost('brav')).dispatch({ ...args(), laufId: '../../x' })
+    assert.equal(res.ok, false)
+    assert.match(res.error, /laufId/)
+    assert.equal(fs.readdirSync(laufDir).length, 0)
+  })
 })

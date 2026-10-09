@@ -98,11 +98,19 @@ export function checksums(projekt: string, files: string[]): Record<string, stri
 
 const execFileP = promisify(execFile)
 
+export async function isRepoRoot(projekt: string): Promise<boolean> {
+  try {
+    const top = await git(projekt, ['rev-parse', '--show-toplevel'])
+    return fs.realpathSync(top) === fs.realpathSync(projekt)
+  } catch {
+    return false
+  }
+}
+
 /** Achtung: git reset --hard + clean -fd. Läuft nur, wenn projekt die Repo-Wurzel ist. */
 export async function savePatchAndReset(projekt: string, base: string, patchFile: string): Promise<void> {
   // reset --hard würde sonst ein umschließendes Repo komplett zurücksetzen.
-  const top = await git(projekt, ['rev-parse', '--show-toplevel'])
-  if (fs.realpathSync(top) !== fs.realpathSync(projekt)) {
+  if (!(await isRepoRoot(projekt))) {
     throw new Error(`projekt ist nicht die Wurzel eines git-Repos: ${projekt}`)
   }
   // Untracked erst in den Index (intent-to-add), damit der Patch sie enthält.

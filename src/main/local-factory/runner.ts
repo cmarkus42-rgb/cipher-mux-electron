@@ -11,7 +11,7 @@ import {
 import { classifyWorker, IDLE_SIGNAL_FILENAME } from './worker-done'
 import {
   runShell, dirtyFiles, headCommit, commitPaths, commitAll, changedSince,
-  checksums, savePatchAndReset, toRepoRelative,
+  checksums, savePatchAndReset, toRepoRelative, isRepoRoot,
 } from './git-ops'
 import { PROTECTED_PATHS_FILENAME } from '../session/entity-boundaries'
 
@@ -53,6 +53,12 @@ export interface DispatchArgs extends AuftragInput {
 export type DispatchAccepted = { ok: true; laufId: string; nummer: number; versuch: number; laufPfad: string }
 export type DispatchRejected = { ok: false; error: string }
 
+interface Attempt {
+  args: DispatchArgs; prot: string[]; base: string; sumsBefore: Record<string, string>
+  laufId: string; laufPfad: string; nummer: number; versuch: number
+  vorherigesGate?: { reasons: string[]; testOutput: string }
+}
+
 interface GateRecord extends GateResult { testOutput: string }
 
 export class LocalFactoryRunner {
@@ -91,8 +97,26 @@ export class LocalFactoryRunner {
   async dispatch(args: DispatchArgs): Promise<DispatchAccepted | DispatchRejected> {
     const errs = validateAuftrag(args)
     if (errs.length) return { ok: false, error: `Auftrag ungültig: ${errs.join('; ')}` }
+    if (args.laufId !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(args.laufId)) {
+      return { ok: false, error: 'laufId ungültig: nur A-Z, a-z, 0-9, _ und -, höchstens 64 Zeichen.' }
+    }
     if (this.busy) return { ok: false, error: 'Es läuft bereits ein Worker. Nacheinander (Spec E2).' }
+    // Synchron setzen: zwischen Prüfung und Start liegen mehrere awaits (Spec E2).
+    this.busy = true
+    let res: DispatchAccepted | DispatchRejected
+    try {
+      res = await this.prepare(args)
+    } catch (err) {
+      res = { ok: false, error: `Vorprüfung fehlgeschlagen: ${String(err)}` }
+    }
+    if (!res.ok) this.busy = false
+    return res
+  }
 
+  private async prepare(args: DispatchArgs): Promise<DispatchAccepted | DispatchRejected> {
+    if (!(await isRepoRoot(args.projekt))) {
+      return { ok: false, error: `projekt ist nicht die Wurzel eines git-Repos: ${args.projekt}` }
+    }
     if (!(await this.o.host.endpointReachable())) {
       await this.o.host.wakeArchitect('[local-factory] Endpunkt nicht erreichbar — kein Versuch gezählt.')
       return { ok: false, error: 'Endpunkt des lokalen Modells nicht erreichbar. Kein Versuch gezählt.' }
@@ -118,8 +142,8 @@ export class LocalFactoryRunner {
     const laufId = args.laufId ?? ulid()
     const laufPfad = this.laufFile(laufId)
     let lauf0: Lauf = loadLauf(laufPfad) ?? newLauf(laufId, projekt, this.o.now())
-    // Ein „laeuft“ ohne lebenden Durchlauf in diesem Prozess ist ein Rest eines App-Neustarts (Spec §9).
-    if (!this.busy && lauf0.haeppchen.some(h => h.status === 'laeuft')) {
+    // busy war beim Eintritt frei: ein „laeuft“ ohne lebenden Durchlauf in diesem Prozess ist ein Rest eines App-Neustarts (Spec §9).
+    if (lauf0.haeppchen.some(h => h.status === 'laeuft')) {
       lauf0 = abortRunning(lauf0)
       saveLauf(laufPfad, lauf0)
     }
@@ -149,20 +173,40 @@ export class LocalFactoryRunner {
       args, prot, base, sumsBefore, laufId, laufPfad,
       nummer: begun.nummer, versuch: begun.versuch, vorherigesGate,
     })
-      .catch(err => this.o.host.wakeArchitect(`[local-factory] #${begun.nummer} Läuferfehler: ${String(err)}`))
+      .catch(err => this.o.host.wakeArchitect(`[local-factory] #${begun.nummer} Läuferfehler: ${String(err)}`).catch(() => {}))
       .finally(() => { this.busy = false })
 
     return { ok: true, laufId, nummer: begun.nummer, versuch: begun.versuch, laufPfad }
   }
 
-  private async runAttempt(a: {
-    args: DispatchArgs; prot: string[]; base: string; sumsBefore: Record<string, string>
-    laufId: string; laufPfad: string; nummer: number; versuch: number
-    vorherigesGate?: { reasons: string[]; testOutput: string }
-  }): Promise<void> {
+  private async runAttempt(a: Attempt): Promise<void> {
+    const started: { sessionId?: string } = {}
+    try {
+      await this.runAttemptInner(a, started)
+    } catch (err) {
+      // Aufräumen: Häppchen nicht in „laeuft“ lassen, Baum zurück auf Basis.
+      try {
+        const dir = path.dirname(a.laufPfad)
+        const patch = path.join(dir, `versuch-${a.nummer}-${a.versuch}.patch`)
+        await savePatchAndReset(a.args.projekt, a.base, patch)
+      } catch { /* Patch/Reset best effort */ }
+      try {
+        const lauf = loadLauf(a.laufPfad)
+        if (lauf) saveLauf(a.laufPfad, endVersuch(lauf, a.nummer, { verdict: 'haengt' }, this.o.now()))
+      } catch { /* */ }
+      throw err
+    } finally {
+      if (started.sessionId) {
+        try { await this.o.host.stopWorker(started.sessionId) } catch { /* */ }
+      }
+    }
+  }
+
+  private async runAttemptInner(a: Attempt, started: { sessionId?: string }): Promise<void> {
     const { host } = this.o
     const projekt = a.args.projekt
     const { runDir, sessionId } = await host.startFreshWorker(projekt)
+    started.sessionId = sessionId
 
     fs.writeFileSync(
       path.join(runDir, PROTECTED_PATHS_FILENAME),
@@ -190,6 +234,7 @@ export class LocalFactoryRunner {
     }
     const tokens = host.tokensAt(sessionId)
     await host.stopWorker(sessionId)
+    started.sessionId = undefined
 
     const test = state === 'fertig'
       ? await runShell(a.args.testBefehl, projekt, this.o.testTimeoutMs)
