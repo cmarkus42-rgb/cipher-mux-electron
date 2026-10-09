@@ -28,11 +28,11 @@ jobs:
     name: Lint (geaenderte Dateien)
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Fuer den Diff gegen den Vorgaenger-Commit bzw. den PR-Basispunkt.
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -72,8 +72,8 @@ jobs:
     name: Typecheck
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -91,9 +91,9 @@ jobs:
       matrix:
         os: [macos-14, ubuntu-22.04]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -124,7 +124,7 @@ jobs:
       # ein Feld der Matrix um, mit `ModuleNotFoundError: No module named
       # 'distutils'`. Hier wird die Version festgenagelt statt node-gyp
       # ausgetauscht: so baut die CI mit demselben node-gyp wie die Entwicklung.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
 
@@ -150,13 +150,13 @@ jobs:
       matrix:
         os: [macos-14, ubuntu-22.04]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # `version:generate` zaehlt Commits seit dem letzten Tag und braucht
           # die Historie.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -168,8 +168,8 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm

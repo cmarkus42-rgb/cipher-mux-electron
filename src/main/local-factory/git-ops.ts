@@ -10,6 +10,16 @@ import { runCommand, getEnhancedPath } from '../util/exec-util'
  * nicht aus dem, was der Worker berichtet.
  */
 
+/**
+ * Die Shell für Testbefehle: zsh, wie im Terminal des Users (macOS-Standard,
+ * dort kommt node/npm aus dem Profil). Wo es keine zsh gibt — die Linux-CI —
+ * `/bin/sh`; ein fest verdrahtetes /bin/zsh ließ dort jeden runShell-Aufruf
+ * mit ENOENT scheitern.
+ */
+export function loginShell(exists: (p: string) => boolean = fs.existsSync): string {
+  return exists('/bin/zsh') ? '/bin/zsh' : '/bin/sh'
+}
+
 export async function runShell(
   cmd: string,
   cwd: string,
@@ -20,7 +30,7 @@ export async function runShell(
     // npm, flutter aus dem Profil-PATH).
     // detached: eigene Prozessgruppe, damit der Timeout auch Enkelprozesse
     // (npm test, a && b) trifft und nicht nur die Shell.
-    const child = spawn('/bin/zsh', ['-lc', cmd], {
+    const child = spawn(loginShell(), ['-lc', cmd], {
       cwd,
       env: { ...process.env, PATH: getEnhancedPath() },
       detached: true,
