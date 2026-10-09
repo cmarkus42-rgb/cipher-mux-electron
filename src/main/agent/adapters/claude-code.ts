@@ -40,6 +40,22 @@ const defaultConfigReader: AgentConfigReader = {
  * - StatusLine hook for context usage reporting
  * - CLAUDE.md as project marker
  */
+/**
+ * Der `cipher-mux`-Eintrag, den dieser Adapter lokal registriert.
+ *
+ * **Mit Rolle.** Der Eintrag landet in `settings.local.json` und per
+ * `claude mcp add-json -s local` im lokalen Scope — und der lokale Scope
+ * schlägt die `.mcp.json` des Run-Verzeichnisses, die der SessionManager mit
+ * `X-Mux-Entity` schreibt. Fehlte die Rolle hier, sähe der Server sie nie:
+ * gemessen am 2026-10-09, die Local Cyber Factory bekam ihr Werkzeug nicht, und
+ * jede Claude-Code-Rolle zählte als „ohne Rolle", also auch für Companion Memory.
+ */
+export function buildClaudeCodeMcpEntry(
+  ctx: Pick<AdapterContext, 'mcpUrl' | 'mcpApiKey' | 'workspaceId' | 'entityId'>,
+): ReturnType<typeof buildMcpServerConfig> {
+  return buildMcpServerConfig(ctx.mcpUrl, ctx.mcpApiKey, ctx.workspaceId, ctx.entityId)
+}
+
 export class ClaudeCodeAdapter implements AgentAdapter {
   readonly id = 'claude-code'
   readonly displayName = 'Claude Code'
@@ -88,7 +104,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
    * 3. Direct write to `~/.claude/projects/<hash>/settings.json` (project-scoped fallback)
    */
   async postLaunchInjection(ctx: AdapterContext): Promise<void> {
-    const mcpServerConfig = buildMcpServerConfig(ctx.mcpUrl, ctx.mcpApiKey, ctx.workspaceId)
+    const mcpServerConfig = buildClaudeCodeMcpEntry(ctx)
 
     // Path 1: Direct write to local settings.local.json (most reliable)
     // This is the same file used by statusLine hook — Claude Code always reads it.
