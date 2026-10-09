@@ -1,9 +1,16 @@
 # MCP Tools Reference
 
-cipher-mux exposes **68 MCP tools** via its Streamable HTTP server, in twelve categories.
-Most are available to any session with MCP access (entities with `features: ['mcp']`); the
-four `companion_memory_*` tools are registered **only** for the Companion and for connections
-without a role — that is the app itself.
+cipher-mux defines **68 MCP tools** for its Streamable HTTP server, in twelve categories. No
+single connection is offered all 68. Most are available to any session with MCP access
+(entities with `features: ['mcp']`); two are role-bound:
+
+- the four `companion_memory_*` tools are registered **only** for the Companion and for
+  connections without a role — that is the app itself;
+- `mux_local_worker_dispatch` is registered **only** for the role `local-factory`.
+
+So the app connection and the Companion are offered **67** (everything but the dispatch tool),
+`local-factory` is offered **64** (the dispatch tool, but not the four Companion tools), and any
+other role **63**.
 
 **Server:** `http://localhost:{port}/mcp` (port auto-assigned, see `.mcp-connection.md`)
 **Auth:** Bearer token (auto-injected into `.mcp.json` per entity). Codex sends no custom
@@ -12,7 +19,7 @@ headers, so its workspace and role travel inside the token — `src/main/mcp/bou
 > **Counting them from the code undercounts.** A grep for `registerMuxTool(` finds 57, because
 > the ten entity handoff tools are generated inside `registerAllHandoffTools`
 > (`src/main/mcp/handoff-kernel.ts`) rather than written out one by one. The authority is what
-> a connected client is offered: 68.
+> a connected client is offered — 67 for the app connection, see above.
 
 ---
 
@@ -595,15 +602,22 @@ keine rollenlose Verbindung bekommt es.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `projekt` | string | yes | Absolute path of the target git repo |
-| `ziel` | string | yes | Goal of the work item |
-| `dateien` | string[] | yes | Files to work on |
-| `akzeptanzkriterium` | string | yes | Acceptance criterion |
-| `geschuetzteTests` | string[] | yes | Acceptance tests (repo-relative or absolute) |
-| `testBefehl` | string | yes | Shell command; exit 0 = green |
-| `nichtZiele` | string[] | yes | What stays untouched |
-| `laufId` | string | no | Existing run (retry) |
-| `haeppchen` | number | no | Work item number (retry / accept) |
+The dispatch fields are optional in the schema, because `accept` does not need them; on a
+dispatch they are required and enforced by the runner (`validateAuftrag`). `accept: true`
+without both `laufId` and `haeppchen` is an error, not a dispatch, and returns `ok: false`
+with a reason when nothing was accepted (unknown run, item not green-waiting).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `projekt` | string | dispatch | Absolute path of the target git repo |
+| `ziel` | string | dispatch | Goal of the work item |
+| `dateien` | string[] | dispatch | Files to work on |
+| `akzeptanzkriterium` | string | dispatch | Acceptance criterion |
+| `geschuetzteTests` | string[] | dispatch | Acceptance tests plus every file the test command depends on (repo-relative or absolute) |
+| `testBefehl` | string | dispatch | Shell command; exit 0 = green |
+| `nichtZiele` | string[] | dispatch | What stays untouched (may be empty) |
+| `laufId` | string | retry, accept | Returned by the first dispatch; pass it on every later item and retry |
+| `haeppchen` | number | retry, accept | Work item number |
 | `accept` | boolean | no | Mark the item as accepted |
 
 ### `mux_ideation_skill_run`
