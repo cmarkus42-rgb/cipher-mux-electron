@@ -94,6 +94,32 @@ export function registerBuiltinEntities(
   })
 
   registry.register({
+    id: 'local-factory',
+    displayName: 'Local Cyber Factory',
+    icon: '🏗️',
+    color: '#8e24aa',
+    projectPath: `${entitiesBase}/local-factory`,
+    features: ['mcp'],
+    visible: true,
+    sortOrder: 41,
+    singleInstance: true,
+  })
+
+  registry.register({
+    id: 'local-worker',
+    displayName: 'Local Worker',
+    icon: '⚙️',
+    color: '#6d4c41',
+    projectPath: `${entitiesBase}/local-worker`,
+    features: ['mcp'],
+    visible: true,
+    sortOrder: 42,
+    // Nacheinander (Spec E2) ist damit eine Eigenschaft der Registry.
+    singleInstance: true,
+    adapterId: 'opencode',
+  })
+
+  registry.register({
     id: 'launcher',
     displayName: 'Launcher',
     icon: '🚀',

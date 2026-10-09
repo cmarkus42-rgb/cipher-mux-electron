@@ -31,6 +31,8 @@ const ENTITY_COLORS: Record<EntityId, string> = {
   debugger: 'var(--entity-color-9, #ff7043)',
   'testing-assistant': 'var(--entity-color-10, #2ecc71)',
   bugreport: 'var(--entity-color-11, #78909c)',
+  'local-factory': '#8e24aa',
+  'local-worker': '#6d4c41',
 }
 
 function contextColorClass(pct: number): string {

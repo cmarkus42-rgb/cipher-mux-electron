@@ -41,6 +41,7 @@ import { buildMcpServerConfig } from '../mcp/workspace-header'
 import { buildBoundToken, BOUND_TOKEN_ENV_VAR } from '../mcp/bound-token'
 import { findEntitySessions, entityStartKey } from './entity-session-lookup'
 import type { Workspace } from '../../shared/persona-types'
+import { generateLocalFactoryPreset, generateLocalWorkerPreset, LOCAL_WORKER_DISPATCH_TOOL } from '../local-factory/presets'
 
 /**
  * Generate the ## Voice Output section content based on ttsLevel.
@@ -151,6 +152,9 @@ function getMcpPermissionsForEntity(entityId: EntityId): string[] {
     case 'launcher':
       perms.push(`${MCP_PREFIX}kickoff_complete`, 'Bash(tmux:*)')
       break
+  }
+  if (entityId === 'local-factory') {
+    perms.push(`${MCP_PREFIX}${LOCAL_WORKER_DISPATCH_TOOL}`)
   }
   if (entityId === COMPANION_ENTITY_ID) {
     perms.push(...COMPANION_MEMORY_PERMISSIONS)
@@ -1148,6 +1152,14 @@ export class SessionManager extends EventEmitter {
         if (!fs.existsSync(presetMdPath)) {
           fs.writeFileSync(presetMdPath, generateIdeationPartnerClaudeMd(), 'utf-8')
         }
+      } else if (config.id === 'local-factory') {
+        if (!fs.existsSync(presetMdPath)) {
+          fs.writeFileSync(presetMdPath, generateLocalFactoryPreset(), 'utf-8')
+        }
+      } else if (config.id === 'local-worker') {
+        // Bei jedem Start neu: der Worker hat keine Handarbeit zu bewahren,
+        // und ein veralteter Rollentext wäre still wirksam.
+        fs.writeFileSync(presetMdPath, generateLocalWorkerPreset(), 'utf-8')
       } else if (!fs.existsSync(presetMdPath)) {
         // Generic fallback — only write once to preserve manual edits
         fs.writeFileSync(presetMdPath, `# ${config.displayName}\n\n${config.displayName} Persona — wird vom User konfiguriert.\n`, 'utf-8')
