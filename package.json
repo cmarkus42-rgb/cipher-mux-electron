@@ -57,7 +57,7 @@
     "@xterm/xterm": "^5.5.0",
     "concurrently": "^9.0.0",
     "electron": "^34.0.0",
-    "electron-builder": "^25.0.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^9.0.0",
     "preact": "^10.24.0",
     "prettier": "^3.4.0",
