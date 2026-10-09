@@ -72,3 +72,24 @@ export async function checkWorkerReady(deps: {
   const p = await deps.probe(url)
   return p.ok ? null : `Endpunkt des lokalen Modells nicht erreichbar: ${url} (${p.detail})`
 }
+
+/**
+ * Eine Zeile in eine CLI-Sitzung tippen und abschicken.
+ *
+ * Text und Enter gehen **getrennt**. Gemessen am 2026-10-09 im echten Lauf: ein
+ * `send-keys` mit Text plus `\r` kommt bei Claude Code als eingefügter Block an,
+ * das `\r` wird dort ein Zeilenumbruch im Eingabefeld — die Weckzeile steht im
+ * Feld und wird nie abgeschickt, der Architekt wartet ewig. Die Pause trennt die
+ * Taste vom eingefügten Block. Zeilenenden im Text werden zu Leerzeichen; jedes
+ * würde sonst dasselbe tun.
+ */
+export async function submitLine(
+  sendText: (keys: string) => Promise<void>,
+  sendKey: (name: string) => Promise<void>,
+  line: string,
+  pause: () => Promise<void> = () => new Promise(r => setTimeout(r, 400)),
+): Promise<void> {
+  await sendText(line.replace(/[\r\n]+/g, ' ').trim())
+  await pause()
+  await sendKey('Enter')
+}

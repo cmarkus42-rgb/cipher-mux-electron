@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import * as assert from 'node:assert/strict'
 import {
-  endpointProbeUrl, readUsageFile, probeEndpoint, checkWorkerReady, type ProbeResult,
+  endpointProbeUrl, readUsageFile, probeEndpoint, checkWorkerReady, submitLine, type ProbeResult,
 } from '../../../src/main/local-factory/worker-host-util'
 import * as http from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -73,5 +73,26 @@ describe('probeEndpoint zählt nur 2xx', () => {
     await new Promise(r => setTimeout(r, 50))
     const r = await probeEndpoint(s.url, 1000)
     assert.equal(r.ok, false)
+  })
+})
+
+describe('submitLine', () => {
+  // Gemessen 2026-10-09 im echten Lauf: Text + '\r' in einem send-keys kommt
+  // bei Claude Code als eingefügter Block an; das '\r' wird ein Zeilenumbruch
+  // im Eingabefeld, die Weckzeile bleibt dort stehen und wird nie abgeschickt.
+  it('schickt den Text ohne Zeilenende und danach Enter als eigene Taste', async () => {
+    const calls: string[] = []
+    await submitLine(
+      async keys => { calls.push(`text:${keys}`) },
+      async name => { calls.push(`key:${name}`) },
+      'Zeile',
+      async () => { calls.push('pause') },
+    )
+    assert.deepEqual(calls, ['text:Zeile', 'pause', 'key:Enter'])
+  })
+  it('entfernt Zeilenenden aus dem Text', async () => {
+    const texts: string[] = []
+    await submitLine(async k => { texts.push(k) }, async () => {}, 'a\r\nb\n', async () => {})
+    assert.deepEqual(texts, ['a b'])
   })
 })

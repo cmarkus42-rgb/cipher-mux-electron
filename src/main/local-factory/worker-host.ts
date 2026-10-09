@@ -2,7 +2,7 @@ import type { ToolContext } from '../mcp/mcp-tools'
 import type { WorkerHost } from './runner'
 import { startEntitySession } from '../mcp/handoff-kernel'
 import { findEntitySessions } from '../session/entity-session-lookup'
-import { endpointProbeUrl, readUsageFile, checkWorkerReady, probeEndpoint } from './worker-host-util'
+import { endpointProbeUrl, readUsageFile, checkWorkerReady, probeEndpoint, submitLine } from './worker-host-util'
 import { BRAND } from '../../shared/brand'
 
 export { endpointProbeUrl, readUsageFile }
@@ -41,7 +41,7 @@ export function createWorkerHost(ctx: ToolContext): WorkerHost {
       return { runDir: session.projectPath, sessionId: session.id }
     },
     async sendToWorker(sessionId, line) {
-      await sm.sendKeys(sessionId, line + '\r')
+      await submitLine(k => sm.sendKeys(sessionId, k), n => sm.sendKey(sessionId, n), line)
     },
     async stopWorker(sessionId) {
       try { await sm.stopEntity('local-worker', sessionId) } catch { /* schon weg */ }
@@ -58,7 +58,7 @@ export function createWorkerHost(ctx: ToolContext): WorkerHost {
         console.warn('[local-factory] Architekt nicht gefunden, Weckzeile verloren:', line)
         return
       }
-      await sm.sendKeys(target.id, line + '\r')
+      await submitLine(k => sm.sendKeys(target.id, k), n => sm.sendKey(target.id, n), line)
     },
   }
 }
