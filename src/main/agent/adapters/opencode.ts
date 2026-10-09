@@ -20,6 +20,11 @@ import {
   writeOpenCodeUsagePlugin,
   OPENCODE_USAGE_PLUGIN_FILENAME,
 } from '../../monitoring/opencode-usage-plugin'
+import {
+  buildIdlePlugin,
+  IDLE_PLUGIN_FILENAME,
+  IDLE_SIGNAL_FILENAME,
+} from '../../local-factory/worker-done'
 import { parseOpenCodeModels } from '../adapter-models'
 import { runCommand } from '../../util/exec-util'
 import {
@@ -171,6 +176,7 @@ export const OPENCODE_PLUGIN_SUBDIR = path.join('.opencode', 'plugin')
 export const OPENCODE_OWNED_PLUGIN_FILENAMES: readonly string[] = [
   OPENCODE_USAGE_PLUGIN_FILENAME,
   OPENCODE_BOUNDARY_PLUGIN_FILENAME,
+  IDLE_PLUGIN_FILENAME,
 ]
 
 /**
@@ -460,6 +466,17 @@ export class OpenCodeAdapter implements AgentAdapter {
       specs.push(toOpenCodePluginSpec(boundaryPath))
     } else {
       try { fs.unlinkSync(boundaryPath) } catch { /* war nie da */ }
+    }
+
+    // Idle-Signal nur für den lokalen Worker — der Läufer liest es.
+    const idlePath = path.join(pluginDir, IDLE_PLUGIN_FILENAME)
+    if (entityId === LOCAL_WORKER_ENTITY_ID) {
+      fs.writeFileSync(idlePath, buildIdlePlugin(path.join(projectPath, IDLE_SIGNAL_FILENAME)), {
+        encoding: 'utf-8', mode: 0o644,
+      })
+      specs.push(toOpenCodePluginSpec(idlePath))
+    } else {
+      try { fs.unlinkSync(idlePath) } catch { /* war nie da */ }
     }
 
     return specs
