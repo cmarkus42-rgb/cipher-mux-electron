@@ -210,6 +210,36 @@ Vor dem Läufer, gegen den Spark, von Hand. Drei Messungen, die das Design kippe
 
 Dazu: Kommt das „untätig"-Ereignis über das opencode-Plugin zuverlässig, und unter welchem Namen?
 
+## 10a. Messergebnis (2026-10-09, opencode 1.18.35, `qwen3.8-27b` auf vLLM/DGX Spark)
+
+1. **Edits außerhalb des cwd: tragen.** opencode im Run-Verzeichnis änderte eine Datei im Projekt
+   per absolutem Pfad. Es kamen zwei `permission.asked`-Ereignisse, `--auto` beantwortete beide
+   still (`permission.replied`). Kein Dialog, kein zusätzlicher Config-Schlüssel nötig. §5/§6
+   bleiben wie geschrieben.
+2. **Ausgabelimit: stiller Abbruch.** Mit `limit.output = 4000` und einem großen Schreibauftrag
+   dachte das Modell 2 min 35 s nach und endete dann **ohne Werkzeugaufruf, ohne Text, ohne
+   Fehler** — die Datei entstand nicht, die Session wurde untätig (`session.idle`). Das
+   Denkbudget frisst das Ausgabebudget. Folgen: `maxOutputTokens` großzügig setzen (≥ 16384);
+   und der Läufer wertet „untätig ohne `REPORT.md`" nach der Ruhezeit sofort als Fehlversuch,
+   statt bis zur Stillstandsgrenze zu warten.
+3. **Idle-Ereignis heißt `session.idle`** und kommt genau einmal am Zugende. Sonst gesehen:
+   `message.updated`, `session.status`, `session.diff`, `file.edited`, `permission.asked`.
+4. **Wecken in eine laufende Claude-Session: wird eingereiht.** Die laufende Antwort lief
+   vollständig zu Ende, danach wurde die Weckzeile als nächste Eingabe verarbeitet.
+
+Nebenbefunde:
+- **Grundlast von opencode: 14,9 k Tokens** Kontext für einen Ein-Zeilen-Auftrag — System-Prompt
+  und Werkzeugdefinitionen. Auf Apple Silicon ist das Prefill bei jedem Auftrag. Argument für den
+  späteren Vergleich mit pi (E7).
+- **Startwartezeit ist nötig:** Ein `send-keys` direkt nach dem Start ging verloren, die TUI war
+  noch nicht bereit.
+- Claude Code fragt in einem neuen Verzeichnis nach Vertrauen — betrifft den Architekten nicht,
+  er läuft in seinem Run-Verzeichnis wie jede Entity.
+
+Nachträge aus der Planung: Der Läufer committet den frisch geschriebenen Abnahmetest selbst als
+Basis (§7 Schritt 2 verlangt sonst einen Baum, den der Architekt nicht liefern kann), und
+`mux_local_worker_dispatch` nimmt mit `accept: true` ein grünes Häppchen ab (§7 Schritt 8).
+
 ## 11. Tests
 
 - **Test-first, reine Funktionen:** Pfadabgleich geschützter Tests, Prüfsummenvergleich,

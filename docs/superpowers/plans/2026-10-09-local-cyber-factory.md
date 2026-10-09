@@ -1456,7 +1456,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `interface WorkerObservation { now: number; startedAt: number; reportMtime: number | null; idleSignalAt: number | null; lastActivityAt: number }`
   - `classifyWorker(o: WorkerObservation, cfg: { quietMs: number; timeoutMs: number; stallMs: number }): WorkerState`
 
-Regel: `fertig`, wenn `REPORT.md` existiert **und** (Idle-Signal nach dem Report **oder** seit `quietMs` keine Aktivität). `haengt`, wenn `now - startedAt > timeoutMs` oder seit `stallMs` keine Aktivität ohne Report. Aktivität = jüngste mtime der Usage-JSON des Workers (Task 10 liest sie).
+Regel: `fertig`, wenn `REPORT.md` existiert **und** (Idle-Signal nach dem Report **oder** seit `quietMs` keine Aktivität). `haengt`, wenn `now - startedAt > timeoutMs`, oder **Idle-Signal ohne Report und seit `quietMs` keine Aktivität** (gemessen, Spec §10a.2: am Ausgabelimit endet das Modell still ohne Werkzeugaufruf — nicht 10 Minuten darauf warten), oder seit `stallMs` keine Aktivität ohne Report. Aktivität = jüngste mtime der Usage-JSON des Workers (Task 10 liest sie).
 
 - [ ] **Step 1: Failing test**
 
@@ -1487,6 +1487,12 @@ describe('classifyWorker', () => {
   })
   it('hängt: Timeout, auch mit Aktivität', () => {
     assert.equal(classifyWorker({ ...o, now: 3_700_000, lastActivityAt: 3_699_000 }, cfg), 'haengt')
+  })
+  it('hängt schnell: Idle ohne Report und Ruhe > quietMs (stiller Abbruch am Ausgabelimit)', () => {
+    assert.equal(classifyWorker({ ...o, idleSignalAt: 60_000, lastActivityAt: 60_000 }, cfg), 'haengt')
+  })
+  it('arbeitet: Idle ohne Report, aber Ruhe noch kurz (zwischen zwei Zügen)', () => {
+    assert.equal(classifyWorker({ ...o, idleSignalAt: 95_000, lastActivityAt: 95_000 }, cfg), 'arbeitet')
   })
   it('hängt: lange Stille ohne Report', () => {
     assert.equal(classifyWorker({ ...o, now: 700_000, lastActivityAt: 50_000 }, cfg), 'haengt')
@@ -1571,6 +1577,8 @@ export function classifyWorker(
     if (quiet > cfg.quietMs) return 'fertig'
     return 'arbeitet'
   }
+  // Untätig ohne Report: am Ausgabelimit endet das Modell still (Spec §10a.2).
+  if (o.idleSignalAt !== null && quiet > cfg.quietMs) return 'haengt'
   if (quiet > cfg.stallMs) return 'haengt'
   return 'arbeitet'
 }
