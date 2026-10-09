@@ -13,6 +13,8 @@ import {
   resolveWorkspaceSections,
   buildFolderAutoLaunch,
   restoreAdapterId,
+  formatWorkspacePrompt,
+  newInstructionsFile,
 } from '../../src/main/session/folder-session'
 
 const workspaces = [
@@ -34,7 +36,10 @@ describe('resolveWorkspaceSections', () => {
 
   it('ID: Prompt und Kontextpfade kommen aus dem Workspace, getrimmt', () => {
     const r = resolveWorkspaceSections({ workspaceId: 'ws-a' }, workspaces)
-    assert.deepEqual(r, { reconcile: true, workspacePrompt: 'Prompt A', contextPaths: ['/x', '/y'] })
+    assert.deepEqual(r, {
+      reconcile: true, workspaceId: 'ws-a', workspaceName: 'A',
+      workspacePrompt: 'Prompt A', contextPaths: ['/x', '/y'],
+    })
   })
 
   it('ID eines Workspaces ohne Prompt: abgleichen heisst entfernen', () => {
@@ -54,7 +59,10 @@ describe('resolveWorkspaceSections', () => {
       { workspaceId: 'ws-a', workspacePrompt: 'Zelle', contextPaths: ['/z'] },
       workspaces,
     )
-    assert.deepEqual(r, { reconcile: true, workspacePrompt: 'Zelle', contextPaths: ['/z'] })
+    assert.deepEqual(r, {
+      reconcile: true, workspaceId: 'ws-a', workspaceName: 'A',
+      workspacePrompt: 'Zelle', contextPaths: ['/z'],
+    })
   })
 
   it('ausdrueckliche Werte ohne workspaceId: weiter injizieren wie bisher', () => {
@@ -104,5 +112,54 @@ describe('restoreAdapterId — welche CLI eine wiederhergestellte Session bekomm
     assert.equal(restoreAdapterId({ adapterId: 'weg' }, known), undefined)
     assert.equal(restoreAdapterId({}, known), undefined)
     assert.equal(restoreAdapterId({ adapterId: null, entityId: null }, known), undefined)
+  })
+})
+
+describe('Workspace beim Namen nennen', () => {
+  it('resolveWorkspaceSections liefert Name und ID des Workspaces mit', () => {
+    const r = resolveWorkspaceSections({ workspaceId: 'ws-leer' }, workspaces)
+    assert.equal(r.workspaceName, 'Leer')
+    assert.equal(r.workspaceId, 'ws-leer')
+  })
+
+  it('auch auf dem ausdruecklichen Weg (Workspace-Apply)', () => {
+    const r = resolveWorkspaceSections({ workspaceId: 'ws-a', workspacePrompt: 'Zelle' }, workspaces)
+    assert.equal(r.workspaceName, 'A')
+  })
+
+  it('ohne oder mit unbekanntem Workspace: kein Name', () => {
+    assert.equal(resolveWorkspaceSections({ workspaceId: null }, workspaces).workspaceName, undefined)
+    assert.equal(resolveWorkspaceSections({ workspaceId: 'ws-weg' }, workspaces).workspaceName, undefined)
+  })
+
+  it('formatWorkspacePrompt: Identitaet vor dem Prompt', () => {
+    assert.equal(
+      formatWorkspacePrompt({ workspaceId: 'ws-a', workspaceName: 'KEEL', workspacePrompt: 'Mach X.' }),
+      'Du arbeitest im Workspace **KEEL** (`ws-a`).\n\nMach X.',
+    )
+  })
+
+  it('formatWorkspacePrompt: Workspace ohne Prompt nennt trotzdem den Namen', () => {
+    assert.equal(
+      formatWorkspacePrompt({ workspaceId: 'ws-a', workspaceName: 'KEEL' }),
+      'Du arbeitest im Workspace **KEEL** (`ws-a`).',
+    )
+  })
+
+  it('formatWorkspacePrompt: ohne Workspace nur der Prompt, ohne beides nichts', () => {
+    assert.equal(formatWorkspacePrompt({ workspacePrompt: 'P' }), 'P')
+    assert.equal(formatWorkspacePrompt({}), undefined)
+  })
+})
+
+describe('newInstructionsFile — der Kopf einer neu angelegten Anweisungsdatei', () => {
+  it('mit Verweis: die CLI soll die CLAUDE.md lesen', () => {
+    const c = newInstructionsFile({ file: 'AGENTS.md', pointerTo: 'CLAUDE.md' })
+    assert.ok(c.includes('`CLAUDE.md`'))
+    assert.ok(c.startsWith('# '))
+  })
+
+  it('ohne Verweis: nur eine Ueberschrift', () => {
+    assert.equal(newInstructionsFile({ file: 'AGENTS.md' }), '# Projektanweisungen\n')
   })
 })

@@ -373,3 +373,62 @@ describe('Ordner-Start: Workspace-Sektionen und Startzeile', () => {
     assert.equal(forked.adapterId, 'test')
   })
 })
+
+// ─── Anweisungsdatei pro CLI ────────────────────────────────
+
+describe('Ordner-Start: der Mux schreibt in die Datei, die die CLI liest', () => {
+  let tmux: MockTmuxManager
+  let dir: string
+
+  /** Eine CLI wie Codex: liest nur AGENTS.md, legt sie mit Verweis an. */
+  function agentsMdManager() {
+    const agents = {
+      ...mockAdapter(),
+      id: 'agents',
+      instructionsTarget: (p: { agentsMd: boolean; claudeMd: boolean }) =>
+        !p.agentsMd && p.claudeMd ? { file: 'AGENTS.md', pointerTo: 'CLAUDE.md' } : { file: 'AGENTS.md' },
+    }
+    const registry = { ...mockRegistry(), get: (id: string) => (id === 'agents' ? agents : id === 'test' ? mockAdapter() : undefined) }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- verzoegert wie createSessionManager: kein Electron-Import beim Laden
+    const { SessionManager } = require('../../src/main/session/session-manager')
+    return new SessionManager(tmux as unknown, registry as unknown)
+  }
+  const read = (f: string) => fsSyncIso.readFileSync(pathIso.join(dir, f), 'utf-8')
+  const exists = (f: string) => fsSyncIso.existsSync(pathIso.join(dir, f))
+
+  beforeEach(() => {
+    tmux = new MockTmuxManager()
+    dir = fsSyncIso.mkdtempSync(pathIso.join(osIso.tmpdir(), 'anweisung-'))
+    fsSyncIso.writeFileSync(pathIso.join(dir, 'CLAUDE.md'), '# Eigenes\n\nInhalt\n')
+  })
+
+  it('fehlt AGENTS.md: neu angelegt, mit Verweis auf die CLAUDE.md; die CLAUDE.md bleibt unberuehrt', async () => {
+    const sm = agentsMdManager()
+    await sm.start({ name: 'o', projectPath: dir, adapterId: 'agents', workspacePrompt: 'P', folderLaunch: {} })
+    assert.ok(exists('AGENTS.md'))
+    assert.ok(read('AGENTS.md').includes('`CLAUDE.md`'), 'Verweis fehlt')
+    assert.ok(read('AGENTS.md').includes('## Workspace Prompt\n\nP'))
+    assert.equal(read('CLAUDE.md'), '# Eigenes\n\nInhalt\n')
+  })
+
+  it('vorhandene AGENTS.md: ihr Inhalt bleibt, die Sektionen kommen dazu', async () => {
+    fsSyncIso.writeFileSync(pathIso.join(dir, 'AGENTS.md'), '# Schon da\n')
+    const sm = agentsMdManager()
+    await sm.start({ name: 'o', projectPath: dir, adapterId: 'agents', workspacePrompt: 'P', folderLaunch: {} })
+    assert.ok(read('AGENTS.md').startsWith('# Schon da\n'))
+    assert.ok(read('AGENTS.md').includes('## Workspace Prompt'))
+  })
+
+  it('nur Shell: keine AGENTS.md — es startet keine CLI, die sie lesen wuerde', async () => {
+    const sm = agentsMdManager()
+    await sm.start({ name: 'o', projectPath: dir, adapterId: 'agents', workspaceId: null, folderLaunch: { shellOnly: true } })
+    assert.ok(!exists('AGENTS.md'))
+  })
+
+  it('Claude-artige CLI (kein instructionsTarget): weiter CLAUDE.md', async () => {
+    const sm = createSessionManager(tmux)
+    await sm.start({ name: 'o', projectPath: dir, workspacePrompt: 'P', folderLaunch: {} })
+    assert.ok(!exists('AGENTS.md'))
+    assert.ok(read('CLAUDE.md').includes('## Workspace Prompt\n\nP'))
+  })
+})

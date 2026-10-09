@@ -8,6 +8,7 @@ import type {
   LaunchOpts,
   AdapterContext,
   ProjectInstructions,
+  InstructionsTarget,
   SendOpts,
 } from '../agent-adapter'
 import type { AdapterFeature, AdapterCapabilities } from '../../../shared/types'
@@ -184,6 +185,10 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     } catch (err) {
       console.warn('[ClaudeCodeAdapter] Direct settings.json write failed:', err)
     }
+  }
+
+  instructionsTarget(): InstructionsTarget {
+    return { file: 'CLAUDE.md' }
   }
 
   getProjectMarkers(): string[] {

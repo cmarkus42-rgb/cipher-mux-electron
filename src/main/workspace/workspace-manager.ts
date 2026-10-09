@@ -25,7 +25,7 @@ export interface ApplyResult {
  *   string    → that workspace
  */
 export interface SessionStarter {
-  start(opts: { name: string; projectPath: string; autoLaunch?: string; workspacePrompt?: string; contextPaths?: string[]; workspaceId?: string | null }): Promise<{ id: string }>
+  start(opts: { name: string; projectPath: string; autoLaunch?: string; workspacePrompt?: string; contextPaths?: string[]; workspaceId?: string | null; adapterId?: string }): Promise<{ id: string }>
   startEntity?(entityId: string, opts?: { workspacePrompt?: string; contextPaths?: string[]; workspaceId?: string | null }): Promise<{ id: string }>
 }
 
@@ -211,7 +211,9 @@ export async function applyWorkspace(
       // workspaceId explicit for the same reason as the preset branch above —
       // without it these sessions stay unbound and every cell of the freshly
       // applied workspace renders the "no workspace" badge.
-      start: () => sessionStarter.start({ name: sessionName, projectPath: project, autoLaunch: launchCmd, workspacePrompt: effectivePrompt, contextPaths: effectivePaths, workspaceId: workspace.id }),
+      // adapterId: die Zeile oben startet fest Claude Code — ohne die Angabe
+      // richtete start() MCP fuer die Default-CLI ein.
+      start: () => sessionStarter.start({ name: sessionName, projectPath: project, autoLaunch: launchCmd, workspacePrompt: effectivePrompt, contextPaths: effectivePaths, workspaceId: workspace.id, adapterId: 'claude-code' }),
     })
   }
 

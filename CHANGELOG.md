@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Codex- und opencode-Ordner-Sessions bekamen Workspace und Global Rules nicht zu sehen.** Der
+  Mux schrieb fest in `CLAUDE.md`. Codex liest nur `AGENTS.md`; opencode liest die `CLAUDE.md` nur,
+  wenn keine `AGENTS.md` daneben liegt (gemessen — nicht „zusätzlich“, wie der Adapter behauptete).
+  Jeder Adapter nennt jetzt seine Datei (`instructionsTarget`). Für Codex legt der Mux eine
+  fehlende `AGENTS.md` an, mit Verweis auf die `CLAUDE.md`, damit opencode sie danach nicht verliert.
+- **Eine Ordner-Session wusste nicht, in welchem Workspace sie ist**, solange der Workspace keinen
+  Prompt hatte. Die Sektion nennt ihn jetzt beim Namen.
+- **Workspace-Zellen richteten MCP für die Standard-CLI ein**, starteten aber fest Claude Code.
+
 ## [0.12.1] — 2026-10-09
 
 ### Added

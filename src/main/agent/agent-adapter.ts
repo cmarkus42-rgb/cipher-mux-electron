@@ -20,6 +20,17 @@ import type { AdapterFeature, AdapterCapabilities, ContextUsage } from '../../sh
 
 export type { AdapterFeature, AdapterCapabilities }
 
+/** Where the Mux writes project instructions for a CLI. */
+export interface InstructionsTarget {
+  file: 'CLAUDE.md' | 'AGENTS.md'
+  /**
+   * Only when the Mux creates the file: it points to this one instead of
+   * hiding it. A new AGENTS.md would otherwise make opencode stop reading the
+   * project's CLAUDE.md.
+   */
+  pointerTo?: 'CLAUDE.md'
+}
+
 export interface LaunchCommand {
   /** Executable name, e.g. 'claude' */
   cmd: string
@@ -130,6 +141,14 @@ export interface AgentAdapter {
   getProjectMarkers(): string[]
   /** Read the agent's project instructions file (e.g. CLAUDE.md). */
   readProjectInstructions(projectPath: string): Promise<ProjectInstructions | null>
+  /**
+   * The file this CLI actually reads as project instructions — where the Mux
+   * writes Global Rules and the workspace sections of a folder session.
+   * Absent = CLAUDE.md. Decided from which files exist, because that is what
+   * the CLI decides it from: opencode reads CLAUDE.md only when no AGENTS.md
+   * lies next to it (measured 2026-10-09).
+   */
+  instructionsTarget?(present: { agentsMd: boolean; claudeMd: boolean }): InstructionsTarget
 
   // --- runtime signals (capability-gated) ---
   /** Check if the adapter supports a specific feature. */

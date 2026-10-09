@@ -7,6 +7,7 @@ import type {
   LaunchOpts,
   AdapterContext,
   ProjectInstructions,
+  InstructionsTarget,
   SendOpts,
 } from '../agent-adapter'
 import type { AdapterFeature, AdapterCapabilities, ContextUsage } from '../../../shared/types'
@@ -258,6 +259,17 @@ export class CodexAdapter implements AgentAdapter {
     } catch (err) {
       console.warn('[CodexAdapter] .codex/config.toml write failed:', err)
     }
+  }
+
+  /**
+   * Codex liest nur AGENTS.md. Fehlt sie, legt der Mux sie an — mit Verweis auf
+   * eine vorhandene CLAUDE.md, weil opencode ab dann nur noch die AGENTS.md
+   * liest und die eigentlichen Projektanweisungen sonst verloere.
+   */
+  instructionsTarget(present: { agentsMd: boolean; claudeMd: boolean }): InstructionsTarget {
+    return !present.agentsMd && present.claudeMd
+      ? { file: 'AGENTS.md', pointerTo: 'CLAUDE.md' }
+      : { file: 'AGENTS.md' }
   }
 
   getProjectMarkers(): string[] {
