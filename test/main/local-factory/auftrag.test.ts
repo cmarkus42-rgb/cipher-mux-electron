@@ -29,6 +29,21 @@ describe('validateAuftrag', () => {
   it('geschützter Test außerhalb des Projekts wird abgelehnt', () => {
     assert.match(validateAuftrag({ ...a, geschuetzteTests: ['/anderswo/x.test.ts'] }).join(), /außerhalb/)
   })
+  it('nicht-String in geschuetzteTests → Fehler statt Wurf', () => {
+    const errs = validateAuftrag({ ...a, geschuetzteTests: [123 as never] })
+    assert.ok(errs.length > 0)
+    assert.match(errs.join(), /geschuetzteTests/)
+  })
+  it('leerer String in geschuetzteTests → Fehler', () => {
+    const errs = validateAuftrag({ ...a, geschuetzteTests: [''] })
+    assert.ok(errs.length > 0)
+    assert.match(errs.join(), /geschuetzteTests/)
+  })
+  it('nicht-String in dateien → Fehler', () => {
+    const errs = validateAuftrag({ ...a, dateien: [null as never] })
+    assert.ok(errs.length > 0)
+    assert.match(errs.join(), /dateien/)
+  })
 })
 
 describe('buildAuftragMd', () => {
@@ -47,9 +62,14 @@ describe('buildAuftragMd', () => {
     assert.ok(md.includes('Versuch 2'))
   })
   it('lange Gate-Ausgabe wird vorne gekürzt, das Ende bleibt', () => {
-    const out = 'A'.repeat(MAX_GATE_OUTPUT_CHARS) + 'ENDE'
+    const out = 'A'.repeat(MAX_GATE_OUTPUT_CHARS * 2) + 'ENDE'
     const md = buildAuftragMd(a, { nummer: 1, versuch: 2, vorherigesGate: { reasons: [], testOutput: out } })
-    assert.ok(md.includes('ENDE'))
-    assert.ok(md.length < out.length + 2000)
+    // Prüfung: ENDE ist vorhanden
+    assert.ok(md.includes('ENDE'), 'ENDE sollte im Output sein')
+    // Prüfung: Kürzungsmarker ist vorhanden
+    assert.ok(md.includes('… (gekürzt)'), 'Kürzungsmarker sollte vorhanden sein')
+    // Prüfung: nicht alle 'A's sind vorhanden (vorne gekürzt)
+    const aCount = md.split('A').length - 1
+    assert.ok(aCount < MAX_GATE_OUTPUT_CHARS * 2, `md sollte weniger als ${MAX_GATE_OUTPUT_CHARS * 2} 'A's enthalten, aber ${aCount} gefunden`)
   })
 })
