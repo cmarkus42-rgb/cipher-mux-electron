@@ -174,5 +174,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
+      # Gate auf Produktionsabhängigkeiten ab high. Seit 2026-10-09 grün erreichbar
+      # (npm audit fix); vorher stand hier continue-on-error und machte den Job
+      # nur scheinbar grün. Verbleibende moderate: gray-matter -> js-yaml 3.
       - run: npm audit --omit=dev --audit-level=high
-        continue-on-error: true
