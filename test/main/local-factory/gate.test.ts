@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { decideGate, touchedProtected, changedChecksums } from '../../../src/main/local-factory/gate'
+import { decideGate, touchedProtected } from '../../../src/main/local-factory/gate'
 
 const base = {
   workerFinished: true,
@@ -79,24 +79,24 @@ describe('Hilfsfunktionen', () => {
   it('touchedProtected normalisiert führendes ./', () => {
     assert.deepEqual(touchedProtected(['./test/a.test.ts'], ['test/a.test.ts']), ['test/a.test.ts'])
   })
-  it('changedChecksums iteriert über protectedFiles und meldet fehlende/geänderte', () => {
-    assert.deepEqual(
-      changedChecksums(
-        { 'test/a.test.ts': '1', 'test/b.test.ts': '2' },
-        { 'test/a.test.ts': '1' },
-        ['test/a.test.ts', 'test/b.test.ts']
-      ),
-      ['test/b.test.ts']
-    )
+  // changedChecksums ist entfallen (ungenutzt); decideGate deckt beides ab:
+  it('decideGate: fehlende Prüfsumme danach → Baseline-Grund, rot', () => {
+    const g = decideGate({
+      workerFinished: true, testExitCode: 0,
+      checksumsBefore: { 'test/a.test.ts': '1', 'test/b.test.ts': '2' },
+      checksumsAfter: { 'test/a.test.ts': '1' },
+      changedFiles: [], protectedFiles: ['test/a.test.ts', 'test/b.test.ts'],
+    })
+    assert.equal(g.verdict, 'rot')
+    assert.deepEqual(g.reasons, ['Baseline fehlt für geschützten Test: test/b.test.ts'])
   })
-  it('changedChecksums mit normalisierten Pfaden', () => {
-    assert.deepEqual(
-      changedChecksums(
-        { './test/a.test.ts': '1' },
-        { 'test/a.test.ts': '1' },
-        ['test/a.test.ts']
-      ),
-      []
-    )
+  it('decideGate: Prüfsummen-Schlüssel mit ./ werden normalisiert → grün', () => {
+    const g = decideGate({
+      workerFinished: true, testExitCode: 0,
+      checksumsBefore: { './test/a.test.ts': '1' },
+      checksumsAfter: { 'test/a.test.ts': '1' },
+      changedFiles: [], protectedFiles: ['test/a.test.ts'],
+    })
+    assert.deepEqual(g, { verdict: 'gruen', reasons: [] })
   })
 })
