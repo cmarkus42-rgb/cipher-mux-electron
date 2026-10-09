@@ -37,18 +37,6 @@ export function touchedProtected(changed: string[], protectedFiles: string[]): s
   return changed.map(norm).filter(f => prot.has(f))
 }
 
-export function changedChecksums(
-  before: Record<string, string>,
-  after: Record<string, string>,
-  protectedFiles: string[],
-): string[] {
-  const beforeNorm = Object.fromEntries(Object.entries(before).map(([k, v]) => [norm(k), v]))
-  const afterNorm = Object.fromEntries(Object.entries(after).map(([k, v]) => [norm(k), v]))
-  return protectedFiles
-    .map(norm)
-    .filter(f => afterNorm[f] !== beforeNorm[f])
-}
-
 export function decideGate(input: GateInput): GateResult {
   const reasons: string[] = []
 
