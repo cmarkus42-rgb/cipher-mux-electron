@@ -1,0 +1,55 @@
+import { describe, it } from 'node:test'
+import * as assert from 'node:assert/strict'
+import { validateAuftrag, buildAuftragMd, MAX_GATE_OUTPUT_CHARS } from '../../../src/main/local-factory/auftrag'
+
+const a = {
+  projekt: '/abs/projekt',
+  ziel: 'Login-Formular validiert E-Mail',
+  dateien: ['src/login.ts'],
+  akzeptanzkriterium: 'Ungültige E-Mail zeigt Fehlermeldung',
+  geschuetzteTests: ['test/login.accept.test.ts'],
+  testBefehl: 'npm test -- test/login.accept.test.ts',
+  nichtZiele: ['Kein Styling'],
+}
+
+describe('validateAuftrag', () => {
+  it('gültiger Auftrag → keine Fehler', () => {
+    assert.deepEqual(validateAuftrag(a), [])
+  })
+  it('leere Pflichtfelder werden einzeln benannt', () => {
+    const errs = validateAuftrag({ ...a, ziel: ' ', geschuetzteTests: [], testBefehl: '' })
+    assert.equal(errs.length, 3)
+    assert.match(errs.join(), /ziel/)
+    assert.match(errs.join(), /geschuetzteTests/)
+    assert.match(errs.join(), /testBefehl/)
+  })
+  it('projekt muss absolut sein', () => {
+    assert.match(validateAuftrag({ ...a, projekt: 'rel' }).join(), /absolut/)
+  })
+  it('geschützter Test außerhalb des Projekts wird abgelehnt', () => {
+    assert.match(validateAuftrag({ ...a, geschuetzteTests: ['/anderswo/x.test.ts'] }).join(), /außerhalb/)
+  })
+})
+
+describe('buildAuftragMd', () => {
+  it('enthält Projektpfad, Kriterium, geschützte Tests, Testbefehl', () => {
+    const md = buildAuftragMd(a, { nummer: 3, versuch: 1 })
+    for (const s of ['/abs/projekt', a.akzeptanzkriterium, 'test/login.accept.test.ts', a.testBefehl, '#3']) {
+      assert.ok(md.includes(s), s)
+    }
+  })
+  it('zweiter Versuch: Gate-Ausgabe wörtlich, in einem Codeblock', () => {
+    const md = buildAuftragMd(a, {
+      nummer: 3, versuch: 2,
+      vorherigesGate: { reasons: ['Testbefehl rot (Exit 1).'], testOutput: 'AssertionError: expected "x"' },
+    })
+    assert.ok(md.includes('AssertionError: expected "x"'))
+    assert.ok(md.includes('Versuch 2'))
+  })
+  it('lange Gate-Ausgabe wird vorne gekürzt, das Ende bleibt', () => {
+    const out = 'A'.repeat(MAX_GATE_OUTPUT_CHARS) + 'ENDE'
+    const md = buildAuftragMd(a, { nummer: 1, versuch: 2, vorherigesGate: { reasons: [], testOutput: out } })
+    assert.ok(md.includes('ENDE'))
+    assert.ok(md.length < out.length + 2000)
+  })
+})
