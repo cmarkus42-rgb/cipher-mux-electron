@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.2] — 2026-10-09
+
 ### Fixed
 - **Codex- und opencode-Ordner-Sessions bekamen Workspace und Global Rules nicht zu sehen.** Der
   Mux schrieb fest in `CLAUDE.md`. Codex liest nur `AGENTS.md`; opencode liest die `CLAUDE.md` nur,
