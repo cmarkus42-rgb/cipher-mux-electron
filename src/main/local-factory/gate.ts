@@ -5,7 +5,11 @@
  * anderen schließt: die Prüfsumme sieht Inhaltsänderungen auch an Dateien, die
  * git ignoriert; der Diff sieht jede Änderung, gleichgültig ob sie über das
  * Edit-Werkzeug oder die Shell kam — dort hat die Plugin-Grenze keine Augen.
+ *
+ * Ruling R6: Vollständige Normalisierung und fail-safe Iterationen.
  */
+
+import { normalize } from 'path/posix'
 
 export type GateVerdict = 'gruen' | 'rot' | 'haengt'
 
@@ -26,7 +30,7 @@ export interface GateResult {
   reasons: string[]
 }
 
-const norm = (p: string): string => p.replace(/^\.\//, '')
+const norm = (p: string): string => normalize(p).replace(/^\.\//, '')
 
 export function touchedProtected(changed: string[], protectedFiles: string[]): string[] {
   const prot = new Set(protectedFiles.map(norm))
@@ -36,21 +40,57 @@ export function touchedProtected(changed: string[], protectedFiles: string[]): s
 export function changedChecksums(
   before: Record<string, string>,
   after: Record<string, string>,
+  protectedFiles: string[],
 ): string[] {
-  return Object.keys(before).filter(f => after[f] !== before[f])
+  const beforeNorm = Object.fromEntries(Object.entries(before).map(([k, v]) => [norm(k), v]))
+  const afterNorm = Object.fromEntries(Object.entries(after).map(([k, v]) => [norm(k), v]))
+  return protectedFiles
+    .map(norm)
+    .filter(f => afterNorm[f] !== beforeNorm[f])
 }
 
 export function decideGate(input: GateInput): GateResult {
-  if (!input.workerFinished) {
-    return { verdict: 'haengt', reasons: ['Worker ist nicht fertig geworden (Timeout oder Stillstand).'] }
-  }
   const reasons: string[] = []
+
+  // Check protected files (empty list is an error condition)
+  if (input.protectedFiles.length === 0) {
+    reasons.push('Keine geschützten Abnahmetests angegeben.')
+    return { verdict: 'rot', reasons }
+  }
+
+  // Normalize checksums
+  const beforeNorm = Object.fromEntries(Object.entries(input.checksumsBefore).map(([k, v]) => [norm(k), v]))
+  const afterNorm = Object.fromEntries(Object.entries(input.checksumsAfter).map(([k, v]) => [norm(k), v]))
+
+  // Check if worker finished (but still compute protection reasons)
   const touched = touchedProtected(input.changedFiles, input.protectedFiles)
   if (touched.length > 0) reasons.push(`Geschützte Tests verändert: ${touched.join(', ')}`)
-  const sums = changedChecksums(input.checksumsBefore, input.checksumsAfter)
-    .filter(f => !touched.includes(norm(f)))
-  if (sums.length > 0) reasons.push(`Prüfsumme geschützter Tests abweichend: ${sums.join(', ')}`)
+
+  // Separate baseline missing from checksum changed
+  const baseline: string[] = []
+  const changed: string[] = []
+  for (const f of input.protectedFiles) {
+    const nf = norm(f)
+    if (touched.includes(nf)) continue // Already reported via diff
+    if (beforeNorm[nf] === undefined || afterNorm[nf] === undefined) {
+      baseline.push(nf)
+    } else if (afterNorm[nf] !== beforeNorm[nf]) {
+      changed.push(nf)
+    }
+  }
+
+  if (baseline.length > 0) reasons.push(`Baseline fehlt für geschützten Test: ${baseline.join(', ')}`)
+  if (changed.length > 0) reasons.push(`Prüfsumme geschützter Tests abweichend: ${changed.join(', ')}`)
+
+  if (!input.workerFinished) {
+    return {
+      verdict: 'haengt',
+      reasons: ['Worker ist nicht fertig geworden (Timeout oder Stillstand).'].concat(reasons),
+    }
+  }
+
   if (input.testExitCode === null) reasons.push('Testbefehl ist nicht gelaufen.')
   else if (input.testExitCode !== 0) reasons.push(`Testbefehl rot (Exit ${input.testExitCode}).`)
+
   return { verdict: reasons.length === 0 ? 'gruen' : 'rot', reasons }
 }
