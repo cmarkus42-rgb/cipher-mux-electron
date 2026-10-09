@@ -1,7 +1,8 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import * as crypto from 'crypto'
-import { spawn } from 'child_process'
+import { spawn, execFile } from 'child_process'
+import { promisify } from 'util'
 import { runCommand, getEnhancedPath } from '../util/exec-util'
 
 /**
@@ -17,23 +18,29 @@ export async function runShell(
   return new Promise(resolve => {
     // -l: der Testbefehl soll dieselbe Umgebung sehen wie im Terminal (node,
     // npm, flutter aus dem Profil-PATH).
+    // detached: eigene Prozessgruppe, damit der Timeout auch Enkelprozesse
+    // (npm test, a && b) trifft und nicht nur die Shell.
     const child = spawn('/bin/zsh', ['-lc', cmd], {
       cwd,
       env: { ...process.env, PATH: getEnhancedPath() },
+      detached: true,
     })
     let output = ''
-    let timedOut = false
+    let done = false
+    const finish = (exitCode: number | null, extra = ''): void => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      resolve({ exitCode, output: output + extra })
+    }
     child.stdout.on('data', d => { output += d })
     child.stderr.on('data', d => { output += d })
-    const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL') }, timeoutMs)
-    child.on('close', code => {
-      clearTimeout(timer)
-      resolve({ exitCode: timedOut ? null : code, output })
-    })
-    child.on('error', err => {
-      clearTimeout(timer)
-      resolve({ exitCode: null, output: output + String(err) })
-    })
+    const timer = setTimeout(() => {
+      try { process.kill(-child.pid!, 'SIGKILL') } catch { /* Gruppe schon weg */ }
+      finish(null)
+    }, timeoutMs)
+    child.on('close', code => finish(code))
+    child.on('error', err => finish(null, String(err)))
   })
 }
 
@@ -89,13 +96,25 @@ export function checksums(projekt: string, files: string[]): Record<string, stri
   return out
 }
 
-/** Achtung: git reset --hard + clean -fd. Läuft nur mit cwd = projekt. */
+const execFileP = promisify(execFile)
+
+/** Achtung: git reset --hard + clean -fd. Läuft nur, wenn projekt die Repo-Wurzel ist. */
 export async function savePatchAndReset(projekt: string, base: string, patchFile: string): Promise<void> {
+  // reset --hard würde sonst ein umschließendes Repo komplett zurücksetzen.
+  const top = await git(projekt, ['rev-parse', '--show-toplevel'])
+  if (fs.realpathSync(top) !== fs.realpathSync(projekt)) {
+    throw new Error(`projekt ist nicht die Wurzel eines git-Repos: ${projekt}`)
+  }
   // Untracked erst in den Index (intent-to-add), damit der Patch sie enthält.
   await git(projekt, ['add', '-N', '.'])
-  const patch = await git(projekt, ['diff', base])
+  // Eigener Aufruf: großer Puffer, --binary, unbeschnitten.
+  const { stdout } = await execFileP('git', ['diff', '--binary', base], {
+    cwd: projekt,
+    maxBuffer: 256 * 1024 * 1024,
+    env: { ...process.env, PATH: getEnhancedPath() },
+  })
   fs.mkdirSync(path.dirname(patchFile), { recursive: true })
-  fs.writeFileSync(patchFile, patch + '\n', 'utf-8')
+  fs.writeFileSync(patchFile, stdout, 'utf-8')
   await git(projekt, ['reset', '-q', '--hard', base])
   await git(projekt, ['clean', '-fdq'])
 }
