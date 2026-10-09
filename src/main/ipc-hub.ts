@@ -2712,7 +2712,7 @@ export class IpcHub {
     const ENTITIES_WITH_TEMPLATE = new Set([
       'audit', 'voice-relay', 'testing-assistant',
       'debugger', 'cyber-factory', 'workshop', 'companion',
-      'refinement', 'ideation-partner',
+      'refinement', 'ideation-partner', 'local-worker',
     ])
 
     ipcMain.handle(IPC.PRESETS_LIST, async () => {
