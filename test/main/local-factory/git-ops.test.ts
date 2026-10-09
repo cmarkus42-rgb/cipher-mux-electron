@@ -6,7 +6,7 @@ import * as path from 'path'
 import { execFileSync } from 'child_process'
 import {
   runShell, dirtyFiles, headCommit, commitPaths, commitAll, changedSince,
-  checksums, savePatchAndReset, toRepoRelative,
+  checksums, savePatchAndReset, toRepoRelative, currentBranch,
 } from '../../../src/main/local-factory/git-ops'
 
 let repo: string
@@ -85,9 +85,55 @@ describe('git-ops', () => {
     assert.match(fs.readFileSync(patch, 'utf-8'), /GIT binary patch/)
   })
   it('commitAll nimmt auch neue Dateien mit', async () => {
+    const base = await headCommit(repo)
     fs.writeFileSync(path.join(repo, 'neu.txt'), 'n')
-    await commitAll(repo, 'alles')
+    await commitAll(repo, base, 'alles')
     assert.deepEqual(await dirtyFiles(repo), [])
+  })
+  it('commitAll faltet eigene Commits seit der Basis in genau einen ein (R14)', async () => {
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'w1.txt'), '1')
+    git('add', '.'); git('commit', '-qm', 'worker 1')
+    fs.writeFileSync(path.join(repo, 'w2.txt'), '2')
+    await commitAll(repo, base, 'lf: zusammen')
+    assert.equal(git('rev-parse', 'HEAD~1'), base)
+    assert.equal(git('log', '-1', '--format=%s'), 'lf: zusammen')
+    assert.deepEqual(git('show', '--name-only', '--format=', 'HEAD').split('\n').sort(), ['w1.txt', 'w2.txt'])
+  })
+  it('pre-commit-Hook mit exit 1 hält commitPaths und commitAll nicht auf (R14)', async () => {
+    const hook = path.join(repo, '.git', 'hooks', 'pre-commit')
+    fs.mkdirSync(path.dirname(hook), { recursive: true })
+    fs.writeFileSync(hook, '#!/bin/sh\nexit 1\n', { mode: 0o755 })
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 't.txt'), 't')
+    await commitPaths(repo, ['t.txt'], 'lf: Abnahmetest #1')
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'neu\n')
+    await commitAll(repo, base, 'lf: gruen')
+    assert.equal(git('log', '-1', '--format=%s'), 'lf: gruen')
+    assert.deepEqual(await dirtyFiles(repo), [])
+  })
+  it('currentBranch nennt den ausgecheckten Branch', async () => {
+    git('checkout', '-qb', 'feature')
+    assert.equal(await currentBranch(repo), 'feature')
+  })
+  it('Nicht-ASCII-Dateinamen kommen unmaskiert zurück (core.quotepath=off)', async () => {
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'grün.txt'), 'g')
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'b\n')
+    git('add', 'a.txt')
+    git('mv', 'a.txt', 'ä.txt')
+    assert.ok((await dirtyFiles(repo)).includes('grün.txt'))
+    assert.ok((await dirtyFiles(repo)).includes('ä.txt'))
+    assert.ok((await changedSince(repo, base)).includes('ä.txt'))
+  })
+  it('savePatchAndReset schreibt den Patch byte-genau (kein UTF-8-Umweg)', async () => {
+    const base = await headCommit(repo)
+    const latin1 = Buffer.from([0x63, 0x61, 0x66, 0xe9, 0x0a]) // "café" in Latin-1
+    fs.writeFileSync(path.join(repo, 'a.txt'), latin1)
+    const patch = path.join(os.tmpdir(), `lf-l1-${Date.now()}.patch`)
+    await savePatchAndReset(repo, base, patch)
+    git('apply', patch)
+    assert.deepEqual(fs.readFileSync(path.join(repo, 'a.txt')), latin1)
   })
   it('checksums: fehlende Datei fehlt im Ergebnis', () => {
     const c = checksums(repo, ['a.txt', 'fehlt.txt'])

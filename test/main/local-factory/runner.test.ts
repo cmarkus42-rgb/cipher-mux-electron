@@ -17,13 +17,17 @@ const git = (...a: string[]) => execFileSync('git', a, { cwd: repo, encoding: 'u
 // Abnahmetest: rot, solange impl.txt nicht "ok" enthält.
 const TEST_CMD = 'grep -q ok impl.txt'
 
-function fakeHost(behaviour: 'brav' | 'schummelt' | 'haengt' | 'endpunkt-weg'): WorkerHost & { wakes: string[]; sent: string[] } {
+type Behaviour = 'brav' | 'schummelt' | 'haengt' | 'nicht-bereit' | 'committet' | 'wechselt-branch'
+
+function fakeHost(behaviour: Behaviour): WorkerHost & { wakes: string[]; sent: string[] } {
   let runDir = ''
   const wakes: string[] = []
   const sent: string[] = []
   return {
     wakes, sent,
-    async endpointReachable() { return behaviour !== 'endpunkt-weg' },
+    async workerReady() {
+      return behaviour === 'nicht-bereit' ? 'Endpunkt des lokalen Modells antwortet nicht (HTTP 404)' : null
+    },
     async startFreshWorker() {
       runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-run-'))
       return { runDir, sessionId: 's1' }
@@ -31,7 +35,12 @@ function fakeHost(behaviour: 'brav' | 'schummelt' | 'haengt' | 'endpunkt-weg'): 
     async sendToWorker(_id, line) {
       sent.push(line)
       if (behaviour === 'haengt') return
+      if (behaviour === 'wechselt-branch') git('checkout', '-qb', 'worker-eigen')
       fs.writeFileSync(path.join(repo, 'impl.txt'), 'ok\n')
+      if (behaviour === 'committet') {
+        git('add', '-A'); git('commit', '-qm', 'worker: eigener Commit')
+        fs.writeFileSync(path.join(repo, 'extra.txt'), 'x\n')
+      }
       if (behaviour === 'schummelt') fs.writeFileSync(path.join(repo, 'test', 'accept.sh'), 'exit 0\n')
       fs.writeFileSync(path.join(runDir, 'REPORT.md'), 'fertig')
       // Idle nach dem Report — sonst wartet der Läufer bis zum Timeout und wertet „hängt“.
@@ -44,6 +53,8 @@ function fakeHost(behaviour: 'brav' | 'schummelt' | 'haengt' | 'endpunkt-weg'): 
   }
 }
 
+type Res = { ok: boolean; error?: string; laufId?: string; laufPfad?: string; nummer?: number; versuch?: number }
+
 const args = () => ({
   projekt: repo,
   ziel: 'impl sagt ok',
@@ -54,9 +65,11 @@ const args = () => ({
   nichtZiele: [],
 })
 
-const fast = (host: WorkerHost) => new LocalFactoryRunner({
+// timeoutMs klein, damit „haengt“ schnell greift. Wer im Fake-Worker git
+// aufruft, braucht mehr — sonst läuft die Frist schon während sendToWorker ab.
+const fast = (host: WorkerHost, timeoutMs = 50) => new LocalFactoryRunner({
   host, laufDir, sleep: async () => {}, pollMs: 0, startupWaitMs: 0,
-  quietMs: 1000, stallMs: 5000, timeoutMs: 50, testTimeoutMs: 5000,
+  quietMs: 1000, stallMs: 5000, timeoutMs, testTimeoutMs: 5000,
 })
 
 beforeEach(() => {
@@ -143,11 +156,14 @@ describe('LocalFactoryRunner', () => {
     assert.match(res.error, /fremd\.txt/)
   })
 
-  it('Endpunkt weg → Ablehnung und Weckzeile, kein Versuch gezählt', async () => {
-    const host = fakeHost('endpunkt-weg')
-    const res: any = await fast(host).dispatch(args())
+  it('nicht bereit → Ablehnung mit Grund und Weckzeile, kein Versuch gezählt (R15)', async () => {
+    const host = fakeHost('nicht-bereit')
+    const res = await fast(host).dispatch(args()) as Res
     assert.equal(res.ok, false)
-    assert.match(res.error, /Endpunkt/)
+    assert.match(res.error!, /Nicht bereit: Endpunkt .*HTTP 404/)
+    assert.deepEqual(host.wakes, [
+      '[local-factory] Nicht bereit: Endpunkt des lokalen Modells antwortet nicht (HTTP 404) — kein Versuch gezählt.',
+    ])
     assert.equal(fs.readdirSync(laufDir).length, 0)
   })
 
@@ -234,5 +250,118 @@ describe('LocalFactoryRunner', () => {
     const patch = fs.readFileSync(v.patchPfad!, 'utf-8')
     assert.ok(patch.length > 0)
     assert.match(patch, /impl\.txt/)
+  })
+
+  it('Worker committet selbst → GRÜN, genau ein lf:-Commit über der Basis (R14)', async () => {
+    const host = fakeHost('committet')
+    const r = fast(host, 10_000)
+    const res = await r.dispatch(args()) as Res
+    await r.whenIdle()
+    assert.match(host.wakes[0], /GRÜN/)
+    const subjects = git('log', '--format=%s').split('\n')
+    assert.deepEqual(subjects.slice(0, 3), ['lf: impl sagt ok', 'lf: Abnahmetest #1', 'init'])
+    assert.deepEqual(git('show', '--name-only', '--format=', 'HEAD').split('\n').sort(), ['extra.txt', 'impl.txt'])
+    const v = loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0]
+    assert.equal(v.verdict, 'gruen')
+    assert.equal(v.commit, git('rev-parse', 'HEAD'))
+  })
+
+  it('pre-commit-Hook exit 1: Abnahmetest-Commit und grüner Commit gelingen trotzdem (R14)', async () => {
+    fs.writeFileSync(path.join(repo, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 1\n', { mode: 0o755 })
+    const host = fakeHost('brav')
+    const r = fast(host)
+    const res = await r.dispatch(args()) as Res
+    assert.equal(res.ok, true)
+    await r.whenIdle()
+    assert.match(host.wakes[0], /GRÜN/)
+    assert.deepEqual(git('log', '--format=%s', '-2').split('\n'), ['lf: impl sagt ok', 'lf: Abnahmetest #1'])
+  })
+
+  it('Worker wechselt den Branch → ROT mit Grund, nichts zurückgesetzt, Basisbranch unberührt', async () => {
+    const host = fakeHost('wechselt-branch')
+    const r = fast(host, 10_000)
+    const startBranch = git('rev-parse', '--abbrev-ref', 'HEAD')
+    const res = await r.dispatch(args()) as Res
+    await r.whenIdle()
+    assert.match(host.wakes[0], /ROT, Versuch 1\/2/)
+    assert.match(host.wakes[0], /Branch gewechselt/)
+    const v = loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0]
+    assert.equal(v.verdict, 'rot')
+    assert.match(fs.readFileSync(v.gatePfad!, 'utf-8'), /Worker hat den Branch gewechselt/)
+    // Konservativ: kein reset auf einem fremden Branch, Arbeit des Workers bleibt stehen.
+    assert.equal(git('rev-parse', '--abbrev-ref', 'HEAD'), 'worker-eigen')
+    assert.equal(fs.readFileSync(path.join(repo, 'impl.txt'), 'utf-8'), 'ok\n')
+    assert.equal(git('log', '-1', '--format=%s', startBranch), 'lf: Abnahmetest #1')
+  })
+
+  it('Weckzeilen sind einzeilig und gekappt: ziel mit Zeilenumbruch', async () => {
+    const host = fakeHost('brav')
+    const r = fast(host)
+    await r.dispatch({ ...args(), ziel: 'impl\nsagt   ok\r\n' + 'x'.repeat(600) })
+    await r.whenIdle()
+    assert.equal(host.wakes.length, 1)
+    assert.doesNotMatch(host.wakes[0], /[\r\n]/)
+    assert.ok(host.wakes[0].length <= 400, `Länge ${host.wakes[0].length}`)
+    assert.match(host.wakes[0], /„impl sagt ok/)
+  })
+
+  it('Läuferfehler mit mehrzeiligem Fehlertext → einzeilige Weckzeile', async () => {
+    const host = fakeHost('brav')
+    host.sendToWorker = async () => { throw new Error('zeile1\nzeile2') }
+    const r = fast(host)
+    await r.dispatch(args()); await r.whenIdle()
+    const w = host.wakes.find(x => x.includes('Läuferfehler'))!
+    assert.doesNotMatch(w, /\n/)
+    assert.match(w, /zeile1 zeile2/)
+  })
+
+  it('accept: grün-wartend → ok und abgenommen', async () => {
+    const r = fast(fakeHost('brav'))
+    const res = await r.dispatch(args()) as Res
+    await r.whenIdle()
+    assert.deepEqual(r.accept(res.laufId!, 1), { ok: true })
+    assert.equal(loadLauf(res.laufPfad!)!.haeppchen[0].status, 'abgenommen')
+  })
+
+  it('accept: unbekannter Lauf bzw. nicht grün-wartend → ok:false mit Grund', async () => {
+    const r = fast(fakeHost('schummelt'))
+    const unbekannt = r.accept('GIBTESNICHT', 1)
+    assert.equal(unbekannt.ok, false)
+    assert.match((unbekannt as Res).error!, /unbekannt/)
+    const res = await r.dispatch(args()) as Res
+    await r.whenIdle()
+    const rot = r.accept(res.laufId!, 1)
+    assert.equal(rot.ok, false)
+    assert.match((rot as Res).error!, /nicht grün/)
+    const fehlt = r.accept(res.laufId!, 7)
+    assert.equal(fehlt.ok, false)
+    assert.match((fehlt as Res).error!, /#7/)
+    assert.equal(r.accept('../x', 1).ok, false)
+  })
+
+  it('Fremddatei bei Neustart-Rest: Fehlermeldung nennt den unterbrochenen Versuch', async () => {
+    const laufId = 'LREST2'
+    const l = newLauf(laufId, repo, 1)
+    l.haeppchen.push({ nummer: 3, ziel: 'z', status: 'laeuft', versuche: [{ nr: 1, gestartet: 5 }] })
+    saveLauf(path.join(laufDir, laufId, 'lauf.json'), l)
+    fs.writeFileSync(path.join(repo, 'impl.txt'), 'halb\n')
+    const res = await fast(fakeHost('brav')).dispatch({ ...args(), laufId, haeppchen: 3 }) as Res
+    assert.equal(res.ok, false)
+    assert.match(res.error!, /impl\.txt/)
+    assert.match(res.error!, /vermutlich Rest eines unterbrochenen Versuchs #3 — Patch sichern oder Baum zurücksetzen/)
+  })
+
+  it('Läuferfehler nach Branchwechsel: kein reset auf dem fremden Branch', async () => {
+    const host = fakeHost('brav')
+    host.sendToWorker = async () => {
+      git('checkout', '-qb', 'fremd')
+      fs.writeFileSync(path.join(repo, 'impl.txt'), 'arbeit\n')
+      git('commit', '-qam', 'fremde Arbeit')
+      throw new Error('boom')
+    }
+    const r = fast(host)
+    await r.dispatch(args()); await r.whenIdle()
+    assert.equal(git('log', '-1', '--format=%s', 'fremd'), 'fremde Arbeit')
+    assert.ok(host.wakes.some(w => w.includes('Läuferfehler')))
   })
 })
