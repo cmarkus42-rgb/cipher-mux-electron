@@ -1,6 +1,13 @@
 import { describe, it } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { mergeOpenCodeConfig, buildOpenCodeMcpEntry } from '../../src/main/agent/adapters/opencode'
+import * as fs from 'fs'
+import * as os from 'os'
+import * as path from 'path'
+import {
+  mergeOpenCodeConfig, buildOpenCodeMcpEntry, OpenCodeAdapter, OPENCODE_CONFIG_FILENAME, OPENCODE_PLUGIN_SUBDIR,
+} from '../../src/main/agent/adapters/opencode'
+import { OPENCODE_BOUNDARY_PLUGIN_FILENAME, PROTECTED_PATHS_FILENAME } from '../../src/main/session/entity-boundaries'
+import { IDLE_PLUGIN_FILENAME } from '../../src/main/local-factory/worker-done'
 import { buildLocalProviderBlock, localModelSpec } from '../../src/main/local-factory/local-provider'
 
 const entry = buildOpenCodeMcpEntry('http://127.0.0.1:3100/mcp', 'k', null, 'local-worker')
@@ -29,5 +36,40 @@ describe('mergeOpenCodeConfig mit lokalem Anbieter', () => {
     const before = mergeOpenCodeConfig({}, entry, [], local)
     const m = mergeOpenCodeConfig(before, entry, [], null) as Merged
     assert.equal(m.model, undefined)
+  })
+})
+
+describe('OpenCodeAdapter.postLaunchInjection — Verdrahtung des lokalen Workers', () => {
+  const ctx = (projectPath: string, entityId: string) => ({
+    projectPath, entityId, mcpUrl: 'http://127.0.0.1:3100/mcp', mcpApiKey: 'k', sessionId: 's', workspaceId: 'ws',
+  })
+  const adapter = new OpenCodeAdapter({ getSkipPermissions: () => true, getLocalWorker: () => cfg })
+  type Cfg = { provider?: Record<string, unknown>; model?: string; plugin?: string[] }
+  const readCfg = (d: string): Cfg => JSON.parse(fs.readFileSync(path.join(d, OPENCODE_CONFIG_FILENAME), 'utf-8'))
+
+  it('local-worker: Anbieter + Modell, Idle-Plugin, Grenze mit absolutem Sperrlisten-Pfad; andere Rolle räumt ab', async () => {
+    const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oc-lw-'))
+    try {
+      await adapter.postLaunchInjection(ctx(runDir, 'local-worker'))
+      const c = readCfg(runDir)
+      assert.ok(c.provider?.['cipher-local'])
+      assert.equal(c.model, 'cipher-local/qwen')
+
+      const pluginDir = path.join(runDir, OPENCODE_PLUGIN_SUBDIR)
+      const idle = path.join(pluginDir, IDLE_PLUGIN_FILENAME)
+      const boundary = path.join(pluginDir, OPENCODE_BOUNDARY_PLUGIN_FILENAME)
+      assert.ok(fs.existsSync(idle), 'Idle-Plugin fehlt')
+      assert.ok(fs.readFileSync(boundary, 'utf-8').includes(JSON.stringify(path.join(runDir, PROTECTED_PATHS_FILENAME))))
+      assert.ok(c.plugin?.some(p => p.endsWith(IDLE_PLUGIN_FILENAME)))
+
+      await adapter.postLaunchInjection(ctx(runDir, 'companion'))
+      const c2 = readCfg(runDir)
+      assert.equal(c2.provider?.['cipher-local'], undefined)
+      assert.equal(c2.model, undefined)
+      assert.equal(fs.existsSync(idle), false)
+      assert.ok(!c2.plugin?.some(p => p.endsWith(IDLE_PLUGIN_FILENAME)))
+    } finally {
+      fs.rmSync(runDir, { recursive: true, force: true })
+    }
   })
 })
