@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] — 2026-10-09
+
 ### Added
 - **Ordner-Sessions bekommen ein Feld „Workspace“ und ein Feld „CLI“** im Launcher. Workspace
   steht auf „ohne“, solange man nichts wählt; CLI auf der Standard-CLI. Die Startzeile baut jetzt
@@ -25,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Start und MCP-Einrichtung liefen unter zwei CLIs**, wenn die Standard-CLI nicht Claude Code
   war: der Ordner-Start tippte fest `claude`, eingerichtet wurde für die Standard-CLI. Dasselbe beim
   Fork einer Session, deren CLI von der Standard-CLI abwich.
+
+### Security
+- **Abhängigkeiten: keine kritische Lücke mehr, das Audit-Gate ist echt.** `npm audit fix` ohne
+  `--force` (MCP-SDK 1.29 → 1.32.1, dazu proxy-addr, fast-uri, hono, ip-address und weitere
+  transitiv) und electron-builder 25 → 26.15.3 (tar, node-gyp 9 → 12). Produktion 12 → 4 Meldungen,
+  alle moderate; gesamt 46 → 14, keine critical. Der CI-Job „Security Audit“ lief bisher mit
+  `continue-on-error` und war nur scheinbar grün — jetzt ist er ein Gate. Offen: Electron 34 → 44,
+  daran hängen die zwei verbleibenden high.
 
 ## [0.12.0] — 2026-10-09
 
