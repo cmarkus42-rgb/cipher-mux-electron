@@ -212,4 +212,27 @@ describe('LocalFactoryRunner', () => {
     assert.match(res.error, /laufId/)
     assert.equal(fs.readdirSync(laufDir).length, 0)
   })
+  it('wakeArchitect wirft nach GRÜN: Arbeitscommit bleibt HEAD, Lauf zeigt gruen', async () => {
+    const host = fakeHost('brav')
+    host.wakeArchitect = async () => { throw new Error('pane weg') }
+    const r = fast(host)
+    const res: any = await r.dispatch(args())
+    await r.whenIdle()
+    assert.equal(git('log', '-1', '--format=%s'), 'lf: impl sagt ok')
+    const v = loadLauf(res.laufPfad)!.haeppchen[0].versuche[0]
+    assert.equal(v.verdict, 'gruen')
+    assert.equal(v.commit, git('rev-parse', 'HEAD'))
+  })
+
+  it('wakeArchitect wirft nach ROT: Patch behält die Änderung des Workers', async () => {
+    const host = fakeHost('schummelt')
+    host.wakeArchitect = async () => { throw new Error('pane weg') }
+    const r = fast(host)
+    const res: any = await r.dispatch(args())
+    await r.whenIdle()
+    const v = loadLauf(res.laufPfad)!.haeppchen[0].versuche[0]
+    const patch = fs.readFileSync(v.patchPfad!, 'utf-8')
+    assert.ok(patch.length > 0)
+    assert.match(patch, /impl\.txt/)
+  })
 })

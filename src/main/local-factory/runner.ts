@@ -168,7 +168,6 @@ export class LocalFactoryRunner {
       } catch { /* kein lesbares Gate — dann ohne */ }
     }
 
-    this.busy = true
     this.running = this.runAttempt({
       args, prot, base, sumsBefore, laufId, laufPfad,
       nummer: begun.nummer, versuch: begun.versuch, vorherigesGate,
@@ -180,10 +179,13 @@ export class LocalFactoryRunner {
   }
 
   private async runAttempt(a: Attempt): Promise<void> {
-    const started: { sessionId?: string } = {}
+    const started: { sessionId?: string; settled?: boolean } = {}
     try {
       await this.runAttemptInner(a, started)
     } catch (err) {
+      // Nach dem Commit bzw. dem regulären Patch+Reset ist der Versuch entschieden;
+      // ein späterer Fehler (Lauf speichern, Wecken) darf daran nichts mehr ändern.
+      if (started.settled) throw err
       // Aufräumen: Häppchen nicht in „laeuft“ lassen, Baum zurück auf Basis.
       try {
         const dir = path.dirname(a.laufPfad)
@@ -202,7 +204,7 @@ export class LocalFactoryRunner {
     }
   }
 
-  private async runAttemptInner(a: Attempt, started: { sessionId?: string }): Promise<void> {
+  private async runAttemptInner(a: Attempt, started: { sessionId?: string; settled?: boolean }): Promise<void> {
     const { host } = this.o
     const projekt = a.args.projekt
     const { runDir, sessionId } = await host.startFreshWorker(projekt)
@@ -256,9 +258,11 @@ export class LocalFactoryRunner {
     let patchPfad: string | undefined
     if (gate.verdict === 'gruen') {
       commit = await commitAll(projekt, `lf: ${a.args.ziel}`)
+      started.settled = true
     } else {
       patchPfad = path.join(dir, `versuch-${a.nummer}-${a.versuch}.patch`)
       await savePatchAndReset(projekt, a.base, patchPfad)
+      started.settled = true
     }
 
     let lauf = loadLauf(a.laufPfad) ?? newLauf(a.laufId, projekt, this.o.now())
