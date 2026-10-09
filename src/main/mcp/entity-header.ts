@@ -72,3 +72,14 @@ export function mayUseCompanionMemory(entityId: string | null | undefined): bool
   if (entityId === null || entityId === undefined) return true
   return entityId === COMPANION_ENTITY_ID
 }
+
+/**
+ * Whether a connection may dispatch local workers (Local Cyber Factory).
+ *
+ * Unlike companion memory, an absent role is NOT allowed: the tool starts
+ * sessions, commits into the target repo and resets it on failure. That is a
+ * role's job, not something any plain connection should be able to trigger.
+ */
+export function mayUseLocalWorkerDispatch(entityId: string | null | undefined): boolean {
+  return entityId === 'local-factory'
+}

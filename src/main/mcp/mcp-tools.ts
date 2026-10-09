@@ -16,7 +16,8 @@ import type { TagClassRepo } from '../notes/tag-repository'
 import { IPC } from '../../shared/ipc-channels'
 import { registerAllHandoffTools, executeHandoff } from './handoff-kernel'
 import { resolveAnchorCommit } from '../notes/handoff-delta'
-import { mayUseCompanionMemory } from './entity-header'
+import { mayUseCompanionMemory, mayUseLocalWorkerDispatch } from './entity-header'
+import { registerLocalFactoryTool } from './local-factory-tool'
 import { dispatchHandoffNote } from '../notes/handoff-dispatch'
 import type { EntityId } from '../../shared/types'
 import { processTagsFor } from '../../shared/tag-axes'
@@ -1455,6 +1456,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       return { content: [{ type: 'text' as const, text: JSON.stringify({ error: message }) }], isError: true }
     }
   })
+
+  // Local Cyber Factory: only the role `local-factory` gets the dispatch tool.
+  if (mayUseLocalWorkerDispatch(ctx.entityId)) {
+    registerLocalFactoryTool(server, ctx)
+  }
 
   // ─── Companion Memory Tools ─────────────────────────────
   //

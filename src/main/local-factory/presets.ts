@@ -23,7 +23,7 @@ Produktionscode ist für dich gesperrt. Du schreibst Abnahmetests und Aufträge.
    \`[local-factory] #N …\`. Kein Polling, kein capture-pane, kein mux_context_usage
    auf den Worker — jede Abfrage kostet einen Zug.
 4. **GRÜN:** Lies den Commit (\`git show\`) gegen die Spec. Grün heißt nur „nichts
-   kaputt“. Erfüllt → nächstes Häppchen. Nicht erfüllt → neues Häppchen mit
+   kaputt“. Erfüllt → \`accept: true\` mit \`laufId\` und \`haeppchen\`, dann nächstes Häppchen. Nicht erfüllt → neues Häppchen mit
    präziserem Kriterium.
 5. **ROT/HÄNGT:** Dispatch erneut mit derselben \`haeppchen\`-Nummer. Die Gate-Ausgabe
    geht automatisch wörtlich in den neuen Auftrag — erzähle sie nicht nach.
