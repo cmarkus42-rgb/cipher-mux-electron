@@ -365,3 +365,80 @@ describe('LocalFactoryRunner', () => {
     assert.ok(host.wakes.some(w => w.includes('Läuferfehler')))
   })
 })
+
+// Branch-Bindung: Ein Lauf gehört zu dem Branch, auf dem er begann. Wechselt der
+// Worker den Branch, wird der Versuch rot ohne Reset — der nächste Dispatch darf
+// dann nicht auf dem fremden Branch mit dessen Stand als neuer Basis weitermachen.
+describe('LocalFactoryRunner — Branch-Bindung des Laufs', () => {
+  function branchWechsler(): WorkerHost & { wakes: string[]; sent: string[] } {
+    const host = fakeHost('brav')
+    let runDir = ''
+    host.startFreshWorker = async () => {
+      runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-run-'))
+      return { runDir, sessionId: 's1' }
+    }
+    host.sendToWorker = async (_id, line) => {
+      host.sent.push(line)
+      // Schwächt den Abnahmetest auf einem eigenen Branch und committet sauber.
+      git('checkout', '-qb', 'worker-eigen')
+      fs.writeFileSync(path.join(repo, 'test', 'accept.sh'), 'exit 0\n')
+      git('add', '-A'); git('commit', '-qm', 'worker: Test geschwächt')
+      fs.writeFileSync(path.join(runDir, 'REPORT.md'), 'fertig')
+      fs.writeFileSync(path.join(runDir, IDLE_SIGNAL_FILENAME), String(Date.now() + 1000))
+    }
+    return host
+  }
+
+  it('merkt sich den Branch beim ersten Dispatch', async () => {
+    const r = fast(fakeHost('brav'), 5000)
+    const res = await r.dispatch(args()) as Res
+    await r.whenIdle()
+    assert.equal(loadLauf(res.laufPfad!)!.branch, git('rev-parse', '--abbrev-ref', 'HEAD'))
+  })
+
+  it('Retry nach Branch-Wechsel des Workers wird abgelehnt, beide Branches genannt', async () => {
+    const start = git('rev-parse', '--abbrev-ref', 'HEAD')
+    const host = branchWechsler()
+    const r = fast(host, 5000)
+    const first = await r.dispatch(args()) as Res
+    assert.equal(first.ok, true)
+    await r.whenIdle()
+    assert.match(host.wakes[0], /ROT/)
+
+    const retry = await r.dispatch({ ...args(), laufId: first.laufId, haeppchen: 1 }) as Res
+    assert.equal(retry.ok, false)
+    assert.match(retry.error!, new RegExp(start))
+    assert.match(retry.error!, /worker-eigen/)
+    assert.equal(host.sent.length, 1, 'kein zweiter Worker')
+  })
+
+  it('auch ein neues Häppchen im selben Lauf wird auf fremdem Branch abgelehnt', async () => {
+    const r = fast(fakeHost('brav'), 5000)
+    const first = await r.dispatch(args()) as Res
+    await r.whenIdle()
+    git('checkout', '-qb', 'anderswo')
+    fs.writeFileSync(path.join(repo, 'test', 'accept2.sh'), 'grep -q zwei impl.txt\n')
+    const res = await r.dispatch({
+      ...args(), laufId: first.laufId, ziel: 'zwei', geschuetzteTests: ['test/accept2.sh'],
+      testBefehl: 'grep -q zwei impl.txt',
+    }) as Res
+    assert.equal(res.ok, false)
+    assert.match(res.error!, /anderswo/)
+  })
+
+  it('ein Lauf auf losgelöstem HEAD wird nicht begonnen', async () => {
+    git('checkout', '-q', '--detach')
+    const res = await fast(fakeHost('brav')).dispatch(args()) as Res
+    assert.equal(res.ok, false)
+    assert.match(res.error!, /losgelöst|Branch/)
+    assert.equal(fs.readdirSync(laufDir).length, 0)
+  })
+
+  it('laufId eines anderen Projekts wird abgelehnt', async () => {
+    const id = 'L1'
+    saveLauf(path.join(laufDir, id, 'lauf.json'), newLauf(id, '/ganz/anderes/projekt', 0))
+    const res = await fast(fakeHost('brav')).dispatch({ ...args(), laufId: id }) as Res
+    assert.equal(res.ok, false)
+    assert.match(res.error!, /anderes Projekt|\/ganz\/anderes\/projekt/)
+  })
+})
