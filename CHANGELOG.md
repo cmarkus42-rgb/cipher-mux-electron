@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-10-09
+
+### Added
+- **Local Cyber Factory: Claude schneidet zu und prüft, ein lokales Modell codet.** Zwei neue
+  Rollen. `local-factory` (Claude Code) zerlegt Arbeit in Häppchen, schreibt pro Häppchen einen
+  Abnahmetest und ruft `mux_local_worker_dispatch`. Ein Läufer im Mux — ohne Modell — prüft den
+  Auftrag, verlangt einen roten Abnahmetest, committet ihn als Basis, startet eine frische
+  `local-worker`-Session (opencode gegen einen OpenAI-kompatiblen lokalen Endpunkt aus
+  `agent.localWorker`), wartet auf `REPORT.md` und das Idle-Signal, führt ein Gate aus
+  (Testbefehl, Prüfsumme und git-Diff der geschützten Tests) und weckt den Architekten mit einer
+  Zeile. Grün wird committet, rot als Patch gesichert und zurückgesetzt. Höchstens zwei Versuche
+  pro Häppchen, gezählt in `lauf.json`, danach Eskalation an den Menschen. Der Architekt darf
+  keinen Produktionscode schreiben, der Worker keine Abnahmetests — beides als Rollengrenze.
+  Echter Lauf gegen `qwen3.8-27b` auf dem DGX Spark: vier Häppchen, alle im ersten Versuch grün.
+  Spec: `docs/superpowers/specs/2026-10-09-local-cyber-factory-design.md`.
+
+### Fixed
+- **Claude-Code-Rollen wiesen sich beim MCP-Server nie als Rolle aus.** Der Adapter registriert
+  `cipher-mux` lokal (`settings.local.json`, `claude mcp add-json -s local`) — ohne
+  `X-Mux-Entity`. Der lokale Scope schlägt die `.mcp.json` des Run-Verzeichnisses, die den Kopf
+  trägt. Damit war auch „Companion Memory nur für Companion“ für alle Claude-Code-Rollen
+  wirkungslos: der Server sah jede von ihnen als „ohne Rolle“.
+- **Zeilen per `send-keys` an Claude Code werden jetzt getrennt getippt und abgeschickt.** Text
+  plus `\r` in einem Aufruf kommt als eingefügter Block an; das `\r` wird ein Zeilenumbruch im
+  Eingabefeld, und die Zeile wird nie abgeschickt.
+
 ## [0.11.7] — 2026-10-05
 
 ### Fixed
