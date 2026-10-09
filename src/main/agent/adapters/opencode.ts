@@ -22,6 +22,13 @@ import {
 } from '../../monitoring/opencode-usage-plugin'
 import { parseOpenCodeModels } from '../adapter-models'
 import { runCommand } from '../../util/exec-util'
+import {
+  readLocalWorkerConfig,
+  buildLocalProviderBlock,
+  localModelSpec,
+  LOCAL_PROVIDER_ID,
+  type LocalWorkerConfig,
+} from '../../local-factory/local-provider'
 
 /**
  * opencode-Adapter — Tier-2.
@@ -104,6 +111,8 @@ import { runCommand } from '../../util/exec-util'
 /** Minimale Sicht auf die Agent-Konfiguration. Spiegelbild zu CodexConfigReader. */
 export interface OpenCodeConfigReader {
   getSkipPermissions(): boolean
+  /** Lokales Modell für `local-worker`, oder null. Spec 2026-10-09 §6. */
+  getLocalWorker?(): LocalWorkerConfig | null
 }
 
 const defaultConfigReader: OpenCodeConfigReader = {
@@ -113,7 +122,15 @@ const defaultConfigReader: OpenCodeConfigReader = {
     const { configStore } = require('../../config/config-store')
     return configStore.get('agent').skipPermissions
   },
+  getLocalWorker(): LocalWorkerConfig | null {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { configStore } = require('../../config/config-store')
+    return readLocalWorkerConfig(configStore.get('agent')?.localWorker ?? null)
+  },
 }
+
+/** Die Rolle, für die der lokale Anbieter geschrieben wird. */
+export const LOCAL_WORKER_ENTITY_ID = 'local-worker'
 
 /** Name der Konfigurationsdatei, die dieser Adapter schreibt. */
 export const OPENCODE_CONFIG_FILENAME = 'opencode.json'
@@ -230,6 +247,7 @@ export function mergeOpenCodeConfig(
   existing: Record<string, unknown>,
   entry: OpenCodeMcpEntry,
   pluginSpecs: readonly string[] = [],
+  local: { provider: Record<string, unknown>; model: string } | null = null,
 ): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...existing }
 
@@ -254,6 +272,26 @@ export function mergeOpenCodeConfig(
   // Projekt gar keines hatte, soll der Mux auch keines hinterlassen.
   if (plugin.length > 0) merged.plugin = plugin
   else delete merged.plugin
+
+  // Lokaler Anbieter (Local Cyber Factory). Besitz hat der Mux nur an
+  // provider['cipher-local'] und an einem model, das darauf zeigt — ein vom
+  // Projekt gesetztes anderes model bleibt, wenn die Rolle keinen lokalen
+  // Anbieter (mehr) hat.
+  const provider =
+    merged.provider && typeof merged.provider === 'object' && !Array.isArray(merged.provider)
+      ? { ...(merged.provider as Record<string, unknown>) }
+      : {}
+  const ownModel =
+    typeof merged.model === 'string' && merged.model.startsWith(`${LOCAL_PROVIDER_ID}/`)
+  if (local) {
+    provider[LOCAL_PROVIDER_ID] = local.provider
+    merged.model = local.model
+  } else {
+    delete provider[LOCAL_PROVIDER_ID]
+    if (ownModel) delete merged.model
+  }
+  if (Object.keys(provider).length > 0) merged.provider = provider
+  else delete merged.provider
 
   return merged
 }
@@ -365,10 +403,16 @@ export class OpenCodeAdapter implements AgentAdapter {
         // an. Bewusst nicht: eine unlesbare Datei als Grund, nichts zu tun.
       }
 
-      const pluginSpecs = this.writePlugins(ctx.projectPath, ctx.entityId)
+      const localCfg =
+        ctx.entityId === LOCAL_WORKER_ENTITY_ID ? (this.configReader.getLocalWorker?.() ?? null) : null
+      const local = localCfg
+        ? { provider: buildLocalProviderBlock(localCfg), model: localModelSpec(localCfg) }
+        : null
+
+      const pluginSpecs = this.writePlugins(ctx.projectPath, ctx.entityId, localCfg?.contextWindow)
 
       const entry = buildOpenCodeMcpEntry(ctx.mcpUrl, ctx.mcpApiKey, ctx.workspaceId, ctx.entityId)
-      const merged = mergeOpenCodeConfig(existing, entry, pluginSpecs)
+      const merged = mergeOpenCodeConfig(existing, entry, pluginSpecs, local)
 
       fs.writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n', 'utf-8')
     } catch (err) {
@@ -385,14 +429,18 @@ export class OpenCodeAdapter implements AgentAdapter {
    * die in `entity-boundaries.ts` niemand mehr nennt. Dasselbe tut der
    * SessionManager fuer den Claude-Code-Hook, und aus demselben Grund.
    */
-  private writePlugins(projectPath: string, entityId?: string | null): string[] {
+  private writePlugins(
+    projectPath: string,
+    entityId?: string | null,
+    contextWindow?: number,
+  ): string[] {
     const pluginDir = path.join(projectPath, OPENCODE_PLUGIN_SUBDIR)
     const specs: string[] = []
 
     specs.push(
       toOpenCodePluginSpec(
         writeOpenCodeUsagePlugin(pluginDir, {
-          contextWindowSize: OPENCODE_FALLBACK_CONTEXT_WINDOW,
+          contextWindowSize: contextWindow ?? OPENCODE_FALLBACK_CONTEXT_WINDOW,
         }),
       ),
     )
