@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.3] — 2026-10-10
+
 ### Changed
 - **Sessions im Workspace kennen seine Projekte.** Die Sektion `## Workspace Prompt` nennt den
   Workspace beim Namen, listet die Projekte aus seinen Zellen (Rollenverzeichnisse ausgenommen) und

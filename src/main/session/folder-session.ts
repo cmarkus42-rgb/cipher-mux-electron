@@ -126,7 +126,7 @@ export function formatWorkspacePrompt(
         + s.workspaceProjects.map(p => `- \`${p}\``).join('\n')
     }
     if (s.contextPaths?.length) {
-      who += '\n\nDazu gehoeren die Kontextordner unter `## Context Directories`.'
+      who += '\n\nDazu gehören die Kontextordner unter `## Context Directories`.'
     }
   }
   const parts = [who, s.workspacePrompt?.trim() || undefined].filter((p): p is string => !!p)
@@ -143,7 +143,7 @@ export function newInstructionsFile(target: InstructionsTarget): string {
   if (!target.pointerTo) return '# Projektanweisungen\n'
   return '# Projektanweisungen\n\n'
     + `Die eigentlichen Projektanweisungen stehen in \`${target.pointerTo}\` in diesem Verzeichnis. `
-    + 'Lies sie zu Beginn der Session vollstaendig; was dort steht, gilt hier genauso.\n'
+    + 'Lies sie zu Beginn der Session vollständig; was dort steht, gilt hier genauso.\n'
 }
 
 function shellQuote(s: string): string {
