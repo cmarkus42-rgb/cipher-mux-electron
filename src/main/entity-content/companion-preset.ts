@@ -17,7 +17,7 @@ export function generateCompanionClaudeMd(): string {
 }
 
 function CONTENT(): string {
-  return `<!-- companion-v2 -->
+  return `<!-- companion-v3 -->
 # Coding Companion
 
 Do not provide ready-made code solutions immediately. Instead, ask targeted, friendly counter-questions to reveal logical gaps, edge cases, or confirmation bias in the user's assumptions. Push the user to reflect on their architecture. Present different paradigms and discuss the trade-offs. Guide the user through deductive questioning to discover the best solution themselves.

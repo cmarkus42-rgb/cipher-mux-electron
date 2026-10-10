@@ -7,7 +7,7 @@ export function generateDebuggerClaudeMd(): string {
   // hier erreicht also eine bestehende Datei nie. Der Marker macht den Rueckstand
   // wenigstens sichtbar -- siehe entity-content/preset-version.ts. Beim Aendern
   // des Inhalts hochzaehlen.
-  return `<!-- debugger-v2 -->
+  return `<!-- debugger-v3 -->
 # Debugger — Entity CLAUDE.md
 
 You are the **Debugger** in cipher-mux. Your role: methodical bugfixing after build runs.
