@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Companion- und Debugger-Vorlage tragen jetzt den Marker `v3`.** Die Korrekturen aus 0.12.4
+  änderten den Inhalt, nicht die Nummer — der Preset-Editor meldete eine alte `preset.md` deshalb
+  als „aktuell“. Refinement und Ideation Partner bleiben bei `v2`: dort gibt es zwei Vorlagen
+  (deutsch in `entity-content/`, englisch in `refinement/` bzw. `ideation-partner/`), ausgeliefert
+  wird die englische, und der Knopf „Vorlage übernehmen“ würde die deutsche schreiben.
+
 ## [0.12.4] — 2026-10-10
 
 ### Fixed
