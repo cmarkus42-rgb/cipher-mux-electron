@@ -15,6 +15,7 @@ import {
   restoreAdapterId,
   formatWorkspacePrompt,
   newInstructionsFile,
+  workspaceProjects,
 } from '../../src/main/session/folder-session'
 
 const workspaces = [
@@ -161,5 +162,50 @@ describe('newInstructionsFile — der Kopf einer neu angelegten Anweisungsdatei'
 
   it('ohne Verweis: nur eine Ueberschrift', () => {
     assert.equal(newInstructionsFile({ file: 'AGENTS.md' }), '# Projektanweisungen\n')
+  })
+})
+
+describe('Projekte des Workspaces', () => {
+  const ENT = '/home/u/.config/cipher-mux/entities'
+  const keel = [{
+    id: 'ws-k', name: 'KEEL', contextPaths: ['/p/cipher-keel'],
+    cells: [
+      { project: `${ENT}/cyber-factory` },
+      { project: `${ENT}/testing-assistant` },
+      { project: '/p/cipher-keel-electron' },
+      { project: '' },
+      { project: '/p/cipher-keel-electron' },
+      {},
+    ],
+  }]
+
+  it('workspaceProjects: Zellen-Projekte, ohne Rollenverzeichnisse, leere und doppelte', () => {
+    assert.deepEqual(workspaceProjects(keel[0], ENT), ['/p/cipher-keel-electron'])
+  })
+
+  it('workspaceProjects: kaputte Zellen aus der Config werfen nicht', () => {
+    assert.deepEqual(workspaceProjects({ id: 'x', cells: null as never }, ENT), [])
+    assert.deepEqual(workspaceProjects({ id: 'x', cells: [null as never, { project: 3 as never }] }, ENT), [])
+  })
+
+  it('resolveWorkspaceSections reicht die Projekte durch', () => {
+    const r = resolveWorkspaceSections({ workspaceId: 'ws-k' }, keel, ENT)
+    assert.deepEqual(r.workspaceProjects, ['/p/cipher-keel-electron'])
+    assert.deepEqual(r.contextPaths, ['/p/cipher-keel'])
+  })
+
+  it('formatWorkspacePrompt: Name, Projekte und Hinweis auf die Kontextordner', () => {
+    const text = formatWorkspacePrompt({
+      workspaceId: 'ws-k', workspaceName: 'KEEL',
+      workspaceProjects: ['/p/cipher-keel-electron'], contextPaths: ['/p/cipher-keel'],
+    })!
+    assert.ok(text.startsWith('Du arbeitest im Workspace **KEEL** (`ws-k`).'))
+    assert.ok(text.includes('- `/p/cipher-keel-electron`'))
+    assert.ok(text.includes('## Context Directories'), 'verweist auf die Kontextordner-Sektion')
+  })
+
+  it('formatWorkspacePrompt: ohne Kontextordner kein Verweis darauf', () => {
+    const text = formatWorkspacePrompt({ workspaceId: 'ws-k', workspaceName: 'KEEL', workspaceProjects: ['/a'] })!
+    assert.ok(!text.includes('Context Directories'))
   })
 })

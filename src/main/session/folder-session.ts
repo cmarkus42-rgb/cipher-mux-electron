@@ -19,6 +19,7 @@ import type { LaunchCommand, InstructionsTarget } from '../agent/agent-adapter'
 export interface WorkspaceSectionSource {
   id: string
   name?: string
+  cells?: ReadonlyArray<{ project?: string } | null>
   workspacePrompt?: string
   contextPaths?: string[]
 }
@@ -36,6 +37,8 @@ export interface WorkspaceSections {
   /** Set when the session belongs to a known workspace — named in the section. */
   workspaceId?: string
   workspaceName?: string
+  /** Projects of the workspace's cells — role directories excluded. */
+  workspaceProjects?: string[]
   workspacePrompt?: string
   contextPaths?: string[]
 }
@@ -50,16 +53,39 @@ export interface WorkspaceSections {
  * - ID: Prompt und Kontextpfade dieses Workspaces; ein unbekannter ist wie
  *   keiner, statt einen anderen zu raten.
  */
+/**
+ * Die Projekte eines Workspaces: was in seinen Zellen als Projekt steht. Zellen,
+ * die auf ein Rollenverzeichnis zeigen (Altlast aus der Zeit vor `presetId`),
+ * sind keine Projekte und fallen raus. Die Zellen kommen ungeprueft aus der
+ * Config — jeder Eintrag wird geprueft, nichts wirft.
+ */
+export function workspaceProjects(ws: WorkspaceSectionSource, entitiesRoot: string): string[] {
+  const root = entitiesRoot.replace(/\/+$/, '') + '/'
+  const out: string[] = []
+  for (const cell of Array.isArray(ws.cells) ? ws.cells : []) {
+    const p = typeof cell?.project === 'string' ? cell.project.trim() : ''
+    if (!p || p.startsWith(root) || out.includes(p)) continue
+    out.push(p)
+  }
+  return out
+}
+
 export function resolveWorkspaceSections(
   req: WorkspaceSectionRequest,
   workspaces: readonly WorkspaceSectionSource[] | null | undefined,
+  entitiesRoot = '',
 ): WorkspaceSections {
   // Die Liste kommt ungeprueft aus der Config — defensiv lesen.
   const ws = typeof req.workspaceId === 'string' && Array.isArray(workspaces)
     ? workspaces.find(w => w?.id === req.workspaceId)
     : undefined
+  const projects = ws && entitiesRoot ? workspaceProjects(ws, entitiesRoot) : []
   const identity = ws
-    ? { workspaceId: ws.id, ...(ws.name?.trim() ? { workspaceName: ws.name.trim() } : {}) }
+    ? {
+      workspaceId: ws.id,
+      ...(ws.name?.trim() ? { workspaceName: ws.name.trim() } : {}),
+      ...(projects.length ? { workspaceProjects: projects } : {}),
+    }
     : {}
 
   if (req.workspacePrompt?.trim() || req.contextPaths?.length) {
@@ -90,11 +116,19 @@ export function resolveWorkspaceSections(
  * `undefined` = Sektion entfernen.
  */
 export function formatWorkspacePrompt(
-  s: Pick<WorkspaceSections, 'workspaceId' | 'workspaceName' | 'workspacePrompt'>,
+  s: Pick<WorkspaceSections, 'workspaceId' | 'workspaceName' | 'workspaceProjects' | 'contextPaths' | 'workspacePrompt'>,
 ): string | undefined {
-  const who = s.workspaceId
-    ? `Du arbeitest im Workspace **${s.workspaceName ?? s.workspaceId}** (\`${s.workspaceId}\`).`
-    : undefined
+  let who: string | undefined
+  if (s.workspaceId) {
+    who = `Du arbeitest im Workspace **${s.workspaceName ?? s.workspaceId}** (\`${s.workspaceId}\`).`
+    if (s.workspaceProjects?.length) {
+      who += '\n\nProjekte in diesem Workspace:\n'
+        + s.workspaceProjects.map(p => `- \`${p}\``).join('\n')
+    }
+    if (s.contextPaths?.length) {
+      who += '\n\nDazu gehoeren die Kontextordner unter `## Context Directories`.'
+    }
+  }
   const parts = [who, s.workspacePrompt?.trim() || undefined].filter((p): p is string => !!p)
   return parts.length ? parts.join('\n\n') : undefined
 }
