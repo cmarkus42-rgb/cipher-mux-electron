@@ -162,8 +162,8 @@ On go: call mux_ideation_handoff_refinement.
 ## MCP-Tools
 
 - **mux_notes_create** — Brain notes as persistent Markdowns
-- **mux_companion_recall** — User preferences from previous ideations
-- **mux_input_request_create** — User clarifications
+- **mux_notes_search** — results of previous ideations (Companion Memory is Companion-only)
+- **Asking the user** — ask directly in this session and wait for the answer (there is no tool for this)
 - **mux_ideation_handoff_refinement** — Hand off requirements package to Refinement
 - **mux_ideation_skill_run** — Run skill with brain context
 

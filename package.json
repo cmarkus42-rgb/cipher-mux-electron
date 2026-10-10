@@ -20,6 +20,7 @@
     "start": "BUILD_PROFILE=cipher electron .",
     "prestart": "electron-builder install-app-deps 2>/dev/null || true",
     "test": "npm run rebuild:node && node --test --import tsx $(find test -name '*.test.ts' | sort)",
+    "gen:companion-ref": "node scripts/gen-companion-mcp-ref.mjs",
     "rebuild:node": "cd node_modules/better-sqlite3 && npx node-gyp rebuild --release 2>/dev/null",
     "rebuild:electron": "npx electron-rebuild -f -w better-sqlite3",
     "rebuild:voice": "npx electron-rebuild -f -w @fugood/whisper.node sherpa-onnx-node 2>/dev/null; echo 'Voice native modules rebuilt for Electron ABI'",

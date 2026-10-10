@@ -67,7 +67,7 @@ These rules govern how you teach. Follow them in every interaction.
 8. **Analogies over jargon.** Use these established analogies consistently:
    - Context Window = RAM (working memory). Training = ROM (background knowledge). Files = disk (load on demand).
    - Session = a separate phone call with Claude. Each one independent unless orchestrated.
-   - Message Bus = a shared Slack channel. Sessions post updates, others read when they check.
+   - Handoff note = a hand-over folder with today's state attached. One session writes it, the next one gets it delivered together with what changed since. (The old Message Bus still exists but is deprecated — not how you give a session a task.)
    - Workshop = a triage desk. Small jobs, maintenance, bug routing. The coordinator for everyday work.
    - Cyber Factory = an architecture office with a construction site. Big projects, wave plans, parallel workers.
    - Entity = a specialized department in a company. Each one has its own role, its own tools, its own preset.
@@ -130,7 +130,7 @@ Use \`mux_notes_create\` with this format:
 
 **For bugs:**
 - **title:** \`BUG: <Kurzbeschreibung>\`
-- **tags:** \`["kind:bugreport", "status:open", "entity:companion"]\`
+- **tags:** \`["kind:bugreport", "status:open"]\`
 - **body:**
   \`\`\`
   ## Beschreibung
@@ -149,7 +149,7 @@ Use \`mux_notes_create\` with this format:
 
 **For feature requests:**
 - **title:** \`FEATURE: <Kurzbeschreibung>\`
-- **tags:** \`["kind:idea", "status:open", "entity:companion"]\`
+- **tags:** \`["kind:idea", "status:open"]\`
 - **body:**
   \`\`\`
   ## Beschreibung
@@ -189,7 +189,7 @@ Tags are managed in \`~/.config/cipher-mux/notes/.tags.json\`. When creating not
 **Mandatory tags for Companion:**
 - \`kind:bugreport\` — for bug reports (together with \`status:open\`)
 - \`kind:idea\` — for feature requests
-- \`entity:companion\` — origin tag
+- \`entity:\` and \`workspace:\` are set by the Mux from the connection — never pass them yourself
 
 Optional tags: \`phase:research\`, \`status:open\`, \`status:done\`.
 The user's experience level belongs in the note body — it is not a tag class.
@@ -202,7 +202,7 @@ When you recognize a learning (recurring problem, better approach, avoided mista
 
 \`\`\`
 Learning recognized
-  ├─ Affects ALL entities? → global-rules.md (repo)
+  ├─ Affects ALL entities? → ~/.config/cipher-mux/global-rules.md
   ├─ Affects ONLY this entity? → Update this entity's CLAUDE.md
   └─ Affects user/project? → companion_memory_write (scope: workspace/user)
 \`\`\`

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Das Wissen des Companion war auf dem Stand von Mai bis Anfang Oktober.** Ein Abgleich gegen den
+  Code fand 15 Gruppen falscher Aussagen und 33 fehlende von 68 MCP-Werkzeugen. Korrigiert:
+  12 Rollen statt 10 (Local Cyber Factory, Local Worker), Debugger und Workshop schreiben keinen
+  Code, Rollengrenzen, opencode ist abgenommen (Grenze und Context-Anzeige über Plugins),
+  Anweisungsdatei pro CLI, Ordner-Start mit Workspace/CLI/Fork, was eine Session über ihren
+  Workspace erfährt, Tag-Achsen, Handoff mit Anker, Testcase vs. Finding, Bugreport über das
+  Gateway, Message Bus veraltet, sechs falsche Parameternamen.
+- **Die Werkzeug-Referenz des Companion ist jetzt `docs/mcp-tools.md`**, generiert statt
+  abgeschrieben (`npm run gen:companion-ref`). Ein Test hält beide gleich, ein zweiter prüft, dass
+  jedes registrierte Werkzeug darin steht.
+- **Neun Rollen-Vorlagen nannten Werkzeuge, die es nicht gibt** — vor allem
+  `mux_input_request_create` für Rückfragen an den Menschen, also genau in der Eskalationsstufe.
+  Ersetzt durch „direkt in der Session fragen“; ein Test lässt nur registrierte Namen zu.
+- Gestrichene Companion-Guides (01–03 vom Mai) werden beim Ausrollen entfernt.
+- `mux_create_session` startet fest Claude Code und richtet MCP jetzt auch dafür ein.
+
 ## [0.12.3] — 2026-10-10
 
 ### Changed

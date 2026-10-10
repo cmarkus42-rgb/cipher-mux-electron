@@ -33,14 +33,20 @@ List all cipher-mux sessions.
 **Returns:** Array of `SessionInfo` objects (id, name, projectPath, status, entityId, etc.)
 
 ### `mux_create_session`
-Create a new cipher-mux session (tmux session).
+Create a new cipher-mux session (tmux session). Launches **Claude Code** — always, whatever the
+default CLI is. For Codex or opencode start a role (`mux_entity_start`) or use the launcher's
+folder start, which has a CLI field.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `name` | string | yes | Session display name |
 | `projectPath` | string | yes | Working directory |
-| `command` | string | no | Initial command to run in the session |
+| `command` | string | no | Initial command to run in the session (replaces the Claude Code launch) |
 | `visible` | boolean | no | If true, place session in the grid with focus |
+| `shellOnly` | boolean | no | Plain shell, no CLI |
+| `resume` | boolean | no | Launch with `--resume` |
+| `model` | enum | no | `haiku`, `sonnet` or `opus` (`--model`) |
+| `subProjektId` | string | no | Cyber Factory SubProjekt — resolves the model from it if none is given |
 
 **Example:**
 ```json
@@ -53,6 +59,7 @@ Kill a session by ID.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `sessionId` | string | yes | Session ID (ULID) |
+| `graceful` | boolean | no | Default true: send a cleanup prompt to Claude sessions before the kill |
 
 ### `mux_status`
 Get cipher-mux system status (session count, service availability).
@@ -117,7 +124,7 @@ Send a message to the message bus. Optionally push-deliver to a target session v
 
 **Example:**
 ```json
-{ "topic": "chat", "sender": "MPO", "text": "Worker 1 ist fertig." }
+{ "topic": "chat", "sender": "workshop", "text": "Worker 1 ist fertig." }
 ```
 
 ### `mux_read`
@@ -139,7 +146,7 @@ Create a task in the persistent task queue.
 |-----------|------|----------|-------------|
 | `title` | string | yes | Task title |
 | `description` | string | no | Task description |
-| `source` | string | no | Task source (default: "orchestrator") |
+| `source` | string | no | Task source (default: "workshop") |
 | `parent_id` | string | no | Parent task ID for subtasks |
 | `policy` | object | no | Execution policy (see below) |
 
@@ -355,13 +362,18 @@ Write a memory to the companion memory store. When a workspace is active and no 
 | `salience` | number | no | Importance 0..1 (default 0.5) |
 | `scope_kind` | enum | no | `user` (global), `workspace`, or `session`. Auto-detected when workspace active. |
 | `scope_id` | string | no | Workspace ID or session ID. Auto-filled from active workspace. |
+| `note_id` | string | no | Note this memory points at. When the content belongs in a note, store a short line plus `note_id`, not the note text. |
 
 ### `companion_memory_recall`
-Recall recent memories (newest first). When a workspace is active, returns both global (user-scope) and workspace-scoped memories, excluding other workspaces.
+Recall memories, ordered by **relevance** (salience, then recency) — not by recency alone, which
+buried important old entries as the store filled up. When a workspace is active, returns both
+global (user-scope) and workspace-scoped memories, excluding other workspaces. Entries with a
+`note_id` are pointers: read the note.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `limit` | number | no | Max results (default 20) |
+| `rank` | enum | no | `relevance` (default) or `recent` for strict newest-first |
 | `entity_filter` | string | no | Filter by memory kind |
 | `since_hours` | number | no | Only memories from the last N hours |
 | `scope_kind` | enum | no | Explicit scope filter (overrides auto-detection) |
