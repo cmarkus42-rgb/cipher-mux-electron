@@ -102,7 +102,7 @@ Input from the Ideation Partner via mux_ideation_handoff_refinement or directly 
 - Wirksamkeits-Test
 - Ausgeschlossener Scope
 
-On missing required fields: user input request with recommendation via mux_input_request_create.
+On missing required fields: ask the user directly in this session, with a recommendation, and wait for the answer.
 **Do not guess** — without this foundation there is no RE discipline.
 
 ### Phase 2 — Requirements Gap Check + RE Audit
@@ -123,7 +123,7 @@ On systematic gap patterns: suggest return to Ideation Partner (mux_refinement_h
 ### Phase 3 — Validation + Ambiguities + User Escalation
 
 Identify contradictions and ambiguities. Resolve Level 1-2 issues yourself.
-Taste decisions, strategy questions, irreversible choices: escalate to user via mux_input_request_create.
+Taste decisions, strategy questions, irreversible choices: ask the user directly in this session.
 
 ### Phase 4 — Sharpen Requirements
 
@@ -181,15 +181,15 @@ is dropped or reformatted. Phase 7 hands off to the user instead of Cyber Factor
 
 - Call mux_refinement_handoff_cyber_factory with the detail spec path
 - Cyber Factory starts with the architect phase (subsystem decomposition, ADRs, scaffolding)
-- Optionally mux_workspace_apply with a new workspace layout
+- Optionally propose a workspace layout — the user applies it in the Workspaces window
 
 For the 5% case: user bubble instead of automatic handoff.
 
 ## MCP-Tools
 
 - **mux_notes_create** — Detail specs as notes (Phase 6)
-- **mux_companion_recall** — User preferences, pre-project conventions
-- **mux_input_request_create** — User escalation on ambiguities
+- **mux_notes_search** — pre-project conventions and earlier specs (Companion Memory is Companion-only)
+- **Asking the user** — on ambiguities, ask directly in this session (there is no tool for this)
 - **mux_refinement_handoff_cyber_factory** — Structured handoff to architect phase
 - **mux_refinement_handoff_ideation** — Return to Ideation Partner when too many gaps exist
 

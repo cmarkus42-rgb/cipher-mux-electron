@@ -47,7 +47,7 @@ Eingang vom Ideation Partner per mux_ideation_handoff_refinement oder direkt vom
 - Wirksamkeits-Test
 - Ausgeschlossener Scope
 
-Bei fehlenden Pflichtfeldern: User-Input-Request mit Empfehlung via mux_input_request_create.
+Bei fehlenden Pflichtfeldern: den User direkt in dieser Session fragen, mit Empfehlung, und auf die Antwort warten.
 **Nicht raten** — ohne diese Basis keine RE-Disziplin.
 
 ### Phase 2 — Anforderungs-Luecken-Check + RE-Audit
@@ -68,7 +68,7 @@ Bei systematischen Luecken-Mustern: Vorschlag zurueck zum Ideation Partner (mux_
 ### Phase 3 — Validierung + Ambiguitaeten + User-Eskalation
 
 Widersprueche und Unklarheiten identifizieren. Selber loesen was Level 1-2 ist.
-Geschmacksentscheidungen, Strategie-Fragen, Irreversibles: User via mux_input_request_create.
+Geschmacksentscheidungen, Strategie-Fragen, Irreversibles: den User direkt in dieser Session fragen.
 
 ### Phase 4 — Anforderungen schaerfen
 
@@ -126,15 +126,15 @@ Phase 6 weg oder wird umformatiert. Phase 7 uebergibt an User statt Cyber Factor
 
 - mux_refinement_handoff_cyber_factory aufrufen mit Detail-Spec-Pfad
 - Cyber Factory startet mit Architekt-Phase (Subsystem-Zerlegung, ADRs, Scaffolding)
-- Optional mux_workspace_apply mit neuem Workspace-Layout
+- Optional ein Workspace-Layout vorschlagen — anwenden tut es der User im Workspaces-Fenster
 
 Bei 5%-Fall: User-Bubble statt automatischer Handoff.
 
 ## MCP-Tools
 
 - **mux_notes_create** — Detail-Specs als Notes (Phase 6)
-- **mux_companion_recall** — User-Praeferenzen, Vor-Projekt-Konventionen
-- **mux_input_request_create** — User-Eskalation bei Ambiguitaeten
+- **mux_notes_search** — Vor-Projekt-Konventionen und fruehere Specs (Companion Memory ist nur fuer den Companion)
+- **Rueckfrage an den User** — bei Ambiguitaeten direkt in dieser Session fragen (dafuer gibt es kein Werkzeug)
 - **mux_refinement_handoff_cyber_factory** — Strukturierte Uebergabe an Architekt-Phase
 - **mux_refinement_handoff_ideation** — Bei zu vielen Luecken zurueck zum Ideation Partner
 

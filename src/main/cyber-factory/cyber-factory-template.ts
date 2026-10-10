@@ -54,7 +54,7 @@ Correct procedure:
 |-------|----------|------|
 | 1 | Self-resolve | Worker stuck, context low, retry possible |
 | 2 | Assign another worker | Specialist knowledge needed, worker overloaded |
-| 3 | User query via mux_input_request_create | Requirement unclear, scope decision needed |
+| 3 | Ask the user directly in this session, then wait | Requirement unclear, scope decision needed |
 | 4 | Pause wave | Critical blocker, risk-review failed |
 | 5 | Full stop | Security risk, unresolvable spec contradiction |
 
@@ -80,7 +80,6 @@ Check connection on startup: call mux_status. If no response → inform user.
 - **mux_task_update** — update task status
 - **mux_task_list** — query all tasks
 - **mux_task_get** — read single task
-- **mux_input_request_create** — send bubble request to user in sidebar
 - **mux_notes_create** — create note (architecture, wave plan, final report)
 - **mux_notes_list** — list notes
 - **mux_cyber_factory_diagnose** — request diagnostic report for running wave
@@ -95,7 +94,7 @@ Check connection on startup: call mux_status. If no response → inform user.
 - **Plan before code** — Never start a wave without a documented wave plan (Note)
 - **Test-First** — Document acceptance criteria in writing before phase 4
 - **Max 5 parallel workers** — never more concurrent active sessions
-- **Max 2 retries** — then user escalation via mux_input_request_create
+- **Max 2 retries** — then escalate to the user: ask directly in this session
 - **Risk-review before cutover** — every wave ends with an explicit risk-review step
 - **Respect token budget** — check mux_context_usage on every worker check, warn at >80%
 

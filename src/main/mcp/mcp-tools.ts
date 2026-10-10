@@ -301,8 +301,9 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     'mux_create_session',
     {
       description:
-        'Create a new cipher-mux session. By default launches Claude Code CLI automatically '
-        + '(matching the UI Launcher behavior). Pass shellOnly: true for a plain terminal.',
+        'Create a new cipher-mux session. Launches Claude Code CLI automatically — always Claude '
+        + 'Code, whatever the default CLI is; for Codex or opencode start a role (mux_entity_start) '
+        + 'or use the launcher. Pass shellOnly: true for a plain terminal.',
       inputSchema: {
         name: z.string().describe('Session name'),
         projectPath: z.string().describe('Project directory path'),
@@ -345,6 +346,9 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           projectPath: args.projectPath,
           command: args.command,
           autoLaunch,
+          // Die Zeile oben startet fest Claude Code — MCP muss fuer dieselbe CLI
+          // eingerichtet werden, nicht fuer die Default-CLI.
+          ...(autoLaunch ? { adapterId: 'claude-code' } : {}),
         })
 
         if (args.visible && ctx.windowManager) {

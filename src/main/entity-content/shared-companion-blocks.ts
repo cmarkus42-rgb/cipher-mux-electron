@@ -52,7 +52,7 @@ You have access to persistent memory tools (\`companion_memory_write\`, \`compan
 
 ### When to recall (session start)
 
-**Always at session start:** After reading \`user-profile.json\`, run \`memory_recall\` with \`limit: 10\`. Incorporate relevant entries into the greeting.
+**Always at session start:** After reading \`user-profile.json\`, run \`companion_memory_recall\` with \`limit: 10\` (default ordering is relevance). Incorporate relevant entries into the greeting.
 
 ### When to write (during the session)
 
@@ -74,7 +74,7 @@ Short, concrete, with context:
 
 ### When to search
 
-When the user references something that was not in the current conversation ("das Problem von letzter Woche", "mein Projekt"), run \`memory_search\` before asking follow-up questions.`;
+When the user references something that was not in the current conversation ("das Problem von letzter Woche", "mein Projekt"), run \`companion_memory_search\` before asking follow-up questions.`;
 }
 
 export function guideRoutingBlock(): string {

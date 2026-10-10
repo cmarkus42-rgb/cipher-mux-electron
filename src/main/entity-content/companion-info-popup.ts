@@ -18,11 +18,11 @@ const CONTENT = `# cipher-mux Features
 
 ## Grid & Sessions
 
-cipher-mux zeigt bis zu 21 Sessions (7 Spalten x 3 Zeilen) in einem flexiblen Grid-Layout. Jede Zelle kann ein Claude-Code-Terminal, einen Markdown-Notiz-Editor oder einen Launcher-Platzhalter enthalten. Zellen lassen sich per Drag & Drop tauschen und vertikal zusammenfassen.
+cipher-mux zeigt bis zu 21 Sessions (7 Spalten x 3 Zeilen) in einem flexiblen Grid-Layout. Jede Zelle kann ein Terminal mit einer Agent-CLI (Claude Code, Codex oder opencode), einen Markdown-Notiz-Editor oder einen Launcher-Platzhalter enthalten. Zellen lassen sich per Drag & Drop tauschen und vertikal zusammenfassen.
 
 ## Sidebar
 
-Vier Tabs auf der rechten Seite: **Nachrichten** (Inter-Session-Chat, sichtbar bei aktivem Workshop), **Hintergrund-Sessions** (laufende Sessions ausserhalb des Grids mit Live-Vorschau), **Eingabe-Anfragen** (Entscheidungen von Entities, sichtbar bei aktiven Entity-Sessions), **Notizen** (Suche und Tag-Filter fuer alle gespeicherten Notizen). Die Sidebar laesst sich als eigenes Fenster abkoppeln.
+Fuenf aufklappbare Sektionen: **Notizen** (Suche und Tag-Filter, bei aktivem Workspace auf ihn gefiltert), **Hintergrund-Sessions** (laufende Sessions ausserhalb des Grids mit Live-Vorschau), **Verwaiste Sessions** (nur wenn vorhanden: uebernehmen oder beenden), **Companion Memory** und **Nachrichten** (Message Bus — veraltet, kein Weg, einer Session etwas zu sagen). Die Sidebar laesst sich als eigenes Fenster abkoppeln.
 
 ## Statusleiste
 
@@ -34,13 +34,11 @@ Lokale Spracherkennung ohne Netzwerk. Silero VAD erkennt Sprache automatisch, Wh
 
 ## Notizen
 
-CodeMirror-6-Editor mit Live-Markdown-Rendering. YAML-Frontmatter fuer Titel und Tags. Auto-Save nach 2 Sekunden. Manuelles Speichern (Cmd+S) loest Claude-Session-basiertes Auto-Tagging aus (bis zu 5 Tags pro Notiz). Notizen sind global oder workspace-bezogen gespeichert. Sidebar-Tab mit Suchfeld und Tag-Filter-Chips.
+CodeMirror-6-Editor mit Live-Markdown-Rendering. YAML-Frontmatter fuer Titel und Tags. Auto-Save nach 2 Sekunden. Manuelles Speichern (Cmd+S) loest Auto-Tagging ueber ein lokales Modell (Ollama) aus, beschraenkt auf die Tag-Achsen kind, phase, status, severity, component. workspace und entity setzt der Mux selbst. Notizen sind global oder workspace-bezogen gespeichert. Sidebar-Tab mit Suchfeld und Tag-Filter-Chips.
 
 ## Projekte
 
-**Scanner:** Automatische Erkennung von Projekten in konfigurierten Verzeichnissen (CLAUDE.md als Marker). Zeigt Git-Branch, Aenderungsstatus und SDD-Phase.
-
-**Projekt-Popup:** Drei Bereiche — gefundene Projekte, manueller Pfad, Kickoff fuer neue Projekte.
+**Ordner-Start:** Im Launcher (Tab Path) einen Projektordner waehlen, dazu **Workspace** (Standard: ohne) und **CLI** (Standard: die globale). Optionen: Nur Shell, Ohne Rueckfragen, Fortsetzen, Abzweigen.
 
 **Kickoff-Dialog:** Startet den Projekt-Launcher mit optionaler Anforderungsdatei. Der Launcher generiert CLAUDE.md, SPEC.md-Skelett, .claude/-Verzeichnis und startet danach ein Anforderungs-Interview.
 
@@ -50,17 +48,23 @@ CodeMirror-6-Editor mit Live-Markdown-Rendering. YAML-Frontmatter fuer Titel und
 
 **Workspaces** sind vorkonfigurierte Grid-Layouts. Im visuellen Editor werden Personas und Projekte pro Zelle zugewiesen. Ein Klick auf "Apply" baut das Grid auf, startet alle Sessions und weist die Rollen zu. Prompt-Aufloesung in drei Stufen: Zell-Prompt > Workspace-Override > Persona-Default.
 
+Jede Session im Workspace — Ordner-Session, Zelle oder Rolle — erfaehrt seinen **Namen**, seine **Projekte** (aus den Zellen) und seine **Kontextordner**. Jede Session traegt ihren eigenen Workspace; Sessions ohne Workspace tragen das Badge "ohne Workspace".
+
 ## Agent-CLIs
 
-Drei Kommandozeilen-KIs koennen in einer Zelle laufen: **Claude Code** (Tier 1, Voreinstellung), **Codex CLI** (Tier 2, gemessen an codex-cli 0.155.1) und **opencode** (Tier 2, gemessen an opencode 1.18.34). Tier 2 heisst: nicht jede Mux-Faehigkeit ist dort gemessen. Unter Codex ist Sub-Agents nicht gemessen; unter opencode fehlen Context-Anzeige und Sub-Agents, Rollengrenzen sind nicht verdrahtet und es gibt keinen Rauchtest gegen die echte CLI.
+Drei Kommandozeilen-KIs koennen in einer Zelle laufen: **Claude Code** (Tier 1, Voreinstellung), **Codex CLI** (Tier 2, gemessen an codex-cli 0.155.1) und **opencode** (Tier 2, gemessen an opencode 1.18.35). Tier 2 heisst: nicht jede Mux-Faehigkeit ist dort gemessen — bei beiden sind es nur die Sub-Agents. Context-Anzeige und Rollengrenzen laufen unter allen dreien (bei opencode ueber Plugins). opencode braucht einen angemeldeten Anbieter.
 
-Gewaehlt wird pro Rolle im Presets-Tab (Feld **CLI**), global unter "einstellungen" → general → **Standard-CLI**. Reihenfolge: Wahl pro Rolle > Default der Rolle > globale Einstellung. Gilt ab dem naechsten Sessionstart der Rolle.
+Gewaehlt wird pro Rolle im Presets-Tab (Felder **CLI** und **Modell**), pro Ordner-Session im Launcher, global unter "einstellungen" → general → **Standard-CLI**. Reihenfolge fuer Rollen: Wahl pro Rolle > Default der Rolle (nur Local Worker: opencode) > globale Einstellung. Gilt ab dem naechsten Sessionstart der Rolle.
 
-Projektanweisungen liest Claude Code aus \`CLAUDE.md\`, Codex und opencode aus \`AGENTS.md\`. Dem Run-Verzeichnis einer Codex-Rolle traegt der Mux in \`~/.codex/config.toml\` Vertrauen ein — ohne das haengt die Session in einem blockierenden Dialog. Abschaltbar ueber \`agent.codexTrustRunDirs\`.
+Projektanweisungen: Claude Code liest \`CLAUDE.md\`, Codex \`AGENTS.md\`, opencode \`AGENTS.md\` wenn vorhanden, sonst \`CLAUDE.md\` — liegt eine \`AGENTS.md\` daneben, liest opencode die \`CLAUDE.md\` gar nicht. Der Mux schreibt in die Datei, die die CLI tatsaechlich liest; fuer Codex legt er eine fehlende \`AGENTS.md\` mit Verweis auf die \`CLAUDE.md\` an. Dem Run-Verzeichnis einer Codex-Rolle traegt der Mux in \`~/.codex/config.toml\` Vertrauen ein — ohne das haengt die Session in einem blockierenden Dialog. Abschaltbar ueber \`agent.codexTrustRunDirs\`.
 
 ## Workshop
 
-Delegiert Aufgaben an Worker-Sessions, ueberwacht den Fortschritt und verarbeitet Bug-Reports. Erstellt automatisch neue Sessions fuer Teilaufgaben, sendet Instruktionen ueber tmux, prueft den Kontext-Verbrauch alle 2 Minuten. Bei Fehlschlaegen: bis zu N Wiederholungen, danach Eskalation an den Nutzer ueber die Sidebar.
+Koordiniert: verteilt Aufgaben und Bug-Reports an die passenden Sessions, sendet Instruktionen ueber tmux, prueft den Kontext-Verbrauch. Schreibt selbst keinen Produktionscode — seine Rollengrenze sperrt \`src/\`.
+
+## Local Cyber Factory
+
+Claude schneidet zu, ein lokales Modell codet: Die Rolle zerlegt Arbeit in Haeppchen mit je einem Abnahmetest, der **Local Worker** (opencode gegen ein lokales Modell aus \`agent.localWorker\`) schreibt den Code. Ein Laeufer ohne Modell prueft und entscheidet — gruen wird committet, rot zurueckgesetzt, hoechstens zwei Versuche. Braucht \`agent.skipPermissions\`.
 
 ## Cyber Factory
 

@@ -16,6 +16,17 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+/**
+ * Guides, die frueher ausgeliefert wurden und gestrichen sind. Sie liegen sonst
+ * fuer immer im Companion-Verzeichnis — dieser Deployer ueberschreibt nur, was
+ * er kennt. Nur diese Namen werden entfernt; eigene Dateien bleiben.
+ */
+export const RETIRED_COMPANION_GUIDES: readonly string[] = [
+  '01-first-steps.md',
+  '02-daily-workflow.md',
+  '03-power-moves.md',
+];
+
 export function deployCompanionGuides(projectPath: string): void {
   const guidesDir = path.join(projectPath, 'guides');
 
@@ -38,6 +49,10 @@ export function deployCompanionGuides(projectPath: string): void {
     fs.mkdirSync(guidesDir, { recursive: true });
     fs.writeFileSync(filePath, file.content, 'utf-8');
   }
+
+  for (const name of RETIRED_COMPANION_GUIDES) {
+    try { fs.rmSync(path.join(guidesDir, name), { force: true }); } catch { /* nicht lebenswichtig */ }
+  }
 }
 
 const GUIDE_GRID = `# Guide: Das Grid — Sessions verstehen und steuern
@@ -59,7 +74,7 @@ Eine **Zelle** ist ein Slot im Grid. Leer → zeigt \`+\`. Belegt → zeigt eine
 1. Klick auf \`+\` in einer leeren Zelle
 2. Das **Launcher-Popup** öffnet sich — drei Tabs:
    - **Presets** — spezialisierte Rollen (Companion, Cyber Factory, etc.)
-   - **Path** — eigenen Projektordner öffnen
+   - **Path** — eigenen Projektordner öffnen. Darunter zwei Felder: **Workspace** (Standard: ohne — die Session gehört dann zu keinem Workspace) und **CLI** (Standard: die aus den Einstellungen). Dazu Haken für Nur Shell, Ohne Rückfragen, Fortsetzen und Abzweigen (die letzte Unterhaltung des Ordners als neuer Zweig)
    - **Notes** — eine Notiz in dieser Zelle anzeigen
 3. Preset oder Pfad wählen → Session startet
 
@@ -111,7 +126,7 @@ Header einer Session anfassen und auf eine andere Zelle ziehen. Die beiden Sessi
 
 ## Context-Warnung ernst nehmen
 
-Wenn der Balken orange oder rot wird, ist das Context Window fast voll. Claude "vergisst" dann ältere Teile des Gesprächs. Lösung: neue Session starten (\`/new\` in der Session oder Fork).
+Wenn der Balken orange oder rot wird, ist das Context Window fast voll. Claude "vergisst" dann ältere Teile des Gesprächs. Lösung: \`/clear\` (frischer Kontext, gleiche Session), \`/compact\` (zusammenfassen) oder eine neue Session.
 
 ---
 
@@ -201,7 +216,7 @@ Jede Sektion ist auf- und zuklappbar — der Zustand wird gespeichert. Klick auf
 
 Dein Notiz-Browser. Zeigt alle Notes, durchsuchbar und nach Tags filterbar.
 
-**Workspace-Filterung:** Wenn ein Workspace aktiv ist, filtert die Notes-Sektion automatisch auf \`workspace:<Name>\`. Du siehst nur Notes die zu deinem aktuellen Workspace gehören. Filter manuell überschreibbar.
+**Workspace-Filterung:** Wenn ein Workspace aktiv ist, filtert die Notes-Sektion automatisch auf diesen Workspace. Der Tag trägt die Workspace-**ID** (\`workspace:ws-…\`), der Filter versteht Name und ID. Notes ganz ohne Workspace-Tag siehst du überall. Filter manuell überschreibbar.
 
 **Interaktion:**
 - Einfachklick → Details/Preview
@@ -240,7 +255,7 @@ Gespeicherte Erinnerungen des Companions aus vergangenen Sessions. Standardmäß
 
 ### 5. Messages
 
-Nachrichten über den **Message Bus** — der gemeinsame Kanal aller Sessions. Zeigt Sender, Uhrzeit, Text.
+Nachrichten über den **Message Bus** — Sender, Uhrzeit, Text. Der Bus ist **veraltet** und wird nicht mehr ausgebaut. Einer Session etwas sagen geht nicht über \`mux_send\`, sondern über eine Übergabe (Handoff-Note) oder direkt im Terminal.
 
 ---
 
@@ -268,14 +283,14 @@ Die Entities sind entlang eines Entwicklungsablaufs angeordnet:
 Idee → Anforderungen → Implementierung → Testen → Bugs fixen
 \`\`\`
 
-Und dahinter drei unterstützende Rollen: Companion, Audit, Workshop.
+Und dahinter unterstützende Rollen: Companion, Audit, Workshop — dazu die Local Cyber Factory als zweiter Bauweg. Zwölf Rollen insgesamt, elf davon im Launcher (der Launcher selbst ist intern).
 
 ---
 
 ## Die Entities im Überblick
 
 ### Companion
-**Dein Einstiegspunkt.** Erklärt Konzepte, hilft bei Entscheidungen, nimmt Bug-Reports auf. Merkt sich deine Präferenzen über Sessions hinaus.
+**Dein Einstiegspunkt.** Erklärt Konzepte, hilft bei Entscheidungen, nimmt Bug-Reports auf. Merkt sich deine Präferenzen über Sessions hinaus — als **einzige** Rolle: Companion Memory ist nur für den Companion registriert.
 
 Nicht: Code schreiben oder ausführen. Der Companion *berät*, er *macht* nicht.
 
@@ -300,20 +315,27 @@ Nicht: Code schreiben oder ausführen. Der Companion *berät*, er *macht* nicht.
 
 ---
 
-### Workshop
-**Für kleine Jobs.** Einzelne Fixes, Wartungsaufgaben, alles zu klein für die Factory. Außerdem: Koordinator für **Bugreport-Triage** — nimmt Findings aus Testing-Sessions entgegen, verteilt sie an Debugger, Ideation oder Cyber Factory.
+### Local Cyber Factory
+**Claude schneidet zu, ein lokales Modell codet.** Zerlegt Arbeit in kleine Häppchen und schreibt pro Häppchen einen Abnahmetest. Den Code schreibt der **Local Worker** — opencode gegen ein lokales Modell (Einstellung \`agent.localWorker\`). Ein Läufer ohne Modell prüft, ob der Test vorher rot ist, und entscheidet nach Testbefehl, Prüfsumme und git-Diff: grün wird committet, rot zurückgesetzt. Höchstens zwei Versuche, dann bist du dran.
 
-*Wann:* "Mach das mal schnell" — oder nach einer Testing-Session wenn Bugs verteilt werden müssen.
+*Voraussetzung:* \`agent.localWorker\` eingetragen und \`agent.skipPermissions\` an — sonst lehnt der Mux mit genau diesem Grund ab.
+
+---
+
+### Workshop
+**Für kleine Jobs — als Koordinator.** Nimmt Wartungsaufgaben und **Bugreport-Triage** an und verteilt sie an die passende Session. Selbst schreibt er keinen Produktionscode; seine Rollengrenze lässt keine Änderung unter \`src/\` zu.
+
+*Wann:* "Mach das mal schnell" — oder wenn Bugs verteilt werden müssen.
 
 ---
 
 ### Testing Assistant
-**Für strukturiertes Testen.** Führt Testcases aus, probiert adversariale Szenarien, prüft Sicherheit, erstellt einen Findings-Report. Übergibt an Workshop.
+**Für strukturiertes Testen.** Führt Testcases aus, probiert adversariale Szenarien, prüft Sicherheit, erstellt einen Findings-Report. Übergibt an den Debugger.
 
 ---
 
 ### Debugger
-**Für gezieltes Bug-Fixen.** Bekommt Findings, analysiert Root Cause, plant Fix, führt aus, verifiziert. Entscheidet selbst: ist es klein → erledigt selbst, ist es groß → gibt an Workshop oder Cyber Factory weiter.
+**Für gezielte Fehleranalyse.** Bekommt Findings, sucht die Ursache, plant den Fix — und übergibt ihn an die Cyber Factory (oder zurück an Testing). Den Code fasst er nicht selbst an: seine Rollengrenze sperrt \`src/\`.
 
 ---
 
@@ -323,7 +345,7 @@ Nicht: Code schreiben oder ausführen. Der Companion *berät*, er *macht* nicht.
 ---
 
 ### Launcher
-**Für den Projekt-Kickoff.** Scannt Projekte, startet die Orchestrierung. Spezialisierte Rolle im Kickoff-Flow.
+**Für den Projekt-Kickoff.** Interne Rolle im Kickoff-Ablauf, nicht in der Preset-Liste.
 
 ---
 
@@ -331,9 +353,24 @@ Nicht: Code schreiben oder ausführen. Der Companion *berät*, er *macht* nicht.
 
 Zwei Entities sind besondere Weichen:
 
-**Debugger** entscheidet nach der Analyse: Ist der Job klein genug → macht er selbst weiter. Ist er zu groß → gibt er an Workshop (viele kleine) oder Cyber Factory (große Projekte) ab.
+**Debugger** übergibt nach der Analyse: den Fix an die Cyber Factory, eine offene Frage zurück an Testing.
 
 **Workshop** ist die Schaltzentrale für Bug-Triage: empfängt Findings, klassifiziert (Trivialität / Bug / Feature / Eskalation), verteilt an die passende Entity.
+
+---
+
+## Rollengrenzen — durchgesetzt, nicht nur gebeten
+
+Was eine Rolle nicht tun soll, steht nicht nur im Prompt. Ein Hook (Claude Code, Codex) bzw. ein Plugin (opencode) lehnt den Dateizugriff ab, und das Modell bekommt den Grund zu lesen.
+
+| Rolle | darf nicht ändern |
+|---|---|
+| Workshop, Testing Assistant, Refinement, Ideation Partner, Audit, Debugger | \`src/\` |
+| Local Cyber Factory | \`src/\`, \`lib/\` |
+| Local Worker | seinen Auftrag (\`AUFTRAG.md\`) und die geschützten Abnahmetests |
+| Cyber Factory, Companion, Voice | keine Grenze |
+
+Die Shell deckt die Grenze nicht ab — über ein Kommando lässt sich eine Datei weiter ändern. Sie ist eine Leitplanke gegen Versehen, kein Sandkasten.
 
 ---
 
@@ -346,7 +383,8 @@ Zwei Entities sind besondere Weichen:
 | Größeres Feature bauen | Cyber Factory |
 | Schnelle Fixes / kleine Jobs | Workshop |
 | Testen und Bugs finden | Testing Assistant |
-| Einzelnen Bug analysieren und fixen | Debugger |
+| Einzelnen Bug analysieren | Debugger |
+| Kleine Häppchen lokal coden lassen | Local Cyber Factory |
 | Code-Qualität und Release prüfen | Audit |
 | Fragen / Erklärungen / Orientierung | Companion |
 
@@ -384,7 +422,7 @@ In jeder Session-Zelle läuft eine Kommandozeilen-KI. Lange war das immer Claude
 |---|---|---|---|
 | **Claude Code** | \`claude-code\` | Tier 1 | Standard, Voreinstellung |
 | **Codex CLI** | \`codex\` | Tier 2 | codex-cli 0.155.1 (2026-10-01) |
-| **opencode** | \`opencode\` | Tier 2 | opencode 1.18.34 (2026-10-01) |
+| **opencode** | \`opencode\` | Tier 2 | opencode 1.18.35 (2026-10-09) |
 
 **Tier 1 heißt:** jede Mux-Fähigkeit ist dort gemessen. Claude Code ist die Voreinstellung — nicht aus Gewohnheit, sondern weil es die einzige CLI ist, für die das gilt.
 
@@ -408,15 +446,11 @@ Sonst nichts. Die **Context-Anzeige** funktioniert, nimmt aber einen anderen Weg
 
 | Fähigkeit | Stand |
 |---|---|
-| Context-Anzeige | nicht gemessen — der Context-Balken bleibt leer |
 | Sub-Agents | nicht gemessen |
 
-Dazu zwei Dinge, die hier nicht schöngeredet werden:
+Sonst nichts — gegen die echte CLI mit einem echten Modell abgenommen. Context-Anzeige und Rollengrenze laufen über **Plugins** statt Hook-Dateien: ein Plugin schreibt die Nutzung in das Format, das der Mux liest, ein zweites lehnt verbotene Dateizugriffe ab (gemessen: die verbotene Datei entstand nicht, die erlaubte schon, und das Modell zitierte den Grund).
 
-- **Rollengrenzen sind noch nicht verdrahtet.** Bei Claude Code und Codex hält ein Hook eine Rolle an ihrer Grenze auf. opencode arbeitet mit Plugin-Events statt Hook-Dateien, und dass so ein Event einen Werkzeugaufruf wirklich *ablehnen* kann, ist nicht gemessen. Eine Grenze, die geschrieben ist und nicht greift, ist schlimmer als keine — deshalb steht hier keine.
-- **Es gibt keinen Rauchtest gegen die echte CLI.** Belegt sind die Unit-Tests des Adapters, nicht ein Lauf gegen opencode selbst. Beim Codex-Adapter gibt es diesen Lauf, hier nicht.
-
-Wenn du opencode nimmst, bist du der erste echte Lauf. Das ist kein Grund, es nicht zu tun — es ist ein Grund, es zu wissen.
+**Eine Voraussetzung:** opencode braucht einen angemeldeten Anbieter. Ohne steht die Session am Prompt mit „Run /connect to add an AI provider" und tut auf jede Eingabe nichts.
 
 ### Claude Code
 
@@ -430,15 +464,19 @@ Zwei Stellen, und eine klare Reihenfolge dazwischen.
 
 **Pro Rolle:** Workspaces-Fenster → Tab **Presets** → Rolle anklicken → Feld **CLI**. Der Eintrag „Default" folgt der globalen Einstellung.
 
-Das sieht dann so aus: wählst du dort eine Tier-2-CLI, schreibt der Editor direkt darunter hin, was fehlt — *„Unter opencode fehlt: Context-Anzeige, Sub-Agents."* Du musst nichts nachschlagen, die Lücke steht vor dem Sessionstart da und nicht danach.
+Darunter das Feld **Modell**: leer heißt, die CLI entscheidet selbst; sonst schlägt es vor, was die CLI kennt, und ein voller Modellname außerhalb der Liste geht auch.
 
-**Global:** \`einstellungen\` → Tab **general** → **Standard-CLI**. Das gilt für jede Rolle ohne eigene Wahl — und für freie Sessions ohne Rolle, also alles, was du über den **Path**-Tab des Launchers startest.
+**Pro Ordner-Session:** Launcher → Tab **Path** → Feld **CLI**.
 
-**Die Reihenfolge, von stark nach schwach:**
+**Global:** \`einstellungen\` → Tab **general** → **Standard-CLI**. Das ist die Vorgabe für beide Felder oben.
+
+**Die Reihenfolge für Rollen, von stark nach schwach:**
 
 1. deine Wahl **pro Rolle** (\`app.entityAdapters\`)
-2. der **Default der Rolle** selbst — keine eingebaute Rolle hat einen
+2. der **Default der Rolle** selbst — nur der Local Worker hat einen: opencode
 3. **\`agent.defaultAdapter\`**, die globale Einstellung (Startwert: Claude Code)
+
+Eine Ausnahme: das MCP-Werkzeug \`mux_create_session\` startet immer Claude Code.
 
 Beides greift **ab dem nächsten Sessionstart** dieser Rolle. Eine laufende Session wechselt die CLI nicht.
 
@@ -458,7 +496,17 @@ Im Normalfall brauchst du die Datei nie anzufassen: Preset-Editor und Einstellun
 
 ## Codex: zwei Eigenheiten, die du merkst
 
-**1. Projektanweisungen heißen \`AGENTS.md\`, nicht \`CLAUDE.md\`.** Codex liest \`AGENTS.md\`, hierarchisch nach Verzeichnis, und eine direkte Anweisung im Chat schlägt die Datei. Der Mux spielt seine Sektionen deshalb dort hinein statt in die \`CLAUDE.md\`. Praktische Folge: zwei Rollen mit verschiedenen CLIs im selben Projektordner schreiben in verschiedene Dateien — zwei Rollen mit derselben CLI überschreiben sich die Sektionen gegenseitig.
+**1. Projektanweisungen heißen \`AGENTS.md\`, nicht \`CLAUDE.md\`.** Codex liest nur \`AGENTS.md\`, hierarchisch nach Verzeichnis, und eine direkte Anweisung im Chat schlägt die Datei. Der Mux schreibt Global Rules und Workspace-Sektionen deshalb dorthin. Fehlt die Datei, legt er sie an — mit einem Verweis auf eine vorhandene \`CLAUDE.md\`, damit die eigentlichen Projektanweisungen nicht verloren gehen.
+
+**Welche Datei welche CLI liest** (gemessen am 2026-10-09):
+
+| CLI | Datei |
+|---|---|
+| Claude Code | \`CLAUDE.md\` |
+| Codex | \`AGENTS.md\` |
+| opencode | \`AGENTS.md\`, wenn es eine gibt — dann liest es die \`CLAUDE.md\` **gar nicht**; sonst die \`CLAUDE.md\` |
+
+Der Mux schreibt immer in die Datei, die die CLI tatsächlich liest.
 
 **2. Codex-Vertrauen fürs Arbeitsverzeichnis.** Codex lädt projektlokale Konfiguration, Hooks und Ausführungsregeln **nur** aus einem Verzeichnis, dem es vertraut — sonst fragt es in einem blockierenden Dialog nach. Der Mux trägt deshalb das Run-Verzeichnis der Rolle in \`~/.codex/config.toml\` als vertraut ein, und **nur** das: dort liegt ausschließlich, was der Mux selbst erzeugt hat. Abschaltbar über \`agent.codexTrustRunDirs\` (Startwert: an).
 
@@ -524,9 +572,24 @@ Am unteren Rand einer Zelle erscheint ein Handle — klicken verbindet die Zelle
 
 ### Workspace-weite Einstellungen
 
-**Workspace Prompt:** Text der in *alle* Sessions dieses Workspaces injiziert wird.
+**Workspace Prompt:** Text, den jede Session dieses Workspaces bekommt.
 
-**Context Directories:** Verzeichnisse als zusätzlicher \`@\`-Kontext für alle Sessions.
+**Context Directories:** Verzeichnisse, die zum Workspace gehören — jede Session bekommt sie als Liste.
+
+### Was eine Session über ihren Workspace erfährt
+
+Jede Session, die zu einem Workspace gehört — Ordner-Session, Workspace-Zelle oder Rolle —, bekommt in ihre Projektanweisung eine Sektion \`## Workspace Prompt\`:
+
+- den **Namen** des Workspaces („Du arbeitest im Workspace **KEEL**"),
+- seine **Projekte**: die Projektordner aus den Zellen (Zellen mit Rollen zählen nicht),
+- einen Verweis auf die **Kontextordner** in \`## Context Directories\`,
+- danach den Workspace-Prompt, falls es einen gibt.
+
+Eine Ordner-Session, die du mit Workspace „ohne" startest, bekommt diese Sektionen **entfernt** — sie liest keinen Prompt, der zu einem anderen Workspace gehört.
+
+### Mehrere Workspaces gleichzeitig
+
+Jede Session trägt ihren eigenen Workspace. Presets laufen parallel in mehreren Workspaces; „nur eine Instanz" gilt pro Workspace. Sessions ohne Workspace tragen das Badge „ohne Workspace" und sind aus jedem Workspace sichtbar.
 
 **Default Tags:** Tags die automatisch auf neue Notes angewendet werden (nur \`klasse:wert\`-Format).
 
@@ -561,7 +624,7 @@ Eigene Characters: Name + Farbe + Prompt-Text. Activate-Button macht ihn aktiv.
 
 ## Tab: Presets
 
-Zeigt alle Entity-Presets. CLAUDE.md-Inhalt direkt editierbar.
+Zeigt alle Entity-Presets. Inhalt direkt editierbar. Pro Rolle zwei Felder: **CLI** (welche Kommandozeilen-KI) und **Modell** (leer = die CLI entscheidet).
 
 Neues Custom-Preset: "Neu anlegen" — liefert ein Template mit Abschnitten: Rolle, Fähigkeiten, Arbeitsregeln, Scope.
 
@@ -609,13 +672,21 @@ Unterstützte Formatierung: Überschriften, **fett**, *kursiv*, Links, Code-Blö
 
 Tags sind das Organisationsprinzip. Format immer: \`klasse:wert\`
 
-Beispiele:
-- \`workspace:CIPHER-MUX\`
-- \`kind:bugreport\`
-- \`entity:companion\`
-- \`status:open\`
+Tags sind ein **Achsenmodell**, kein Freitext:
 
-Beim Speichern mit \`Cmd+S\` schlägt das lokale Modell (Ollama) passende Tags vor. Du kannst sie übernehmen, ablehnen oder eigene tippen.
+| Achse | Werte | wer setzt sie |
+|---|---|---|
+| \`kind\` | 14 feste Werte, z. B. bugreport, finding, testcase, spec, handoff, idea | du, nur einer |
+| \`phase\` | 7: research, architecture, coding, testing, debugging, automation, monitoring | du |
+| \`status\` | open, in-progress, blocked, verify, done, superseded | du, nur einer |
+| \`severity\` | low, mid, hi, now (im Tag-Manager änderbar) | du, nur einer |
+| \`component\` | projektspezifisch, im Tag-Manager | du |
+| \`workspace\` | die Workspace-**ID** | der Mux |
+| \`entity\` | die schreibende Rolle | der Mux |
+
+Ein unbekannter Tag lässt \`mux_notes_create\` scheitern — der Mux nimmt nur vergebbare Werte an.
+
+Beim Speichern mit \`Cmd+S\` schlägt das lokale Modell (Ollama) passende Tags vor, beschränkt auf diese Achsen. Du kannst sie übernehmen, ablehnen oder eigene wählen.
 
 **Tag-Autocomplete:** Beim Tippen eines Tags werden bekannte Tags vorgeschlagen.
 
@@ -625,7 +696,7 @@ Beim Speichern mit \`Cmd+S\` schlägt das lokale Modell (Ollama) passende Tags v
 
 Sidebar → Sektion **Notes**. Suche (Volltextsuche) und Tag-Filter.
 
-**Workspace-Filter:** Wenn ein Workspace aktiv ist, zeigt die Sidebar automatisch nur Notes mit \`workspace:<Name>\`. Manuell überschreibbar.
+**Workspace-Filter:** Wenn ein Workspace aktiv ist, zeigt die Sidebar automatisch die Notes dieses Workspaces (Tag mit der Workspace-ID) und alle Notes ohne Workspace-Tag. Manuell überschreibbar.
 
 **Doppelklick** auf eine Note → öffnet sie in einer Grid-Zelle.
 **Drag** → Note auf eine leere Zelle ziehen.
@@ -642,20 +713,30 @@ In Workspaces kann eine Zelle als **Notes-Zelle** konfiguriert werden (statt Ses
 
 | Note | Companion Memory |
 |------|--------------------|
-| Sichtbar in der Sidebar | Nicht im UI sichtbar |
-| Teilbar (auch in Obsidian) | Nur intern |
+| Sichtbar in der Sidebar, Sektion Notes | Sichtbar in der Sidebar, Sektion Companion Memory |
+| Jede Rolle kann schreiben | **Nur der Companion** — andere Rollen bekommen die Werkzeuge gar nicht |
 | Für Inhalte die dokumentiert werden sollen | Für Präferenzen und Kontext |
 | Handoffs zwischen Sessions | Session-übergreifende Erinnerungen |
 
-**Faustregel:** Wenn du es in Obsidian lesen willst — Note. Wenn es nur die KI wissen soll — Memory.
+**Faustregel:** Was andere lesen oder weiterreichen sollen — Note. Was der Companion über dich wissen soll — Memory. Gehört der Inhalt in eine Note, speichert Memory nur einen **Zeiger** auf sie, nicht den Text.
+
+---
+
+## Testcases und Findings
+
+**Testcases** sind die manuelle Abnahme: ein Mensch benutzt die App und hakt ab. Neue Einträge entstehen **offen** — wer sie anlegt, hakt sie nicht selbst ab. Was ein Testlauf findet, ist ein **Finding** (\`kind:finding\`), kein Testcase.
+
+## Typisierte Notes und Spiegelung
+
+Notes können einen Typ tragen (testcase, finding, spec, requirements, research) und haben dann eigene Ansichten. \`mux_mirror_sync\` spiegelt eine Datei aus git als typisierte Note und zeigt sichtbar, wenn beide auseinanderlaufen.
 
 ---
 
 ## Handoff-Notes
 
-Sessions übergeben Aufgaben über **Handoff-Notes** — strukturierte Notes mit Tags wie \`kind:handoff\`, \`toEntity:debugger\`.
+Sessions übergeben Aufgaben über **Handoff-Notes**: \`mux_notes_handoff_create\` legt sie an (Marker \`handoff\`, Zielrolle und Status im Frontmatter) und hält den aktuellen Commit als **Anker** fest. \`mux_notes_handoff_dispatch\` stellt sie zu: berechnet beim Zustellen, was sich seit dem Anker geändert hat (Branch, Commits, Diff), und schickt das zusammen mit der Note in die Zielsession. So handelt die empfangende Session nie nach einer veralteten Beschreibung.
 
-Das ist der Standard-Weg wie z.B. Testing Assistant seine Findings an Workshop übergibt: als Note, nicht als direkter Chat.
+Das ist der Standard-Weg, wie z. B. Testing seine Findings an den Debugger übergibt: als Note, nicht als direkter Chat.
 
 ---
 
@@ -837,9 +918,7 @@ The difference is not length — it is precision. The good prompt takes 30 secon
 
 Every AI model has a limit on how much text it can hold in "working memory" at once. This is the **context window**, measured in tokens (roughly: one token ≈ 0.75 English words, one long German word ≈ 3-5 tokens).
 
-**Current specs (April 2026):**
-- Claude Opus 4.6/4.7, Sonnet 4.6: 1,000,000 tokens (~750K English words, ~1,500 book pages)
-- Claude Haiku 4.5: 200,000 tokens
+**How big it is** depends on the model and changes with every release — this guide deliberately names no numbers that would go stale. The context bar in each cell header shows how full the window of *that* session is; in Claude Code, \`/context\` breaks it down.
 
 Think of it as **RAM vs. ROM vs. Disk:**
 - **Context window = RAM.** What the AI is actively thinking about right now. Limited, fast, everything here is "in focus."
@@ -1081,11 +1160,11 @@ If cipher-mux has a quality baseline directory configured, the Launcher uses it 
 
 ---
 
-## Writing for Cyber Factory Input Requests
+## Answering Questions from a Role
 
-When the Cyber Factory cannot make a decision autonomously, it sends a bubble to the sidebar. Your response drives the direction of multiple worker sessions.
+When the Cyber Factory — or Refinement, the Workshop, the Debugger — cannot decide something on its own, it asks you **directly in its own session** and waits. (Earlier versions sent a bubble to the sidebar; that mechanism is gone.) Your answer can steer several worker sessions at once.
 
-### What a Bubble Looks Like
+### What a Good Question Looks Like
 
 \`\`\`
 Question: The authentication sub-project needs a session storage
@@ -1099,17 +1178,15 @@ Options:
 Context: The requirements mention "no external dependencies beyond
 the database." Redis would add a dependency. JWT aligns better with
 the stated constraints.
-
-[Custom answer field]
 \`\`\`
 
 ### How to Answer Effectively
 
-- **Read the recommendation first.** The Cyber Factory has context you might not have — it knows what all workers are doing. The recommended option usually has the best reasoning.
-- **If you agree:** click the recommended option. Done. Fast.
-- **If you disagree:** click a different option, or write a custom answer with your reasoning: "Use B because we need session revocation, and JWT revocation is hard to get right."
-- **If you need more info:** write "Explain the trade-offs in more detail" in the custom field. The Cyber Factory will elaborate and re-ask.
-- **Speed matters.** Workers are paused. A 30-second decision keeps the pipeline moving. A 30-minute deliberation means 30 minutes of idle compute. If you genuinely need time, that is fine — but do not forget there are sessions waiting.
+- **Read the recommendation first.** The role has context you might not have — it knows what all workers are doing. The recommended option usually has the best reasoning.
+- **If you agree:** answer with the letter. Done. Fast.
+- **If you disagree:** name a different option with your reasoning: "B, because we need session revocation, and JWT revocation is hard to get right."
+- **If you need more info:** "Explain the trade-offs in more detail." The role will elaborate and re-ask.
+- **Speed matters.** Workers may be waiting. A 30-second decision keeps the pipeline moving. If you genuinely need time, that is fine — but do not forget there are sessions waiting.
 
 ---
 
@@ -1163,41 +1240,33 @@ A bugreport feeds into the Workshop's bug queue. The better the report, the fast
 
 **Good:** "Steps: 1. Open NotesCell, 2. Create new note, 3. Click Save icon in tab bar. Expected: note saves, toast confirmation. Actual: nothing happens, console shows 'Error: ENOENT: no such file or directory'. Affects: NoteEditor component, save flow for new (unsaved) notes."
 
-### Using Voice Interview Mode
+### Dictating a Bugreport
 
-The bugreport dialog has a voice interview option. Claude asks you questions about the bug and enriches your answers into a structured report. This is great when you are frustrated and just want to vent — the AI turns your stream of consciousness into actionable information.
+Dictation is the intended input of the bugreport dialog (Cmd+B). Just talk — on submit, a model behind the LLM gateway turns it into a structured report (title, severity, tags, steps). Your original words stay **verbatim** underneath, because the exact phrasing often matters when reproducing a bug. If the gateway is unreachable, the report goes out raw — it never blocks.
 
 ### Screenshot Capture
 
-The bugreport dialog can capture a screenshot and attach it to the report. Use this for visual bugs — layout issues, missing elements, wrong colors. The screenshot is base64-encoded in the report's YAML frontmatter.
+The dialog can attach a screenshot. Use this for visual bugs — layout issues, missing elements, wrong colors. It is stored as a file next to the report; the report also carries a snapshot of the pane and the current commit.
 
 ---
 
 ## Inter-Session Communication
 
-Sessions in cipher-mux communicate through two channels:
+Sessions in cipher-mux hand work to each other in two ways:
 
-### The Message Bus
+### Handoff Notes
 
-A shared SQLite database where sessions post messages tagged with a topic. Anyone can read, anyone can write. The Workshop reads the bus regularly to monitor progress.
-
-**Topics:**
-- \`chat\` — user-facing messages, shown in sidebar Messages tab
-- \`status\` — progress updates from workers
-- \`bug\` — incoming bugreport notifications
-- \`system\` — warnings (high context usage, errors)
-
-The bus is asynchronous — you post a message, and other sessions pick it up when they check. There is no guarantee of immediate delivery.
+The standard way. A session writes a handoff note (\`mux_notes_handoff_create\`), which records the current commit as an anchor. \`mux_notes_handoff_dispatch\` delivers it: it finds or starts the target session, computes what changed since the anchor (branch, commits, diff) and sends that together with the note. The receiving session never acts on a stale description of the code.
 
 ### tmux send-keys (Direct Injection)
 
-For immediate delivery, the Workshop uses tmux to type directly into a worker's terminal. This is how initial task instructions are sent — the message bus cannot deliver prompts to an idle Claude session (it is not reading the bus until it has a task).
+For immediate delivery, a coordinating session types directly into a worker's terminal. This is how initial task instructions are sent. Wait 8–10 seconds after starting a session before sending — the CLI needs time to come up.
 
-**When to use which:**
-- Status updates, reports, notifications → Message Bus
-- Initial task instructions, urgent redirects → tmux send-keys (handled by Workshop automatically)
+### The Message Bus — deprecated
 
-As a user, you rarely interact with either directly. The Workshop handles routing. But understanding the distinction helps when debugging communication issues: if a worker did not receive an instruction, it is usually a timing issue with tmux send-keys (the worker was not ready yet), not a bus problem.
+There is still a Message Bus (\`mux_send\` / \`mux_read\`, sidebar section Messages), but it is no longer developed and **not** a way to give a session a prompt. Use a handoff or send-keys instead.
+
+As a user, you rarely interact with any of this directly. But when a worker did not receive an instruction, it is usually timing (the worker was not ready yet).
 
 ---
 
@@ -1207,9 +1276,9 @@ As a user, you rarely interact with either directly. The Workshop handles routin
 |---|---|
 | Workshop | Decomposable tasks with clear boundaries and success criteria |
 | Cyber Factory | Complete requirements doc with goal, audience, features, constraints |
-| Cyber Factory Input Requests | Fast decisions, trust recommendations, ask for detail when unsure |
+| Questions from a role | Fast decisions, trust recommendations, ask for detail when unsure |
 | Voice | Natural language only, review before submit, no code dictation |
-| Bugreports | Steps to reproduce > vague descriptions. Use voice interview when frustrated |
+| Bugreports | Steps to reproduce > vague descriptions. Dictate freely — your words are kept verbatim |
 | Workers | Standard prompting (Guide 04) — one topic, specific, constrained |
 
 **Next step:** Guide 06 (Token Craft) covers how to work efficiently with context windows, choose the right model, and keep sessions productive.
@@ -1227,23 +1296,23 @@ This guide covers the practical side of AI efficiency: choosing the right model,
 
 ## Models: When to Use What
 
-Claude comes in three tiers, each with different strengths. Knowing which to use when is the first efficiency lever.
+Claude comes in tiers, each with different strengths. Knowing which to use when is the first efficiency lever. Version numbers and window sizes change with every release, so this guide names the tiers, not versions — \`/model\` in Claude Code shows what is current. Codex and opencode have their own models; the role's **Modell** field in the preset editor suggests what each CLI knows.
 
-### Claude Opus 4.6 / 4.7
+### The top tier (Opus, Fable)
 
-The most capable model. Best at: complex multi-step reasoning, architectural decisions, creative work, ambiguous tasks that need judgment. Largest context window (1M tokens). Most expensive in terms of compute budget.
+The most capable models. Best at: complex multi-step reasoning, architectural decisions, creative work, ambiguous tasks that need judgment. Most expensive in terms of compute budget.
 
 Use for: orchestration, planning, code review, complex debugging, anything where getting it right the first time matters more than speed.
 
-### Claude Sonnet 4.6
+### Sonnet
 
-The daily driver. Fast, capable, cost-effective. Same 1M context window. Handles most coding tasks, refactoring, feature implementation, and documentation without breaking a sweat.
+The daily driver. Fast, capable, cost-effective. Handles most coding tasks, refactoring, feature implementation, and documentation without breaking a sweat.
 
 Use for: implementation work, routine coding, file modifications, test writing. This is your default for worker sessions.
 
-### Claude Haiku 4.5
+### Haiku
 
-The lightweight model. 200K context window (smaller but still substantial). Fastest response times. Lowest compute cost. Excellent at well-specified tasks where the instructions are clear and the scope is narrow.
+The lightweight model. Smaller context window, fastest response times. Lowest compute cost. Excellent at well-specified tasks where the instructions are clear and the scope is narrow.
 
 Use for: simple changes, formatting, file operations, tasks with detailed specs, high-volume work. Also: Haiku excels when given frontloaded context — a well-written CLAUDE.md or spec makes Haiku surprisingly effective.
 
@@ -1385,7 +1454,7 @@ cipher-mux has several features that support token-efficient work without you th
 
 **Workshop / Cyber Factory Context Monitoring:** Both check worker context usage every 2 minutes. If a worker hits 90%, they can take action — finish the current sub-task, summarize, and start a fresh worker.
 
-**Message Bus:** Lightweight asynchronous messaging. A status update on the bus is a few dozen tokens. The alternative — having two sessions share a full conversation — would cost thousands of tokens. The bus architecture is inherently token-efficient.
+**Handoff notes:** A handoff carries only what the next session needs plus the diff since its anchor — a few hundred tokens instead of a shared conversation of thousands. (The older Message Bus is deprecated.)
 
 **Session Survival:** tmux sessions survive app crashes. This means no token loss from unexpected restarts. Recovery adopts sessions without re-creating context.
 
