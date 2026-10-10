@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Sessions im Workspace kennen seine Projekte.** Die Sektion `## Workspace Prompt` nennt den
+  Workspace beim Namen, listet die Projekte aus seinen Zellen (Rollenverzeichnisse ausgenommen) und
+  verweist auf die Kontextordner — für Ordner-Sessions, Workspace-Zellen **und Rollen**. Rollen
+  bekamen bisher nur Prompt und Kontextordner, nicht einmal den Namen.
+
 ## [0.12.2] — 2026-10-09
 
 ### Fixed

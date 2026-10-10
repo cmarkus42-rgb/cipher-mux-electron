@@ -48,7 +48,11 @@ import {
   restoreAdapterId,
   formatWorkspacePrompt,
   newInstructionsFile,
+  workspaceProjects,
 } from './folder-session'
+
+/** Role directories — a workspace cell pointing here is a role, not a project. */
+const ENTITIES_ROOT = path.join(os.homedir(), '.config', 'cipher-mux', 'entities')
 import type { WorkspaceSectionSource } from './folder-session'
 import { generateLocalFactoryPreset, generateLocalWorkerPreset, LOCAL_WORKER_DISPATCH_TOOL } from '../local-factory/presets'
 
@@ -373,6 +377,7 @@ export class SessionManager extends EventEmitter {
         const sections = resolveWorkspaceSections(
           { workspaceId: opts.workspaceId, workspacePrompt: opts.workspacePrompt, contextPaths: opts.contextPaths },
           configStore.get('workspaces') as WorkspaceSectionSource[] | undefined,
+          ENTITIES_ROOT,
         )
         if (sections.reconcile) {
           this.injectWorkspaceSections(
@@ -1393,6 +1398,17 @@ export class SessionManager extends EventEmitter {
         // Unconditional: independent of the workspace-fallback branch above.
         if (callerProjectPath) {
           wsPaths = [...(wsPaths ?? []), callerProjectPath].filter((v, i, a) => a.indexOf(v) === i)
+        }
+        // Auch eine Rolle soll wissen, in welchem Workspace sie laeuft und was
+        // dazugehoert — dieselbe Sektion wie bei Ordner-Sessions.
+        if (targetWorkspace) {
+          wsPrompt = formatWorkspacePrompt({
+            workspaceId: targetWorkspace.id,
+            workspaceName: targetWorkspace.name?.trim() || undefined,
+            workspaceProjects: workspaceProjects(targetWorkspace, ENTITIES_ROOT),
+            contextPaths: wsPaths,
+            workspacePrompt: wsPrompt,
+          })
         }
         const assembled = this.assembleEntityClaudeMd(
           presetContent,
