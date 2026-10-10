@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.4] — 2026-10-10
+
 ### Fixed
 - **Das Wissen des Companion war auf dem Stand von Mai bis Anfang Oktober.** Ein Abgleich gegen den
   Code fand 15 Gruppen falscher Aussagen und 33 fehlende von 68 MCP-Werkzeugen. Korrigiert:
