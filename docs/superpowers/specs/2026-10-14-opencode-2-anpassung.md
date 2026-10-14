@@ -90,16 +90,19 @@ Nicht jedes Event trägt `location`: `session.usage.updated` hat nur `sessionID`
    tokens }` und zählt **pro Schritt**. Fünf Schritte eines Laufs: `cache.read` 1536 → 8192 →
    8448 → 8704 → 8960, `input` 6758 → 383 → 264 → 313 → 439. Die Promptgröße des letzten
    Schritts ist `input + cache.read + cache.write` (Schritt 5: 439 + 8960 = 9399).
-3. **`session.usage.updated`** (`{ sessionID, cost, tokens }`) ist **kumulativ** über die
+3. **Reasoning zählt zum Kontext.** Gemessen in der TUI: letzter Schritt `{ input 3282, output 223,
+   reasoning 353, cache.read 9728 }`, angezeigt als „13.6K" — `3282 + 9728 + 223 + 353 = 13586`.
+   Die Mux-Anzeige zählt `output + reasoning` als erzeugt, damit beide dieselbe Zahl nennen.
+4. **`session.usage.updated`** (`{ sessionID, cost, tokens }`) ist **kumulativ** über die
    Session und kommt auch mitten im Schritt; die Summen passten nicht exakt zu den
    Schrittwerten (Differenz 64 Tokens). **Nicht als Kontextgröße verwendbar.**
-4. **Das Modell steht nur in `session.step.started`** (`{ sessionID, assistantMessageID,
+5. **Das Modell steht nur in `session.step.started`** (`{ sessionID, assistantMessageID,
    agent, model: { id, providerID, variant }, started }`). Verknüpfung über `assistantMessageID`.
-5. **`ctx.model.list()` liefert `{ location, data: [...] }`** (414 Einträge an dieser Installation),
+6. **`ctx.model.list()` liefert `{ location, data: [...] }`** (414 Einträge an dieser Installation),
    jeder mit `id`, `modelID`, `providerID`, `limit: { context, output, input? }`. Beispiel
    `opencode/big-pickle`: `context 200000`, `input 160000`. Damit ist das Fenster pro Modell
    abfragbar (D12).
-6. `ctx.model.default()` liefert das **Standardmodell der Config**, nicht das Modell der
+7. `ctx.model.default()` liefert das **Standardmodell der Config**, nicht das Modell der
    laufenden Session.
 
 ### 2.5 Idle
@@ -107,8 +110,10 @@ Nicht jedes Event trägt `location`: `session.usage.updated` hat nur `sessionID`
 1. Turn-Ende: `session.execution.started` → `session.execution.succeeded` (jeweils
    `{ sessionID }`). Im Binary zusätzlich `session.execution.failed` und
    `session.execution.interrupted`.
-2. **`session.idle` kam im `opencode run`-Lauf nicht an**, steht aber als Eventname im Binary.
-   Ob die TUI es sendet, ist nicht gemessen. (V1 sendete es genau einmal am Zugende.)
+2. **`session.idle` kam weder im `opencode run`- noch im TUI-Lauf an**, steht aber als Eventname
+   im Binary. **In der TUI** (§9) kamen `session.execution.started` und, am Zugende,
+   `session.execution.succeeded` plus `session.step.ended`. (V1 sendete `session.idle` genau
+   einmal am Zugende.) `session.idle` bleibt in der Liste (D5), ist aber ohne Messung nur Reserve.
 
 ### 2.6 CLI
 
@@ -254,6 +259,28 @@ Das Feuern nachweisen, nicht die Datei schreiben (Vorgänger §1). Jeweils im tm
 9. **Rollengrenze mit relativem Pfad** (`src/x.ts`, nicht nur `/p/src/x.ts`) und, wenn ein
    Modell `patch` angeboten bekommt, mit einem mehrteiligen `patch`.
 10. Fork im Launcher: die Zeile erscheint im Pane, es entsteht keine halbe Session.
+
+## 9. Abnahmeergebnis (2026-10-14, opencode 2.0.29, TUI unter `--standalone`)
+
+Zwei Sessions parallel in einem eigenen tmux-Server, Verzeichnisse mit dem echten Adapter-Code
+erzeugt (`postLaunchInjection`, `ensureInstructionsFile`), Modell `opencode/big-pickle` über den
+Override. Umgebung: je eigene `CIPHER_MUX_SESSION_ID`.
+
+| # | Kriterium | Ergebnis |
+|---|---|---|
+| 1 | Grenze (Rolle `workshop`, **relativer** Pfad `src/no.ts`) | **bestanden.** `docs/ok.md` entstand, `src/` nicht; der Grund kam wörtlich beim Modell an, es umging die Grenze nicht. |
+| 2 | Zwei Sessions parallel, getrennte Usage-Dateien | **bestanden.** `ACCEPT-A.json` und `ACCEPT-B.json` trugen je die eigene opencode-Session-ID. |
+| 3 | Context-Prozent = TUI | **nach Korrektur bestanden.** Erste Fassung zählte kein Reasoning (13,2K statt 13,6K) → siehe §2.4.3. B stimmte von Anfang an (8.575). Fenster 200000 kam aus `ctx.model.list()`. |
+| 4 | Idle-Signal | **bestanden** über `session.execution.succeeded` (kein `session.idle`, §2.5). |
+| 5 | Restore mit `--session <id>` | **bestanden.** Frühere Unterhaltung da, Session-ID unverändert, Usage-Datei dieselbe. |
+| 6 | Kein `failed to load plugin` | **bestanden** (kein Treffer im Server-Log für die Abnahmeverzeichnisse). |
+| 7 | Rollen-Modell greift | **bestanden.** Beide TUIs zeigten „Big Pickle", das Standardmodell der Config ist ein anderes (OpenRouter). Wiederherstellung des Projekt-`model` nur im Unit-Test belegt. |
+| 8 | Rolle kennt ihr Preset (über `AGENTS.md`-Verweis) | **bestanden.** Das Codewort stand nur in der `CLAUDE.md`; die Session nannte es nach einem Lesevorgang. |
+| 9 | Grenze mit mehrteiligem `patch` | **nicht gemessen** — das Testmodell bekam `patch` nicht angeboten. |
+| 10 | Fork im Launcher | **nicht gemessen** (nur Unit-Test; echter Start über den Mux steht aus). |
+
+Nebenbefund: Ein `-m` am Top-Level beendete eine Session sofort (Hilfe gedruckt) — dieselbe
+stille Falle wie bei `--model`/`--fork`, hier unfreiwillig bestätigt.
 
 ## 8. Risiken und offene Punkte
 

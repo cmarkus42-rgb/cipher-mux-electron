@@ -179,16 +179,41 @@ describe('opencode-Usage-Plugin (opencode 2) — laedt und schreibt', () => {
     assert.equal(data.session_id, 'ses_abc')
     assert.equal(data.model.id, 'qwen3')
     const cw = data.context_window
-    // Prompt = input + cache.read + cache.write; Anzeige = Prompt + Antwort.
+    // Prompt = input + cache.read + cache.write; erzeugt = output + reasoning.
     assert.equal(cw.total_input_tokens, 383 + 8192)
-    assert.equal(cw.total_output_tokens, 93)
+    assert.equal(cw.total_output_tokens, 93 + 9)
     assert.equal(cw.context_window_size, 100_000)
-    assert.equal(cw.used_percentage, 8.7) // (383 + 8192 + 93) / 100000 = 8.668 -> 8.7
+    assert.equal(cw.used_percentage, 8.7) // (383 + 8192 + 93 + 9) / 100000 = 8.677 -> 8.7
     assert.equal(cw.remaining_percentage, 91.3)
     assert.equal(cw.current_usage.input_tokens, 383)
-    assert.equal(cw.current_usage.output_tokens, 93)
+    assert.equal(cw.current_usage.output_tokens, 93 + 9)
     assert.equal(cw.current_usage.cache_read_input_tokens, 8192)
     assert.equal(cw.current_usage.cache_creation_input_tokens, 0)
+  })
+
+  it('zaehlt Reasoning mit — so wie die TUI von opencode selbst', async () => {
+    // Gemessen in der TUI (2.0.29): letzter Schritt { input 3282, output 223,
+    // reasoning 353, cache.read 9728 } — die TUI zeigt „13.6K" (6,8 % von 200000).
+    // 3282 + 9728 + 223 = 13233 haette „13.2K" ergeben; erst mit dem Reasoning stimmt
+    // die Mux-Anzeige mit der, die der Nutzer im Pane sieht.
+    reset()
+    const { deliver, cleanup } = await start({ contextWindowSize: 200_000 })
+    await deliver(stepStarted('ses_abc', 'msg_1'))
+    await deliver(stepEnded('ses_abc', 'msg_1', tok(3282, 223, 9728, 0, 353)))
+    cleanup()
+    const cw = read().context_window
+    assert.equal(cw.used_percentage, 6.8)
+    assert.equal(cw.current_usage.input_tokens + cw.current_usage.output_tokens
+      + cw.current_usage.cache_read_input_tokens + cw.current_usage.cache_creation_input_tokens, 13_586)
+  })
+
+  it('ohne reasoning-Feld (aeltere Form) bleibt alles wie vorher', async () => {
+    reset()
+    const { deliver, cleanup } = await start({ contextWindowSize: 1000 })
+    await deliver(stepStarted('ses_abc', 'msg_1'))
+    await deliver(stepEnded('ses_abc', 'msg_1', { input: 100, output: 50, cache: { read: 200, write: 0 } }))
+    cleanup()
+    assert.equal(read().context_window.used_percentage, 35)
   })
 
   it('der StatusLineMonitor versteht die Datei ohne jede Aenderung', async () => {

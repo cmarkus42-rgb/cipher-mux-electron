@@ -18,6 +18,10 @@ import { BRAND } from '../../shared/brand'
  *    cache: { read, write } }` — **pro Schritt**, ohne `total`, und `input` ist
  *    der Teil OHNE den gecachten Anteil (1.x: einschliesslich). Gemessen an
  *    fuenf Schritten eines Laufs: `cache.read` 1536 → 8192 → 8448 → 8704 → 8960.
+ *  - Die TUI zaehlt das **Reasoning** zum Kontext mit: letzter Schritt `{ input 3282,
+ *    output 223, reasoning 353, cache.read 9728 }` zeigte sie als „13.6K" —
+ *    3282 + 9728 + 223 + 353 = 13586. Ohne das Reasoning waeren es 13,2K gewesen.
+ *    Die Mux-Anzeige folgt der TUI, damit beide dieselbe Zahl nennen.
  *  - `session.usage.updated` ist **kumulativ** ueber die Session und kommt auch
  *    mitten im Schritt. Als Kontextgroesse unbrauchbar und deshalb hier
  *    absichtlich nicht ausgewertet.
@@ -181,20 +185,23 @@ export default {
           const cacheWrite = isNum(cache.write) ? cache.write : 0
           // 'input' ist hier OHNE den gecachten Anteil. Was beim naechsten Zug
           // mitgeschickt wird: der ganze Prompt (Cache zaehlt im Fenster mit)
-          // plus die letzte Antwort.
+          // plus die letzte Antwort. Das Reasoning zaehlt mit, weil die TUI es
+          // mitzaehlt (gemessen: 3282 + 9728 + 223 + 353 = 13586 = '13.6K').
+          const reasoning = isNum(t.reasoning) ? t.reasoning : 0
+          const generated = t.output + reasoning
           const prompt = t.input + read + cacheWrite
-          const used = prompt + t.output
+          const used = prompt + generated
           const size = await windowFor(model)
           const pct = size > 0 ? (used / size) * 100 : 0
           st.context_window = {
             used_percentage: Math.min(100, Math.round(pct * 10) / 10),
             remaining_percentage: Math.max(0, Math.round((100 - pct) * 10) / 10),
             total_input_tokens: prompt,
-            total_output_tokens: t.output,
+            total_output_tokens: generated,
             context_window_size: size,
             current_usage: {
               input_tokens: t.input,
-              output_tokens: t.output,
+              output_tokens: generated,
               cache_read_input_tokens: read,
               cache_creation_input_tokens: cacheWrite,
             },
