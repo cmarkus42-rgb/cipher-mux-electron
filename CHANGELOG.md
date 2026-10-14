@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-10-14
+
+### Changed
+- **opencode 2.0 statt 1.x.** opencode 2 weist die Plugins der 1.x-Zeit ab — mit einer einzigen
+  WARN-Zeile im Server-Log. Die Session startete gesund und lief ohne Rollengrenze, ohne
+  Context-Anzeige und ohne Idle-Signal. Gemessen an opencode 2.0.29, Spec
+  `docs/superpowers/specs/2026-10-14-opencode-2-anpassung.md`. **opencode 1.x wird nicht mehr
+  unterstützt.**
+  - Alle drei erzeugten Plugins (Rollengrenze, Usage, Idle) sind V2-Definitionen, abhängigkeitsfrei,
+    in `.opencode/plugins/`. Alte V1-Dateien und ihre Einträge in `opencode.json` räumt der Mux
+    beim nächsten Start der Session weg.
+  - **`--standalone` für jede opencode-Session.** Ein V2-Plugin läuft im Server, nicht in der TUI.
+    Im geteilten Hintergrunddienst bekam es die `CIPHER_MUX_SESSION_ID` der Session, die den Dienst
+    gestartet hat, und sah die Ereignisse aller Verzeichnisse — jede Session hätte in die
+    Usage-Datei einer fremden geschrieben.
+  - **Kein `--model`, `--fork`, `--pure` mehr.** Das Top-Level-opencode kennt sie nicht und meldet
+    unbekannte Optionen nicht: es druckt die Hilfe und beendet sich. Das Modell einer Rolle steht
+    jetzt als `model` in der `opencode.json` (mit Marker, ein Projekt-`model` kommt zurück). Ein
+    Fork wird im Pane sichtbar verweigert; die Variante über die API ist noch ungemessen.
+  - **Projektanweisungen nur noch aus `AGENTS.md`.** opencode 2 liest `CLAUDE.md` nicht mehr. Der
+    Mux legt eine `AGENTS.md` mit Verweis an — auch im Run-Verzeichnis einer Rolle, sonst hätte
+    sie ohne ihr Preset gearbeitet.
+  - Die Context-Anzeige kommt aus `session.step.started/ended`, das Kontextfenster aus dem
+    Modellkatalog des Servers; Reasoning-Tokens zählen mit, so wie in der opencode-TUI.
+
+### Fixed
+- **Die opencode-Rollengrenze hätte unter 2.x nichts mehr gesperrt.** Das Pfadfeld heißt jetzt
+  `path` (vorher `filePath`), das Modell übergibt Pfade relativ (`src/x.ts` trifft `/src/` nicht),
+  und `patch` trägt mehrere Dateien samt Move-Ziel in `patchText`. Die Grenze löst Pfade auf, prüft
+  jeden Eintrag eines Patches und lehnt ein Edit-Werkzeug ohne lesbaren Pfad ab, statt es
+  durchzulassen. In der TUI nachgewiesen.
+
+### Bekannt
+- `patch` mit mehreren Dateien ist nur aus dem Binary gelesen, nicht an einem Aufruf gemessen.
+- Codex-Rollen bekommen durch die neue Anweisungsdatei erstmals eine `AGENTS.md` mit Verweis;
+  ungemessen.
+
 ## [0.12.9] — 2026-10-12
 
 ### Fixed
