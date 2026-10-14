@@ -47,7 +47,7 @@ import {
   buildFolderAutoLaunch,
   restoreAdapterId,
   formatWorkspacePrompt,
-  newInstructionsFile,
+  ensureInstructionsFile,
   workspaceProjects,
 } from './folder-session'
 
@@ -339,6 +339,7 @@ export class SessionManager extends EventEmitter {
             sessionId: id,
             workspaceId: opts.workspaceId ?? null,
             entityId: opts.entityId ?? null,
+            ...(opts.model ? { model: opts.model } : {}),
           })
         } catch (err) {
           console.warn('[SessionManager] Adapter MCP injection failed:', err)
@@ -1032,15 +1033,7 @@ export class SessionManager extends EventEmitter {
    * CLAUDE.md so opencode does not lose it). Returns the file name.
    */
   private prepareInstructionsFile(projectPath: string, adapter: AgentAdapter): string {
-    const present = {
-      agentsMd: fs.existsSync(path.join(projectPath, 'AGENTS.md')),
-      claudeMd: fs.existsSync(path.join(projectPath, 'CLAUDE.md')),
-    }
-    const target = adapter.instructionsTarget?.(present) ?? { file: 'CLAUDE.md' as const }
-    if (target.file === 'AGENTS.md' && !present.agentsMd && fs.existsSync(projectPath)) {
-      fs.writeFileSync(path.join(projectPath, 'AGENTS.md'), newInstructionsFile(target), 'utf-8')
-    }
-    return target.file
+    return ensureInstructionsFile(projectPath, adapter)
   }
 
   /**
@@ -1443,6 +1436,26 @@ export class SessionManager extends EventEmitter {
       }
     }
 
+    // Die Anweisungsdatei, die die CLI dieser Rolle wirklich liest. Die Preset-
+    // Anweisung steht oben als CLAUDE.md im Run-Verzeichnis; opencode 2 liest die
+    // nicht mehr (nur AGENTS.md), die Rolle liefe sonst ohne Preset, Persona und
+    // Global Rules — ohne jede Meldung. Ein Fehler hier ist kein Grund, den Start
+    // abzubrechen.
+    try {
+      ensureInstructionsFile(runDir, this.adapterForEntity(entityId))
+    } catch (err) {
+      console.warn('[SessionManager] Instructions file for entity failed:', err)
+    }
+
+    // Das Rollen-Modell muss bis zu postLaunchInjection reichen: opencode 2 hat am
+    // Top-Level kein --model, das Modell reist dort als `model` in der Config.
+    let roleModel: string | undefined
+    try {
+      roleModel = resolveEntityRuntime(config, configStore.get('app') as EntityRuntimeConfig).model ?? undefined
+    } catch (err) {
+      console.warn('[SessionManager] Role model resolution failed:', err)
+    }
+
     // Start session
     const session = await this.start({
       name: displayName,
@@ -1451,6 +1464,7 @@ export class SessionManager extends EventEmitter {
       workspaceId,
       entityId,
       _entityInjected: true,
+      ...(roleModel && !restOpts.model ? { model: roleModel } : {}),
     })
 
     // Inject session ID into CLAUDE.md so the entity can pass it to mux_tts_speak (focus gate)

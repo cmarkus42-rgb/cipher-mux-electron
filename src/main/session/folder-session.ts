@@ -14,6 +14,8 @@
  *    `claude …`, waehrend der Main-Prozess MCP fuer die Default-CLI einrichtete.
  *    Jetzt baut sie der Adapter, der auch injiziert.
  */
+import * as fs from 'fs'
+import * as path from 'path'
 import type { LaunchCommand, InstructionsTarget } from '../agent/agent-adapter'
 
 export interface WorkspaceSectionSource {
@@ -144,6 +146,34 @@ export function newInstructionsFile(target: InstructionsTarget): string {
   return '# Projektanweisungen\n\n'
     + `Die eigentlichen Projektanweisungen stehen in \`${target.pointerTo}\` in diesem Verzeichnis. `
     + 'Lies sie zu Beginn der Session vollständig; was dort steht, gilt hier genauso.\n'
+}
+
+/**
+ * Die Anweisungsdatei, die die CLI dieser Session wirklich liest — angelegt, wenn
+ * die CLI eine braucht und sie fehlt. Gibt den Dateinamen zurueck.
+ *
+ * Ein Adapter ohne `instructionsTarget` bleibt bei `CLAUDE.md` (Claude Code). Eine
+ * vorhandene `AGENTS.md` wird nie ueberschrieben. Fehlt das Verzeichnis, wird
+ * nichts geschrieben — der Aufrufer haengt an einer Init-Kette, und ein Wurf dort
+ * kostet still den ganzen Restore.
+ *
+ * **Auch fuer Run-Verzeichnisse von Rollen.** opencode 2 liest `CLAUDE.md` nicht
+ * mehr; ohne den Verweis in einer `AGENTS.md` arbeitete eine Rolle ohne ihr Preset,
+ * ihre Persona und ihre Global Rules, und nichts meldete es.
+ */
+export function ensureInstructionsFile(
+  projectPath: string,
+  adapter: { instructionsTarget?: (present: { agentsMd: boolean; claudeMd: boolean }) => InstructionsTarget },
+): string {
+  const present = {
+    agentsMd: fs.existsSync(path.join(projectPath, 'AGENTS.md')),
+    claudeMd: fs.existsSync(path.join(projectPath, 'CLAUDE.md')),
+  }
+  const target = adapter.instructionsTarget?.(present) ?? { file: 'CLAUDE.md' as const }
+  if (target.file === 'AGENTS.md' && !present.agentsMd && fs.existsSync(projectPath)) {
+    fs.writeFileSync(path.join(projectPath, 'AGENTS.md'), newInstructionsFile(target), 'utf-8')
+  }
+  return target.file
 }
 
 function shellQuote(s: string): string {

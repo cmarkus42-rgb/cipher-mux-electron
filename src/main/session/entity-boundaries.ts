@@ -190,54 +190,65 @@ process.stdin.on('end', () => {
 }
 
 /**
- * The file-editing tools of opencode, by their own names.
+ * The file-editing tools of opencode 2, by their own names.
  *
- * Not guessed and not translated from Claude Code: read off
- * `GET /experimental/tool/ids` of a running opencode 1.18.34, which answers
- * `["invalid","question","bash","read","glob","grep","edit","write","task",
- * "webfetch","todowrite","websearch","skill","apply_patch"]`. Three of those
- * write files.
+ * Not guessed and not translated from Claude Code: read off `ctx.tool.list()` of
+ * a running opencode 2.0.29 (2026-10-14), which answers `patch, edit, glob,
+ * grep, …, question, read, shell, skill, subagent, webfetch, websearch, write`.
+ * Three of those write files: `write`, `edit`, `patch`. V1 called the last one
+ * `apply_patch`, and the binary keeps that as an alias — so both names are
+ * listed. A name that never appears costs nothing; a missing one is a hole.
  *
- * Why the list and not "anything carrying a filePath": `read` carries one too,
- * and the Claude Code boundary does not block reads. A boundary that also
- * blinds the role is a different rule than the one declared above.
+ * Why the list and not "anything carrying a path": `read` carries one too, and
+ * the Claude Code boundary does not block reads. A boundary that also blinds the
+ * role is a different rule than the one declared above.
  */
-export const OPENCODE_EDIT_TOOLS = ['write', 'edit', 'apply_patch'] as const
+export const OPENCODE_EDIT_TOOLS = ['write', 'edit', 'patch', 'apply_patch'] as const
 
 /** Filename of the generated opencode boundary plugin. */
 export const OPENCODE_BOUNDARY_PLUGIN_FILENAME = 'cipher-mux-role-boundary.js'
 
+/** Stable plugin id. opencode 2 keys storage and diagnostics on it. */
+export const OPENCODE_BOUNDARY_PLUGIN_ID = 'cipher-mux.role-boundary'
+
 /**
- * Generate the boundary as an opencode **plugin**, not a hook file.
+ * Generate the boundary as an opencode 2 **plugin**, not a hook file.
  *
  * opencode has no PreToolUse configuration. It has plugin modules, and the
- * only one of its events that can stop a call is `tool.execute.before`: the
- * trigger runs before `tool.execute`, so a throw there means the tool never
- * runs. Measured against opencode 1.18.34 on 2026-10-01, in `opencode run`
- * **and** in the TUI under `--auto`:
+ * hook that can stop a call is `ctx.tool.hook("execute.before")`. Measured
+ * against opencode 2.0.29 on 2026-10-14 (`opencode run`, `--auto`):
  *
- *  - The refused call ends as `state.status: "error"` with `state.error` set to
- *    this exact REASON string — so the reason reaches the model verbatim, the
- *    same property the Codex route was chosen for.
- *  - The file was not written. Not "written and reverted" — never created.
- *  - The second call of the same turn, to an allowed path, completed. The throw
- *    is contained per tool call; it does not kill the turn or the session. That
- *    is what makes this selective rather than a blanket lock.
- *  - `--auto` does not bypass it. It auto-replies to permission requests, and
- *    this is not one — which is precisely why the plugin route was taken and
- *    not opencode's `permission` ruleset.
+ *  - A throw in the callback prevents the call: the file was never created, the
+ *    event stream shows `session.tool.failed` with `executed: false`, and the
+ *    session ran on. The second call of the same turn, to an allowed path,
+ *    completed — selective, not a blanket lock.
+ *  - The message reaches the model verbatim, wrapped as
+ *    `{"error":{"type":"unknown","message":"<REASON>"}}`.
+ *  - `--auto` does not bypass it: it answers permission requests, and this is
+ *    not one — which is why a hook and not the `permissions` ruleset.
  *
- * Two silent failure modes measured around it, both the reason this is
- * generated and not hand-written:
+ * What changed from opencode 1.x, each of which would have been SILENT:
  *
- *  1. **A CommonJS module is rejected.** `module.exports = fn` fails with
- *     "Plugin export is not a function", visible only under `--print-logs`.
- *     The export has to be an ESM `default` that is a *function* returning the
- *     hook object. Hence the shape below.
- *  2. **The documented `permission.ask` hook never fires.** opencode's own help
- *     text lists it; the binary never triggers it (`trigger("...")` appears for
- *     every other hook name, never for that one). A boundary built on it would
- *     be written and dead.
+ *  1. **A V1 plugin is rejected.** `export default async () => ({…})` fails with
+ *     "Plugin must export a default definition with an id and an effect or setup
+ *     function" — a WARN line, nothing on the screen. The export is now an object
+ *     `{ id, setup }`. A plain object loads without importing `@opencode/plugin`,
+ *     so the file stays dependency-free.
+ *  2. **The path field is `path`, not `filePath`.** A port that kept reading
+ *     `filePath` would match nothing and the boundary would be dead. `filePath`
+ *     stays as a fallback; and an edit tool with NO readable path is now refused
+ *     (fail-closed) — the V1 rule let it through, which is exactly how a field
+ *     rename turns into a hole.
+ *  3. **Paths arrive relative.** The model passes `path: "t.txt"` to `edit`. The
+ *     rule is a substring match on `/src/`, which `src/x.ts` does not contain, so
+ *     paths are resolved against `ctx.location.directory` (and `..` collapsed)
+ *     before the comparison.
+ *  4. **`patch` carries `{ patchText }`**, not a path: a text with
+ *     `*** Add File:`, `*** Update File:`, `*** Delete File:` and optionally
+ *     `*** Move to:` headers, possibly several files at once. Every path in it is
+ *     checked, destinations of a move included. (Read off the binary's own parser;
+ *     the test model was not offered `patch`, so this is not yet measured on a
+ *     live call.)
  */
 export function buildOpenCodeBoundaryPlugin(
   denyPathPatterns: readonly string[],
@@ -247,13 +258,16 @@ export function buildOpenCodeBoundaryPlugin(
   return `// Generated by cipher-mux (entity-boundaries.ts). Do not edit — regenerated on
 // every entity start. The rule and its reason are baked in below.
 //
-// ESM default export of a FUNCTION: opencode rejects a CommonJS module with
-// "Plugin export is not a function", and says so only under --print-logs.
+// opencode 2: default-export a plugin DEFINITION ({ id, setup }). The V1 shape,
+// a function returning a hook object, is rejected with a WARN line only.
 import * as fs from 'node:fs'
+import * as path from 'node:path'
 
 const DENY = ${JSON.stringify(denyPathPatterns)}
 const REASON = ${JSON.stringify(reason)}
 const EDIT_TOOLS = new Set(${JSON.stringify(OPENCODE_EDIT_TOOLS)})
+const PATCH_TOOLS = new Set(['patch', 'apply_patch'])
+const PATCH_HEADERS = ['*** Add File: ', '*** Update File: ', '*** Delete File: ', '*** Move to: ']
 const DENY_LIST_FILE = ${JSON.stringify(denyListFile ?? null)}
 
 function extraDeny() {
@@ -267,22 +281,65 @@ function extraDeny() {
   }
 }
 
-export default async () => ({
-  'tool.execute.before': async (input, output) => {
-    // Only the file-editing tools. 'read' carries a filePath as well, and
-    // blinding the role is not the rule that was declared.
-    if (!input || !EDIT_TOOLS.has(input.tool)) return
+// A single path from write/edit. 'path' is the opencode 2 name; 'filePath' the V1 one.
+function singlePath(input) {
+  for (const key of ['path', 'filePath']) {
+    if (typeof input[key] === 'string' && input[key]) return [input[key]]
+  }
+  return null
+}
 
-    const filePath = output && output.args ? output.args.filePath : ''
-    if (typeof filePath !== 'string' || !filePath) return
-
-    if ([...DENY, ...extraDeny()].some(pattern => filePath.includes(pattern))) {
-      // The throw is what stops the call. opencode surfaces the message as the
-      // tool's error, which is how the reason reaches the model.
-      throw new Error(REASON)
+// Every path a patch touches, destinations of a move included. null = none readable.
+function patchPaths(text) {
+  if (typeof text !== 'string') return null
+  const out = []
+  for (const raw of text.split('\\n')) {
+    const line = raw.replace(/\\r$/, '').trim()
+    for (const header of PATCH_HEADERS) {
+      if (line.startsWith(header)) {
+        const p = line.slice(header.length).trim()
+        if (p) out.push(p)
+      }
     }
+  }
+  return out.length ? out : null
+}
+
+export default {
+  id: ${JSON.stringify(OPENCODE_BOUNDARY_PLUGIN_ID)},
+  async setup(ctx) {
+    const cwd = (ctx && ctx.location && ctx.location.directory) || process.cwd()
+
+    await ctx.tool.hook('execute.before', (event) => {
+      // Only the file-editing tools. 'read' carries a path as well, and
+      // blinding the role is not the rule that was declared.
+      if (!event || typeof event.tool !== 'string' || !EDIT_TOOLS.has(event.tool)) return
+
+      const input = event.input && typeof event.input === 'object' ? event.input : {}
+      const paths = PATCH_TOOLS.has(event.tool) ? patchPaths(input.patchText) : singlePath(input)
+
+      // Fail closed. An edit that names no readable path is a finding, not a free
+      // pass — otherwise a renamed field silently disables the boundary.
+      if (!paths) {
+        throw new Error(
+          'Der Pfad dieses ' + event.tool + '-Aufrufs ist nicht lesbar; die Rollengrenze lässt ihn deshalb nicht durch. ' + REASON,
+        )
+      }
+
+      const rules = [...DENY, ...extraDeny()]
+      for (const p of paths) {
+        // Relative paths are the normal case; resolve them (and collapse '..')
+        // before the substring comparison, or '/src/' never matches 'src/x.ts'.
+        const resolved = path.resolve(cwd, p)
+        if (rules.some(pattern => resolved.includes(pattern) || p.includes(pattern))) {
+          // The throw is what stops the call. opencode surfaces the message as
+          // the tool's error, which is how the reason reaches the model.
+          throw new Error(REASON)
+        }
+      }
+    })
   },
-})
+}
 `
 }
 

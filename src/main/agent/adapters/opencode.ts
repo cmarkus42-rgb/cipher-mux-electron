@@ -40,80 +40,76 @@ import {
 /**
  * opencode-Adapter — Tier-2.
  *
- * Gemessen an **opencode 1.18.34 vom 2026-10-01**, erst gegen die Unit-Tests und
- * dann gegen die laufende CLI. Die zweite Runde ist die, die zaehlt: beim
- * Codex-Adapter fand die Abnahme vier Fehler, die keine Testsuite zeigte, und
- * drei davon liessen die Session hochkommen und aussehen wie Erfolg. Was hier
- * steht, steht in keinem Diff und kann mit der naechsten CLI-Version kippen.
+ * Gemessen an **opencode 2.0.29 vom 2026-10-14** (Spec
+ * `docs/superpowers/specs/2026-10-14-opencode-2-anpassung.md`); die Messungen an
+ * 1.18.34/35 vom 2026-10-01/09 stehen im Handover `2026-10-01-drei-cli-adapter.md`.
+ * Wie beim Codex-Adapter gilt: erst gegen die Unit-Tests, dann gegen die laufende
+ * CLI — die zweite Runde ist die, die zaehlt. Was hier steht, steht in keinem Diff
+ * und kann mit der naechsten CLI-Version kippen.
  *
- * 1. **`AGENTS.md` ist die Projektanweisung, `CLAUDE.md` nur der Ersatz.**
- *    Gemessen am 2026-10-09 (1.18.35): liegt nur eine CLAUDE.md im Verzeichnis,
- *    liest opencode sie; liegt eine AGENTS.md daneben, liest es **nur** die —
- *    nicht „zusaetzlich", wie es hier bis dahin stand. Die Injektionsmechanik
- *    traegt, aber nur in die richtige Datei: siehe `instructionsTarget`.
+ * Was sich mit opencode 2 geaendert hat, und jedes davon waere still gewesen:
  *
- * 2. **MCP mit freien HTTP-Headern funktioniert.** Gegen einen Horchposten
- *    belegt: `authorization`, `x-mux-workspace` und `x-mux-entity` kamen alle an,
- *    unter `user-agent: opencode/1.18.34`. Deshalb nutzt dieser Adapter den
- *    **normalen** Weg — `buildMcpServerConfig` aus `mcp/workspace-header.ts`,
- *    also dieselben Kopfnamen, die Claude Code schreibt — und **nicht** die
- *    Token-Bindung aus `mcp/bound-token.ts`. Die existiert einzig, weil Codex
- *    keine Header senden kann; sie hier zu nehmen hiesse, Identitaet und
- *    Berechtigung ohne Not zu vermischen.
+ * 1. **Ein V1-Plugin laeuft nicht.** opencode 2 weist `export default async () =>
+ *    ({…})` mit „Plugin must export a default definition with an id and an effect
+ *    or setup function" ab — eine WARN-Zeile im Server-Log, sonst nichts. Die Session
+ *    startet gesund und laeuft ohne Rollengrenze, ohne Usage, ohne Idle-Signal. Die
+ *    drei generierten Plugins sind jetzt Definitionen `{ id, setup }`.
  *
- * 3. **Kein positionales Projektargument.** `opencode [project]` nimmt ein
- *    Verzeichnis entgegen, und der Adapter gab `opts.projectPath` dorthin — bis
- *    die Abnahme zeigte, dass genau das die Session aus dem richtigen
- *    Verzeichnis herauszieht. Es ist derselbe Fehler, den Codex' `-C` hatte, und
- *    er ist hier nachgemessen: mit `tmux`-cwd = Run-Verzeichnis und dem Argument
- *    auf das authored-Verzeichnis zeigte `pane_current_path` **und** die
- *    Statuszeile von opencode das authored-Verzeichnis, und am Horchposten kam
- *    **null** Verbindung an — statt der zwoelf Anfragen ohne das Argument. Die
- *    generierte `opencode.json` lag im Run-Verzeichnis und wurde nie gelesen:
- *    keine MCP-Werkzeuge, keine Rollengrenze, kein Usage. Und zwar lautlos, die
- *    Session steht am Prompt und sieht gesund aus.
+ * 2. **Plugins laufen im Server, nicht in der TUI — deshalb `--standalone`.** Im
+ *    geteilten Hintergrunddienst las ein Plugin als `CIPHER_MUX_SESSION_ID` die ID
+ *    der Session, die den Dienst gestartet hat (gemessen: zwei Laeufe mit je
+ *    eigener Variable bekamen beide „projekt-a"), und sah die Ereignisse aller
+ *    Verzeichnisse. Unter `--standalone` ist der Server ein Kind der CLI und erbt
+ *    die Umgebung (gemessen korrekt). Ein Prozess = eine Mux-Session.
  *
- *    Grund wie bei Codex: `LaunchOpts.projectPath` ist bei einer Entity-Session
- *    das **authored**-Verzeichnis (`entities/<id>`), waehrend
- *    `postLaunchInjection` ins **Run**-Verzeichnis schreibt, wo der tmux-Pane
- *    schon steht. Also wird das cwd geerbt, so wie Claude Code es tut.
+ * 3. **`--model`, `--fork` und `--pure` gibt es am Top-Level nicht.** Eine
+ *    unbekannte Option wird nicht gemeldet: die CLI druckt die Hilfe und beendet
+ *    sich, im Pane steht danach eine Shell. `--model` und `--fork` kennt nur
+ *    `opencode run`. Das Modell der Rolle reist deshalb als `model` in der
+ *    `opencode.json`; ein Fork wird sichtbar verweigert (siehe `buildLaunchCommand`).
  *
- * 4. **Rollengrenzen laufen ueber ein Plugin — und sie feuern.** opencode kennt
- *    keine `PreToolUse`-Konfiguration, sondern Plugin-Module. Von seinen Events
- *    kann nur `tool.execute.before` einen Aufruf aufhalten: ein Wurf dort
- *    verhindert die Ausfuehrung, der Aufruf endet als `state.status: "error"`
- *    mit dem Grund in `state.error`, und das Modell liest ihn wortwoertlich.
- *    Nachgemessen in `opencode run` **und** in der TUI unter `--auto`, mit einem
- *    echten Modell: der verbotene Pfad entstand nicht, der erlaubte entstand,
- *    und die Session lief weiter. Begruendung und Messprotokoll in
- *    `session/entity-boundaries.ts`.
+ * 4. **`CLAUDE.md` wird nicht mehr gelesen.** opencode 2 entdeckt nur `AGENTS.md`.
+ *    Die V1-Messung („liegt nur eine CLAUDE.md da, liest es sie") gilt nicht mehr.
+ *    `instructionsTarget` schreibt wie bei Codex immer nach `AGENTS.md`, mit
+ *    Verweis auf eine vorhandene `CLAUDE.md`.
  *
- *    Zwei stille Fehlschlaege rund darum, beide gemessen:
- *    **(a)** Ein CommonJS-Plugin wird mit „Plugin export is not a function"
- *    abgewiesen — sichtbar nur unter `--print-logs`. Es muss ein ESM-Default-
- *    Export sein, der eine Funktion ist.
- *    **(b)** Der in opencodes eigener Hilfe aufgefuehrte Hook `permission.ask`
- *    wird vom Binary **nie** ausgeloest. Eine darauf gebaute Grenze waere
- *    geschrieben und tot.
+ * 5. **Plugins liegen in `.opencode/plugins/` und stehen NICHT in der Config.** Die
+ *    Auto-Entdeckung ist gemessen; ob Auto-Entdeckung plus Eintrag in V2 doppelt
+ *    laedt, nicht. Alte V1-Dateien in `.opencode/plugin/` und ihre Eintraege im
+ *    `plugin`-Feld werden entfernt — ein stehengebliebener Eintrag auf eine V1-Datei
+ *    erzeugt bei jedem Start eine WARN-Zeile, und ein altes Grenzen-Plugin sieht
+ *    aus, als schuetze es.
  *
- * 5. **Context-Usage ohne Statusline, ueber dasselbe Plugin-System.** Ein
- *    `event`-Hook sieht jedes Bus-Ereignis; `message.updated` traegt pro
- *    Assistentennachricht `sessionID`, `modelID` und `tokens`. Daraus entsteht
- *    genau das JSON, das der bestehende `StatusLineMonitor` liest — ein weiterer
- *    Schreiber, kein zweiter Leser. Einzelheiten und die Grenze der Messung
- *    (das Kontextfenster ist geschaetzt, die Tokenzahlen nicht) in
- *    `monitoring/opencode-usage-plugin.ts`.
+ * Unveraendert aus der 1.x-Zeit und weiter gueltig:
  *
- * Und eine Eigenschaft, die den Bau erst traegt: eine **projektlokale**
- * `opencode.json` im Arbeitsverzeichnis greift (`opencode debug config` zeigt
- * sie aufgeloest), und ein Plugin wird aus `.opencode/plugin/` **auto-entdeckt**
- * *und* laesst sich gleichzeitig in `plugin` eintragen, ohne doppelt zu laden
- * (gemessen: ein Ladevorgang, ein `plugin_origins`-Eintrag). Deshalb schreibt
- * dieser Adapter beides — die Datei dorthin, wo sie von sich aus gefunden wird,
- * und den Eintrag dazu, damit die Verdrahtung in `debug config` nachlesbar ist.
+ * a. **MCP mit freien HTTP-Headern funktioniert.** `authorization`,
+ *    `x-mux-workspace` und `x-mux-entity` kamen an (1.18.34, Horchposten). Deshalb
+ *    nutzt dieser Adapter den **normalen** Weg — `buildMcpServerConfig` aus
+ *    `mcp/workspace-header.ts` — und **nicht** die Token-Bindung aus
+ *    `mcp/bound-token.ts`, die einzig existiert, weil Codex keine Header senden
+ *    kann. Die V1-Form `mcp.<name>` wird von 2.x still normalisiert (`opencode
+ *    debug config` zeigt die Normalform); die laufende projekt-b-Session selbst
+ *    haengt an einer solchen Datei.
  *
- * **Nicht benutzen: `--pure`.** Das Flag laedt die Session ohne externe Plugins,
- * und damit ohne Rollengrenze und ohne Usage.
+ * b. **Kein positionales Projektargument.** `opencode [directory]` nimmt ein
+ *    Verzeichnis entgegen, und der Adapter gab `opts.projectPath` dorthin — bis die
+ *    Abnahme zeigte, dass genau das die Session aus dem richtigen Verzeichnis
+ *    herauszieht: `LaunchOpts.projectPath` ist bei einer Entity-Session das
+ *    **authored**-Verzeichnis, `postLaunchInjection` schreibt ins **Run**-Verzeichnis,
+ *    wo der tmux-Pane schon steht. Die generierte `opencode.json` wurde nie gelesen:
+ *    keine MCP-Werkzeuge, keine Rollengrenze, kein Usage — lautlos. Also wird das
+ *    cwd geerbt, wie Claude Code es tut.
+ *
+ * c. **Rollengrenzen laufen ueber `ctx.tool.hook("execute.before")`** und feuern:
+ *    ein Wurf verhindert den Aufruf (`executed: false`), der Grund erreicht das
+ *    Modell wortwoertlich, `--auto` umgeht es nicht. Begruendung und Messprotokoll
+ *    in `session/entity-boundaries.ts`.
+ *
+ * d. **Context-Usage ohne Statusline, ueber dasselbe Plugin-System.** Details und die
+ *    Grenze der Messung in `monitoring/opencode-usage-plugin.ts`.
+ *
+ * Eine projektlokale `opencode.json` im Arbeitsverzeichnis greift (`opencode debug
+ * config` zeigt sie aufgeloest, V1-Formen normalisiert).
  */
 
 /** Minimale Sicht auf die Agent-Konfiguration. Spiegelbild zu CodexConfigReader. */
@@ -165,40 +161,43 @@ export const OPENCODE_CONFIG_FILENAME_JSONC = 'opencode.jsonc'
 export const OPENCODE_SCHEMA_URL = 'https://opencode.ai/config.json'
 
 /**
- * Verzeichnis, aus dem opencode Plugins von sich aus laedt.
+ * Verzeichnis, aus dem opencode 2 Plugins von sich aus laedt.
  *
- * Gemessen: sowohl `.opencode/plugin/` als auch `.opencode/plugins/` werden
- * gescannt, jede `*.ts`- und jede ESM-`*.js`-Datei darin wird geladen. Der Mux
- * nimmt den Singular, weil die eingebaute Hilfe ihn zuerst nennt — und nur
- * eines von beiden, damit dieselbe Datei nicht zweimal liegt.
+ * Gemessen an 2.0.29: ein Plugin dort wird ohne Config-Eintrag geladen (Log:
+ * `loading plugin id=…/.opencode/plugins/…`). Die Doku nennt den Plural als
+ * bevorzugt. Nur eines von beiden wird beschrieben, damit dieselbe Datei nicht
+ * zweimal liegt.
  */
-export const OPENCODE_PLUGIN_SUBDIR = path.join('.opencode', 'plugin')
+export const OPENCODE_PLUGIN_SUBDIR = path.join('.opencode', 'plugins')
 
 /**
- * Die beiden Plugins, die der Mux besitzt — und nur die.
+ * Das V1-Verzeichnis. Dort liegen nach einem Upgrade noch die alten Plugins, die
+ * 2.x abweist. Der Mux schreibt dort nichts mehr und raeumt seine eigenen Dateien
+ * weg — nur diese.
+ */
+export const OPENCODE_LEGACY_PLUGIN_SUBDIR = path.join('.opencode', 'plugin')
+
+/**
+ * Wo sich der Mux merkt, was er in `model` geschrieben und was er dabei ersetzt
+ * hat. Ein Feld `model` ist ein String; ihm laesst sich nicht ansehen, wer es
+ * gesetzt hat. Ohne Marker muesste der Mux entweder jedes `model` fuer fremd halten
+ * (ein Rollen-Override bliebe fuer immer stehen) oder jedes fuer eigen (das Modell
+ * des Projekts ginge verloren).
+ */
+export const OPENCODE_MODEL_MARKER_FILE = path.join('.opencode', 'cipher-mux-model.json')
+
+/**
+ * Die Plugins, die der Mux besitzt — und nur die.
  *
- * `mergeOpenCodeConfig` raeumt genau diese Namen aus dem `plugin`-Feld und
- * schreibt sie neu; jeder fremde Eintrag bleibt. Ohne diese Liste waere die
- * Alternative, das ganze Feld zu uebernehmen, und damit ein Plugin des Projekts
- * beim ersten Sessionstart zu verlieren.
+ * `mergeOpenCodeConfig` raeumt genau diese Namen aus dem `plugin`/`plugins`-Feld;
+ * jeder fremde Eintrag bleibt. Ohne diese Liste waere die Alternative, das ganze
+ * Feld zu uebernehmen, und damit ein Plugin des Projekts zu verlieren.
  */
 export const OPENCODE_OWNED_PLUGIN_FILENAMES: readonly string[] = [
   OPENCODE_USAGE_PLUGIN_FILENAME,
   OPENCODE_BOUNDARY_PLUGIN_FILENAME,
   IDLE_PLUGIN_FILENAME,
 ]
-
-/**
- * Plugin-Eintrag in der Form, die opencode sicher aufloest.
- *
- * `file://` plus absoluter Pfad, nicht relativ: ein relativer Pfad gilt laut
- * Doku „relative to the declaring config", und das ist eine Annahme mehr als
- * noetig. Die URL-Form ist gemessen — ein Plugin ausserhalb von
- * `.opencode/plugin/` wurde allein durch diesen Eintrag geladen.
- */
-export function toOpenCodePluginSpec(absolutePath: string): string {
-  return `file://${absolutePath}`
-}
 
 /**
  * Kontextfenster, wenn es sich nicht erfragen laesst — und das ist hier der
@@ -241,6 +240,26 @@ export function buildOpenCodeMcpEntry(
 }
 
 /**
+ * Entfernt die eigenen Plugin-Eintraege aus einem `plugin`/`plugins`-Feld.
+ * Fremde Eintraege bleiben in ihrer Reihenfolge; ein Feld, das kein Array ist,
+ * bleibt wie es ist — es laesst sich nicht filtern, und raten waere schlimmer.
+ * Erkannt wird ein Eintrag als String oder als `{ package }` (V2-Objektform) am
+ * Dateinamen.
+ */
+function dropOwnedPluginEntries(value: unknown): unknown {
+  if (!Array.isArray(value)) return value
+  const isOwned = (spec: unknown): boolean => {
+    const name =
+      typeof spec === 'string' ? spec
+      : spec && typeof spec === 'object' && typeof (spec as { package?: unknown }).package === 'string'
+        ? (spec as { package: string }).package
+        : null
+    return name !== null && OPENCODE_OWNED_PLUGIN_FILENAMES.some(f => name.endsWith(f))
+  }
+  return value.filter(spec => !isOwned(spec))
+}
+
+/**
  * Mischt den Mux-Eintrag in eine bestehende `opencode.json`.
  *
  * Lesen-mergen-schreiben wie `claude-code.ts` es mit `settings.local.json` tut,
@@ -252,16 +271,19 @@ export function buildOpenCodeMcpEntry(
  * ueberschreiben hiesse, dem Projekt eine Entscheidung wegzunehmen, die es
  * schon getroffen hat.
  *
- * Beim `plugin`-Feld reicht „nicht anfassen" nicht: eine Rolle kann ihre Grenze
- * verlieren, und dann muss der Eintrag weg, sonst erzwingt ein stehengebliebenes
- * Plugin weiter eine Regel, die niemand mehr erklaert. Deshalb werden die
- * **eigenen** Namen herausgefiltert und durch die uebergebenen ersetzt; alles
- * andere im Feld bleibt in seiner Reihenfolge stehen.
+ * **Plugins: der Mux traegt keine mehr ein, er raeumt nur auf.** opencode 2
+ * entdeckt `.opencode/plugins/` von selbst. Aus `plugin` (V1) und `plugins` (V2)
+ * werden die **eigenen** Namen herausgefiltert — ein stehengebliebener Eintrag auf
+ * eine V1-Datei erzeugte bei jedem Start eine WARN-Zeile, ein Grenzen-Eintrag
+ * erzwaenge weiter eine Regel, die niemand mehr erklaert. Leere Felder werden
+ * entfernt, aber nur, wenn das Filtern sie geleert hat.
+ *
+ * Das **Rollen-Modell** (`model`) setzt `postLaunchInjection` selbst, mit Marker —
+ * hier geht es nur um den lokalen Anbieter des Workers.
  */
 export function mergeOpenCodeConfig(
   existing: Record<string, unknown>,
   entry: OpenCodeMcpEntry,
-  pluginSpecs: readonly string[] = [],
   local: { provider: Record<string, unknown>; model: string } | null = null,
 ): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...existing }
@@ -277,16 +299,17 @@ export function mergeOpenCodeConfig(
   mcp['cipher-mux'] = entry
   merged.mcp = mcp
 
-  const foreign = (Array.isArray(merged.plugin) ? merged.plugin : []).filter(
-    spec =>
-      typeof spec !== 'string'
-      || !OPENCODE_OWNED_PLUGIN_FILENAMES.some(name => spec.endsWith(name)),
-  )
-  const plugin = [...foreign, ...pluginSpecs]
-  // Ein leeres Feld ist kein Fortschritt gegenueber keinem Feld — und wenn das
-  // Projekt gar keines hatte, soll der Mux auch keines hinterlassen.
-  if (plugin.length > 0) merged.plugin = plugin
-  else delete merged.plugin
+  for (const field of ['plugin', 'plugins'] as const) {
+    if (!(field in merged)) continue
+    const before = merged[field]
+    const after = dropOwnedPluginEntries(before)
+    if (Array.isArray(before) && Array.isArray(after)) {
+      // Nur ein Feld, das das Filtern GELEERT hat, verschwindet — ein leeres
+      // Feld, das das Projekt schon so hatte, ist nicht Sache des Mux.
+      if (after.length === 0 && before.length > 0) delete merged[field]
+      else merged[field] = after
+    }
+  }
 
   // Lokaler Anbieter (Local Cyber Factory). Besitz hat der Mux nur an
   // provider['cipher-local'] und an einem model, das darauf zeigt — ein vom
@@ -311,6 +334,40 @@ export function mergeOpenCodeConfig(
   return merged
 }
 
+/** Was der Mux zuletzt in `model` geschrieben hat, und was dort vorher stand. */
+export interface OpenCodeModelMarker {
+  written: string
+  replaced: string | null
+}
+
+/** Liest den Marker; fehlt er oder ist er kaputt, gibt es keinen. */
+function readModelMarker(projectPath: string): OpenCodeModelMarker | null {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(projectPath, OPENCODE_MODEL_MARKER_FILE), 'utf-8'))
+    if (raw && typeof raw.written === 'string' && (raw.replaced === null || typeof raw.replaced === 'string')) {
+      return { written: raw.written, replaced: raw.replaced }
+    }
+  } catch {
+    // Kein Marker: dann hat der Mux nichts zu erinnern.
+  }
+  return null
+}
+
+/**
+ * Macht den frueheren Mux-Eintrag in `model` rueckgaengig — und nur ihn.
+ *
+ * Steht dort noch genau das, was der Mux geschrieben hat, kommt der ersetzte Wert
+ * zurueck (oder das Feld verschwindet, wenn es keinen gab). Steht dort etwas
+ * anderes, hat der Nutzer es seitdem selbst geaendert, und es bleibt.
+ */
+function restoreOwnedModel(config: Record<string, unknown>, marker: OpenCodeModelMarker): Record<string, unknown> {
+  if (config.model !== marker.written) return config
+  const restored = { ...config }
+  if (marker.replaced !== null) restored.model = marker.replaced
+  else delete restored.model
+  return restored
+}
+
 export class OpenCodeAdapter implements AgentAdapter {
   readonly id = 'opencode'
   readonly displayName = 'opencode'
@@ -323,32 +380,32 @@ export class OpenCodeAdapter implements AgentAdapter {
   }
 
   buildLaunchCommand(opts: LaunchOpts): LaunchCommand {
-    const args: string[] = []
+    // **Fork: sichtbar verweigern, weder werfen noch still fortsetzen.**
+    // Das Top-Level-opencode 2.0.29 hat kein `--fork` (nur `opencode run`), und
+    // `opencode session` kennt kein `fork`; der Weg ueber `POST
+    // /api/session/{id}/fork` ist ungemessen. Ein Wurf waere falsch: start() ruft
+    // diese Methode erst NACH tmux.createSession und sessions.set auf und
+    // hinterliesse eine registrierte, leere Session. Ein stilles --continue oder
+    // --session wuerde die QUELLE fortsetzen statt sie zu verzweigen. Also steht im
+    // Pane eine Zeile — als Shell-Zeile ohne ein einziges Sonderzeichen, denn
+    // cmd + args werden mit Leerzeichen zusammengefuegt.
+    if (opts.forkFromClaudeSessionId || opts.forkLatest) {
+      return { cmd: 'echo', args: ['opencode', 'Fork', 'ist', 'in', 'opencode', '2', 'nicht', 'verfuegbar'] }
+    }
 
-    // **Kein positionales Projektargument.** `opencode [project]` nimmt eines
-    // entgegen, und hier stand es auch — bis die Abnahme zeigte, dass es die
-    // Session aus dem richtigen Verzeichnis herauszieht. Siehe Kopfkommentar
-    // Punkt 3: `opts.projectPath` ist bei einer Entity-Session das
-    // authored-Verzeichnis, geschrieben wird aber ins Run-Verzeichnis, und der
-    // tmux-Pane steht schon dort. Das Argument hat opencode genau daraus
-    // herausgeholt — gemessen, mit null MCP-Verbindungen als Folge.
-    //
+    // **Immer `--standalone`.** Ein V2-Plugin laeuft im Server. Im geteilten
+    // Hintergrunddienst ist `process.env.CIPHER_MUX_SESSION_ID` die ID der Session,
+    // die den Dienst gestartet hat, und das Plugin sieht die Ereignisse aller
+    // Verzeichnisse — gemessen an 2.0.29. Unter --standalone ist der Server ein
+    // Kind der CLI, erbt die Umgebung und sieht nur die eigene Session. Siehe
+    // Kopfkommentar Punkt 2.
+    const args: string[] = ['--standalone']
+
+    // **Kein positionales Projektargument.** Siehe Kopfkommentar Punkt b:
     // `opts.projectPath` bleibt Teil des Vertrags und wird hier bewusst nicht
-    // benutzt: das cwd des Panes ist die Wahrheit, wie bei Claude Code.
+    // benutzt; das cwd des Panes ist die Wahrheit, wie bei Claude Code.
 
-    // Fork schlaegt Resume — dieselbe Entscheidung wie bei den anderen beiden:
-    // wer forken will, will keine Fortsetzung derselben Unterhaltung.
-    //
-    // `--fork` ist laut `--help` nur **zusammen mit** `--session` oder
-    // `--continue` gueltig. Weil hier eine ID bekannt ist, ist `--session <id>`
-    // die praezisere der beiden Varianten: sie benennt, was geforkt wird,
-    // statt es aus „die letzte" zu erraten.
-    if (opts.forkFromClaudeSessionId) {
-      args.push('--session', opts.forkFromClaudeSessionId, '--fork')
-    } else if (opts.forkLatest) {
-      // Die andere der beiden gueltigen Formen: `--fork` mit `--continue`.
-      args.push('--continue', '--fork')
-    } else if (opts.resumeClaudeSessionId) {
+    if (opts.resumeClaudeSessionId) {
       args.push('--session', opts.resumeClaudeSessionId)
     } else if (opts.resume) {
       // Ohne ID bleibt nur „die letzte Unterhaltung dieses Verzeichnisses".
@@ -358,17 +415,11 @@ export class OpenCodeAdapter implements AgentAdapter {
       args.push('--continue')
     }
 
-    // Beim lokalen Worker bestimmt das Profil das Modell (opencode.json, von der Bilanz notiert).
-    // Ein `--model` aus dem Rollen-Override (entityModels) würde es still überstimmen, und die
-    // Bilanz führte ein Modell, das nie lief. Ohne Profil-Datei (von Hand gestartet) bleibt es beim Alten.
-    const profilBestimmtModell = opts.entityId === LOCAL_WORKER_ENTITY_ID
-      && readLocalProfileFile(opts.workDir ?? opts.projectPath) !== null
-    if (opts.model && !profilBestimmtModell) {
-      // Erwartet `provider/model`. Der Mux gibt weiter, was die Rolle oder der
-      // Nutzer gesetzt hat, und validiert es nicht: eine Liste gueltiger
-      // Modell-IDs waere eine Kopie, die veraltet.
-      args.push('--model', opts.model)
-    }
+    // **Kein `--model`.** Das Top-Level-opencode kennt es nicht, und eine
+    // unbekannte Option wird nicht gemeldet — die CLI druckt die Hilfe und beendet
+    // sich. Das Modell der Rolle schreibt `postLaunchInjection` als `model` in die
+    // opencode.json (Kopfkommentar Punkt 3). Auch das Profil des lokalen Workers
+    // wird dort gegen den Override entschieden, nicht hier.
 
     if (opts.skipPermissions ?? this.configReader.getSkipPermissions()) {
       // Das Gegenstueck zu `--dangerously-skip-permissions`: Permissions
@@ -381,7 +432,7 @@ export class OpenCodeAdapter implements AgentAdapter {
   }
 
   /**
-   * Schreibt `opencode.json` plus die beiden Plugins ins Projekt.
+   * Schreibt `opencode.json` plus die Plugins ins Projekt.
    *
    * **Die Bindung reist im Kopf, nicht im Token.** Workspace (`ctx.workspaceId`)
    * und Rolle (`ctx.entityId`) gehen als `X-Mux-Workspace` und `X-Mux-Entity`
@@ -394,6 +445,10 @@ export class OpenCodeAdapter implements AgentAdapter {
    * eine Datei, die opencode nicht liest. Eine Grenze gehoert dorthin, wo die
    * Datei entsteht, die sie traegt; sonst schreibt eine Stelle die Regel und
    * eine andere vergisst, sie zu verdrahten.
+   *
+   * **Das Rollen-Modell reist als `model`** (kein `--model` am Top-Level). Vor dem
+   * Mischen wird ein frueherer Mux-Eintrag zurueckgenommen (Marker), danach der
+   * neue gesetzt. Der lokale Worker hat Vorrang: sein Profil bestimmt das Modell.
    *
    * Projektlokal und nicht global, aus demselben Grund wie bei Codex: die
    * globale Konfiguration gehoert dem Nutzer, und zwei Workspaces wuerden sich
@@ -432,20 +487,51 @@ export class OpenCodeAdapter implements AgentAdapter {
         ? { provider: buildLocalProviderBlock(localCfg), model: localModelSpec(localCfg) }
         : null
 
-      const pluginSpecs = this.writePlugins(ctx.projectPath, ctx.entityId, localCfg?.contextWindow)
+      this.writePlugins(ctx.projectPath, ctx.entityId, localCfg?.contextWindow)
 
       const entry = buildOpenCodeMcpEntry(ctx.mcpUrl, ctx.mcpApiKey, ctx.workspaceId, ctx.entityId)
-      const merged = mergeOpenCodeConfig(existing, entry, pluginSpecs, local)
+
+      // Frueheren Mux-Eintrag in `model` zuruecknehmen, dann neu mischen.
+      const marker = readModelMarker(ctx.projectPath)
+      const base = marker ? restoreOwnedModel(existing, marker) : existing
+      const merged = mergeOpenCodeConfig(base, entry, local)
+
+      // Das Profil des lokalen Workers schlaegt den Override — sonst fuehrte die
+      // Bilanz ein Modell, das nie lief.
+      let nextMarker: OpenCodeModelMarker | null = null
+      if (!local && ctx.model) {
+        nextMarker = { written: ctx.model, replaced: typeof merged.model === 'string' ? merged.model : null }
+        merged.model = ctx.model
+      }
 
       fs.writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n', 'utf-8')
+
+      const markerPath = path.join(ctx.projectPath, OPENCODE_MODEL_MARKER_FILE)
+      if (nextMarker) {
+        fs.mkdirSync(path.dirname(markerPath), { recursive: true })
+        fs.writeFileSync(markerPath, JSON.stringify(nextMarker) + '\n', 'utf-8')
+      } else {
+        try { fs.unlinkSync(markerPath) } catch { /* war nie da */ }
+      }
     } catch (err) {
       console.warn('[OpenCodeAdapter] opencode.json write failed:', err)
     }
   }
 
   /**
+   * Raeumt die V1-Dateien des Mux aus `.opencode/plugin/` weg. Nur die eigenen
+   * Namen — was das Projekt dort selbst abgelegt hat, bleibt.
+   */
+  private removeLegacyPlugins(projectPath: string): void {
+    for (const name of OPENCODE_OWNED_PLUGIN_FILENAMES) {
+      try { fs.unlinkSync(path.join(projectPath, OPENCODE_LEGACY_PLUGIN_SUBDIR, name)) } catch { /* war nie da */ }
+    }
+  }
+
+  /**
    * Legt Usage-Plugin und — falls die Rolle eine Grenze hat — Grenzen-Plugin
-   * an und gibt ihre Eintraege fuer `opencode.json` zurueck.
+   * (und beim lokalen Worker das Idle-Plugin) in `.opencode/plugins/` an.
+   * Eintraege in `opencode.json` gibt es nicht: die Auto-Entdeckung traegt.
    *
    * **Eine Rolle ohne Grenze verliert ihre Datei.** Nicht aus Ordnungsliebe: ein
    * stehengebliebenes Plugin wird weiter auto-entdeckt und erzwingt eine Regel,
@@ -456,17 +542,17 @@ export class OpenCodeAdapter implements AgentAdapter {
     projectPath: string,
     entityId?: string | null,
     contextWindow?: number,
-  ): string[] {
+  ): void {
     const pluginDir = path.join(projectPath, OPENCODE_PLUGIN_SUBDIR)
-    const specs: string[] = []
 
-    specs.push(
-      toOpenCodePluginSpec(
-        writeOpenCodeUsagePlugin(pluginDir, {
-          contextWindowSize: contextWindow ?? OPENCODE_FALLBACK_CONTEXT_WINDOW,
-        }),
-      ),
-    )
+    this.removeLegacyPlugins(projectPath)
+
+    // Ein bekannter Profilwert (lokaler Worker) behaelt Vorrang; sonst fragt das
+    // Plugin den Katalog nach dem Modell und faellt auf die Schaetzung zurueck.
+    writeOpenCodeUsagePlugin(pluginDir, {
+      contextWindowSize: contextWindow ?? OPENCODE_FALLBACK_CONTEXT_WINDOW,
+      lookupModelLimit: contextWindow === undefined,
+    })
 
     const boundaryPath = path.join(pluginDir, OPENCODE_BOUNDARY_PLUGIN_FILENAME)
     const boundary = getEntityBoundary(entityId)
@@ -480,7 +566,6 @@ export class OpenCodeAdapter implements AgentAdapter {
         ),
         { encoding: 'utf-8', mode: 0o644 },
       )
-      specs.push(toOpenCodePluginSpec(boundaryPath))
     } else {
       try { fs.unlinkSync(boundaryPath) } catch { /* war nie da */ }
     }
@@ -491,22 +576,22 @@ export class OpenCodeAdapter implements AgentAdapter {
       fs.writeFileSync(idlePath, buildIdlePlugin(path.join(projectPath, IDLE_SIGNAL_FILENAME)), {
         encoding: 'utf-8', mode: 0o644,
       })
-      specs.push(toOpenCodePluginSpec(idlePath))
     } else {
       try { fs.unlinkSync(idlePath) } catch { /* war nie da */ }
     }
-
-    return specs
   }
 
   /**
-   * Gemessen am 2026-10-09 (1.18.35): liegt nur CLAUDE.md im Verzeichnis, liest
-   * opencode sie; liegt eine AGENTS.md daneben, liest es **nur** die. Der Mux
-   * schreibt dorthin, wo opencode tatsaechlich liest — und legt keine AGENTS.md
-   * an, die die CLAUDE.md verdecken wuerde.
+   * opencode 2 entdeckt nur `AGENTS.md` — die V1-Messung vom 2026-10-09 („liegt nur
+   * CLAUDE.md da, liest es sie") gilt nicht mehr. Deshalb wie bei Codex: immer
+   * `AGENTS.md`, und fehlt sie, legt der Mux sie mit Verweis auf eine vorhandene
+   * `CLAUDE.md` an, damit die Session die eigentlichen Projektanweisungen nicht
+   * verliert.
    */
   instructionsTarget(present: { agentsMd: boolean; claudeMd: boolean }): InstructionsTarget {
-    return { file: present.agentsMd ? 'AGENTS.md' : 'CLAUDE.md' }
+    return !present.agentsMd && present.claudeMd
+      ? { file: 'AGENTS.md', pointerTo: 'CLAUDE.md' }
+      : { file: 'AGENTS.md' }
   }
 
   getProjectMarkers(): string[] {
@@ -597,15 +682,18 @@ export class OpenCodeAdapter implements AgentAdapter {
   /**
    * Schreibt das Usage-Plugin nach.
    *
-   * `postLaunchInjection` tut das schon und traegt es zusaetzlich in
-   * `opencode.json` ein. Hier wird nur die Datei gelegt — der Eintrag fehlt dann,
-   * aber die Auto-Entdeckung aus `.opencode/plugin/` greift auch ohne ihn
-   * (gemessen). Das ist der Grund, warum beide Wege geschrieben werden: dieser
-   * Pfad des Vertrags kann die Konfiguration nicht mitpflegen.
+   * `postLaunchInjection` tut das schon. Hier wird nur die Datei gelegt — die
+   * Auto-Entdeckung aus `.opencode/plugins/` greift ohne Config-Eintrag (gemessen).
+   * Das ist der Grund, warum beide Wege geschrieben werden: dieser Pfad des
+   * Vertrags kann die Konfiguration nicht mitpflegen. Auch hier werden V1-Altlasten
+   * weggeraeumt: ein altes Usage-Plugin in `.opencode/plugin/` erzeugte sonst bei
+   * jedem Start eine WARN-Zeile.
    */
   async attachStatusHook(projectPath: string): Promise<void> {
+    this.removeLegacyPlugins(projectPath)
     writeOpenCodeUsagePlugin(path.join(projectPath, OPENCODE_PLUGIN_SUBDIR), {
       contextWindowSize: OPENCODE_FALLBACK_CONTEXT_WINDOW,
+      lookupModelLimit: true,
     })
   }
 
@@ -637,21 +725,27 @@ export class OpenCodeAdapter implements AgentAdapter {
     if (lang === 'de') {
       return `### Worker-Session-Startup (opencode)
 
-Starte Worker mit: \`opencode --auto\` — **im Projektverzeichnis**, ohne Pfadargument.
+Starte Worker mit: \`opencode --standalone --auto\` — **im Projektverzeichnis**, ohne Pfadargument.
 Ein positionales Verzeichnis zieht opencode aus dem Verzeichnis heraus, in dem
 seine Konfiguration liegt; dann fehlen MCP-Werkzeuge, ohne jede Meldung.
-Niemals \`--pure\` — das laedt die Session ohne Plugins, also ohne Rollengrenze.
-Projektanweisungen liest opencode aus \`AGENTS.md\`; \`CLAUDE.md\` nur zusaetzlich.
+\`--standalone\`: eigener Server pro Session. Im geteilten Dienst liefe das Plugin
+mit der Umgebung einer fremden Session und schriebe deren Usage-Datei.
+Kein \`--model\`, \`--fork\`, \`--pure\` — das Top-Level-opencode 2 kennt sie nicht und
+druckt bei einer unbekannten Option nur die Hilfe.
+Projektanweisungen liest opencode 2 nur aus \`AGENTS.md\`; eine \`CLAUDE.md\` wird nicht gelesen.
 Instruktionen DIREKT via tmux send-keys in den Pane schicken — nicht via mux_send.
 `
     }
     return `### Worker Session Startup (opencode)
 
-Start workers with: \`opencode --auto\` — **inside the project directory**, no path argument.
+Start workers with: \`opencode --standalone --auto\` — **inside the project directory**, no path argument.
 A positional directory moves opencode out of the directory holding its config;
 MCP tools then go missing with no message at all.
-Never \`--pure\` — it loads the session without plugins, so without role boundaries.
-opencode reads project instructions from \`AGENTS.md\`; \`CLAUDE.md\` only in addition.
+\`--standalone\`: a private server per session. In the shared service the plugin would
+run with another session's environment and write that session's usage file.
+No \`--model\`, \`--fork\`, \`--pure\` — top-level opencode 2 does not know them and
+only prints its help on an unknown option.
+opencode 2 reads project instructions from \`AGENTS.md\` only; \`CLAUDE.md\` is not read.
 Send instructions DIRECTLY via tmux send-keys — not via mux_send.
 `
   }
@@ -669,21 +763,21 @@ Send instructions DIRECTLY via tmux send-keys — not via mux_send.
     if (lang === 'de') {
       return `### opencode-Besonderheiten
 
-Projektanweisungen stehen in \`AGENTS.md\`. Eine direkte Instruktion schlaegt sie.
+Projektanweisungen stehen in \`AGENTS.md\` (opencode 2 liest keine \`CLAUDE.md\`). Eine direkte Instruktion schlaegt sie.
 MCP-Server und Kopfzeilen stehen in \`opencode.json\` — die Datei wird gemischt,
 nicht ersetzt; fremde Eintraege darin bleiben.
-Rollengrenzen laufen hier ueber ein Plugin in \`.opencode/plugin/\`
-(\`tool.execute.before\`), nicht ueber Hook-Dateien. Ein abgelehnter Aufruf
+Rollengrenzen laufen hier ueber ein Plugin in \`.opencode/plugins/\`
+(\`tool.execute.before\`-Hook), nicht ueber Hook-Dateien. Ein abgelehnter Aufruf
 erscheint als Werkzeugfehler mit dem Grund im Text — er wurde nicht ausgefuehrt.
 `
     }
     return `### opencode specifics
 
-Project instructions live in \`AGENTS.md\`. A direct instruction overrides them.
+Project instructions live in \`AGENTS.md\` (opencode 2 does not read \`CLAUDE.md\`). A direct instruction overrides them.
 MCP server and headers live in \`opencode.json\` — the file is merged, not
 replaced; foreign entries survive.
-Role boundaries run through a plugin in \`.opencode/plugin/\`
-(\`tool.execute.before\`), not hook files. A refused call shows up as a tool
+Role boundaries run through a plugin in \`.opencode/plugins/\`
+(an \`execute.before\` tool hook), not hook files. A refused call shows up as a tool
 error carrying the reason — it was not executed.
 `
   }

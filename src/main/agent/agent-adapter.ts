@@ -100,6 +100,16 @@ export interface AdapterContext {
    * Optional so existing adapters stay source-compatible.
    */
   entityId?: string | null
+  /**
+   * Model override of this session (role preset or launcher), e.g.
+   * `anthropic/claude-sonnet-4-5`. Optional so existing adapters stay
+   * source-compatible.
+   *
+   * An adapter needs it when its CLI cannot take the model on the command line —
+   * opencode 2 has no top-level `--model`, and an unknown option is not reported
+   * (the CLI prints its help and exits). There it travels in the config file.
+   */
+  model?: string
 }
 
 export interface ProjectInstructions {

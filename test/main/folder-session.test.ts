@@ -9,7 +9,13 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
+import * as fs from 'fs'
+import * as os from 'os'
+import * as path from 'path'
+import { OpenCodeAdapter } from '../../src/main/agent/adapters/opencode'
+import { ClaudeCodeAdapter } from '../../src/main/agent/adapters/claude-code'
 import {
+  ensureInstructionsFile,
   resolveWorkspaceSections,
   buildFolderAutoLaunch,
   restoreAdapterId,
@@ -207,5 +213,54 @@ describe('Projekte des Workspaces', () => {
   it('formatWorkspacePrompt: ohne Kontextordner kein Verweis darauf', () => {
     const text = formatWorkspacePrompt({ workspaceId: 'ws-k', workspaceName: 'KEEL', workspaceProjects: ['/a'] })!
     assert.ok(!text.includes('Context Directories'))
+  })
+})
+
+describe('ensureInstructionsFile — die Datei, die die CLI wirklich liest', () => {
+  // opencode 2 liest CLAUDE.md nicht mehr (nur AGENTS.md). Der Entity-Pfad schrieb
+  // die Rollen-Anweisung (Preset, Persona, Global Rules) bisher ausschliesslich als
+  // CLAUDE.md ins Run-Verzeichnis — unter opencode 1.x als Rueckfall gelesen, unter
+  // 2.x gar nicht: die Rolle haette ohne ihren Prompt gearbeitet, ohne jede Meldung.
+  const opencode = new OpenCodeAdapter({ getSkipPermissions: () => false })
+  const claude = new ClaudeCodeAdapter({ getSkipPermissions: () => false })
+  const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ensure-instr-'))
+
+  it('opencode 2, nur CLAUDE.md im Run-Verzeichnis: legt AGENTS.md mit Verweis an', () => {
+    const d = tmp()
+    fs.writeFileSync(path.join(d, 'CLAUDE.md'), '# Rolle\n')
+    assert.equal(ensureInstructionsFile(d, opencode), 'AGENTS.md')
+    const agents = fs.readFileSync(path.join(d, 'AGENTS.md'), 'utf-8')
+    assert.match(agents, /CLAUDE\.md/)
+    assert.match(agents, /vollständig/)
+    assert.equal(fs.readFileSync(path.join(d, 'CLAUDE.md'), 'utf-8'), '# Rolle\n', 'CLAUDE.md angefasst')
+    fs.rmSync(d, { recursive: true, force: true })
+  })
+
+  it('Claude Code: CLAUDE.md, es wird keine AGENTS.md angelegt', () => {
+    const d = tmp()
+    fs.writeFileSync(path.join(d, 'CLAUDE.md'), '# Rolle\n')
+    assert.equal(ensureInstructionsFile(d, claude), 'CLAUDE.md')
+    assert.ok(!fs.existsSync(path.join(d, 'AGENTS.md')))
+    fs.rmSync(d, { recursive: true, force: true })
+  })
+
+  it('eine vorhandene AGENTS.md wird nie ueberschrieben', () => {
+    const d = tmp()
+    fs.writeFileSync(path.join(d, 'AGENTS.md'), '# Eigene Regeln\n')
+    fs.writeFileSync(path.join(d, 'CLAUDE.md'), '# Rolle\n')
+    assert.equal(ensureInstructionsFile(d, opencode), 'AGENTS.md')
+    assert.equal(fs.readFileSync(path.join(d, 'AGENTS.md'), 'utf-8'), '# Eigene Regeln\n')
+    fs.rmSync(d, { recursive: true, force: true })
+  })
+
+  it('ein Adapter ohne instructionsTarget bleibt bei CLAUDE.md', () => {
+    const d = tmp()
+    assert.equal(ensureInstructionsFile(d, {} as never), 'CLAUDE.md')
+    assert.ok(!fs.existsSync(path.join(d, 'AGENTS.md')))
+    fs.rmSync(d, { recursive: true, force: true })
+  })
+
+  it('wirft nicht, wenn das Verzeichnis fehlt', () => {
+    assert.equal(ensureInstructionsFile('/gibt/es/nicht/wirklich', opencode), 'AGENTS.md')
   })
 })

@@ -1,7 +1,7 @@
 # Spec: opencode 2.0 — Plugins und Adapter portieren
 
 **Datum:** 2026-10-14
-**Status:** Entwurf, Messungen abgeschlossen, Umsetzung offen
+**Status:** umgesetzt im Branch `opencode-2` (Tests grün); Abnahme in der TUI (§7) offen
 **Gemessen an:** opencode **2.0.29** (macOS, `/opt/homebrew/bin/opencode`), 2026-10-14
 **Vorgänger:** `docs/superpowers/handovers/2026-10-01-drei-cli-adapter.md` (Messungen an 1.18.34/35)
 **Branch/Worktree:** `opencode-2` in `.claude/worktrees/opencode-2`
@@ -68,14 +68,17 @@ Nicht jedes Event trägt `location`: `session.usage.updated` hat nur `sessionID`
 5. **Das Pfadfeld heißt `path`,** nicht `filePath`: `write` = `{path, content}`,
    `edit` = `{path, oldString, newString}`. (Das Binary liest in seiner eigenen Pfadauflösung
    `path` zuerst und `filePath` als Rückfall.)
-6. **Tool-IDs:** `write`, `edit`, `patch` (V1: `apply_patch`; das Binary führt den Alias
+6. **Pfade kommen relativ.** `edit` erhielt `path: "t.txt"`. Eine Teilstring-Regel auf
+   `/src/` trifft `src/x.ts` nicht — ohne Auflösen gegen `ctx.location.directory` (und
+   Einklappen von `..`) ist das eine Lücke. Die V1-Grenze sah absolute Pfade.
+7. **Tool-IDs:** `write`, `edit`, `patch` (V1: `apply_patch`; das Binary führt den Alias
    `apply_patch → patch`), außerdem `shell` (V1: `bash`), `read`, `glob`, `grep`, `question`,
    `skill`, `subagent`, `webfetch`, `websearch`.
-7. **`patch` nimmt `{ patchText }`** — ein Text mit `*** Begin Patch` … `*** End Patch` und den
+8. **`patch` nimmt `{ patchText }`** — ein Text mit `*** Begin Patch` … `*** End Patch` und den
    Kopfzeilen `*** Add File: <pfad>`, `*** Update File: <pfad>`, `*** Delete File: <pfad>`,
    optional `*** Move to: <ziel>`. **Aus dem Binary gelesen, nicht an einem Aufruf gemessen:**
    das Testmodell bekam `patch` nicht angeboten.
-8. Ein `patch` kann **mehrere Dateien** berühren. Die V1-Grenze (`output.args.filePath`) hat
+9. Ein `patch` kann **mehrere Dateien** berühren. Die V1-Grenze (`output.args.filePath`) hat
    `apply_patch` vermutlich nie erfasst: ohne `filePath` kehrte sie früh zurück. *Vermutung
    zur V1-Seite, nicht nachgemessen.*
 
@@ -92,8 +95,10 @@ Nicht jedes Event trägt `location`: `session.usage.updated` hat nur `sessionID`
    Schrittwerten (Differenz 64 Tokens). **Nicht als Kontextgröße verwendbar.**
 4. **Das Modell steht nur in `session.step.started`** (`{ sessionID, assistantMessageID,
    agent, model: { id, providerID, variant }, started }`). Verknüpfung über `assistantMessageID`.
-5. `ctx.model.list()` liefert `{ location, data }`. Die Form von `data` ist nicht gemessen;
-   die Doku zeigt `model.limit.context`.
+5. **`ctx.model.list()` liefert `{ location, data: [...] }`** (414 Einträge an dieser Installation),
+   jeder mit `id`, `modelID`, `providerID`, `limit: { context, output, input? }`. Beispiel
+   `opencode/big-pickle`: `context 200000`, `input 160000`. Damit ist das Fenster pro Modell
+   abfragbar (D12).
 6. `ctx.model.default()` liefert das **Standardmodell der Config**, nicht das Modell der
    laufenden Session.
 
@@ -136,6 +141,11 @@ Nicht jedes Event trägt `location`: `session.usage.updated` hat nur `sessionID`
 - **`CLAUDE.md` wird nicht mehr als Rückfall gelesen** (Migrationsleitfaden: „V2 currently only
   discovers `AGENTS.md`"). Das widerspricht der V1-Messung vom 2026-10-09 und dem heutigen
   `instructionsTarget()`.
+- **Das gilt auch für Rollen.** Der Entity-Pfad schreibt die Preset-Anweisung als `CLAUDE.md` ins
+  Run-Verzeichnis (`runs/<ws>/<rolle>/`). Unter 1.x wurde sie als Rückfall gelesen, unter 2.x
+  gar nicht — Preset, Persona und Global Rules einer Rolle wären still weg. Die vorhandenen
+  Run-Verzeichnisse mit `.codex/` haben ebenfalls keine `AGENTS.md`; ob Codex-Rollen davon
+  betroffen waren, ist nicht gemessen (D15).
 - Unbekannte/ungenutzte Felder bleiben harmlos.
 
 ## 3. Entscheidungen
@@ -148,13 +158,16 @@ Nicht jedes Event trägt `location`: `session.usage.updated` hat nur `sessionID`
 | D4 | **Usage aus `step.started` + `step.ended`**, nicht aus `usage.updated`. | §2.4. „Gemessen" heißt: ein `step.ended` mit `tokens` liegt vor. |
 | D5 | **Idle aus `session.execution.succeeded|failed|interrupted` und `session.idle`.** | §2.5. Beide Wege, weil die TUI-Quelle ungemessen ist. |
 | D6 | **Grenze prüft `input.path` (Rückfall `filePath`) und bei `patch` jeden Pfad aus `patchText`** (`Add/Update/Delete File`, `Move to`). | §2.3. Ein 1:1-Port würde nie matchen. |
-| D7 | **Projektanweisungen immer in `AGENTS.md`.** `instructionsTarget()` gibt stets `AGENTS.md` zurück. | §2.7. Eine nur geschriebene `CLAUDE.md` wird nicht gelesen. |
-| D8 | **Plugins nach `.opencode/plugins/`, ohne Eintrag in der Config.** Alte Dateien in `.opencode/plugin/` und Alteinträge im `plugin`-Feld werden entfernt. | Auto-Entdeckung ist gemessen; ein Alteintrag auf eine V1-Datei erzeugte bei jedem Start eine WARN-Zeile. |
+| D7 | **Projektanweisungen immer in `AGENTS.md`**, wie bei Codex: fehlt sie und liegt eine `CLAUDE.md` daneben, legt der Mux eine `AGENTS.md` **mit Verweis** auf die `CLAUDE.md` an (`pointerTo`). | §2.7. Eine nur geschriebene `CLAUDE.md` wird nicht gelesen; ohne Verweis ginge dem Projekt seine eigentliche Anweisung verloren. (Mein erster Entwurf sagte „immer `AGENTS.md`" ohne Verweis.) |
+| D8 | **Plugins nach `.opencode/plugins/`, ohne Eintrag in der Config.** Eigene Dateien in `.opencode/plugin/` und eigene Einträge in `plugin` **und** `plugins` (String oder `{package}`) werden entfernt; fremde bleiben. | Auto-Entdeckung ist gemessen; ein Alteintrag auf eine V1-Datei erzeugte bei jedem Start eine WARN-Zeile, ein altes Grenzen-Plugin sähe aus, als schütze es. |
 | D9 | **Config-Formen bleiben V1** (`mcp.<name>`, `provider`, `model`). | Still normalisiert, gemessen; keine unnötige Umstellung. |
-| D10 | **`--model` fällt weg; ein Rollen-Override wird als `model` in die `opencode.json` geschrieben.** `AdapterContext` bekommt ein optionales `model`. | §2.6. Das Feld `model` ist V1/V2-gemeinsam. Ein vom Mux gesetzter Wert muss als solcher erkennbar sein (Besitz wie bei `cipher-local/`). |
-| D11 | **Fork: vorerst ein klarer Fehler**, kein stilles Weiterführen derselben Unterhaltung. Folgearbeit: Fork über `POST /api/session/{id}/fork`, dann `opencode --standalone --session <neu>`. | §2.6. Ein Fork, der die Quelle fortsetzt, wäre ein stiller Fehlschlag. |
+| D10 | **`--model` fällt weg; ein Rollen-/Launcher-Modell wird als `model` in die `opencode.json` geschrieben.** `AdapterContext.model` (optional) trägt es; `SessionManager.start()` und `startEntity()` reichen es durch. **Marker** `.opencode/cipher-mux-model.json` `{ written, replaced }`: beim nächsten Start wird der Mux-Eintrag zurückgenommen (das `model` des Projekts kommt wieder), ein vom Nutzer inzwischen geändertes `model` bleibt. Das Profil des lokalen Workers schlägt den Override. | §2.6. Ein String-Feld verrät nicht, wer es gesetzt hat. Ohne Marker bliebe ein Rollen-Override für immer stehen oder das Projekt-`model` ginge verloren — und eine Ordner-Session läuft im Projekt des Nutzers. `OPENCODE_CONFIG_CONTENT` ist keine Quelle (§2.6). |
+| D11 | **Fork: sichtbar verweigert — weder Wurf noch stilles Weiterführen.** Der Adapter liefert `echo opencode Fork ist in opencode 2 nicht verfuegbar` statt `opencode …`. Folgearbeit: Fork über `POST /api/session/{id}/fork`, dann `opencode --standalone --session <neu>`. | §2.6. **Korrektur gegenüber meinem ersten Entwurf („ein klarer Fehler"):** `SessionManager.start()` ruft `buildLaunchCommand` erst nach `tmux.createSession` und `sessions.set` — ein Wurf hinterließe eine registrierte, leere Session. Ein stilles `--continue` setzte die Quelle fort. |
 | D12 | **Kontextfenster aus `ctx.model.list()` (`limit.context`) für das Modell der Session**, Rückfall `OPENCODE_FALLBACK_CONTEXT_WINDOW`. Der Profilwert des lokalen Workers (`contextWindow`) behält Vorrang. | §2.4. Aus einer Schätzung wird, wo möglich, ein gemessener Wert. |
 | D13 | `sub-agents` bleibt `false` (ungemessen). | Gate sagt die Wahrheit (Vorgänger §5.3). |
+| D14 | **Grenze: Pfade werden gegen `ctx.location.directory` aufgelöst, `..` eingeklappt; geprüft wird auch der unaufgelöste Pfad.** Ein Edit-Werkzeug ohne lesbaren Pfad wird abgelehnt (fail-closed). | §2.3 Punkt 6. Sonst trifft `/src/` den Pfad `src/x.ts` nicht. |
+| D15 | **Rollen bekommen die Anweisungsdatei ihrer CLI:** `ensureInstructionsFile(runDir, adapter)` (aus `folder-session.ts`, vorher die private `prepareInstructionsFile`) läuft jetzt auch im Entity-Pfad (`startEntity`), nicht nur beim Ordner-Start. | §2.7. Ohne das liefe eine opencode-2-Rolle ohne ihr Preset. **Wirkt auf alle Adapter, die `AGENTS.md` ziehen — also auch Codex;** das ist dort nicht gemessen und sollte beim nächsten Codex-Lauf bestätigt werden. |
+| D16 | **Usage schreibt die Datei schon bei `step.started`** (Session-ID und Modell, ohne `context_window`) und behält bei einem neuen Schritt die letzte Messung. | Keep Working braucht die ID vor der ersten Messung (§4). |
 
 ## 4. Neue Plugin-Formen
 
@@ -176,25 +189,34 @@ export default {
   einem eigenen Grund („Pfad nicht lesbar") abgelehnt. Die V1-Grenze ließ so etwas durch;
   genau das hätte ein Feldnamenwechsel wie `filePath` → `path` unbemerkt zur Lücke gemacht.
 - **Usage:** `ctx.event.subscribe()` in `setup`, Abbruch über das zurückgegebene Cleanup.
-  `step.started` merkt sich `assistantMessageID → model`; `step.ended` schreibt die JSON-Datei
-  im bekannten Format (`session_id`, `model.id`, `context_window.*`). `used = input +
-  cache.read + cache.write + output`. Ohne `CIPHER_MUX_SESSION_ID` wird nichts geschrieben.
-  Der Schreiber filtert auf die eigene Session nicht — unter `--standalone` gibt es nur eine.
+  `step.started` merkt sich `assistantMessageID → { id, providerID }` und schreibt die Datei
+  mit `session_id` und `model.id` (D16); `step.ended` ergänzt `context_window.*` im bekannten
+  Format. `used = input + cache.read + cache.write + output`; `total_input_tokens` ist der
+  ganze Prompt, `current_usage.input_tokens` der ungecachte Teil. Das Fenster kommt mit
+  `lookupModelLimit` aus `ctx.model.list()` (Anbieter + Modell), sonst aus dem eingebackenen
+  Wert; der Profilwert des lokalen Workers hat Vorrang. Ohne `CIPHER_MUX_SESSION_ID` wird
+  nichts geschrieben. Jedes Ereignis läuft in eigenem `try/catch`: ein Wurf beendete sonst
+  die Schleife. Der Schreiber filtert nicht auf die eigene Session — unter `--standalone` gibt
+  es nur eine.
 - **Idle:** wie bisher, mit den Events aus D5.
 
 ## 5. Adapter
 
-- `buildLaunchCommand`: `--standalone` und `--auto` (bei skipPermissions); `--session <id>`,
-  `--continue`; **kein** `--model`, `--fork`, `--pure`. Fork → Fehler (D11).
-- `postLaunchInjection`: Plugins nach `.opencode/plugins/`; Altdateien in
-  `.opencode/plugin/` mit den eigenen Namen löschen; Alteinträge aus `plugin` entfernen
-  (`mergeOpenCodeConfig` behält fremde Einträge); `model` nach D10.
-- `instructionsTarget`: immer `AGENTS.md` (D7). Bestehende `CLAUDE.md` bleibt unberührt.
+- `buildLaunchCommand`: `--standalone` immer; `--auto` bei skipPermissions; `--session <id>` /
+  `--continue`; **kein** `--model`, `--fork`, `--pure`. Fork → `echo`-Zeile (D11). Ein Test
+  hält fest, dass jedes Flag im Startkommando in der Liste der am Top-Level gemessenen steht
+  (`--standalone --auto --continue --session`) — gegen das stille „Hilfe drucken und beenden".
+- `postLaunchInjection`: frühere Mux-Eintragung in `model` zurücknehmen (Marker), mischen
+  (`mergeOpenCodeConfig(existing, entry, local)` — ohne Plugin-Parameter), danach `model`
+  setzen (nicht beim lokalen Worker), Marker schreiben oder löschen. Plugins nach
+  `.opencode/plugins/`; V1-Altlasten räumen (`removeLegacyPlugins`).
+- `attachStatusHook`: räumt ebenfalls die V1-Altlasten und legt das Usage-Plugin an.
+- `instructionsTarget`: wie Codex (D7). `ensureInstructionsFile` im Entity-Pfad (D15).
 - `getCapabilities`: unverändert, bis die Abnahme etwas anderes zeigt.
-- Prompt-Fragmente: `--pure`-Hinweis ersetzen („Plugins werden aus `.opencode/plugins/`
-  geladen"), Startzeile `opencode --standalone --auto`, Anweisungen **nur** aus `AGENTS.md`.
-- Texte mit „1.18.35" in `companion-info-popup.ts`, `companion-ref.ts` und den Kommentaren
-  nachziehen.
+- Prompt-Fragmente: Startzeile `opencode --standalone --auto`; kein `--pure`/`--model`/`--fork`;
+  Anweisungen nur aus `AGENTS.md`; Plugins aus `.opencode/plugins/`.
+- Texte „1.18.x" in `companion-info-popup.ts`, `companion-ref.ts`, `companion-guides.ts`,
+  `README.md` → 2.0.29; README nennt die Folgen (`--standalone`, `AGENTS.md`, kein `--model`/`--fork`).
 
 ## 6. Tests
 
@@ -224,6 +246,14 @@ Das Feuern nachweisen, nicht die Datei schreiben (Vorgänger §1). Jeweils im tm
 4. Idle-Signal erscheint am Zugende (TUI-Quelle klären: `session.idle` oder `execution.*`).
 5. Restore mit `--session <id>`.
 6. Startlog der Session enthält **kein** `failed to load plugin`.
+7. **Rollen-Modell greift:** eine Rolle mit Modell-Override startet in der TUI mit diesem Modell
+   (der Mux schreibt `model` in die Config; ob die TUI es dem zuletzt benutzten Modell
+   vorzieht, ist ungemessen). Zweiter Start ohne Override: `model` des Projekts wieder da.
+8. **Rolle kennt ihr Preset:** eine opencode-Rolle beantwortet eine Frage, die nur in ihrer
+   `CLAUDE.md`/Preset steht — über den Verweis in der neuen `AGENTS.md`.
+9. **Rollengrenze mit relativem Pfad** (`src/x.ts`, nicht nur `/p/src/x.ts`) und, wenn ein
+   Modell `patch` angeboten bekommt, mit einem mehrteiligen `patch`.
+10. Fork im Launcher: die Zeile erscheint im Pane, es entsteht keine halbe Session.
 
 ## 8. Risiken und offene Punkte
 

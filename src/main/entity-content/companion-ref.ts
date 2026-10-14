@@ -241,7 +241,7 @@ Which command-line AI runs in a cell. Independent of the entity: the entity is t
 |---|---|---|---|
 | Claude Code | \`claude-code\` | Tier 1 | default |
 | Codex CLI | \`codex\` | Tier 2 | codex-cli 0.155.1 (2026-10-01) |
-| opencode | \`opencode\` | Tier 2 | opencode 1.18.34 (2026-10-01) |
+| opencode | \`opencode\` | Tier 2 | opencode 2.0.29 (2026-10-14) |
 
 **Tier 1** — every Mux capability measured. **Tier 2** — not every capability measured. \`false\` in an adapter means "unproven", not "absent".
 

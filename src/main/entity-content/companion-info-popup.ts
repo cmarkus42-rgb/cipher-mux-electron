@@ -52,7 +52,7 @@ Jede Session im Workspace — Ordner-Session, Zelle oder Rolle — erfaehrt sein
 
 ## Agent-CLIs
 
-Drei Kommandozeilen-KIs koennen in einer Zelle laufen: **Claude Code** (Tier 1, Voreinstellung), **Codex CLI** (Tier 2, gemessen an codex-cli 0.155.1) und **opencode** (Tier 2, gemessen an opencode 1.18.35). Tier 2 heisst: nicht jede Mux-Faehigkeit ist dort gemessen — bei beiden sind es nur die Sub-Agents. Context-Anzeige und Rollengrenzen laufen unter allen dreien (bei opencode ueber Plugins). opencode braucht einen angemeldeten Anbieter.
+Drei Kommandozeilen-KIs koennen in einer Zelle laufen: **Claude Code** (Tier 1, Voreinstellung), **Codex CLI** (Tier 2, gemessen an codex-cli 0.155.1) und **opencode** (Tier 2, gemessen an opencode 2.0.29). Tier 2 heisst: nicht jede Mux-Faehigkeit ist dort gemessen — bei beiden sind es nur die Sub-Agents. Context-Anzeige und Rollengrenzen laufen unter allen dreien (bei opencode ueber Plugins). opencode braucht einen angemeldeten Anbieter.
 
 Gewaehlt wird pro Rolle im Presets-Tab (Felder **CLI** und **Modell**), pro Ordner-Session im Launcher, global unter "einstellungen" → general → **Standard-CLI**. Reihenfolge fuer Rollen: Wahl pro Rolle > Default der Rolle (nur Local Worker: opencode) > globale Einstellung. Gilt ab dem naechsten Sessionstart der Rolle.
 

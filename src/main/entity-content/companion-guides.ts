@@ -422,7 +422,7 @@ In jeder Session-Zelle läuft eine Kommandozeilen-KI. Lange war das immer Claude
 |---|---|---|---|
 | **Claude Code** | \`claude-code\` | Tier 1 | Standard, Voreinstellung |
 | **Codex CLI** | \`codex\` | Tier 2 | codex-cli 0.155.1 (2026-10-01) |
-| **opencode** | \`opencode\` | Tier 2 | opencode 1.18.35 (2026-10-09) |
+| **opencode** | \`opencode\` | Tier 2 | opencode 2.0.29 (2026-10-14) |
 
 **Tier 1 heißt:** jede Mux-Fähigkeit ist dort gemessen. Claude Code ist die Voreinstellung — nicht aus Gewohnheit, sondern weil es die einzige CLI ist, für die das gilt.
 

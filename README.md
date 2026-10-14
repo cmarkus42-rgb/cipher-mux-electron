@@ -320,7 +320,7 @@ A role is not tied to one CLI. Three adapters ship in the registry
 |-----|-----------|------|---------------------|------------------|------------|
 | **Claude Code** | `claude-code` | Tier 1 | `CLAUDE.md`, `.claude` | v2.1.284 | — |
 | **Codex CLI** | `codex` | Tier 2 | `AGENTS.md`, `.codex` | codex-cli 0.155.1 | sub-agents |
-| **opencode** | `opencode` | Tier 2 | `AGENTS.md`, `opencode.json`, `.opencode` | opencode 1.18.34 | sub-agents |
+| **opencode** | `opencode` | Tier 2 | `AGENTS.md`, `opencode.json`, `.opencode` | opencode 2.0.29 | sub-agents |
 
 **Tier 2 means: not every capability has been measured there.** The last column is not a guess —
 it is the set of `false` entries in the adapter's own `getCapabilities()`. A `false` says
@@ -331,7 +331,7 @@ display work under all three.
 Two differences are worth naming outright.
 
 **Role boundaries use a different mechanism per CLI.** Claude Code and Codex enforce them
-through a `PreToolUse` hook, opencode through a plugin on `tool.execute.before`. All three were
+through a `PreToolUse` hook, opencode through a plugin (`execute.before` tool hook). All three were
 proven to deny *selectively* against the live CLI, with the reason arriving at the model
 verbatim. The mechanism differs; the guarantee does not.
 
@@ -342,6 +342,14 @@ verbatim. The mechanism differs; the guarantee does not.
 
 **opencode needs an authenticated provider.** Without one it starts, reaches its prompt, and
 then does nothing on any input. No flag removes this — it is a precondition, not a dialog.
+
+**opencode 2.x only.** opencode 1.x plugins do not load in 2.x (the CLI skips them with a single
+warning in its server log), so the Mux generates 2.x plugins and starts every opencode session with
+`--standalone` — a private server per session, because a 2.x plugin runs in the server and a shared
+one would hand it another session's identity. Two consequences: opencode 2 reads project
+instructions from `AGENTS.md` only (the Mux creates one pointing at your `CLAUDE.md`), and the
+top-level CLI has no `--model` or `--fork` (the role's model travels in `opencode.json`; forking an
+opencode session is not available yet).
 
 ### Choosing a CLI and a model
 

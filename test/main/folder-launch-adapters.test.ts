@@ -6,7 +6,9 @@
  *   fortsetzen. Jede CLI schreibt das anders, gemessen am 2026-10-09:
  *   `claude --continue --fork-session` (claude 2.1.295 kennt kein `--fork` —
  *   „error: unknown option '--fork'"), `codex fork --last` (codex-cli 0.160.1),
- *   `opencode --continue --fork` (1.18.35; `--fork` allein ist ungueltig).
+ *   opencode 1.18.35 kannte `opencode --continue --fork`; **opencode 2.0.29 hat am
+ *   Top-Level kein `--fork` mehr** (nur `opencode run`) — der Adapter weigert sich
+ *   sichtbar, siehe unten.
  * - `skipPermissions`: die Wahl im Launcher schlaegt die globale Einstellung.
  *   Fehlt sie, gilt weiter die Config — Entity-Sessions setzen sie nie.
  */
@@ -44,10 +46,12 @@ describe('Ordner-Start: die letzte Unterhaltung abzweigen', () => {
     assert.ok(!args.includes('resume'))
   })
 
-  it('opencode: --continue --fork', () => {
-    const { args } = opencode(false).buildLaunchCommand({ ...base, forkLatest: true })
-    assert.ok(args.includes('--continue'))
-    assert.ok(args.includes('--fork'))
+  it('opencode 2: kein Fork am Top-Level — der Adapter startet opencode gar nicht', () => {
+    // Weder --fork (unbekannte Flags druckt die CLI nur als Hilfe) noch ein
+    // stilles --continue, das die QUELLE fortsetzen wuerde. Details: opencode-adapter.test.ts.
+    const { cmd, args } = opencode(false).buildLaunchCommand({ ...base, forkLatest: true })
+    assert.notEqual(cmd, 'opencode')
+    assert.ok(!args.includes('--fork') && !args.includes('--continue'))
   })
 
   it('eine bekannte ID schlaegt forkLatest — sie benennt, was geforkt wird', () => {
@@ -86,9 +90,11 @@ describe('Ordner-Start: Rueckfragen pro Start statt global', () => {
   })
 })
 
-// Gemessen am 2026-10-09 (opencode 1.18.35, gpu/qwen3.8-27b, ohne Werkzeugaufruf):
-// liegt nur CLAUDE.md im Verzeichnis, liest opencode sie; liegt AGENTS.md
-// daneben, liest es **nur** AGENTS.md. Codex liest ausschliesslich AGENTS.md.
+// opencode 1.18.35 (gemessen 2026-10-09): liegt nur CLAUDE.md im Verzeichnis, liest
+// es sie. **opencode 2 liest CLAUDE.md nicht mehr** (Migrationsleitfaden: „V2
+// currently only discovers AGENTS.md"). Deshalb schreibt der Mux dort wie bei
+// Codex immer in AGENTS.md — mit Verweis, wenn eine CLAUDE.md daneben liegt, sonst
+// verloere die Session die eigentlichen Projektanweisungen.
 describe('instructionsTarget — in welche Datei der Mux fuer eine CLI schreibt', () => {
   const none = { agentsMd: false, claudeMd: false }
   const onlyClaude = { agentsMd: false, claudeMd: true }
@@ -101,11 +107,11 @@ describe('instructionsTarget — in welche Datei der Mux fuer eine CLI schreibt'
     }
   })
 
-  it('opencode: AGENTS.md, wenn es eine gibt — sonst liest es die CLAUDE.md', () => {
+  it('opencode 2: immer AGENTS.md; neu angelegt mit Verweis, wenn eine CLAUDE.md daneben liegt', () => {
     assert.deepEqual(opencode(false).instructionsTarget!(both), { file: 'AGENTS.md' })
     assert.deepEqual(opencode(false).instructionsTarget!(onlyAgents), { file: 'AGENTS.md' })
-    assert.deepEqual(opencode(false).instructionsTarget!(onlyClaude), { file: 'CLAUDE.md' })
-    assert.deepEqual(opencode(false).instructionsTarget!(none), { file: 'CLAUDE.md' })
+    assert.deepEqual(opencode(false).instructionsTarget!(onlyClaude), { file: 'AGENTS.md', pointerTo: 'CLAUDE.md' })
+    assert.deepEqual(opencode(false).instructionsTarget!(none), { file: 'AGENTS.md' })
   })
 
   it('Codex: immer AGENTS.md; neu angelegt mit Verweis, wenn eine CLAUDE.md daneben liegt', () => {

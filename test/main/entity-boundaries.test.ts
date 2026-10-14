@@ -123,70 +123,200 @@ describe('buildBoundaryHookScript', () => {
   })
 })
 
+/**
+ * Das opencode-2-Plugin wird mit einem Fake-`ctx` GELADEN und AUSGEFUEHRT, nicht
+ * nach Woertern abgesucht. opencode 2.0.29 weist ein V1-Plugin ab ("Plugin must
+ * export a default definition with an id and an effect or setup function") und
+ * sagt es nur im WARN-Log: ein Modul mit den richtigen Woertern, das nicht laedt,
+ * ist genau der stille Fehlschlag, den diese Datei verhindern soll.
+ *
+ * Ereignisform gemessen an opencode 2.0.29 (2026-10-14), `ctx.tool.hook`:
+ * `{ tool, sessionID, agent, messageID, id, input }`. Pfadfeld ist `path`
+ * (nicht `filePath`); `patch` traegt `{ patchText }`.
+ */
+type BoundaryHook = (event: unknown) => Promise<void> | void
+
+interface LoadedBoundary {
+  id: unknown
+  hook: BoundaryHook
+  registered: string[]
+}
+
 describe('buildOpenCodeBoundaryPlugin', () => {
-  // The generated module is loaded and called here, not grepped. opencode
-  // rejects a CommonJS plugin with "Plugin export is not a function" and says
-  // so only under --print-logs: a module that contains the right words and
-  // fails to load is exactly the silent failure this file exists to avoid.
   let dir: string
   before(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oc-boundary-')) })
   after(() => { fs.rmSync(dir, { recursive: true, force: true }) })
 
   let seq = 0
+  async function load(
+    patterns: readonly string[],
+    reason: string,
+    opts: { denyListFile?: string; cwd?: string } = {},
+  ): Promise<LoadedBoundary> {
+    const file = path.join(dir, `b${seq++}.js`)
+    fs.writeFileSync(file, buildOpenCodeBoundaryPlugin(patterns, reason, opts.denyListFile), 'utf-8')
+    const mod = await import(`file://${file}`)
+    assert.equal(typeof mod.default, 'object', 'default export is not a plugin definition')
+    assert.equal(typeof mod.default.setup, 'function', 'definition has no setup()')
+
+    const hooks: Record<string, BoundaryHook> = {}
+    const registered: string[] = []
+    const ctx = {
+      location: { directory: opts.cwd ?? '/p', project: { id: 'x', directory: '/p', canonical: '/p' } },
+      tool: {
+        hook: async (name: string, cb: BoundaryHook) => {
+          registered.push(name)
+          hooks[name] = cb
+          return { dispose: async () => {} }
+        },
+      },
+    }
+    await mod.default.setup(ctx)
+    assert.equal(typeof hooks['execute.before'], 'function', 'execute.before not registered')
+    return { id: mod.default.id, hook: hooks['execute.before'], registered }
+  }
+
   async function hook(
     patterns: readonly string[],
     reason: string,
-  ): Promise<(input: unknown, output: unknown) => Promise<void>> {
-    const file = path.join(dir, `b${seq++}.js`)
-    fs.writeFileSync(file, buildOpenCodeBoundaryPlugin(patterns, reason), 'utf-8')
-    const mod = await import(`file://${file}`)
-    assert.equal(typeof mod.default, 'function', 'default export is not a function')
-    const hooks = await mod.default({})
-    const fn = hooks['tool.execute.before']
-    assert.equal(typeof fn, 'function', 'tool.execute.before not registered')
-    return fn
+    opts: { denyListFile?: string; cwd?: string } = {},
+  ): Promise<BoundaryHook> {
+    return (await load(patterns, reason, opts)).hook
   }
 
-  const call = (tool: string, filePath?: string): [unknown, unknown] => [
-    { tool, sessionID: 'ses_x', callID: 'c1' },
-    { args: filePath === undefined ? {} : { filePath } },
-  ]
+  const call = (tool: string, input?: Record<string, unknown>): unknown => ({
+    tool, sessionID: 'ses_x', agent: 'build', messageID: 'msg_1', id: 'call_1', input,
+  })
+  const patch = (...lines: string[]): unknown =>
+    call('patch', { patchText: ['*** Begin Patch', ...lines, '*** End Patch'].join('\n') })
+
+  it('is a V2 definition with a stable id, never a V1 function', async () => {
+    const { id, registered } = await load(['/src/'], 'Testgrund')
+    assert.equal(id, 'cipher-mux.role-boundary')
+    assert.deepEqual(registered, ['execute.before'])
+  })
 
   it('throws for a denied path, and the message is the reason', async () => {
-    // The throw is what stops the call; opencode surfaces the message as the
-    // tool's error, which is how the reason reaches the model.
+    // The throw is what stops the call (measured: executed:false, file never
+    // created); the message reaches the model verbatim.
     const fn = await hook(['/src/'], 'Testgrund')
-    await assert.rejects(() => fn(...call('write', '/p/src/x.ts')), /Testgrund/)
+    await assert.rejects(async () => fn(call('write', { path: '/p/src/x.ts', content: 'x' })), /Testgrund/)
   })
 
   it('lets an allowed path through — selective, not a blanket lock', async () => {
     const fn = await hook(['/src/'], 'Testgrund')
-    await fn(...call('write', '/p/docs/x.md'))
-    await fn(...call('edit', '/p/test/x.test.ts'))
+    await fn(call('write', { path: '/p/docs/x.md', content: 'x' }))
+    await fn(call('edit', { path: '/p/test/x.test.ts', oldString: 'a', newString: 'b' }))
   })
 
-  it('covers every file-editing tool opencode has', async () => {
-    // Read off GET /experimental/tool/ids of a running opencode 1.18.34.
-    // A boundary that misses apply_patch is not a boundary.
+  it('resolves a RELATIVE path against the plugin location', async () => {
+    // Measured: the model passes `path: "t.txt"` to edit. A substring rule on
+    // "/src/" does not match "src/x.ts" — without resolving, that is a hole.
+    const fn = await hook(['/src/'], 'Testgrund', { cwd: '/p' })
+    await assert.rejects(async () => fn(call('write', { path: 'src/x.ts', content: 'x' })), /Testgrund/)
+    await assert.rejects(async () => fn(call('edit', { path: './src/x.ts', oldString: 'a', newString: 'b' })), /Testgrund/)
+    await fn(call('write', { path: 'docs/x.md', content: 'x' }))
+  })
+
+  it('normalises ".." so a traversal cannot walk around the rule', async () => {
+    const fn = await hook(['/src/'], 'Testgrund', { cwd: '/p' })
+    await assert.rejects(async () => fn(call('write', { path: '/p/docs/../src/x.ts', content: 'x' })), /Testgrund/)
+    await assert.rejects(async () => fn(call('write', { path: '../p/src/x.ts', content: 'x' })), /Testgrund/)
+  })
+
+  it('still accepts the V1 field name filePath as a fallback', async () => {
+    const fn = await hook(['/src/'], 'Testgrund')
+    await assert.rejects(async () => fn(call('write', { filePath: '/p/src/x.ts' })), /Testgrund/)
+  })
+
+  it('covers every file-editing tool opencode 2 has', async () => {
+    // Tool ids from ctx.tool.list() on 2.0.29: write, edit, patch (V1: apply_patch).
+    // A boundary that misses one of them is not a boundary.
     const fn = await hook(['/src/'], 'Testgrund')
     for (const tool of OPENCODE_EDIT_TOOLS) {
-      await assert.rejects(() => fn(...call(tool, '/p/src/x.ts')), /Testgrund/, `${tool} passed`)
+      const ev = tool === 'patch' || tool === 'apply_patch'
+        ? call(tool, { patchText: '*** Begin Patch\n*** Add File: /p/src/x.ts\n+x\n*** End Patch' })
+        : call(tool, { path: '/p/src/x.ts' })
+      await assert.rejects(async () => fn(ev), /Testgrund/, `${tool} passed`)
     }
+    assert.ok(OPENCODE_EDIT_TOOLS.includes('patch'), 'patch missing from the list')
   })
 
-  it('does not block reading — read carries a filePath too', async () => {
+  describe('patch', () => {
+    it('blocks when ANY file of a multi-file patch is denied', async () => {
+      const fn = await hook(['/src/'], 'Testgrund')
+      await assert.rejects(async () => fn(patch(
+        '*** Add File: /p/docs/ok.md', '+x',
+        '*** Update File: /p/src/x.ts', '@@', '-a', '+b',
+      )), /Testgrund/)
+    })
+
+    it('lets a patch through when none of its files is denied', async () => {
+      const fn = await hook(['/src/'], 'Testgrund')
+      await fn(patch('*** Add File: /p/docs/a.md', '+x', '*** Update File: /p/test/b.ts', '@@', '-a', '+b'))
+    })
+
+    it('checks Delete File', async () => {
+      const fn = await hook(['/src/'], 'Testgrund')
+      await assert.rejects(async () => fn(patch('*** Delete File: /p/src/x.ts')), /Testgrund/)
+    })
+
+    it('checks the destination of Move to — moving INTO a denied path is a write', async () => {
+      const fn = await hook(['/src/'], 'Testgrund')
+      await assert.rejects(async () => fn(patch(
+        '*** Update File: /p/docs/a.md', '*** Move to: /p/src/a.md', '@@', '-a', '+b',
+      )), /Testgrund/)
+    })
+
+    it('checks the source of a move as well', async () => {
+      const fn = await hook(['/src/'], 'Testgrund')
+      await assert.rejects(async () => fn(patch(
+        '*** Update File: /p/src/a.md', '*** Move to: /p/docs/a.md', '@@', '-a', '+b',
+      )), /Testgrund/)
+    })
+
+    it('resolves relative paths inside a patch', async () => {
+      const fn = await hook(['/src/'], 'Testgrund', { cwd: '/p' })
+      await assert.rejects(async () => fn(patch('*** Update File: src/x.ts', '@@', '-a', '+b')), /Testgrund/)
+    })
+
+    it('a patch body line that merely LOOKS like a header is not a path', async () => {
+      // Added lines start with "+", so "+*** Add File: /p/src/x" is content.
+      const fn = await hook(['/src/'], 'Testgrund')
+      await fn(patch('*** Add File: /p/docs/a.md', '+*** Add File: /p/src/x.ts'))
+    })
+
+    it('fails closed on a patch it cannot read any path from', async () => {
+      const fn = await hook(['/src/'], 'Testgrund')
+      await assert.rejects(async () => fn(call('patch', { patchText: 'kein Patch' })), /nicht lesbar/)
+      await assert.rejects(async () => fn(call('patch', {})), /nicht lesbar/)
+    })
+  })
+
+  it('does not block reading, searching or the shell', async () => {
     // Claude Code's boundary does not blind the role, and neither does this one.
     const fn = await hook(['/src/'], 'Testgrund')
-    for (const tool of ['read', 'grep', 'glob', 'bash']) {
-      await fn(...call(tool, '/p/src/x.ts'))
+    for (const tool of ['read', 'grep', 'glob', 'shell', 'webfetch']) {
+      await fn(call(tool, { path: '/p/src/x.ts', command: 'cat /p/src/x.ts' }))
     }
   })
 
-  it('allows a call without a usable path instead of blocking on nothing', async () => {
+  it('FAILS CLOSED: an edit tool without a readable path is refused', async () => {
+    // The V1 boundary let this through — and a field rename (filePath → path)
+    // would have turned the whole boundary into a silent hole. A boundary-role
+    // edit that names no readable path is a finding, not a free pass.
     const fn = await hook(['/src/'], 'Testgrund')
-    await fn(...call('write'))
-    await fn({ tool: 'write' }, {})
-    await fn({ tool: 'write' }, { args: { filePath: 42 } })
+    await assert.rejects(async () => fn(call('write')), /nicht lesbar/)
+    await assert.rejects(async () => fn(call('write', {})), /nicht lesbar/)
+    await assert.rejects(async () => fn(call('edit', { path: 42 })), /nicht lesbar/)
+    await assert.rejects(async () => fn(call('write', { path: '' })), /nicht lesbar/)
+  })
+
+  it('ignores events that are not tool calls at all', async () => {
+    const fn = await hook(['/src/'], 'Testgrund')
+    await fn(undefined)
+    await fn({})
+    await fn({ tool: 42 })
   })
 
   it('embeds rule and reason as JSON literals, not as raw text', async () => {
@@ -196,24 +326,26 @@ describe('buildOpenCodeBoundaryPlugin', () => {
     assert.ok(!src.includes(`'${reason}'`) && !src.includes(`"${reason}"`))
     // And it still loads and still carries the reason verbatim.
     const fn = await hook(['/src/'], reason)
-    await assert.rejects(() => fn(...call('write', '/p/src/x.ts')), (err: Error) => {
+    await assert.rejects(async () => fn(call('write', { path: '/p/src/x.ts' })), (err: Error) => {
       assert.equal(err.message, reason)
       return true
     })
   })
 
-  it('is ESM, never CommonJS', () => {
+  it('is ESM, never CommonJS, and has no import of the plugin package', () => {
     const src = buildOpenCodeBoundaryPlugin(['/src/'], 'x')
     assert.ok(src.includes('export default'))
     assert.ok(!src.includes('module.exports'))
     assert.ok(!src.includes('require('))
+    // Dependency-free on purpose: measured to load as a plain object on 2.0.29.
+    assert.ok(!src.includes('@opencode/plugin') && !src.includes('@opencode-ai/plugin'))
   })
 
   it('carries the real reason of every role that has a boundary', async () => {
     for (const [id, boundary] of Object.entries(ENTITY_BOUNDARIES)) {
       const fn = await hook(boundary.denyPathPatterns, boundary.reason)
       await assert.rejects(
-        () => fn(...call('write', `/p${boundary.denyPathPatterns[0]}x.ts`)),
+        async () => fn(call('write', { path: `/p${boundary.denyPathPatterns[0]}x.ts` })),
         (err: Error) => {
           assert.equal(err.message, boundary.reason, `${id} reports a different reason`)
           return true
@@ -259,9 +391,12 @@ describe('Local Cyber Factory boundaries', () => {
     const pluginPath = path.join(dir, 'p.mjs')
     fs.writeFileSync(pluginPath, buildOpenCodeBoundaryPlugin(['/AUFTRAG.md'], 'R', listFile))
     const mod = await import(pluginPath)
-    const hooks = await mod.default()
-    const call = (filePath: string) =>
-      hooks['tool.execute.before']({ tool: 'edit' }, { args: { filePath } })
+    let before: (e: unknown) => unknown = () => {}
+    await mod.default.setup({
+      location: { directory: '/p' },
+      tool: { hook: async (_n: string, cb: (e: unknown) => unknown) => { before = cb } },
+    })
+    const call = async (filePath: string) => before({ tool: 'edit', input: { path: filePath } })
 
     // ohne Datei: nur die statische Regel
     await call('/p/test/accept.test.ts')
