@@ -111,7 +111,7 @@ Nicht jedes Event trägt `location`: `session.usage.updated` hat nur `sessionID`
    `{ sessionID }`). Im Binary zusätzlich `session.execution.failed` und
    `session.execution.interrupted`.
 2. **`session.idle` kam weder im `opencode run`- noch im TUI-Lauf an**, steht aber als Eventname
-   im Binary. **In der TUI** (§9) kamen `session.execution.started` und, am Zugende,
+   im Binary. **In der TUI** (§8) kamen `session.execution.started` und, am Zugende,
    `session.execution.succeeded` plus `session.step.ended`. (V1 sendete `session.idle` genau
    einmal am Zugende.) `session.idle` bleibt in der Liste (D5), ist aber ohne Messung nur Reserve.
 
@@ -240,7 +240,7 @@ Aufruf mit Ereignissen, Dateiausgabe) — nicht per Textvergleich.
   Fork wirft; `instructionsTarget` ohne und mit `AGENTS.md`; `mergeOpenCodeConfig` entfernt
   V1-Alteinträge und behält fremde; Altdateien werden gelöscht.
 
-## 7. Abnahme (gegen die echte CLI, in der TUI)
+## 7. Abnahme (gegen die echte CLI, in der TUI) — Ergebnis in §8
 
 Das Feuern nachweisen, nicht die Datei schreiben (Vorgänger §1). Jeweils im tmux-Pane unter
 `--standalone`, nicht nur mit `opencode run`:
@@ -260,7 +260,7 @@ Das Feuern nachweisen, nicht die Datei schreiben (Vorgänger §1). Jeweils im tm
    Modell `patch` angeboten bekommt, mit einem mehrteiligen `patch`.
 10. Fork im Launcher: die Zeile erscheint im Pane, es entsteht keine halbe Session.
 
-## 9. Abnahmeergebnis (2026-10-14, opencode 2.0.29, TUI unter `--standalone`)
+## 8. Abnahmeergebnis (2026-10-14, opencode 2.0.29, TUI unter `--standalone`)
 
 Zwei Sessions parallel in einem eigenen tmux-Server, Verzeichnisse mit dem echten Adapter-Code
 erzeugt (`postLaunchInjection`, `ensureInstructionsFile`), Modell `opencode/big-pickle` über den
@@ -282,21 +282,31 @@ Override. Umgebung: je eigene `CIPHER_MUX_SESSION_ID`.
 Nebenbefund: Ein `-m` am Top-Level beendete eine Session sofort (Hilfe gedruckt) — dieselbe
 stille Falle wie bei `--model`/`--fork`, hier unfreiwillig bestätigt.
 
-## 8. Risiken und offene Punkte
+## 9. Risiken und offene Punkte
 
 - **Kind-Sessions (Sub-Agents):** Ihre `step.ended` tragen eine andere `sessionID` und könnten
   die Anzeige der Hauptsession überschreiben. `sub-agents` ist ungemessen; Verhalten klären,
   bevor das Gate je `true` wird.
-- **`patch`-Eingabe** ist nur aus dem Binary gelesen — im Abnahmelauf mit einem Modell
-  messen, das `patch` angeboten bekommt.
-- **`session.idle` in der TUI** ungemessen (§2.5).
+- **`patch`-Eingabe** ist nur aus dem Binary gelesen (§8 Nr. 9) — mit einem Modell messen, das
+  `patch` angeboten bekommt. Bis dahin hält fail-closed die Grenze: ein `patch` ohne lesbare
+  `patchText`-Pfade wird abgelehnt.
+- **Codex und D15:** `ensureInstructionsFile` läuft jetzt für **alle** Adapter im Entity-Pfad. Für
+  Codex-Rollen legt der Mux damit erstmals eine `AGENTS.md` mit Verweis an. Das ist dort ungemessen
+  und beim nächsten Codex-Lauf zu bestätigen — es ist die wahrscheinliche Erklärung dafür, dass
+  die vorhandenen Codex-Run-Verzeichnisse keine `AGENTS.md` haben.
 - **Fork** (D11) bleibt offen, bis die API-Variante gemessen ist (läuft ein Fork gegen die
   Datenbank einer `--standalone`-Session? ungemessen).
-- **Laufende Sessions** (heute z. B. projekt-a) tragen die V1-Plugins bis zum nächsten Start.
-  Der geteilte Hintergrunddienst läuft weiter, wird aber nicht mehr benutzt.
+- **Wiederherstellung des Projekt-`model`** (D10) ist nur im Unit-Test belegt, nicht in der TUI.
+- **Laufende Sessions** (heute z. B. projekt-a und projekt-b) tragen die V1-Plugins in
+  `.opencode/plugin/` und den V1-Eintrag in `opencode.json` bis zum nächsten Start mit dem neuen
+  Mux; dann werden sie geräumt. Der geteilte Hintergrunddienst läuft weiter, wird aber nicht mehr
+  benutzt.
 - **Lokaler Worker / Local Cyber Factory** hängt an `cipher-mux-idle.js` und am Anbieterblock
-  in der `opencode.json`; beide fallen unter D5/D9. Die dortige Spec
+  (V1-Form `provider`, still normalisiert) in der `opencode.json`. Der Anbieterblock ist **nicht**
+  an einem echten lokalen Endpunkt gemessen. Die dortige Spec
   (`2026-10-09-local-cyber-factory-design.md` §10a) nennt `session.idle` aus 1.18.35 und ist
   danach zu ergänzen.
-- `ctx.model.list()`: Form von `data` und der Eintrag für ein selbst eingetragenes Modell
-  (Anbieter `cipher-local`) sind ungemessen; Rückfall bleibt.
+- **Ausgabelimit-Messung der Factory (§10a Nr. 2)** wurde an 1.18.35 gemacht und gilt für 2.x
+  ungeprüft.
+- `ctx.model.list()` kennt für einen selbst eingetragenen Anbieter (`cipher-local`) vermutlich
+  keinen Eintrag; Rückfall bleibt der Profilwert.
