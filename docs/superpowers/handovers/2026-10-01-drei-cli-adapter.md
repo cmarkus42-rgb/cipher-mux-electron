@@ -100,6 +100,11 @@ Dazu: die Auswahl in der UI (Feld „CLI" pro Rolle im Preset-Editor, „Standar
 
 ## 4. Die Messungen — opencode (1.18.34, 2026-10-01)
 
+> **Überholt für opencode 2.x.** Plugin-API, `--model`/`--fork`, `CLAUDE.md`-Rückfall und
+> Prozessgrenze der Plugins haben sich geändert — siehe
+> `docs/superpowers/specs/2026-10-14-opencode-2-anpassung.md`. Der Abschnitt bleibt als
+> Messprotokoll für 1.18.x stehen.
+
 - **MCP mit freien Headern funktioniert** — dieselbe Horchposten-Messung, `authorization`,
   `x-mux-workspace` und `x-mux-entity` kamen alle an. **Die Header-Lücke ist also eine
   Eigenschaft von Codex, keine des Adapter-Vertrags.**
