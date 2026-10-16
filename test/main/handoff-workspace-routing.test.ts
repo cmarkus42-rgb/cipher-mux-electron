@@ -19,7 +19,7 @@ interface MockSession {
   tmuxPane?: string | null
 }
 
-function ctxWith(sessions: MockSession[], workspaceId: string | null, busyTargets: string[] = []): ToolContext {
+function ctxWith(sessions: MockSession[], workspaceId: string | null, busyTargets: string[] = [], activeWorkspaceId: string | null = null): ToolContext {
   const sessionManager = {
     list: () => sessions,
     getEntityRegistry: () => ({
@@ -34,6 +34,7 @@ function ctxWith(sessions: MockSession[], workspaceId: string | null, busyTarget
 
   return {
     workspaceId,
+    getActiveWorkspaceId: () => activeWorkspaceId,
     sessionManager,
     messageBus: null,
     statusLineMonitor: null,
@@ -89,6 +90,14 @@ describe('findBestSession — workspace isolation', () => {
     assert.equal(result?.session.id, 'd-global')
   })
 
+  it('an unbound caller looks in the active workspace when one is open', async () => {
+    // Gleiche Aufloesung wie beim Start: sonst startete jede Uebergabe aus
+    // einer ungebundenen Session eine neue Instanz im aktiven Workspace,
+    // weil die Suche sie dort nie faende.
+    const result = await findBestSession(ctxWith(SESSIONS, null, [], 'ws-alpha'), 'debugger')
+    assert.equal(result?.session.id, 'd-alpha')
+  })
+
   it('returns null when no session of that entity exists at all', async () => {
     const result = await findBestSession(ctxWith(SESSIONS, 'ws-alpha'), 'refinement')
     assert.equal(result, null)
@@ -105,7 +114,11 @@ describe('findBestSession — workspace isolation', () => {
  * object reaches startEntity. windowManager stays null so the
  * SESSION_VISIBLE_ADD branch is skipped, same as the rest of this file.
  */
-function ctxForStartEntity(workspaceId: string | null | undefined, captured: { opts?: Partial<StartSessionOpts> }): ToolContext {
+function ctxForStartEntity(
+  workspaceId: string | null | undefined,
+  captured: { opts?: Partial<StartSessionOpts> },
+  activeWorkspaceId: string | null = null,
+): ToolContext {
   const sessionManager = {
     startEntity: async (entityId: string, opts: Partial<StartSessionOpts>) => {
       captured.opts = opts
@@ -118,6 +131,7 @@ function ctxForStartEntity(workspaceId: string | null | undefined, captured: { o
 
   return {
     workspaceId,
+    getActiveWorkspaceId: () => activeWorkspaceId,
     sessionManager,
     messageBus: null,
     statusLineMonitor: null,
@@ -139,22 +153,32 @@ describe('startEntitySession — workspace forwarding', () => {
     assert.strictEqual(captured.opts?.workspaceId, 'ws-beta')
   })
 
-  it('forwards null — not undefined — when ctx.workspaceId is unset', async () => {
-    // ctx.workspaceId left `undefined` on purpose (field omitted), not
-    // explicitly `null`. This is the case that actually exercises the
-    // `?? null` normalization: if ctx.workspaceId were already `null`,
-    // `null ?? null` and a bare pass-through both yield `null` and the
-    // test could not tell a correct forward from a dropped fallback. Only
-    // the `undefined` case distinguishes them, because startEntity/
-    // resolveEntityWorkspace treats `undefined` as "resolve the active
-    // workspace" and `null` as "stay explicitly unbound" — exactly the
-    // silent-cross-workspace-leak this fallback exists to prevent.
+  it('an unbound caller starts in the active workspace — user decision 2026-10-16', async () => {
+    // Bis 0.13.0 erbte ein ungebundener Aufrufer "ungebunden": eine Ordner-
+    // Session ohne Workspace startete den Workshop ausserhalb des Workspace,
+    // in dem der User sass. Ungebunden heisst jetzt "keine Vorliebe" -- wie
+    // beim Start aus der Oberflaeche.
     const captured: { opts?: Partial<StartSessionOpts> } = {}
-    await startEntitySession(ctxForStartEntity(undefined, captured), 'debugger')
+    await startEntitySession(ctxForStartEntity(null, captured, 'ws-active'), 'debugger')
+    assert.strictEqual(captured.opts?.workspaceId, 'ws-active')
+  })
+
+  it('forwards an explicit null — never undefined — when nothing is active', async () => {
+    // Die Aufloesung passiert hier, nicht spaeter in startEntity: undefined
+    // dort liest configStore erneut, und Suche und Start koennten dann
+    // verschiedene Workspaces sehen.
+    const captured: { opts?: Partial<StartSessionOpts> } = {}
+    await startEntitySession(ctxForStartEntity(undefined, captured, null), 'debugger')
     assert.strictEqual(captured.opts?.workspaceId, null)
     assert.ok(
       captured.opts !== undefined && Object.prototype.hasOwnProperty.call(captured.opts, 'workspaceId'),
       'workspaceId key must be present, not merely absent-and-therefore-undefined',
     )
+  })
+
+  it('a bound caller keeps its own workspace, whatever is active', async () => {
+    const captured: { opts?: Partial<StartSessionOpts> } = {}
+    await startEntitySession(ctxForStartEntity('ws-beta', captured, 'ws-active'), 'debugger')
+    assert.strictEqual(captured.opts?.workspaceId, 'ws-beta')
   })
 })

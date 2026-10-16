@@ -107,6 +107,22 @@ export async function isBusy(ctx: ToolContext, session: SessionInfo): Promise<bo
 
 // ─── Session Matching (REQ-HANDOFF-003) ────────────────────
 
+/**
+ * Der Workspace, in dem ein MCP-Aufruf sucht und startet.
+ *
+ * Eine gebundene Verbindung bleibt in ihrem Workspace. Eine ungebundene hat
+ * keine Vorliebe und bekommt den, den der User offen hat — wie ein Start aus
+ * der Oberflaeche. Bis 0.13.0 erbte sie "ungebunden": eine Ordner-Session ohne
+ * Workspace startete den Workshop ausserhalb des Workspace, in dem der User
+ * sass (Entscheidung 2026-10-16).
+ *
+ * Suche und Start muessen dieselbe Antwort sehen, sonst findet die naechste
+ * Uebergabe die eben gestartete Instanz nicht und startet eine zweite.
+ */
+export function callerWorkspace(ctx: ToolContext): string | null {
+  return ctx.workspaceId ?? ctx.getActiveWorkspaceId?.() ?? null
+}
+
 interface SessionCandidate {
   session: SessionInfo
   visible: boolean
@@ -127,7 +143,7 @@ export async function findBestSession(
   const entitySessions = findEntitySessions(
     ctx.sessionManager.list(),
     entityId,
-    ctx.workspaceId ?? null,
+    callerWorkspace(ctx),
   )
 
   if (entitySessions.length === 0) return null
@@ -199,7 +215,7 @@ export async function startEntitySession(
 ): Promise<SessionInfo> {
   const session = await ctx.sessionManager.startEntity(entityId, {
     name: opts?.name ?? entityId,
-    workspaceId: ctx.workspaceId ?? null,
+    workspaceId: callerWorkspace(ctx),
     ...(opts?.projectPath ? { projectPath: opts.projectPath } : {}),
   })
 

@@ -159,7 +159,12 @@ export class McpServerManager {
     // otherwise provide. The role decides which tools get registered at all,
     // which is the only way to actually withhold one: a missing entry in a
     // permission list merely produces an approval prompt.
-    registerTools(mcpServer, { ...this.toolCtx!, workspaceId, entityId })
+    registerTools(mcpServer, {
+      ...this.toolCtx!,
+      workspaceId,
+      entityId,
+      getActiveWorkspaceId: () => configStore.get('activeWorkspaceId') ?? null,
+    })
 
     const sessionId = randomUUID()
 

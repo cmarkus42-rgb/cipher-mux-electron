@@ -44,7 +44,7 @@ via `command`, filed as `claude-code`, without model injection or usage plugin.
 | `projectPath` | string | yes | Working directory |
 | `adapter` | enum | no | `claude-code` (default), `opencode` or `codex` |
 | `model` | string | no | Passed through to the adapter unchanged (`opus`, `anthropic/claude-opus-5-5`, …) |
-| `workspaceId` | string \| null | no | Omitted = the caller's workspace, `null` = unbound, unknown ID = error |
+| `workspaceId` | string \| null | no | Omitted = the caller's workspace — an unbound caller gets the workspace the user has open; `null` = unbound, unknown ID = error |
 | `command` | string | no | Run this instead of the adapter launch — also pass `adapter`, or the session is filed under the default CLI |
 | `visible` | boolean | no | If true, place session in the grid with focus |
 | `shellOnly` | boolean | no | Plain shell, no CLI |
@@ -85,6 +85,8 @@ reader.
 ### `mux_entity_start`
 Start an entity session — the same code path as the preset button in the UI. Use this for
 Workshop, Cyber Factory, Refinement, Ideation Partner, Testing Assistant, Debugger, Audit.
+The role starts in the caller's workspace; an unbound caller starts it in the workspace the user
+has open (until 0.13.0 it stayed unbound). Handoffs search for a running instance the same way.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|

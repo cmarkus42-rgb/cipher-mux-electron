@@ -14,7 +14,7 @@ import type { NoteSearchIndex } from '../notes/note-search-index'
 import type { MemoryStore } from '../companion/memory-store'
 import type { TagClassRepo } from '../notes/tag-repository'
 import { IPC } from '../../shared/ipc-channels'
-import { registerAllHandoffTools, executeHandoff } from './handoff-kernel'
+import { registerAllHandoffTools, executeHandoff, callerWorkspace } from './handoff-kernel'
 import { resolveAnchorCommit } from '../notes/handoff-delta'
 import { mayUseCompanionMemory, mayUseLocalWorkerDispatch } from './entity-header'
 import { registerLocalFactoryTool } from './local-factory-tool'
@@ -60,6 +60,11 @@ export interface ToolContext {
    * configStore at call time, which is the whole point.
    */
   workspaceId?: string | null
+  /**
+   * The workspace the user has open, read at call time. Only for callers
+   * without a binding of their own — see `callerWorkspace` in handoff-kernel.
+   */
+  getActiveWorkspaceId?: () => string | null
   /**
    * Role this connection belongs to, bound once at initialize from the
    * X-Mux-Entity header. null = no role (the app's own tooling, a plain
@@ -306,7 +311,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         + 'adapter picks the CLI (claude-code | opencode | codex, default claude-code); the launch '
         + 'line, MCP wiring, model and usage tracking all come from that adapter. model is passed '
         + 'through as is (e.g. "opus" for Claude Code, "anthropic/claude-opus-5-5" for opencode). '
-        + 'workspaceId: omitted = your own workspace, null = no workspace. '
+        + 'workspaceId: omitted = your own workspace (if you have none, the one the user has open), null = no workspace. '
         + 'shellOnly: true opens a plain terminal; command replaces the launch entirely — then name '
         + 'the adapter too, or the session is filed under the default CLI.',
       inputSchema: {
@@ -318,7 +323,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         shellOnly: z.boolean().optional().describe('If true, open plain shell without an agent CLI'),
         resume: z.boolean().optional().describe('If true, resume the most recent conversation of the directory'),
         model: z.string().optional().describe('Model for the CLI, passed through unchanged'),
-        workspaceId: z.string().nullable().optional().describe('Workspace ID; omitted = caller workspace, null = unbound'),
+        workspaceId: z.string().nullable().optional().describe('Workspace ID; omitted = caller workspace, else the open one; null = unbound'),
         subProjektId: z.string().optional().describe('Cyber Factory SubProjekt ID — auto-resolves model from SubProjekt if no explicit model given'),
       },
     },
@@ -342,7 +347,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         }
 
         const session = await ctx.sessionManager.start(
-          buildCreateSessionOpts({ ...args, model: effectiveModel }, ctx.workspaceId),
+          buildCreateSessionOpts({ ...args, model: effectiveModel }, callerWorkspace(ctx)),
         )
 
         if (args.visible && ctx.windowManager) {
