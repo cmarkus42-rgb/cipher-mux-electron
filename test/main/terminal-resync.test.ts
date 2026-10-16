@@ -114,7 +114,7 @@ describe('die Aufrufstellen geben die Tiefe mit', () => {
     const file = path.join(__dirname, '../../src/renderer/hooks/useTerminal.ts')
     const src = readFileSync(file, 'utf-8')
     const calls = [...src.matchAll(/terminal\.snapshot\(([^)]*)\)/g)]
-    assert.ok(calls.length >= 2, `erwartet: mindestens zwei Aufrufe, waren ${calls.length}`)
+    assert.ok(calls.length >= 1, `erwartet: mindestens ein Aufruf, waren ${calls.length}`)
     for (const [ganz, args] of calls) {
       assert.match(
         args,
@@ -254,5 +254,32 @@ describe('capture-pane, Scrollback und reine Hoehenaenderung', { skip: tmuxAvail
     resize(SHORT_ROWS)
     execFileSync('sh', ['-c', 'sleep 0.5'])
     assert.equal(zaehle(), LONG_LINE_LENGTH, 'nach dem Zurueckstellen')
+  })
+})
+
+describe('der Neuaufbau laeuft in Reihenfolge mit dem Livestream', () => {
+  // Bis zum 2026-10-16 schrieb der Livestream waehrend des Neuaufbaus ungebremst
+  // ins Terminal; Reste im Eingabefeld von Claude Code waren die Folge. Die
+  // Reihenfolge selbst prueft `tmux-snapshot-order.test.ts` gegen echtes tmux und
+  // `terminal-stream-gate.test.ts` am Tor. Hier steht nur die Verdrahtung im Hook,
+  // die sich ohne DOM nicht ausfuehren laesst.
+  // Ohne Kommentarzeilen — die nennen `term.reset()` in der Begruendung.
+  const src = readFileSync(path.join(__dirname, '../../src/renderer/hooks/useTerminal.ts'), 'utf-8')
+    .split('\n')
+    .filter((z) => !/^\s*(\/\/|\*|\/\*)/.test(z))
+    .join('\n')
+
+  it('der Livestream geht durch das Tor, nicht direkt ins Terminal', () => {
+    assert.match(src, /gate\.data\(payload\.seq, payload\.data\)/)
+    assert.doesNotMatch(src, /term\.write\(payload\.data\)/)
+  })
+
+  it('term.reset() steht nur im Neuaufbau, und der wartet vorher auf xterms Schreibpuffer', () => {
+    const resets = [...src.matchAll(/term\.reset\(\)/g)]
+    assert.equal(resets.length, 1, `term.reset() an ${resets.length} Stellen — jeder Neuaufbau muss durch rebuildFromTmux`)
+    const i = src.indexOf('const rebuildFromTmux')
+    const j = src.indexOf('term.reset()')
+    assert.ok(i !== -1 && j > i, 'term.reset() liegt ausserhalb von rebuildFromTmux')
+    assert.match(src.slice(i, j), /term\.write\('', \(\) =>/, 'vor dem Zuruecksetzen fehlt das Leerschreiben, das xterms Puffer abwartet')
   })
 })

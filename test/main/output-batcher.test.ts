@@ -107,4 +107,16 @@ describe('OutputBatcher', () => {
     // if we got this far, the import at the top of this file succeeded.
     assert.ok(OutputBatcher, 'OutputBatcher class should be importable')
   })
+  it('flushPane leert nur den genannten Pane', () => {
+    batcher.push('pane-1', 'a')
+    batcher.push('pane-2', 'b')
+    batcher.flushPane('pane-1')
+    assert.deepEqual(flushed, [{ paneId: 'pane-1', data: 'a' }])
+    assert.equal(batcher.pendingCount, 1)
+  })
+
+  it('flushPane ohne Daten ruft nichts auf', () => {
+    batcher.flushPane('pane-1')
+    assert.equal(flushed.length, 0)
+  })
 })

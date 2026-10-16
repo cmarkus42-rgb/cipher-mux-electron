@@ -9,7 +9,7 @@ import type { ThemeName } from '../../shared/grid-types'
 import type { TerminalThemeColors } from '../../shared/terminal-theme'
 import { registerTerminal, unregisterTerminal, setMarker, clearAllTextureAtlases } from '../terminal-registry'
 import { getTerminalFontSize } from '../a11y/terminal-font-size'
-import { RESYNC_SCROLLBACK_LINES, needsReflowResync, buildRestoreSequence } from '../../shared/terminal-resync'
+import { RESYNC_SCROLLBACK_LINES, needsReflowResync, buildRestoreSequence, StreamGate } from '../../shared/terminal-resync'
 
 const api = () => window.cipherMux
 
@@ -90,6 +90,14 @@ const MIN_FIT_DIMENSION = 50
 /** Debounce interval (ms) for fit() calls — coalesces rapid ResizeObserver / window resize events. */
 const FIT_DEBOUNCE_MS = 150
 
+/**
+ * Spaetestens dann gibt ein Neuaufbau den angehaltenen Livestream wieder frei,
+ * auch wenn der Schnappschuss nicht kommt. Ueber der Frist des Main-Prozesses
+ * (`SNAPSHOT_WATCHER_TIMEOUT_MS`, 2 s, danach der getrennte Aufruf) — ein
+ * eingefrorenes Terminal waere schlimmer als ein ungeordneter Neuaufbau.
+ */
+const REBUILD_RELEASE_MS = 4000
+
 export interface UseTerminalResult {
   terminalRef: preact.RefObject<HTMLDivElement>
   fit: () => void
@@ -123,6 +131,63 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
   const resyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   /** Last cols/rows sent to tmux — skip IPC if unchanged. */
   const lastSizeRef = useRef<{ cols: number; rows: number }>({ cols: 0, rows: 0 })
+  /** Haelt den Livestream an, solange ein Neuaufbau aus tmux laeuft. */
+  const gateRef = useRef<StreamGate | null>(null)
+
+  /**
+   * Das Terminal aus einem tmux-Schnappschuss neu aufbauen — **in Reihenfolge mit
+   * dem Livestream**. Einziger Weg dafuer; Resync und Restore beim Mount gehen
+   * beide hier durch.
+   *
+   * Bis zum 2026-10-16 schrieb der Livestream waehrend des Neuaufbaus ungebremst
+   * weiter, und was danach kam, konnte schon im Schnappschuss stecken oder fehlen.
+   * Claude Code malt relativ zum Cursor; ein doppelter oder fehlender Zug liess
+   * Zeilen im Eingabefeld stehen, die tmux laengst geloescht hatte. Jetzt:
+   *
+   * 1. Livestream anhalten (`StreamGate.hold`), dann Schnappschuss holen — er
+   *    traegt die Nummer des letzten Stuecks, das in ihm steckt.
+   * 2. Abwarten, bis xterm alles vor dem Anhalten Geschriebene verarbeitet hat.
+   *    **`term.reset()` leert xterms Schreibpuffer nicht** (xterm 5.5.0,
+   *    `CoreTerminal.reset`): ein noch wartendes Stueck liefe sonst nach dem
+   *    Zuruecksetzen auf den leeren Bildschirm und verschoebe den Cursor, bevor
+   *    der Schnappschuss kommt.
+   * 3. Zuruecksetzen, Schnappschuss schreiben, dann nur die Stuecke danach.
+   *
+   * `after` laeuft, wenn der Schnappschuss geschrieben ist; `ifEmpty`, wenn tmux
+   * nichts geliefert hat (dann bleibt der Puffer, wie er ist).
+   */
+  const rebuildFromTmux = useCallback((after: () => void, ifEmpty?: () => void) => {
+    const term = termRef.current
+    const gate = gateRef.current
+    if (!term || !gate) return
+    const token = gate.hold()
+    const safety = setTimeout(() => gate.release(token), REBUILD_RELEASE_MS)
+    api().terminal.snapshot(sessionId, RESYNC_SCROLLBACK_LINES).then((snap) => {
+      if (termRef.current !== term) return
+      term.write('', () => {
+        clearTimeout(safety)
+        if (termRef.current !== term || !gate.isCurrent(token)) return
+        if (snap.content.trim()) {
+          gate.release(token, {
+            seq: snap.seq,
+            rewrite: () => {
+              term.reset()
+              // Mit Cursor und ungekuerzt -- sonst malt Claude Code den naechsten Zug
+              // zu tief, siehe `buildRestoreSequence`.
+              term.write(buildRestoreSequence(snap), after)
+            },
+          })
+        } else {
+          gate.release(token)
+          ifEmpty?.()
+        }
+      })
+    }).catch(() => {
+      // session may not be ready
+      clearTimeout(safety)
+      gate.release(token)
+    })
+  }, [sessionId])
 
   /**
    * Re-sync xterm.js buffer with tmux's actual pane content via capture-pane.
@@ -148,49 +213,41 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       const wasAtBottom = buf.viewportY >= buf.baseY
       const savedViewportY = buf.viewportY
 
-      api().terminal.snapshot(sessionId, RESYNC_SCROLLBACK_LINES).then((snap) => {
-        if (!term || !termRef.current) return
-        if (snap.content.trim()) {
-          term.reset()
-          // Mit Cursor und ungekuerzt -- sonst malt Claude Code den naechsten Zug
-          // zu tief, siehe `buildRestoreSequence`.
-          term.write(buildRestoreSequence(snap), () => {
-            // T-BF.1: Restore scroll position instead of always jumping to bottom
-            if (wasAtBottom) {
-              term.scrollToBottom()
-            } else {
-              const newBuf = term.buffer.active
-              term.scrollToLine(Math.min(savedViewportY, newBuf.baseY))
-            }
-            try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
-
-            // T-BF.2: Re-fit after content write — scrollbar may have appeared/
-            // disappeared, changing available viewport width. Without this, cols
-            // calculated pre-write can be too wide, clipping the right edge.
-            const fitAddon = fitAddonRef.current
-            if (fitAddon) {
-              try {
-                fitAddon.fit()
-                const { cols, rows } = term
-                const last = lastSizeRef.current
-                if (cols !== last.cols || rows !== last.rows) {
-                  lastSizeRef.current = { cols, rows }
-                  // Bewusst **ohne** Resync: wir stehen gerade in einem. Ein zweiter
-                  // direkt hinterher wuerde den Puffer erneut neu schreiben.
-                  void api().terminal.resize(sessionId, cols, rows).catch(() => { /* ignore */ })
-                }
-              } catch { /* ignore */ }
-            }
-          })
+      rebuildFromTmux(() => {
+        // T-BF.1: Restore scroll position instead of always jumping to bottom
+        if (wasAtBottom) {
+          term.scrollToBottom()
+        } else {
+          const newBuf = term.buffer.active
+          term.scrollToLine(Math.min(savedViewportY, newBuf.baseY))
         }
-      }).catch(() => { /* session may not be ready */ })
+        try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
+
+        // T-BF.2: Re-fit after content write — scrollbar may have appeared/
+        // disappeared, changing available viewport width. Without this, cols
+        // calculated pre-write can be too wide, clipping the right edge.
+        const fitAddon = fitAddonRef.current
+        if (fitAddon) {
+          try {
+            fitAddon.fit()
+            const { cols, rows } = term
+            const last = lastSizeRef.current
+            if (cols !== last.cols || rows !== last.rows) {
+              lastSizeRef.current = { cols, rows }
+              // Bewusst **ohne** Resync: wir stehen gerade in einem. Ein zweiter
+              // direkt hinterher wuerde den Puffer erneut neu schreiben.
+              void api().terminal.resize(sessionId, cols, rows).catch(() => { /* ignore */ })
+            }
+          } catch { /* ignore */ }
+        }
+      })
       // Die 200 ms sind seit dem 2026-10-02 **nur noch Zusammenfassung**, keine
       // Schaetzung mehr: der Aufrufer wartet den Resize ab, bevor er hierher kommt
       // (`resized.finally`). Gebraucht wird der Timer dafuer, mehrere Resizes in
       // schneller Folge -- Ziehen am Fenster, Focus Mode, Zellen-Merge -- zu einem
       // Resync zusammenzufassen; jeder Aufruf raeumt den vorigen weg.
     }, 200)
-  }, [sessionId])
+  }, [sessionId, rebuildFromTmux])
 
   /**
    * Core fit-and-sync: runs fitAddon.fit(), syncs tmux resize-pane if
@@ -337,6 +394,8 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
 
     termRef.current = term
     fitAddonRef.current = fitAddon
+    const gate = new StreamGate((data) => term.write(data))
+    gateRef.current = gate
     registerTerminal(sessionId, term)
 
     // **Den Glyphen-Atlas nach dem Aufbau einmal verwerfen.**
@@ -524,23 +583,16 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
             // 2026-10-02 nach dem App-Start ueberhaupt keine Historie, weil hier
             // derselbe sichtbare Bereich in einen zuruckgesetzten Puffer geschrieben
             // wurde wie im Resync.
-            api().terminal.snapshot(sessionId, RESYNC_SCROLLBACK_LINES).then((snap) => {
-              if (snap.content.trim() && term) {
-                term.reset()
-                term.write(buildRestoreSequence(snap), () => {
-                  term.scrollToBottom()
-                  try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
-                  // Final fit to catch any dimension drift
-                  fitAndSync()
-                  requestAnimationFrame(() => fitAndSync())
-                })
-              } else {
-                try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
-                fitAndSync()
-                requestAnimationFrame(() => fitAndSync())
-              }
-            }).catch(() => {
-              // session may not be ready yet
+            rebuildFromTmux(() => {
+              term.scrollToBottom()
+              try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
+              // Final fit to catch any dimension drift
+              fitAndSync()
+              requestAnimationFrame(() => fitAndSync())
+            }, () => {
+              try { term.refresh(0, term.rows - 1) } catch { /* ignore */ }
+              fitAndSync()
+              requestAnimationFrame(() => fitAndSync())
             })
           }, 300)
         }, 300)
@@ -556,9 +608,11 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
 
     // Receive output from main process
     const unsubscribe = api().terminal.onData(
-      (payload: { paneId: string; data: string }) => {
+      (payload: { paneId: string; data: string; seq?: number }) => {
         if (payload.paneId === sessionId) {
-          term.write(payload.data)
+          // Durch das Tor: waehrend eines Neuaufbaus gesammelt, danach ohne das,
+          // was schon im Schnappschuss steckt (`rebuildFromTmux`).
+          gate.data(payload.seq, payload.data)
         }
       }
     )
@@ -579,6 +633,7 @@ export function useTerminal(sessionId: string, theme: ThemeName = 'cipher-ivory'
       term.dispose()
       termRef.current = null
       fitAddonRef.current = null
+      gateRef.current = null
       lastSizeRef.current = { cols: 0, rows: 0 }
     }
     // Bewusst nur `sessionId`: ein Themewechsel darf das Terminal nicht

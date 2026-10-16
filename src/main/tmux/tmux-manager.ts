@@ -4,7 +4,7 @@ import { EventEmitter } from 'events'
 import { TmuxParser, TmuxEvent } from './tmux-parser'
 import { OutputBatcher } from './output-batcher'
 import { runCommand } from '../util/exec-util'
-import { parsePaneSnapshot, type PaneSnapshot } from '../../shared/terminal-resync'
+import { parsePaneSnapshot, type SyncedSnapshot } from '../../shared/terminal-resync'
 
 export interface TmuxSessionInfo {
   id: string
@@ -17,7 +17,8 @@ export interface TmuxSessionInfo {
 }
 
 export interface TmuxManagerEvents {
-  output: (paneId: string, data: string) => void
+  /** `seq` zaehlt pro Pane hoch — siehe `snapshotPane`. */
+  output: (paneId: string, data: string, seq: number) => void
   'sessions-changed': () => void
   'session-changed': (sessionId: string, name: string) => void
   exit: (reason: string) => void
@@ -44,6 +45,30 @@ export interface TmuxManagerEvents {
  */
 export const PTY_CHUNK_BYTES = 400
 export const PTY_CHUNK_PAUSE_MS = 40
+
+/**
+ * Wie lange ein Schnappschuss ueber die Watcher-Verbindung hoechstens dauern darf,
+ * bevor auf den getrennten `tmux`-Aufruf ausgewichen wird. Gemessen sind es
+ * wenige Millisekunden; die Frist ist nur der Boden unter einem haengenden
+ * Watcher, damit der Renderer seinen angehaltenen Livestream wieder freigibt.
+ */
+export const SNAPSHOT_WATCHER_TIMEOUT_MS = 2000
+
+/** Zustand eines Watchers fuer Schnappschuesse, die ueber ihn laufen. */
+interface WatcherSnapState {
+  /** Der gerade offene Antwortblock — nur unsere eigenen (flags 1) zaehlen. */
+  block: { lines: string[]; flags: number } | null
+  /** Nach der `SNAP`-Zeile: fuer welchen Auftrag der naechste Block der Inhalt ist. */
+  expect: { id: number; cursor: string } | null
+  waiters: Map<number, { resolve: (s: SyncedSnapshot) => void; reject: (e: Error) => void }>
+}
+
+interface OutputWatcher {
+  process: ChildProcess
+  parser: TmuxParser
+  emitId: string
+  snap: WatcherSnapState
+}
 
 /**
  * Split text into pieces of at most `maxBytes`, never cutting a character.
@@ -87,13 +112,18 @@ export class TmuxManager extends EventEmitter {
     reject: (err: Error) => void
     buffer: string[]
   }> = new Map()
-  private outputWatchers: Map<string, { process: ChildProcess; parser: TmuxParser }> = new Map()
+  private outputWatchers: Map<string, OutputWatcher> = new Map()
+  /** Laufende Nummer der ausgegebenen Stuecke, pro Pane bzw. Session-ULID. */
+  private outputSeq: Map<string, number> = new Map()
+  private snapCounter = 0
 
   constructor() {
     super()
     this.parser = new TmuxParser()
     this.batcher = new OutputBatcher((paneId, data) => {
-      this.emit('output', paneId, data)
+      const seq = (this.outputSeq.get(paneId) ?? 0) + 1
+      this.outputSeq.set(paneId, seq)
+      this.emit('output', paneId, data, seq)
     })
 
     this.parser.onEvent((event: TmuxEvent) => {
@@ -193,10 +223,27 @@ export class TmuxManager extends EventEmitter {
 
     const sessionParser = new TmuxParser()
     const sessionDecoder = new StringDecoder('utf-8')
+    const snap: WatcherSnapState = { block: null, expect: null, waiters: new Map() }
     sessionParser.onEvent((event: TmuxEvent) => {
-      if (event.type === 'output') {
-        // Remap tmux pane ID → session ULID for renderer matching
-        this.batcher.push(emitId, event.data)
+      switch (event.type) {
+        case 'output':
+          // Remap tmux pane ID → session ULID for renderer matching
+          this.batcher.push(emitId, event.data)
+          break
+        case 'begin':
+          snap.block = { lines: [], flags: event.flags }
+          break
+        case 'block-line':
+          snap.block?.lines.push(event.text)
+          break
+        case 'end':
+        case 'error': {
+          const block = snap.block
+          snap.block = null
+          // flags 0 ist die Antwort auf das `attach-session` selbst, nicht unsere.
+          if (block && block.flags === 1) this.onWatcherBlock(snap, emitId, block.lines, event.type === 'error')
+          break
+        }
       }
     })
 
@@ -210,9 +257,11 @@ export class TmuxManager extends EventEmitter {
 
     proc.on('exit', () => {
       this.outputWatchers.delete(sessionName)
+      for (const w of snap.waiters.values()) w.reject(new Error('Watcher beendet'))
+      snap.waiters.clear()
     })
 
-    this.outputWatchers.set(sessionName, { process: proc, parser: sessionParser })
+    this.outputWatchers.set(sessionName, { process: proc, parser: sessionParser, emitId, snap })
   }
 
   /**
@@ -454,19 +503,92 @@ export class TmuxManager extends EventEmitter {
 
   /**
    * Schnappschuss fuer den Neuaufbau im Renderer: Inhalt **ungekuerzt** plus
-   * Cursorposition, in **einem** tmux-Aufruf — dazwischen kann also keine
-   * Ausgabe den Cursor verschieben. Flags wie `capturePane` (`-J` siehe dort).
-   * Warum Cursor und leere Zeilen zaehlen: `shared/terminal-resync.ts`.
+   * Cursorposition, dazu `seq` — die Nummer des letzten Ausgabestuecks, das schon
+   * im Schnappschuss steckt. Flags wie `capturePane` (`-J` siehe dort). Warum
+   * Cursor und leere Zeilen zaehlen: `shared/terminal-resync.ts`.
+   *
+   * **Ueber die Watcher-Verbindung, nicht ueber einen eigenen `tmux`-Aufruf.**
+   * Bis zum 2026-10-16 lief der Schnappschuss getrennt vom Livestream, und es gab
+   * keine Reihenfolge zwischen beiden: was der Renderer nach dem Neuaufbau noch an
+   * Ausgabe bekam, konnte schon im Schnappschuss stecken (doppelt) oder fehlen.
+   * Ergebnis waren Zeilen im Eingabefeld von Claude Code, die tmux laengst
+   * geloescht hatte. Im Control-Mode schreibt tmux Ausgabe und Befehlsantworten
+   * in **einen** Strom, in der Reihenfolge, in der es sie verarbeitet — alles vor
+   * dem `%begin` ist im Schnappschuss, alles danach nicht. Gemessen gegen
+   * tmux 3.7c: `a ; b` ergibt zwei Bloecke mit flags 1, leere Zeilen und
+   * Escape-Sequenzen kommen roh.
+   *
+   * Ohne Watcher (oder wenn er nicht antwortet) faellt es auf den getrennten
+   * Aufruf zurueck — mit der alten, ungeordneten Naht, aber besser als nichts.
+   *
+   * @param watchKey Name der tmux-Session, unter dem der Watcher laeuft.
    */
-  async snapshotPane(target: string, lines?: number): Promise<PaneSnapshot> {
+  async snapshotPane(target: string, lines?: number, watchKey?: string): Promise<SyncedSnapshot> {
     const capture = ['capture-pane', '-t', target, '-p', '-e', '-J']
     if (lines) capture.push('-S', String(-lines))
+
+    const watcher = watchKey ? this.outputWatchers.get(watchKey) : undefined
+    if (watcher?.process.stdin?.writable) {
+      try {
+        return await this.snapshotViaWatcher(watcher, target, capture)
+      } catch (err) {
+        console.warn(`[TmuxManager] Schnappschuss ueber Watcher fehlgeschlagen (${target}), weiche aus:`, err)
+      }
+    }
+
+    if (watcher) this.batcher.flushPane(watcher.emitId)
+    const seq = watcher ? (this.outputSeq.get(watcher.emitId) ?? 0) : 0
     const raw = await runCommand(
       'tmux',
       ['display-message', '-t', target, '-p', '#{cursor_x} #{cursor_y}', ';', ...capture],
       { trim: false },
     )
-    return parsePaneSnapshot(raw)
+    return { ...parsePaneSnapshot(raw), seq }
+  }
+
+  private snapshotViaWatcher(watcher: OutputWatcher, target: string, capture: string[]): Promise<SyncedSnapshot> {
+    const id = ++this.snapCounter
+    return new Promise<SyncedSnapshot>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        watcher.snap.waiters.delete(id)
+        reject(new Error(`keine Antwort nach ${SNAPSHOT_WATCHER_TIMEOUT_MS} ms`))
+      }, SNAPSHOT_WATCHER_TIMEOUT_MS)
+      watcher.snap.waiters.set(id, {
+        resolve: (s) => { clearTimeout(timer); resolve(s) },
+        reject: (e) => { clearTimeout(timer); reject(e) },
+      })
+      // target ist unser eigener Name (`cmux-…`) oder eine Pane-ID (`%N`) — ohne
+      // Leer- oder Anfuehrungszeichen, darf also roh in die Befehlszeile.
+      watcher.process.stdin!.write(
+        `display-message -t ${target} -p 'SNAP ${id} #{cursor_x} #{cursor_y}' ; ${capture.join(' ')}\n`,
+      )
+    })
+  }
+
+  /**
+   * Eine eigene Befehlsantwort auf der Watcher-Verbindung. Der erste Block traegt
+   * `SNAP <id> <x> <y>`, der naechste ist der Inhalt dazu. Die Nummer wird erst
+   * genannt, nachdem alles vorher Angekommene aus dem Batcher hinaus ist.
+   */
+  private onWatcherBlock(snap: WatcherSnapState, emitId: string, lines: string[], failed: boolean): void {
+    const head = /^SNAP (\d+) (.*)$/.exec(lines[0] ?? '')
+    if (head && !failed) {
+      snap.expect = { id: Number(head[1]), cursor: head[2] }
+      return
+    }
+    const expect = snap.expect
+    snap.expect = null
+    if (!expect) return
+    const waiter = snap.waiters.get(expect.id)
+    if (!waiter) return
+    snap.waiters.delete(expect.id)
+    if (failed) {
+      waiter.reject(new Error(`capture-pane: ${lines.join(' ')}`))
+      return
+    }
+    this.batcher.flushPane(emitId)
+    const raw = `${expect.cursor}\n${lines.map((l) => `${l}\n`).join('')}`
+    waiter.resolve({ ...parsePaneSnapshot(raw), seq: this.outputSeq.get(emitId) ?? 0 })
   }
 
   /**

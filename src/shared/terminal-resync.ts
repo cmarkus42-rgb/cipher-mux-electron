@@ -114,3 +114,88 @@ export function buildRestoreSequence(s: PaneSnapshot): string {
   const body = s.content.split('\n').join('\r\n')
   return `${body}\x1b[0m\x1b[${s.cursorY + 1};${s.cursorX + 1}H`
 }
+
+/**
+ * Ein Schnappschuss mit seiner Stelle im Livestream: `seq` ist die Nummer des
+ * letzten Ausgabestuecks, das **schon im Schnappschuss steckt**. Alles mit einer
+ * groesseren Nummer kam danach und gehoert obendrauf, alles mit einer kleineren
+ * oder gleichen darf nicht noch einmal geschrieben werden.
+ */
+export interface SyncedSnapshot extends PaneSnapshot {
+  seq: number
+}
+
+/**
+ * Haelt den Livestream an, waehrend ein Terminal aus einem Schnappschuss neu
+ * aufgebaut wird, und setzt ihn an der richtigen Stelle fort.
+ *
+ * **Warum es das braucht** (2026-10-16): Neben dem Eingabefeld von Claude Code
+ * blieben Zeilen stehen, die tmux laengst geloescht hatte — `capture-pane` zeigte
+ * zur selben Zeit ein leeres Feld. Der Neuaufbau nach einem Resize lief so:
+ * Schnappschuss holen, `term.reset()`, Schnappschuss schreiben. Die laufende
+ * Ausgabe schrieb dabei ungebremst weiter, und zwischen Schnappschuss und Strom
+ * gab es keine Reihenfolge. Ein Stueck, das schon im Schnappschuss steckte, wurde
+ * danach noch einmal angewendet, oder eines dazwischen ging verloren. Claude Code
+ * malt relativ zum Cursor („n Zeilen hoch, loeschen, neu schreiben“) — ein
+ * einziger doppelter oder fehlender Zug, und die Reste bleiben stehen.
+ *
+ * Der Ablauf mit dem Tor:
+ *
+ * 1. `hold()` vor dem Schnappschuss: ab jetzt wird gesammelt statt geschrieben.
+ * 2. `release(token, cut)` mit dem Schnappschuss: `cut.rewrite()` setzt das
+ *    Terminal neu auf, danach folgt nur, was **nach** `cut.seq` kam. Stuecke bis
+ *    `cut.seq`, die spaeter noch eintreffen, werden verworfen.
+ * 3. `release(token)` ohne Schnitt (leerer Schnappschuss, Fehler, Frist): das
+ *    Gesammelte wird geschrieben wie vorher, nichts verworfen.
+ *
+ * Ueberlappen sich zwei Neuaufbauten, gilt nur der juengste. Ein aelteres
+ * `release` wird ignoriert — das juengere kommt noch und gibt frei.
+ */
+export class StreamGate {
+  private pending: Array<{ seq: number; data: string }> | null = null
+  private token = 0
+  private dropUpTo = -Infinity
+
+  constructor(private readonly write: (data: string) => void) {}
+
+  /** Ein Ausgabestueck aus dem Livestream. Ohne Nummer gilt es als neu. */
+  data(seq: number | undefined, data: string): void {
+    const s = seq ?? Infinity
+    if (s <= this.dropUpTo) return
+    if (this.pending) {
+      this.pending.push({ seq: s, data })
+      return
+    }
+    this.write(data)
+  }
+
+  /** Ab jetzt sammeln. Gibt das Zeichen zurueck, mit dem freigegeben wird. */
+  hold(): number {
+    if (!this.pending) this.pending = []
+    return ++this.token
+  }
+
+  /** Ist `token` noch der juengste Neuaufbau? */
+  isCurrent(token: number): boolean {
+    return token === this.token && this.pending !== null
+  }
+
+  /**
+   * Freigeben. Mit `cut`: neu aufsetzen, dann nur Stuecke nach `cut.seq`.
+   * Ohne: alles Gesammelte schreiben. Gibt `false` zurueck, wenn `token` nicht
+   * mehr der juengste ist — dann ist nichts passiert.
+   */
+  release(token: number, cut?: { seq: number; rewrite: () => void }): boolean {
+    if (!this.isCurrent(token)) return false
+    const held = this.pending!
+    this.pending = null
+    if (cut) {
+      cut.rewrite()
+      this.dropUpTo = Math.max(this.dropUpTo, cut.seq)
+    }
+    for (const p of held) {
+      if (p.seq > this.dropUpTo) this.write(p.data)
+    }
+    return true
+  }
+}

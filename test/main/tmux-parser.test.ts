@@ -335,7 +335,7 @@ describe('TmuxParser', () => {
 
     parser.feed('nse-data\n%end 100 1 0\n');
     assert.equal(events.length, 3);
-    assert.equal(events[1].type, 'unknown'); // response body line
+    assert.equal(events[1].type, 'block-line'); // response body line, roh durchgereicht
     assert.equal(events[2].type, 'end');
   });
 
@@ -460,5 +460,44 @@ describe('StringDecoder chunk boundary safety', () => {
     const safe1 = decoder.write(aBuf.subarray(0, 1));
     const safe2 = decoder.write(aBuf.subarray(1));
     assert.equal(safe1 + safe2, 'ä'); // CORRECT
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TmuxParser — Befehlsantworten (%begin … %end)
+// ---------------------------------------------------------------------------
+
+describe('TmuxParser — Antwortblock', () => {
+  function collect(input: string): TmuxEvent[] {
+    const parser = new TmuxParser();
+    const events: TmuxEvent[] = [];
+    parser.onEvent((e) => events.push(e));
+    parser.feed(input);
+    return events;
+  }
+
+  it('reicht leere Zeilen im Block durch — sie sind Bildschirminhalt', () => {
+    const ev = collect('%begin 1 7 1\nrot\n\n\nende\n%end 1 7 1\n');
+    const lines = ev.filter((e) => e.type === 'block-line').map((e) => (e as { text: string }).text);
+    assert.deepEqual(lines, ['rot', '', '', 'ende']);
+    assert.equal(ev[ev.length - 1].type, 'end');
+  });
+
+  it('eine Zeile mit % im Block ist Inhalt, keine Benachrichtigung', () => {
+    const ev = collect('%begin 1 7 1\n%output %1 nein\n%end 1 8 1\n%end 1 7 1\n');
+    assert.deepEqual(
+      ev.map((e) => e.type),
+      ['begin', 'block-line', 'block-line', 'end'],
+    );
+  });
+
+  it('nach dem Block wird wieder normal geparst', () => {
+    const ev = collect('%begin 1 7 1\nx\n%end 1 7 1\n%output %1 hallo\n');
+    assert.equal(ev[ev.length - 1].type, 'output');
+  });
+
+  it('schliesst auch mit %error', () => {
+    const ev = collect('%begin 1 7 1\nfehler\n%error 1 7 1\n\n');
+    assert.deepEqual(ev.map((e) => e.type), ['begin', 'block-line', 'error']);
   });
 });

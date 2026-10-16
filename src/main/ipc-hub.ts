@@ -656,15 +656,17 @@ export class IpcHub {
       // (VoiceOutputRouter disabled — voice-relay uses mux_tts_speak directly)
     })
 
-    this.tmux.on('output', (paneId: string, data: string) => {
-      // Route terminal data to detached window if session is detached, else mainWindow
+    this.tmux.on('output', (paneId: string, data: string, seq: number) => {
+      // Route terminal data to detached window if session is detached, else mainWindow.
+      // `seq` braucht der Renderer, um nach einem Neuaufbau nichts doppelt
+      // anzuwenden (`StreamGate` in shared/terminal-resync.ts).
       if (this.windowManager.isDetached?.(paneId)) {
         const detachedWin = this.windowManager.getDetachedWindow?.(paneId)
         if (detachedWin && !detachedWin.isDestroyed()) {
-          detachedWin.webContents.send(IPC.TERMINAL_DATA, { paneId, data })
+          detachedWin.webContents.send(IPC.TERMINAL_DATA, { paneId, data, seq })
         }
       } else {
-        this.windowManager.sendToMainWindow(IPC.TERMINAL_DATA, { paneId, data })
+        this.windowManager.sendToMainWindow(IPC.TERMINAL_DATA, { paneId, data, seq })
       }
     })
 

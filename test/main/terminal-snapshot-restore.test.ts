@@ -83,7 +83,9 @@ describe('useTerminal baut über den Schnappschuss neu auf', () => {
     assert.equal([...src.matchAll(/terminal\.capture\(/g)].length, 0)
     const snaps = [...src.matchAll(/terminal\.snapshot\(/g)].length
     const builds = [...src.matchAll(/buildRestoreSequence\(/g)].length
-    assert.ok(snaps >= 2, `erwartet mindestens zwei Schnappschüsse, waren ${snaps}`)
+    // Seit dem 2026-10-16 ein einziger Weg (`rebuildFromTmux`), den Resync und
+    // Restore beim Mount beide nehmen.
+    assert.ok(snaps >= 1, `erwartet mindestens einen Schnappschuss, waren ${snaps}`)
     assert.equal(builds, snaps)
   })
 })

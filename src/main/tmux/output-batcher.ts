@@ -42,6 +42,19 @@ export class OutputBatcher {
     this.stopTimer()
   }
 
+  /**
+   * Nur diesen Pane sofort leeren. Der Schnappschuss ueber die Watcher-Verbindung
+   * braucht das: alles, was vor seiner Antwort ankam, muss mit einer Nummer
+   * hinaus sein, bevor er seine eigene Nummer nennt.
+   */
+  flushPane(paneId: string): void {
+    const data = this.buffers.get(paneId)
+    if (data === undefined) return
+    this.buffers.delete(paneId)
+    this.flushCb(paneId, data)
+    if (this.buffers.size === 0) this.stopTimer()
+  }
+
   /** Flush remaining data and stop the batcher permanently. */
   destroy(): void {
     this.flush()

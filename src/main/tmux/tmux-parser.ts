@@ -23,6 +23,8 @@ export type TmuxEvent =
   | { type: 'pane-mode-changed'; paneId: string }
   | { type: 'exit'; reason: string }
   | { type: 'layout-change'; windowId: string; layout: string }
+  /** Eine Zeile Befehlsausgabe zwischen `%begin` und `%end`, unveraendert. */
+  | { type: 'block-line'; text: string }
   | { type: 'unknown'; line: string };
 
 // ---------------------------------------------------------------------------
@@ -209,6 +211,15 @@ export type TmuxEventHandler = (event: TmuxEvent) => void;
 export class TmuxParser {
   private buffer = '';
   private handler: TmuxEventHandler | null = null;
+  /**
+   * Der offene Antwortblock, falls einer laeuft. Zwischen `%begin` und dem
+   * passenden `%end`/`%error` (gleiche Zeit, gleiche Nummer) steht Befehlsausgabe,
+   * **roh**: leere Zeilen gehoeren dazu (`capture-pane` liefert den Bildschirm samt
+   * Leerzeilen), und eine Zeile, die zufaellig mit `%` beginnt, ist Inhalt und
+   * keine Benachrichtigung. Gemessen gegen tmux 3.7c: Benachrichtigungen stehen
+   * nie innerhalb eines Blocks.
+   */
+  private block: { time: number; number: number } | null = null;
 
   /** Register a handler that will be called for each parsed event. */
   onEvent(handler: TmuxEventHandler): void {
@@ -230,8 +241,23 @@ export class TmuxParser {
     this.buffer = lines.pop()!;
 
     for (const line of lines) {
+      if (this.block) {
+        const close = parseLine(line);
+        if (
+          (close.type === 'end' || close.type === 'error') &&
+          close.time === this.block.time &&
+          close.number === this.block.number
+        ) {
+          this.block = null;
+          this.handler?.(close);
+        } else {
+          this.handler?.({ type: 'block-line', text: line });
+        }
+        continue;
+      }
       if (line.length === 0) continue;
       const event = parseLine(line);
+      if (event.type === 'begin') this.block = { time: event.time, number: event.number };
       this.handler?.(event);
     }
   }
@@ -239,5 +265,6 @@ export class TmuxParser {
   /** Reset the internal buffer. */
   reset(): void {
     this.buffer = '';
+    this.block = null;
   }
 }
