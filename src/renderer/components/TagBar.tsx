@@ -69,6 +69,28 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
   const [highlightIdx, setHighlightIdx] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
+  // Die Achsen-Reihen schweben auf Abruf über dem Editor. Offen im Fluss
+  // nahmen sie fünf Zeilen weg — bei jeder Note, auch beim blossen Lesen.
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const barRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!pickerOpen) return
+    // Kein stopPropagation im Popup (Preact-Falle) — stattdessen prüfen, ob
+    // der Klick ausserhalb der ganzen Leiste lag.
+    const onDown = (e: MouseEvent): void => {
+      if (barRef.current && !barRef.current.contains(e.target as Node)) setPickerOpen(false)
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setPickerOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [pickerOpen])
 
   // Load available tags + class data
   useEffect(() => {
@@ -284,7 +306,7 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
   }, [tags, classValues, onTagsChange])
 
   return (
-    <div class="tag-bar">
+    <div class="tag-bar" ref={barRef}>
       {/* Current tags as chips */}
       <div class="tag-bar__chips">
         {tags.map(tag => {
@@ -321,51 +343,61 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
             </span>
           )
         })}
-
-        {/* Input field */}
-        <div class="tag-bar__input-wrap">
-          <input
-            ref={inputRef}
-            class="tag-bar__input"
-            type="text"
-            value={input}
-            placeholder={tags.length >= MAX_TAGS ? 'Max erreicht' : 'klasse:wert...'}
-            disabled={tags.length >= MAX_TAGS}
-            onInput={(e) => {
-              setInput((e.target as HTMLInputElement).value)
-              setShowSuggestions(true)
-            }}
-            onFocus={() => setShowSuggestions(true)}
-            onKeyDown={handleKeyDown}
-          />
-          {showSuggestions && suggestions.length > 0 && (
-            <div ref={suggestionsRef} class="tag-bar__suggestions">
-              {classPrefix && (
-                <div class="tag-bar__suggestions-header">
-                  {classColors[classPrefix] && (
-                    <span class="tag-bar__suggestions-dot" style={{ background: classColors[classPrefix] }} />
-                  )}
-                  {classPrefix}:
-                </div>
-              )}
-              {suggestions.map((s, idx) => (
-                <div
-                  key={s.tag}
-                  class={`tag-bar__suggestion${idx === highlightIdx ? ' tag-bar__suggestion--highlighted' : ''}`}
-                  onMouseDown={(e) => { e.preventDefault(); addTag(s.tag) }}
-                  onMouseEnter={() => setHighlightIdx(idx)}
-                >
-                  {s.color && <span class="tag-bar__suggestion-dot" style={{ background: s.color }} />}
-                  {s.tag}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
+      {/* Input field — ausserhalb der scrollenden Chips, sonst schneidet deren
+          overflow die Vorschlagsliste ab */}
+      <div class="tag-bar__input-wrap">
+        <input
+          ref={inputRef}
+          class="tag-bar__input"
+          type="text"
+          value={input}
+          placeholder={tags.length >= MAX_TAGS ? 'Max erreicht' : 'klasse:wert...'}
+          disabled={tags.length >= MAX_TAGS}
+          onInput={(e) => {
+            setInput((e.target as HTMLInputElement).value)
+            setShowSuggestions(true)
+          }}
+          onFocus={() => setShowSuggestions(true)}
+          onKeyDown={handleKeyDown}
+        />
+        {showSuggestions && suggestions.length > 0 && (
+          <div ref={suggestionsRef} class="tag-bar__suggestions">
+            {classPrefix && (
+              <div class="tag-bar__suggestions-header">
+                {classColors[classPrefix] && (
+                  <span class="tag-bar__suggestions-dot" style={{ background: classColors[classPrefix] }} />
+                )}
+                {classPrefix}:
+              </div>
+            )}
+            {suggestions.map((s, idx) => (
+              <div
+                key={s.tag}
+                class={`tag-bar__suggestion${idx === highlightIdx ? ' tag-bar__suggestion--highlighted' : ''}`}
+                onMouseDown={(e) => { e.preventDefault(); addTag(s.tag) }}
+                onMouseEnter={() => setHighlightIdx(idx)}
+              >
+                {s.color && <span class="tag-bar__suggestion-dot" style={{ background: s.color }} />}
+                {s.tag}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <button
+        class={`tag-bar__picker-toggle${pickerOpen ? ' tag-bar__picker-toggle--open' : ''}`}
+        onClick={() => setPickerOpen(o => !o)}
+        title={pickerOpen ? 'Auswahl schliessen' : 'Typ, Phase, Zustand, Schwere, Bauteil wählen'}
+        aria-expanded={pickerOpen}
+      >
+        ▾
+      </button>
+
       {/* Harte Auswahl pro Zeile — kein Freitext, keine erfundenen Klassen */}
-      <div class="tag-bar__axes">
+      {pickerOpen && <div class="tag-bar__axes">
         {PICK_ROWS.map(row => {
           const values = valuesForRow(row, classValues)
           // Eine Registry-Zeile ohne Werte wird nicht gezeigt. Eine leere
@@ -396,7 +428,7 @@ export function TagBar({ tags, onTagsChange }: TagBarProps) {
             </div>
           )
         })}
-      </div>
+      </div>}
 
       {/* Warning */}
       {warning && <div class="tag-bar__warning">{warning}</div>}

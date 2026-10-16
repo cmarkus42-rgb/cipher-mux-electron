@@ -2222,24 +2222,51 @@
 /* ─── Tag Bar ─────────────────────────────────────────── */
 
 .tag-bar {
+  /* Eine Zeile. Die Achsen-Reihen schweben auf Abruf darüber (▾), statt den
+     Editor bei jeder Note um fünf Zeilen nach unten zu schieben. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: 4px var(--space-sm);
+  padding: 2px var(--space-sm);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-elevated);
   font-family: var(--font-sans);
   font-size: var(--font-size-xs);
-  flex-wrap: wrap;
-  min-height: 28px;
+  flex-wrap: nowrap;
+  min-height: 24px;
 }
 
 .tag-bar__chips {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tag-bar__chips::-webkit-scrollbar {
+  display: none;
+}
+
+.tag-bar__picker-toggle {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-dim);
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 5px;
+  cursor: pointer;
+}
+
+.tag-bar__picker-toggle:hover,
+.tag-bar__picker-toggle--open {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .tag-bar__chip {
@@ -2288,7 +2315,7 @@
 
 .tag-bar__input-wrap {
   position: relative;
-  min-width: 100px;
+  flex: 0 0 100px;
 }
 
 .tag-bar__input {
@@ -2366,11 +2393,18 @@
    Eingabe (margin-left: auto). Die Achsen tragen Beschriftungen und brauchen
    die ganze Breite. */
 .tag-bar__axes {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 90;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  width: 100%;
-  margin-top: 6px;
+  padding: 6px var(--space-sm);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.35);
 }
 
 .tag-bar__axis {
@@ -2426,10 +2460,16 @@
 }
 
 .tag-bar__warning {
-  width: 100%;
+  /* Schwebt unter der Leiste — im Fluss bräche er die eine Zeile um. */
+  position: absolute;
+  top: 100%;
+  right: var(--space-sm);
+  z-index: 91;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
   color: var(--color-warning, #fa0);
   font-size: 10px;
-  padding: 2px 0;
+  padding: 2px 6px;
 }
 
 .notes-editor-area {
