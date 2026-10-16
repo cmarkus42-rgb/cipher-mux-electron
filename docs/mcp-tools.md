@@ -33,19 +33,22 @@ List all cipher-mux sessions.
 **Returns:** Array of `SessionInfo` objects (id, name, projectPath, status, entityId, etc.)
 
 ### `mux_create_session`
-Create a new cipher-mux session (tmux session). Launches **Claude Code** — always, whatever the
-default CLI is. For Codex or opencode start a role (`mux_entity_start`) or use the launcher's
-folder start, which has a CLI field.
+Create a new cipher-mux session (tmux session) and launch an agent CLI in it. The launch line,
+MCP wiring, model and usage tracking come from the chosen adapter — the same path as the
+launcher's folder start. Until 0.13.0 this tool always launched Claude Code; opencode only ran
+via `command`, filed as `claude-code`, without model injection or usage plugin.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `name` | string | yes | Session display name |
 | `projectPath` | string | yes | Working directory |
-| `command` | string | no | Initial command to run in the session (replaces the Claude Code launch) |
+| `adapter` | enum | no | `claude-code` (default), `opencode` or `codex` |
+| `model` | string | no | Passed through to the adapter unchanged (`opus`, `anthropic/claude-opus-5-5`, …) |
+| `workspaceId` | string \| null | no | Omitted = the caller's workspace, `null` = unbound, unknown ID = error |
+| `command` | string | no | Run this instead of the adapter launch — also pass `adapter`, or the session is filed under the default CLI |
 | `visible` | boolean | no | If true, place session in the grid with focus |
 | `shellOnly` | boolean | no | Plain shell, no CLI |
-| `resume` | boolean | no | Launch with `--resume` |
-| `model` | enum | no | `haiku`, `sonnet` or `opus` (`--model`) |
+| `resume` | boolean | no | Resume the most recent conversation of the directory |
 | `subProjektId` | string | no | Cyber Factory SubProjekt — resolves the model from it if none is given |
 
 **Example:**

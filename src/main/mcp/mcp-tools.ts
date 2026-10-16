@@ -33,6 +33,7 @@ import { resolveNoteWorkspaceId } from '../notes/note-workspace'
 const MAX_MANUAL_TAGS = 7
 import { integrate, inventory, migrationPlan, hubApply, hubVerify, hubRelease, hubRollback } from '../hub'
 import { registerMuxTool } from './register-tool'
+import { buildCreateSessionOpts, CREATE_SESSION_ADAPTERS, type CreateSessionArgs } from './create-session-opts'
 
 /**
  * Context passed to tool handlers — references to core services.
@@ -301,21 +302,27 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     'mux_create_session',
     {
       description:
-        'Create a new cipher-mux session. Launches Claude Code CLI automatically — always Claude '
-        + 'Code, whatever the default CLI is; for Codex or opencode start a role (mux_entity_start) '
-        + 'or use the launcher. Pass shellOnly: true for a plain terminal.',
+        'Create a new cipher-mux session in projectPath and launch an agent CLI there. '
+        + 'adapter picks the CLI (claude-code | opencode | codex, default claude-code); the launch '
+        + 'line, MCP wiring, model and usage tracking all come from that adapter. model is passed '
+        + 'through as is (e.g. "opus" for Claude Code, "anthropic/claude-opus-5-5" for opencode). '
+        + 'workspaceId: omitted = your own workspace, null = no workspace. '
+        + 'shellOnly: true opens a plain terminal; command replaces the launch entirely — then name '
+        + 'the adapter too, or the session is filed under the default CLI.',
       inputSchema: {
         name: z.string().describe('Session name'),
         projectPath: z.string().describe('Project directory path'),
-        command: z.string().optional().describe('Initial command to run (overrides Claude CLI launch)'),
+        adapter: z.enum(CREATE_SESSION_ADAPTERS).optional().describe('Agent CLI to launch (default claude-code)'),
+        command: z.string().optional().describe('Initial command to run instead of the adapter launch'),
         visible: z.boolean().optional().describe('If true, session appears in the grid with focus'),
-        shellOnly: z.boolean().optional().describe('If true, open plain shell without Claude CLI'),
-        resume: z.boolean().optional().describe('If true, launch Claude with --resume flag'),
-        model: z.enum(['haiku', 'sonnet', 'opus']).optional().describe('Model to use for Claude CLI (--model flag)'),
+        shellOnly: z.boolean().optional().describe('If true, open plain shell without an agent CLI'),
+        resume: z.boolean().optional().describe('If true, resume the most recent conversation of the directory'),
+        model: z.string().optional().describe('Model for the CLI, passed through unchanged'),
+        workspaceId: z.string().nullable().optional().describe('Workspace ID; omitted = caller workspace, null = unbound'),
         subProjektId: z.string().optional().describe('Cyber Factory SubProjekt ID — auto-resolves model from SubProjekt if no explicit model given'),
       },
     },
-    async (args: { name: string; projectPath: string; command?: string; visible?: boolean; shellOnly?: boolean; resume?: boolean; model?: string; subProjektId?: string }) => {
+    async (args: CreateSessionArgs & { visible?: boolean; subProjektId?: string }) => {
       try {
         // Resolve model from SubProjekt if not explicitly provided
         let effectiveModel = args.model
@@ -328,28 +335,15 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           }
         }
 
-        // Build autoLaunch for Claude CLI (matches UI Launcher-Cell path in app.tsx)
-        let autoLaunch: string | undefined
-        if (!args.command && !args.shellOnly) {
-          const escaped = args.projectPath.replace(/'/g, "'\\''")
+        if (typeof args.workspaceId === 'string') {
           const { configStore: cs } = await import('../config/config-store')
-          const skipPerms = cs.get('agent')?.skipPermissions === true
-          const parts = [`cd '${escaped}' && clear; claude`]
-          if (skipPerms) parts.push('--dangerously-skip-permissions')
-          if (args.resume) parts.push('--resume')
-          if (effectiveModel) parts.push('--model', effectiveModel)
-          autoLaunch = parts.join(' ') + '\n'
+          const known = (cs.get('workspaces') ?? []).some(w => w.id === args.workspaceId)
+          if (!known) throw new Error(`Unknown workspace: ${args.workspaceId}`)
         }
 
-        const session = await ctx.sessionManager.start({
-          name: args.name,
-          projectPath: args.projectPath,
-          command: args.command,
-          autoLaunch,
-          // Die Zeile oben startet fest Claude Code — MCP muss fuer dieselbe CLI
-          // eingerichtet werden, nicht fuer die Default-CLI.
-          ...(autoLaunch ? { adapterId: 'claude-code' } : {}),
-        })
+        const session = await ctx.sessionManager.start(
+          buildCreateSessionOpts({ ...args, model: effectiveModel }, ctx.workspaceId),
+        )
 
         if (args.visible && ctx.windowManager) {
           ctx.windowManager.sendToMainWindow(IPC.SESSION_VISIBLE_ADD, { sessionId: session.id })
