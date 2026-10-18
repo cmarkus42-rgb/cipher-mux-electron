@@ -858,7 +858,7 @@ export class SessionManager extends EventEmitter {
     const session = this.sessions.get(sessionId)
     if (!session) throw new Error(`Session ${sessionId} not found`)
     const target = session.tmuxPane ?? session.tmuxSession
-    await this.tmux.resizePane(target, cols, rows)
+    await this.tmux.resizePane(target, cols, rows, session.tmuxSession)
   }
 
   /**
@@ -889,7 +889,7 @@ export class SessionManager extends EventEmitter {
     // pass ensures tmux state matches before we launch a TUI.
     const target = session.tmuxPane ?? session.tmuxSession
     try {
-      await this.tmux.resizePane(target, cols, rows)
+      await this.tmux.resizePane(target, cols, rows, session.tmuxSession)
     } catch (err) {
       console.warn('[SessionManager] markReady resize failed:', err)
     }

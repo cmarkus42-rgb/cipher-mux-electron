@@ -54,6 +54,25 @@ export const PTY_CHUNK_PAUSE_MS = 40
  */
 export const SNAPSHOT_WATCHER_TIMEOUT_MS = 2000
 
+/**
+ * Groessenwaechter: wie lange nach einer gemeldeten Abweichung nachgemessen wird,
+ * und wie viele Korrekturen pro Session in welchem Fenster erlaubt sind.
+ *
+ * Nachgemessen statt sofort korrigiert, weil die `%layout-change`-Meldung eines
+ * eigenen, frueheren Resizes noch unterwegs sein kann, wenn schon der naechste
+ * gewuenscht ist. Begrenzt, weil ein zweiter Client, der dauerhaft eine andere
+ * Groesse will, sonst ein Pingpong aus SIGWINCHs ausloest.
+ */
+export const SIZE_GUARD_SETTLE_MS = 250
+export const SIZE_GUARD_MAX_FIXES = 3
+export const SIZE_GUARD_WINDOW_MS = 30_000
+
+/** `%layout-change`-Layout → Fenstergroesse, z.B. `a21d,70x20,0,0,0` → 70×20. */
+export function parseLayoutSize(layout: string): { cols: number; rows: number } | null {
+  const m = /^[0-9a-f]+,(\d+)x(\d+),/.exec(layout)
+  return m ? { cols: Number(m[1]), rows: Number(m[2]) } : null
+}
+
 /** Zustand eines Watchers fuer Schnappschuesse, die ueber ihn laufen. */
 interface WatcherSnapState {
   /** Der gerade offene Antwortblock — nur unsere eigenen (flags 1) zaehlen. */
@@ -116,6 +135,16 @@ export class TmuxManager extends EventEmitter {
   /** Laufende Nummer der ausgegebenen Stuecke, pro Pane bzw. Session-ULID. */
   private outputSeq: Map<string, number> = new Map()
   private snapCounter = 0
+  /**
+   * Zuletzt von der Zelle verlangte Groesse, pro beobachteter Session. Die Zelle
+   * schickt nur, wenn sie sich selbst aendert; aendert etwas anderes tmux, stellt
+   * `onWatcherLayout` zurueck. Weicht tmux ab, zeichnet Claude Code fuer die
+   * falsche Zeilenzahl und in der Zelle bleiben Reste stehen.
+   */
+  private wantedSize: Map<string, { target: string; cols: number; rows: number }> = new Map()
+  private resizesInFlight: Map<string, number> = new Map()
+  private sizeCheckTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  private sizeFixes: Map<string, number[]> = new Map()
 
   constructor() {
     super()
@@ -244,6 +273,9 @@ export class TmuxManager extends EventEmitter {
           if (block && block.flags === 1) this.onWatcherBlock(snap, emitId, block.lines, event.type === 'error')
           break
         }
+        case 'layout-change':
+          this.onWatcherLayout(sessionName, event.layout)
+          break
       }
     })
 
@@ -268,6 +300,7 @@ export class TmuxManager extends EventEmitter {
    * Stop watching a session's output.
    */
   unwatchSession(sessionName: string): void {
+    this.forgetSize(sessionName)
     const watcher = this.outputWatchers.get(sessionName)
     if (watcher) {
       watcher.process.kill()
@@ -281,6 +314,7 @@ export class TmuxManager extends EventEmitter {
       watcher.process.kill()
     }
     this.outputWatchers.clear()
+    for (const key of [...this.wantedSize.keys(), ...this.sizeCheckTimers.keys()]) this.forgetSize(key)
 
     this.batcher.destroy()
     if (this.controlProcess) {
@@ -473,9 +507,75 @@ export class TmuxManager extends EventEmitter {
    * Must resize the window first — panes cannot exceed their window dimensions.
    * Without this, detached sessions (no non-ignore-size client) stay at 80x24.
    */
-  async resizePane(target: string, cols: number, rows: number): Promise<void> {
+  async resizePane(target: string, cols: number, rows: number, watchKey: string = target): Promise<void> {
+    this.wantedSize.set(watchKey, { target, cols, rows })
+    this.resizesInFlight.set(watchKey, (this.resizesInFlight.get(watchKey) ?? 0) + 1)
+    try {
+      await this.applySize(target, cols, rows)
+    } finally {
+      const n = (this.resizesInFlight.get(watchKey) ?? 1) - 1
+      if (n > 0) this.resizesInFlight.set(watchKey, n)
+      else this.resizesInFlight.delete(watchKey)
+    }
+  }
+
+  private async applySize(target: string, cols: number, rows: number): Promise<void> {
     await runCommand('tmux', ['resize-window', '-t', target, '-x', String(cols), '-y', String(rows)])
     await runCommand('tmux', ['resize-pane', '-t', target, '-x', String(cols), '-y', String(rows)])
+  }
+
+  private forgetSize(watchKey: string): void {
+    const t = this.sizeCheckTimers.get(watchKey)
+    if (t) clearTimeout(t)
+    this.sizeCheckTimers.delete(watchKey)
+    this.wantedSize.delete(watchKey)
+    this.resizesInFlight.delete(watchKey)
+    this.sizeFixes.delete(watchKey)
+  }
+
+  /**
+   * tmux meldet eine neue Fenstergroesse. Weicht sie von der ab, die die Zelle
+   * zuletzt verlangt hat, wird nach `SIZE_GUARD_SETTLE_MS` nachgemessen und — wenn
+   * die Abweichung bleibt und kein eigener Resize laeuft — zurueckgestellt.
+   */
+  private onWatcherLayout(watchKey: string, layout: string): void {
+    const want = this.wantedSize.get(watchKey)
+    const got = parseLayoutSize(layout)
+    if (!want || !got) return
+    if (got.cols === want.cols && got.rows === want.rows) return
+    if (this.sizeCheckTimers.has(watchKey)) return
+    this.sizeCheckTimers.set(watchKey, setTimeout(() => {
+      this.sizeCheckTimers.delete(watchKey)
+      void this.checkSize(watchKey).catch((err) => {
+        console.warn(`[TmuxManager] Groessenpruefung ${watchKey} fehlgeschlagen:`, err)
+      })
+    }, SIZE_GUARD_SETTLE_MS))
+  }
+
+  private async checkSize(watchKey: string): Promise<void> {
+    const want = this.wantedSize.get(watchKey)
+    if (!want || this.resizesInFlight.has(watchKey)) return
+    const out = await runCommand('tmux', ['display-message', '-t', want.target, '-p', '#{window_width} #{window_height}'])
+    const [cols, rows] = out.split(' ').map(Number)
+    // Waehrend des Messens kann eine neue Groesse verlangt worden sein.
+    const now = this.wantedSize.get(watchKey)
+    if (!now || this.resizesInFlight.has(watchKey)) return
+    if (cols === now.cols && rows === now.rows) return
+
+    const t = Date.now()
+    const recent = (this.sizeFixes.get(watchKey) ?? []).filter((x) => t - x < SIZE_GUARD_WINDOW_MS)
+    if (recent.length >= SIZE_GUARD_MAX_FIXES) {
+      if (recent.length === SIZE_GUARD_MAX_FIXES) {
+        console.warn(`[TmuxManager] Groesse von ${watchKey} wird staendig von aussen geaendert (${cols}x${rows}) -- keine weitere Korrektur in diesem Fenster`)
+        recent.push(t)
+        this.sizeFixes.set(watchKey, recent)
+      }
+      return
+    }
+    recent.push(t)
+    this.sizeFixes.set(watchKey, recent)
+    console.warn(`[TmuxManager] Groesse von ${watchKey} weicht ab: tmux ${cols}x${rows}, Zelle ${now.cols}x${now.rows} -- stelle zurueck`)
+    await this.applySize(now.target, now.cols, now.rows)
   }
 
   /**
