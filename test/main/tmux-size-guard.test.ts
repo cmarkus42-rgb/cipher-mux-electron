@@ -6,6 +6,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { TmuxManager } from '../../src/main/tmux/tmux-manager';
+import type { SizeLogEntry } from '../../src/main/tmux/size-log';
 
 /**
  * tmux behaelt die Groesse, die die Zelle zuletzt verlangt hat.
@@ -64,6 +65,7 @@ describe('tmux behaelt die Groesse der Zelle', { skip: !tmuxAvailable() && 'tmux
   let isolated = false;
   const warn = console.warn;
   const warnungen: string[] = [];
+  const mitschrift: SizeLogEntry[] = [];
 
   before(async () => {
     prevTmpdir = process.env.TMUX_TMPDIR;
@@ -81,6 +83,7 @@ describe('tmux behaelt die Groesse der Zelle', { skip: !tmuxAvailable() && 'tmux
 
     tmux(['new-session', '-d', '-s', SESSION, '-x', '80', '-y', '24', 'sleep', '120']);
     mgr = new TmuxManager();
+    mgr.setSizeLog((e) => mitschrift.push(e));
     mgr.watchSession(SESSION, 'emit-size');
     assert.ok(await waitFor(() => tmux(['list-clients']).stdout.includes(SESSION), 5000), 'Watcher nicht verbunden');
   });
@@ -103,6 +106,11 @@ describe('tmux behaelt die Groesse der Zelle', { skip: !tmuxAvailable() && 'tmux
     tmux(['resize-window', '-t', SESSION, '-x', '81', '-y', '31']);
     assert.ok(await waitFor(() => paneSize() === '81x33', 3000), `tmux blieb bei ${paneSize()}`);
     assert.ok(warnungen.some((w) => w.includes('81x31') && w.includes('81x33')), `keine Meldung: ${warnungen.join(' | ')}`);
+    // Und in der Mitschrift steht, was passiert ist — die Zelle, die fremde
+    // Groesse von tmux, die Korrektur.
+    assert.ok(mitschrift.some((e) => e.kind === 'zelle' && e.cols === 81 && e.rows === 33));
+    assert.ok(mitschrift.some((e) => e.kind === 'tmux' && e.rows === 31));
+    assert.ok(mitschrift.some((e) => e.kind === 'korrektur' && e.rows === 31 && e.wantRows === 33 && e.session === SESSION));
   });
 
   it('eigene Resizes in schneller Folge loesen keine Korrektur aus', async () => {

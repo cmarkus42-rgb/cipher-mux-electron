@@ -5,6 +5,7 @@ import * as os from 'os'
 import { WindowManager } from './window-manager'
 import { SessionManager } from './session/session-manager'
 import { TmuxManager } from './tmux/tmux-manager'
+import { createSizeLog } from './tmux/size-log'
 import { MessageBus } from './message-bus/message-bus'
 import { configStore } from './config/config-store'
 import { getActiveWorkspace } from './workspace/workspace-utils'
@@ -168,6 +169,7 @@ export class IpcHub {
       console.log(`[IpcHub] Scanned ${scanned.length} additional entities: ${scanned.map(e => e.id).join(', ')}`)
     }
     this.tmux = new TmuxManager()
+    this.tmux.setSizeLog(createSizeLog())
     // Resolve app root for entity asset deployment
     const appRoot = path.resolve(__dirname, '..', '..', '..')
     this.sessionManager = new SessionManager(this.tmux, this.adapterRegistry, entityRegistry, appRoot)
