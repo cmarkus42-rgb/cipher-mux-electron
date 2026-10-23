@@ -34,6 +34,8 @@ export interface Versuch {
    * Test), nicht auf das Modell. Zählt nicht gegen MAX_VERSUCHE und nicht als Anlauf.
    */
   architektenfehler?: string
+  /** L16a: Begründung, mit der der Architekt ein Vorab-Rot aus dem Testcode übersteuert hat. */
+  rotGrund?: string
 }
 
 export interface Haeppchen {
@@ -75,6 +77,18 @@ const replaceH = (lauf: Lauf, h: Haeppchen): Lauf => ({
 })
 
 export function beginVersuch(
+  lauf: Lauf,
+  opts: { nummer?: number; ziel: string; now: number; mitTest?: boolean; architektenfehler?: string; rotGrund?: string },
+): { lauf: Lauf; nummer: number; versuch: number } | { error: string } {
+  const r = beginOhneRotGrund(lauf, opts)
+  if ('error' in r || opts.rotGrund === undefined) return r
+  // Der neue Versuch ist der letzte des Häppchens; dort steht die Begründung.
+  const h = r.lauf.haeppchen.find(x => x.nummer === r.nummer)!
+  const versuche = [...h.versuche.slice(0, -1), { ...h.versuche[h.versuche.length - 1], rotGrund: opts.rotGrund }]
+  return { ...r, lauf: replaceH(r.lauf, { ...h, versuche }) }
+}
+
+function beginOhneRotGrund(
   lauf: Lauf,
   opts: { nummer?: number; ziel: string; now: number; mitTest?: boolean; architektenfehler?: string },
 ): { lauf: Lauf; nummer: number; versuch: number } | { error: string } {

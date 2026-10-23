@@ -275,3 +275,46 @@ describe('L15 worktreeVorbereitung und sauberkeitIgnoriert (echter Symlink)', ()
     assert.equal(host.sent.length, 0)
   })
 })
+
+describe('L16a Rot aus dem richtigen Grund (echter node:test-Lauf)', () => {
+  // Abnahmetest als node:test-Datei; testBefehl führt sie aus. NODE_TEST_CONTEXT erbt der
+  // Befehl sonst von dieser Suite — ein verschachteltes node --test meldet dann Exit 0.
+  const nodeArgs = () => ({
+    ...args(), geschuetzteTests: ['test/zaehler.test.js'], testBefehl: 'env -u NODE_TEST_CONTEXT node --test test/zaehler.test.js',
+  })
+  const loestNode: Arbeit = () => schreib('impl.js', 'exports.zaehle = () => 2\n')
+  beforeEach(() => fs.rmSync(path.join(repo, 'test', 'accept.sh')))
+
+  it('Hilfsobjekt fehlt (G.__calls) → abgelehnt, auch mit rotGrund, kein Versuch', async () => {
+    schreib('test/zaehler.test.js', "const { test } = require('node:test')\nconst G = globalThis\ntest('zählt', () => { G.__calls() })\n")
+    const host = fakeHost(loestNode)
+    const res = await lauf(runner(host), { ...nodeArgs(), rotGrund: 'ist so gewollt' })
+    assert.equal(res.ok, false)
+    assert.match(res.error!, /Abnahmetest rot, weil ein Test-Hilfsobjekt fehlt \(`__calls`\), Übersteuern nicht möglich/)
+    assert.equal(host.sent.length, 0)
+    assert.equal(fs.readdirSync(laufDir).length, 0)
+  })
+  it('ReferenceError im Test → abgelehnt; mit rotGrund geht er durch, Begründung in lauf.json', async () => {
+    schreib('test/zaehler.test.js', "const { test } = require('node:test')\nconst assert = require('node:assert')\n"
+      + "test('zählt', () => { assert.equal(zaehle(), 2) })\n")
+    const host = fakeHost(loestNode)
+    const ohne = await lauf(runner(host), nodeArgs())
+    assert.equal(ohne.ok, false)
+    assert.match(ohne.error!, /Abnahmetest rot, vermutlich aus einem Fehler im Test selbst \(ReferenceError in test\/zaehler\.test\.js\)/)
+    assert.match(ohne.error!, /rotGrund/)
+    assert.equal(host.sent.length, 0)
+
+    const mit = await lauf(runner(host), { ...nodeArgs(), rotGrund: 'zaehle wird global vom Worker bereitgestellt' })
+    assert.equal(mit.ok, true, mit.error)
+    assert.equal(loadLauf(mit.laufPfad!)!.haeppchen[0].versuche[0].rotGrund, 'zaehle wird global vom Worker bereitgestellt')
+  })
+  it('Produktions-TypeError (Ort in impl.js) → Dispatch läuft wie bisher', async () => {
+    schreib('impl.js', 'exports.zaehle = (x) => x.wert.zahl\n')
+    git('add', 'impl.js'); git('commit', '-qm', 'impl')
+    schreib('test/zaehler.test.js', "const { test } = require('node:test')\nconst assert = require('node:assert')\n"
+      + "const { zaehle } = require('../impl.js')\ntest('zählt', () => { assert.equal(zaehle(), 2) })\n")
+    const res = await lauf(runner(fakeHost(loestNode)), { ...nodeArgs(), dateien: ['impl.js'] })
+    assert.equal(res.ok, true, res.error)
+    assert.equal(loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0].rotGrund, undefined)
+  })
+})

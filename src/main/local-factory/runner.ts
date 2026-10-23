@@ -4,7 +4,7 @@ import * as path from 'path'
 import { ulid } from 'ulidx'
 import { validateAuftrag, validateDispatchSteuerung, buildAuftragMd, type AuftragInput } from './auftrag'
 import {
-  decideGate, testWarnungen, readGateRecord, mitGruenden, pruefeErsetzungen, diffAusserhalbAuftrag,
+  decideGate, testWarnungen, readGateRecord, mitGruenden, pruefeErsetzungen, diffAusserhalbAuftrag, rotAusTestfehler,
   type GateResult, type GateRecord, type GateDiagnose,
 } from './gate'
 import { ladeProjektConfig, passtGlob, type ProjektConfig } from './projekt-config'
@@ -339,11 +339,30 @@ export class LocalFactoryRunner {
     if (fehlend.length) return { ok: false, error: `Abnahmetest fehlt: ${fehlend.join(', ')}` }
 
     // Ohne Abnahmetest (Workshop) gibt es nichts, was vorab rot sein müsste.
+    let rotGrund: string | undefined
     if (prot.length > 0) {
       const vorher = await runShell(args.testBefehl, projekt, this.o.testTimeoutMs)
       if (vorher.exitCode === 0) {
         return { ok: false, error: 'Der Abnahmetest ist vor der Arbeit schon grün — er prüft nichts.' }
       }
+      // L16a: rot, aber aus dem richtigen Grund? Ein Fehler mit Ursprung im Test selbst
+      // misst nichts am Produktionscode. Ein fehlendes Test-Hilfsobjekt ist nie richtig.
+      const befund = rotAusTestfehler(vorher.output, prot, projekt)
+      if (befund?.helfer) {
+        return {
+          ok: false,
+          error: `Abnahmetest rot, weil ein Test-Hilfsobjekt fehlt (\`${befund.helfer}\`), Übersteuern nicht möglich `
+            + `(${befund.fehler} in ${befund.datei}). Test korrigieren. Kein Versuch gezählt.`,
+        }
+      }
+      if (befund && args.rotGrund === undefined) {
+        return {
+          ok: false,
+          error: `Abnahmetest rot, vermutlich aus einem Fehler im Test selbst (${befund.fehler} in ${befund.datei}). `
+            + 'Test prüfen; ist das Rot so richtig, erneut mit rotGrund: "<Begründung>" dispatchen. Kein Versuch gezählt.',
+        }
+      }
+      if (befund) rotGrund = args.rotGrund
     }
 
     const laufId = args.laufId ?? ulid()
@@ -357,7 +376,7 @@ export class LocalFactoryRunner {
       saveLauf(laufPfad, lauf0)
     }
     const begun = beginVersuch(lauf0, {
-      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0, architektenfehler: args.architektenfehler,
+      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0, architektenfehler: args.architektenfehler, rotGrund,
     })
     if ('error' in begun) return { ok: false, error: begun.error }
 
@@ -374,7 +393,7 @@ export class LocalFactoryRunner {
     let basis: Lauf = loadLauf(laufPfad) ?? lauf0
     if (!basis.branch) basis = { ...basis, branch: branchJetzt }
     const frisch = beginVersuch(basis, {
-      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0, architektenfehler: args.architektenfehler,
+      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0, architektenfehler: args.architektenfehler, rotGrund,
     })
     if ('error' in frisch) return { ok: false, error: frisch.error }
     saveLauf(laufPfad, frisch.lauf)

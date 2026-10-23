@@ -195,3 +195,83 @@ export function diffAusserhalbAuftrag(
     && !isTestPath(f, auftrag.testpfade),
   )
 }
+
+/** Was `rotAusTestfehler` findet: Fehlerklasse, Ort (repo-relativ), ggf. Test-Hilfsname. */
+export interface TestfehlerBefund {
+  fehler: string
+  datei: string
+  /** `globalThis.<name>` oder ein Bezeichner mit führendem `__` — nicht übersteuerbar. */
+  helfer: string | null
+}
+
+const FEHLERKLASSE = /\b(ReferenceError|TypeError|NameError|AttributeError)\b/
+// pytest, langes Format: Absturzzeile „tests/test_x.py:6: NameError“
+const PY_ABSTURZ = /^\s*(\S+\.py):\d+: (ReferenceError|TypeError|NameError|AttributeError)\b/
+// Python-Rahmen: „File "x.py", line 3“ (Traceback) oder „tests/x.py:6: in test_y“ (pytest kurz)
+const PY_RAHMEN = /File "([^"]+\.py)", line \d+|^\s*(\S+\.py):\d+: in /
+// JS-Rahmen: „at f (/abs/x.test.js:3:9)“, TAP ohne „at“, vitest „❯ src/x.test.ts:12:14“
+const JS_RAHMEN = /((?:file:\/\/)?[^\s()'"❯]+\.(?:[cm]?[jt]sx?|svelte|vue)):\d+/
+
+/** Test-Hilfsname in einer Fehlermeldung; Python-Dunder (`__enter__`) zählen nicht. */
+function hilfsname(meldung: string): string | null {
+  const g = meldung.match(/\bglobalThis\.([A-Za-z_$][\w$]*)/)
+  if (g) return `globalThis.${g[1]}`
+  for (const m of meldung.matchAll(/(?<![\w$])__[\w$]+/g)) {
+    if (!/^__\w+__$/.test(m[0])) return m[0]
+  }
+  return null
+}
+
+/**
+ * L16a: Ist der Abnahmetest vorab aus dem falschen Grund rot — ein Fehler, dessen
+ * Ort im Test selbst liegt? Maßgeblich ist der Ursprungsort: der oberste Rahmen
+ * (JS) bzw. die Absturzzeile oder der letzte Rahmen (Python). Ein Produktionsfehler,
+ * den der Test nur aufruft, hat seinen Ursprung in src/ und blockiert nicht.
+ * Ist kein Ort lesbar, gibt es keinen Befund (fail-open).
+ */
+export function rotAusTestfehler(output: string, prot: readonly string[], projekt: string): TestfehlerBefund | null {
+  const geschuetzt = prot.map(norm)
+  const treffer = (ort: string): string | null => {
+    let p = ort.replace(/^file:\/\//, '')
+    if (p.startsWith('/')) {
+      const rel = p.startsWith(projekt.replace(/\/+$/, '') + '/') ? p.slice(projekt.replace(/\/+$/, '').length + 1) : p
+      p = rel
+    }
+    const n = norm(p)
+    return geschuetzt.find(g => n === g || n.endsWith('/' + g)) ?? null
+  }
+  const zeilen = output.split('\n')
+  let befund: TestfehlerBefund | null = null
+  for (let i = 0; i < zeilen.length; i++) {
+    const z = zeilen[i]
+    const k = z.match(FEHLERKLASSE)
+    // pytest-Zusammenfassung („FAILED tests/x.py::t - NameError: …“) hat keinen Ort.
+    if (!k || /^\s*(FAILED|ERROR) /.test(z)) continue
+    let ort: string | null = null
+    const absturz = z.match(PY_ABSTURZ)
+    if (absturz) ort = absturz[1]
+    for (let j = i + 1; !ort && j < Math.min(zeilen.length, i + 12); j++) {
+      const a = zeilen[j].match(PY_ABSTURZ)
+      if (a) ort = a[1]
+    }
+    for (let j = i + 1; !ort && j < Math.min(zeilen.length, i + 20); j++) {
+      if (/node:|node_modules/.test(zeilen[j])) continue
+      const r = zeilen[j].match(JS_RAHMEN)
+      if (r) ort = r[1]
+      else if (zeilen[j].match(FEHLERKLASSE)) break
+    }
+    for (let j = i - 1; !ort && j >= Math.max(0, i - 40); j--) {
+      const r = zeilen[j].match(PY_RAHMEN)
+      if (r) ort = r[1] ?? r[2]
+    }
+    if (!ort) continue
+    const datei = treffer(ort)
+    if (!datei) continue
+    // Die Meldung: die Zeile selbst, bei TAP zusätzlich die „error:“-Zeile kurz davor.
+    const umfeld = zeilen.slice(Math.max(0, i - 4), i).filter(x => /^\s*error: /.test(x))
+    const helfer = hilfsname([...umfeld, z].join('\n'))
+    if (helfer) return { fehler: k[1], datei, helfer }
+    befund ??= { fehler: k[1], datei, helfer: null }
+  }
+  return befund
+}
