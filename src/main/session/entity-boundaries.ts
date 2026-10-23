@@ -163,8 +163,11 @@ export const ENTITY_BOUNDARIES: Record<string, EntityBoundary> = {
   'local-worker': {
     denyPathPatterns: ['/AUFTRAG.md'],
     denyListFile: PROTECTED_PATHS_FILENAME,
+    // Die Projekt-Config bestimmt Pflicht-Gates und verbotene Muster — wer sie aendert,
+    // aendert die eigene Pruefung. Der Gate wertet eine Aenderung zusaetzlich als ROT.
+    lockPathPatterns: ['/' + PROJECT_CONFIG_RELPATH],
     reason:
-      'Abnahmetests und Auftrag gehoeren dem Architekten. Wer den Test aendert, den er '
+      'Abnahmetests, Auftrag und Projekt-Config gehoeren dem Architekten. Wer den Test aendert, den er '
       + 'bestehen soll, beweist nichts (Keel C-001). Eigene Unit-Tests sind erlaubt.',
   },
   debugger: {

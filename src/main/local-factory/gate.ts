@@ -10,7 +10,7 @@
  */
 
 import { normalize } from 'path/posix'
-import { isTestPath, matchGlob } from '../session/entity-boundaries'
+import { isTestPath, matchGlob, PROJECT_CONFIG_RELPATH } from '../session/entity-boundaries'
 
 export type GateVerdict = 'gruen' | 'rot' | 'haengt'
 
@@ -311,4 +311,15 @@ export function pruefeVerboteneMuster(
 function oneLineKurz(s: string): string {
   const t = s.trim()
   return t.length > 120 ? t.slice(0, 119) + '…' : t
+}
+
+/**
+ * Config-Schutz: Die Projekt-Config bestimmt, was der Gate prüft. Ändert der Worker
+ * sie, ist der Versuch ROT — auch bei grünem Test. Auf der vollen Liste geprüft,
+ * nicht auf der um sauberkeitIgnoriert gekürzten.
+ */
+export function configVeraendert(changed: readonly string[]): string[] {
+  return changed.map(norm).includes(PROJECT_CONFIG_RELPATH)
+    ? [`Projekt-Config ${PROJECT_CONFIG_RELPATH} verändert — sie gehört dem Architekten.`]
+    : []
 }

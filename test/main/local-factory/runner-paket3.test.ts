@@ -352,3 +352,21 @@ describe('L16b verboteneMuster im Gate', () => {
     assert.match(host.wakes[0], /GRÜN/)
   })
 })
+
+describe('Config-Schutz: der Worker ändert die Projekt-Config', () => {
+  it('Änderung an .cipher-mux/local-factory.json → ROT, auch wenn der Test grün ist', async () => {
+    config({ pflichtGates: [{ muster: '*.txt', befehl: 'exit 1' }] })
+    const host = fakeHost(() => { schreib('impl.txt', 'ok\n'); schreib('.cipher-mux/local-factory.json', '{}') })
+    const res = await lauf(runner(host), args())
+    assert.match(host.wakes[0], /ROT/)
+    assert.match(gateVon(res.laufPfad!).reasons.join(), /Projekt-Config \.cipher-mux\/local-factory\.json verändert/)
+    // Basis wiederhergestellt: die Config des Architekten gilt weiter
+    assert.match(lies('.cipher-mux/local-factory.json'), /pflichtGates/)
+  })
+  it('auch wenn sauberkeitIgnoriert das Verzeichnis nennt', async () => {
+    config({ sauberkeitIgnoriert: ['.cipher-mux'] })
+    const host = fakeHost(() => { schreib('impl.txt', 'ok\n'); schreib('.cipher-mux/local-factory.json', '{}') })
+    const res = await lauf(runner(host), args())
+    assert.match(gateVon(res.laufPfad!).reasons.join(), /Projekt-Config .* verändert/)
+  })
+})

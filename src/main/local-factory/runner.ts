@@ -4,7 +4,7 @@ import * as path from 'path'
 import { ulid } from 'ulidx'
 import { validateAuftrag, validateDispatchSteuerung, buildAuftragMd, type AuftragInput } from './auftrag'
 import {
-  decideGate, testWarnungen, readGateRecord, mitGruenden, pruefeErsetzungen, diffAusserhalbAuftrag, rotAusTestfehler, pruefeVerboteneMuster,
+  decideGate, testWarnungen, readGateRecord, mitGruenden, pruefeErsetzungen, diffAusserhalbAuftrag, rotAusTestfehler, pruefeVerboteneMuster, configVeraendert,
   type GateResult, type GateRecord, type GateDiagnose,
 } from './gate'
 import { ladeProjektConfig, passtGlob, type ProjektConfig } from './projekt-config'
@@ -507,7 +507,7 @@ export class LocalFactoryRunner {
     // sehen nicht, was das Projekt als Umgebung deklariert hat (L15).
     const changedAlle = branchGewechselt ? [] : await changedSince(projekt, a.base)
     const changed = changedAlle.filter(f => !istIgnoriert(f, a.config.sauberkeitIgnoriert))
-    const zusatz: string[] = []
+    const zusatz: string[] = configVeraendert(changedAlle)
     const warnungen = [...a.configHinweise.map(h => `Projekt-Config: ${h}`), ...testWarnungen(test.output)]
     let testOutput = test.output
     if (pruefen) {
