@@ -225,6 +225,11 @@ export class IpcHub {
     this.noteWatcher = new NoteWatcher(notesDir, (noteId) => {
       console.log(`[NoteWatcher] External change detected: ${noteId}`)
       this.tagIndex.rebuild()
+      // Jeder Schreibweg ausserhalb der Oberflaeche landet hier (MCP-Werkzeuge
+      // unterdruecken das Ereignis nicht). Ohne diese Zeile blieb der Suchindex
+      // auf dem Stand des App-Starts.
+      this.noteSearchIndex.syncNote(this.noteManager, noteId).catch(err =>
+        console.warn(`[NoteWatcher] Suchindex fuer ${noteId} nicht aktualisiert:`, err))
       this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, {
         action: 'external-update',
         id: noteId,

@@ -947,6 +947,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           writeFileSync(filePath, updated, 'utf-8')
         }
 
+        // Suchindex sofort nachziehen. Der Watcher tut es auch, aber erst nach
+        // seiner Entprellung -- eine Suche direkt danach saehe den alten Titel.
+        if (ctx.noteSearchIndex) await ctx.noteSearchIndex.syncNote(ctx.noteManager, note.id)
+
         // Notify UI
         if (ctx.windowManager) {
           ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'updated', note })
@@ -1141,6 +1145,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Note not found: ${args.id}` }) }], isError: true }
         }
 
+        ctx.noteSearchIndex?.remove(args.id)
+
         // Notify UI
         if (ctx.windowManager) {
           ctx.windowManager.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'deleted', id: args.id })
@@ -1217,6 +1223,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
             entityId: ctx.entityId,
           },
         )
+
+        // Ohne das fand mux_notes_search eine Uebergabe erst nach dem naechsten
+        // App-Start. Siehe NoteSearchIndex.syncNote.
+        if (ctx.noteSearchIndex) await ctx.noteSearchIndex.syncNote(ctx.noteManager, note.id)
 
         // Notify UI
         if (ctx.windowManager) {
