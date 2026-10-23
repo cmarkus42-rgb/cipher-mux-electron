@@ -196,7 +196,8 @@ export interface NeueZeile {
  * Gelöschte Zeilen zählen nicht — wer ein Muster entfernt, verstößt nicht dagegen.
  */
 export async function hinzugefuegteZeilen(projekt: string, base: string, ausnahmen: readonly string[] = []): Promise<NeueZeile[]> {
-  const { stdout } = await execFileP('git', [...NO_QUOTE, 'diff', '-U0', '--no-renames', '--no-color', '--no-ext-diff', base], {
+  // --text/--no-textconv: Attribute des Repos (binary, diff=…) dürfen keine Zeilen verstecken.
+  const { stdout } = await execFileP('git', [...NO_QUOTE, 'diff', '-U0', '--no-renames', '--no-color', '--no-ext-diff', '--text', '--no-textconv', base], {
     cwd: projekt, maxBuffer: 256 * 1024 * 1024, env: { ...process.env, PATH: getEnhancedPath() },
   })
   const out: NeueZeile[] = []
@@ -205,7 +206,7 @@ export async function hinzugefuegteZeilen(projekt: string, base: string, ausnahm
   for (const l of stdout.split('\n')) {
     if (l.startsWith('diff --git ')) { datei = null; continue }
     if (l.startsWith('+++ ')) {
-      const p = l.slice(4)
+      const p = unquote(l.slice(4))
       datei = p === '/dev/null' ? null : p.replace(/^b\//, '')
       continue
     }
@@ -224,12 +225,31 @@ export async function hinzugefuegteZeilen(projekt: string, base: string, ausnahm
       if (!fs.statSync(path.join(projekt, f)).isFile()) continue
       buf = fs.readFileSync(path.join(projekt, f))
     } catch { continue }
-    if (buf.includes(0)) continue // binär
+    // Auch mit NUL-Bytes gelesen: ein einzelnes NUL machte die Datei sonst unsichtbar.
     const text = buf.toString('utf-8').split('\n')
     if (text.at(-1) === '') text.pop()
     text.forEach((t, i) => out.push({ datei: f, zeile: i + 1, text: t }))
   }
   return out
+}
+
+const ESCAPES: Record<string, number> = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '"': 34, '\\': 92 }
+
+/** Pfad aus einem diff-Kopf: git setzt Namen mit `"`, `\\` oder Steuerzeichen C-artig in Anführungszeichen. */
+function unquote(p: string): string {
+  if (!p.startsWith('"') || !p.endsWith('"')) return p
+  const bytes: number[] = []
+  const inner = p.slice(1, -1)
+  for (let i = 0; i < inner.length; i++) {
+    const c = inner[i]
+    if (c !== '\\') { bytes.push(...Buffer.from(c, 'utf-8')); continue }
+    const n = inner[i + 1]
+    const okt = inner.slice(i + 1, i + 4)
+    if (/^[0-7]{3}$/.test(okt)) { bytes.push(parseInt(okt, 8)); i += 3 }
+    else if (n in ESCAPES) { bytes.push(ESCAPES[n]); i += 1 }
+    else bytes.push(92)
+  }
+  return Buffer.from(bytes).toString('utf-8')
 }
 
 /** Umfang eines Commits für die Bilanz: Dateien und Zeilen (hinzu + weg). Binärdateien zählen als Datei, nicht als Zeilen. */

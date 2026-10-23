@@ -209,7 +209,6 @@ describe('L16b hinzugefuegteZeilen', () => {
     fs.mkdirSync(path.join(repo, 'src'))
     fs.writeFileSync(path.join(repo, 'src', 'neu.js'), 'x = 1\n+++ kein Kopf\n')
     fs.mkdirSync(path.join(repo, '.cache')); fs.writeFileSync(path.join(repo, '.cache', 'c.js'), 'geheim\n')
-    fs.writeFileSync(path.join(repo, 'bild.bin'), Buffer.from([0, 1, 2, 0]))
     const z = await hinzugefuegteZeilen(repo, base, ['.cache'])
     assert.deepEqual(z.sort((x, y) => (x.datei + x.zeile).localeCompare(y.datei + y.zeile)), [
       { datei: 'a.txt', zeile: 2, text: 'ZWEI' },
@@ -217,5 +216,31 @@ describe('L16b hinzugefuegteZeilen', () => {
       { datei: 'src/neu.js', zeile: 1, text: 'x = 1' },
       { datei: 'src/neu.js', zeile: 2, text: '+++ kein Kopf' },
     ])
+  })
+})
+
+describe('L16b hinzugefuegteZeilen: nicht zu umgehen', () => {
+  it('.gitattributes „binary“ versteckt keine Zeilen', async () => {
+    fs.writeFileSync(path.join(repo, '.gitattributes'), '*.js binary\n')
+    fs.mkdirSync(path.join(repo, 'src')); fs.writeFileSync(path.join(repo, 'src', 'a.js'), 'alt\n')
+    git('add', '.'); git('commit', '-qm', 'attr')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'src', 'a.js'), 'alt\nglobalThis.__x = 1\n')
+    const z = await hinzugefuegteZeilen(repo, base)
+    assert.deepEqual(z, [{ datei: 'src/a.js', zeile: 2, text: 'globalThis.__x = 1' }])
+  })
+  it('NUL-Byte in einer neuen Datei versteckt sie nicht', async () => {
+    const base = await headCommit(repo)
+    fs.mkdirSync(path.join(repo, 'src')); fs.writeFileSync(path.join(repo, 'src', 'b.js'), 'globalThis.__y = 1\n\u0000\n')
+    const z = await hinzugefuegteZeilen(repo, base)
+    assert.ok(z.some(x => x.datei === 'src/b.js' && x.text === 'globalThis.__y = 1'))
+  })
+  it('Pfad mit Anführungszeichen (git quotet ihn) wird richtig gelesen', async () => {
+    fs.mkdirSync(path.join(repo, 'src')); fs.writeFileSync(path.join(repo, 'src', 'a"b.js'), 'x\n')
+    git('add', '.'); git('commit', '-qm', 'quote')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'src', 'a"b.js'), 'x\nglobalThis.__z = 1\n')
+    const z = await hinzugefuegteZeilen(repo, base)
+    assert.deepEqual(z, [{ datei: 'src/a"b.js', zeile: 2, text: 'globalThis.__z = 1' }])
   })
 })
