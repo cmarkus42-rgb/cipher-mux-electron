@@ -96,3 +96,20 @@ export async function submitLine(
   await pause()
   await sendKey('Enter')
 }
+
+/** CSI- und OSC-Sequenzen; capture-pane liefert mit -e die Farbcodes mit. */
+const ANSI = /\x1b\[[0-9;?]*[ -\/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g
+
+/**
+ * Die letzten n sichtbaren Zeilen einer Pane, für die Diagnose eines hängenden
+ * Workers (L8). Wirft nie: eine fehlende Pane ist ein Befund, kein Läuferfehler.
+ */
+export async function paneTailLines(capture: () => Promise<string>, n: number): Promise<string[]> {
+  try {
+    const lines = (await capture()).replace(ANSI, '').split('\n').map(l => l.replace(/\s+$/, ''))
+    while (lines.length && lines[lines.length - 1] === '') lines.pop()
+    return lines.slice(-n)
+  } catch {
+    return []
+  }
+}

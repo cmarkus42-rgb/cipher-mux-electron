@@ -2,7 +2,7 @@ import type { ToolContext } from '../mcp/mcp-tools'
 import type { WorkerHost } from './runner'
 import { startEntitySession } from '../mcp/handoff-kernel'
 import { findEntitySessions } from '../session/entity-session-lookup'
-import { endpointProbeUrl, readUsageFile, checkWorkerReady, probeEndpoint, submitLine } from './worker-host-util'
+import { endpointProbeUrl, readUsageFile, checkWorkerReady, probeEndpoint, submitLine, paneTailLines } from './worker-host-util'
 import { resolveLocalWorkerProfile, writeLocalProfileFile } from './local-provider'
 import { resolveRunDir } from '../session/entity-run-dir'
 import { BRAND } from '../../shared/brand'
@@ -63,6 +63,9 @@ export function createWorkerHost(ctx: ToolContext): WorkerHost {
     },
     async stopWorker(sessionId) {
       try { await sm.stopEntity('local-worker', sessionId) } catch { /* schon weg */ }
+    },
+    paneTail(sessionId, n) {
+      return paneTailLines(() => sm.capture(sessionId, n), n)
     },
     lastActivityAt(sessionId) {
       return readUsageFile(BRAND.statusLineDir, sessionId)?.mtime ?? 0

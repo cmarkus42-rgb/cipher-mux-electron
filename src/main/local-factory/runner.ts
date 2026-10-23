@@ -3,7 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { ulid } from 'ulidx'
 import { validateAuftrag, buildAuftragMd, type AuftragInput } from './auftrag'
-import { decideGate, type GateResult } from './gate'
+import { decideGate, testWarnungen, readGateRecord, type GateResult, type GateRecord, type GateDiagnose } from './gate'
 import {
   newLauf, beginVersuch, endVersuch, countWeckruf, markAbgenommen, markBeurteilt,
   loadLauf, saveLauf, abortRunning, MAX_VERSUCHE, type Lauf,
@@ -40,6 +40,8 @@ export interface WorkerHost {
   ): Promise<{ runDir: string; sessionId: string; profil?: string; modell?: string }>
   sendToWorker(sessionId: string, line: string): Promise<void>
   stopWorker(sessionId: string): Promise<void>
+  /** Letzte n Pane-Zeilen (Diagnose bei HÄNGT). Fehler → leeres Array, nie werfen. */
+  paneTail(sessionId: string, n: number): Promise<string[]>
   lastActivityAt(sessionId: string): number
   tokensAt(sessionId: string): { input: number; output: number } | null
   wakeArchitect(line: string, rolle?: RunnerRolle): Promise<void>
@@ -82,6 +84,9 @@ export type DispatchAccepted = { ok: true; laufId: string; nummer: number; versu
 export type DispatchRejected = { ok: false; error: string }
 export type AcceptResult = { ok: true } | { ok: false; error: string }
 
+/** So viele Pane-Zeilen nimmt die Diagnose eines hängenden Workers mit (L8). */
+export const DIAGNOSE_PANE_ZEILEN = 30
+
 /** Höchstlänge einer Weckzeile. Sie geht per send-keys in ein Eingabefeld. */
 export const MAX_WECKZEILE = 400
 
@@ -101,8 +106,6 @@ interface Attempt {
   laufId: string; laufPfad: string; nummer: number; versuch: number
   vorherigesGate?: { reasons: string[]; testOutput: string }
 }
-
-interface GateRecord extends GateResult { testOutput: string }
 
 export class LocalFactoryRunner {
   private readonly o: Required<Omit<RunnerOpts, 'host' | 'laufDir' | 'bilanz' | 'workspaceId'>> & Pick<RunnerOpts, 'host' | 'laufDir' | 'bilanz' | 'workspaceId'>
@@ -339,8 +342,8 @@ export class LocalFactoryRunner {
     let vorherigesGate: { reasons: string[]; testOutput: string } | undefined
     if (prevV?.gatePfad) {
       try {
-        const g = JSON.parse(fs.readFileSync(prevV.gatePfad, 'utf-8')) as GateRecord
-        vorherigesGate = { reasons: g.reasons ?? [], testOutput: g.testOutput ?? '' }
+        const g = readGateRecord(JSON.parse(fs.readFileSync(prevV.gatePfad, 'utf-8')))
+        vorherigesGate = { reasons: g.reasons, testOutput: g.testOutput }
       } catch { /* kein lesbares Gate — dann ohne */ }
     }
 
@@ -414,6 +417,8 @@ export class LocalFactoryRunner {
       state = classifyWorker(this.observe(runDir, sessionId, startedAt), this.cfg())
     }
     const tokens = host.tokensAt(sessionId)
+    // Vor dem Stoppen: danach gibt es keine Pane mehr, die man lesen könnte.
+    const diagnose = state === 'haengt' ? await this.diagnose(sessionId, startedAt, tokens) : undefined
     await host.stopWorker(sessionId)
     started.sessionId = undefined
 
@@ -443,7 +448,9 @@ export class LocalFactoryRunner {
 
     const dir = path.dirname(a.laufPfad)
     const gatePfad = path.join(dir, `gate-${a.nummer}-${a.versuch}.json`)
-    fs.writeFileSync(gatePfad, JSON.stringify({ ...gate, testOutput: test.output } satisfies GateRecord, null, 2), 'utf-8')
+    const warnungen = testWarnungen(test.output)
+    const record: GateRecord = { ...gate, testOutput: test.output, warnungen, ...(diagnose ? { diagnose } : {}) }
+    fs.writeFileSync(gatePfad, JSON.stringify(record, null, 2), 'utf-8')
 
     let commit: string | undefined
     let patchPfad: string | undefined
@@ -485,7 +492,23 @@ export class LocalFactoryRunner {
         + (h?.status === 'eskaliert'
           ? (this.o.rolle === 'local-workshop' ? ' — ausgeschöpft, selbst übernehmen' : ' — ESKALIERT, an den User melden')
           : '')
-    await this.wake(line)
+    // Zuletzt: wird die Zeile gekappt, trifft es den Hinweis, nicht Pfad oder Eskalation.
+    await this.wake(warnungen.length ? `${line} — Warnung: ${warnungen.join('; ')}` : line)
+  }
+
+  private async diagnose(
+    sessionId: string, startedAt: number, tokens: GateDiagnose['tokens'],
+  ): Promise<GateDiagnose> {
+    let paneTail: string[] = []
+    try { paneTail = await this.o.host.paneTail(sessionId, DIAGNOSE_PANE_ZEILEN) } catch { /* Vertrag: wirft nicht */ }
+    const zuletzt = this.o.host.lastActivityAt(sessionId)
+    return {
+      laufzeitSek: Math.round((this.o.now() - startedAt) / 1000),
+      tokens,
+      // 0 heißt: keine Usage-Datei — unbekannt, nicht „1970“.
+      letzteAktivitaet: zuletzt > 0 ? new Date(zuletzt).toISOString() : null,
+      paneTail,
+    }
   }
 
   private cfg() {

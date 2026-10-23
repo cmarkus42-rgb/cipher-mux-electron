@@ -84,3 +84,51 @@ export function decideGate(input: GateInput): GateResult {
 
   return { verdict: reasons.length === 0 ? 'gruen' : 'rot', reasons }
 }
+
+/**
+ * Lagebild eines hängenden Workers (L8), aufgenommen VOR dem Stoppen — danach
+ * ist die Pane weg. Was der Läufer nicht weiß, steht als null da, nicht geschätzt.
+ */
+export interface GateDiagnose {
+  laufzeitSek: number
+  tokens: { input: number; output: number } | null
+  /** ISO-Zeitpunkt der letzten Aktivität laut Usage-Datei; null = unbekannt. */
+  letzteAktivitaet: string | null
+  paneTail: string[]
+}
+
+/** Was als gate-<n>-<v>.json auf der Platte liegt. */
+export interface GateRecord extends GateResult {
+  testOutput: string
+  /** Hinweise, die das Urteil nicht ändern (L10). Alte Gates haben keine. */
+  warnungen: string[]
+  diagnose?: GateDiagnose | null
+}
+
+/**
+ * Hinweise aus der Testausgabe. Sie ändern das Urteil nicht: ein gefilterter
+ * Lauf kann zu Recht grün sein, nur prüft er dann weniger, als der Name sagt.
+ */
+export function testWarnungen(output: string): string[] {
+  const warnungen: string[] = []
+  // pytest: „== 3 passed, 41 deselected in 0.5s ==“ bzw. „collected 44 items / 41 deselected“
+  const deselected = [...output.matchAll(/\b(\d+) deselected\b/g)].map(m => Number(m[1]))
+  const n = Math.max(0, ...deselected)
+  if (n > 0) warnungen.push(`${n} Tests deselected — -k filtert, nur für den Abnahmetest gedacht`)
+  return warnungen
+}
+
+/** Liest ein Gate tolerant: alte Gates ohne warnungen/diagnose, kaputte Felder → Leerwerte. */
+export function readGateRecord(raw: unknown): GateRecord {
+  const g = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const strings = (v: unknown): string[] => Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+  const verdict = g.verdict === 'gruen' || g.verdict === 'haengt' ? g.verdict : 'rot'
+  const d = g.diagnose
+  return {
+    verdict,
+    reasons: strings(g.reasons),
+    testOutput: typeof g.testOutput === 'string' ? g.testOutput : '',
+    warnungen: strings(g.warnungen),
+    diagnose: d && typeof d === 'object' ? d as GateDiagnose : null,
+  }
+}

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { decideGate, touchedProtected } from '../../../src/main/local-factory/gate'
+import { decideGate, touchedProtected, testWarnungen, readGateRecord } from '../../../src/main/local-factory/gate'
 
 const base = {
   workerFinished: true,
@@ -105,5 +105,39 @@ describe('decideGate ohne Testpflicht', () => {
   it('testPflicht false: leere Schutzliste und Test grün → grün', () => {
     assert.equal(decideGate({ workerFinished: true, testExitCode: 0, checksumsBefore: {}, checksumsAfter: {},
       changedFiles: ['a.ts'], protectedFiles: [], testPflicht: false }).verdict, 'gruen')
+  })
+})
+
+describe('testWarnungen (L10)', () => {
+  it('pytest „N deselected“ in der Zusammenfassung → eine Warnung mit Anzahl', () => {
+    const w = testWarnungen('collected 44 items / 41 deselected / 3 selected\n...\n== 3 passed, 41 deselected in 0.5s ==\n')
+    assert.equal(w.length, 1)
+    assert.match(w[0], /41 Tests deselected/)
+    assert.match(w[0], /-k/)
+  })
+  it('ohne Filter keine Warnung', () => {
+    assert.deepEqual(testWarnungen('== 44 passed in 1.2s =='), [])
+    assert.deepEqual(testWarnungen(''), [])
+  })
+  it('„0 deselected“ ist keine Warnung', () => {
+    assert.deepEqual(testWarnungen('== 3 passed, 0 deselected in 0.1s =='), [])
+  })
+})
+
+describe('readGateRecord (alte Gates)', () => {
+  it('altes Gate ohne warnungen/diagnose → leere Warnungen, keine Diagnose', () => {
+    const g = readGateRecord({ verdict: 'rot', reasons: ['x'], testOutput: 'out' })
+    assert.deepEqual(g, { verdict: 'rot', reasons: ['x'], testOutput: 'out', warnungen: [], diagnose: null })
+  })
+  it('kaputte Felder werden nicht übernommen, nie ein Wurf', () => {
+    const g = readGateRecord({ reasons: 'nein', warnungen: [1, 'w'], diagnose: 'x' })
+    assert.deepEqual(g.reasons, [])
+    assert.deepEqual(g.warnungen, ['w'])
+    assert.equal(g.diagnose, null)
+    assert.equal(readGateRecord(null).testOutput, '')
+  })
+  it('Diagnose bleibt erhalten', () => {
+    const diagnose = { laufzeitSek: 12, tokens: null, letzteAktivitaet: null, paneTail: ['a'] }
+    assert.deepEqual(readGateRecord({ verdict: 'haengt', reasons: [], testOutput: '', diagnose }).diagnose, diagnose)
   })
 })
