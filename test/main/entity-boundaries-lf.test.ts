@@ -53,6 +53,7 @@ describe('local-factory: Testpfade sind von der Codesperre ausgenommen', () => {
     for (const p of [
       'src/app.test.ts', 'src/app.spec.tsx', 'lib/main.test.dart',
       'src/tests/a.ts', 'src/__tests__/a.ts', 'src/test/a.ts', 'lib/x/tests/b.py',
+      'src/acceptance/login.ts', 'lib/acceptance/a.py',
     ]) {
       assert.equal(denied(`${repo}/${p}`), false, p)
     }
@@ -253,7 +254,7 @@ describe('Paritaet: dieselben Faelle gegen Funktion, Claude-Hook und opencode-Pl
     unterTest = path.join(tmp, 'test', 'repo')
     for (const r of [repo, unterTest]) fs.mkdirSync(path.join(r, '.git'), { recursive: true })
     fs.mkdirSync(path.join(repo, '.cipher-mux'))
-    fs.writeFileSync(path.join(repo, PROJECT_CONFIG_RELPATH), JSON.stringify({ testpfade: ['/src/testing/', '/src/', 'fixtures'] }))
+    fs.writeFileSync(path.join(repo, PROJECT_CONFIG_RELPATH), JSON.stringify({ testpfade: ['/src/testing/', '/src/', 'fixtures', 'src/acceptance-e2e/**'] }))
 
     hookFile = path.join(tmp, 'role-boundary.js')
     fs.writeFileSync(hookFile, buildBoundaryHookScript(LF))
@@ -281,6 +282,9 @@ describe('Paritaet: dieselben Faelle gegen Funktion, Claude-Hook und opencode-Pl
       p(`${repo}/src/test/a.ts`, false),
       p(`${repo}/test/a.ts`, false),
       p(`${repo}/src/testing/helper.ts`, false),
+      p(`${repo}/src/acceptance/login.ts`, false),
+      p(`${repo}/src/acceptance-e2e/x.ts`, false),
+      p(`${repo}/src/acceptanceish.ts`, true),
       p(`${repo}/src/fixtures/x.ts`, true),
       p(`${repo}/src/attestation.ts`, true),
       p(`${repo}/${PROJECT_CONFIG_RELPATH}`, true, KONFIG_GRUND),

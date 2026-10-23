@@ -232,3 +232,12 @@ describe('readGateRecord: pruefungen und laeuferfehler', () => {
     ])
   })
 })
+
+describe('Testmerkmal acceptance im Gate', () => {
+  it('eine Datei unter /acceptance/ ist kein Diff außerhalb des Auftrags', () => {
+    assert.deepEqual(diffAusserhalbAuftrag(['dashboard-src/acceptance/login.ts', 'acceptance/x.py'], { dateien: [], prot: [], testpfade: [] }), [])
+  })
+  it('über testpfade der Config: dashboard-src/acceptance/**', () => {
+    assert.deepEqual(diffAusserhalbAuftrag(['dashboard-src/acceptance-e2e/a.ts'], { dateien: [], prot: [], testpfade: ['dashboard-src/acceptance-e2e/**'] }), [])
+  })
+})

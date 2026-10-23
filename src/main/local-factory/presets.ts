@@ -27,7 +27,7 @@ schreibst Abnahmetests und Aufträge.
 
 **Technisch gesperrt** (der Mux lehnt ab):
 - Edit-Werkzeuge unter \`/src/\` und \`/lib/\` — außer Testpfaden (\`.test.\`, \`.spec.\`,
-  \`/test/\`, \`/tests/\`, \`/__tests__/\` und die \`testpfade\` der Projekt-Config).
+  \`/test/\`, \`/tests/\`, \`/__tests__/\`, \`/acceptance/\` und die \`testpfade\` der Projekt-Config).
 - Edit an \`${cfg}\` — die Datei pflegen nur der User oder die Systems-Session.
 - \`git stash\`, \`git checkout\`, \`git switch\`, \`git reset --hard\` (Befehlssperre,
   auch als \`git -C …\`). \`refs/stash\` gehört allen Worktrees gemeinsam.
@@ -143,7 +143,7 @@ Liegt im Ziel-Repo. **Du änderst sie nicht** (gesperrt, s. o.); fehlt etwas, sc
 dem User vor. Ungültige Einträge werden verworfen und als \`hinweise\` gemeldet.
 
 - \`testpfade\` — zusätzliche Pfade, in denen du Tests schreiben darfst. Gilt nur mit
-  Testmerkmal (\`test\`, \`spec\`, \`tests\`, \`__tests__\`), nie für reines \`/src/\`/\`/lib/\`.
+  Testmerkmal (\`test\`, \`spec\`, \`tests\`, \`__tests__\`, \`acceptance\`), nie für reines \`/src/\`/\`/lib/\`.
 - \`pflichtGates\` \`[{muster, befehl}]\` — ändert der Worker eine Datei, die auf \`muster\`
   passt, läuft \`befehl\` zusätzlich im Gate (z. B. Katalog-Wächter).
 - \`vorpruefung\` \`{befehl, erwartet}\` — läuft vor jedem Versuch (\`{projekt}\` wird ersetzt);

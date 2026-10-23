@@ -175,3 +175,10 @@ describe('local-factory v3 — Läuferfehler', () => {
     assert.doesNotMatch(beschreibung, /laeuferfehler:/)
   })
 })
+
+describe('local-factory v3 — Testmerkmal acceptance', () => {
+  it('Rollentext nennt /acceptance/ bei den Standard-Testpfaden und acceptance bei den testpfade-Merkmalen', () => {
+    assert.match(p, /`\/acceptance\/`/)
+    assert.match(p, /Testmerkmal \([^)]*`acceptance`[^)]*\)/)
+  })
+})

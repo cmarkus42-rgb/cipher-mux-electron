@@ -219,7 +219,7 @@ nie geworfen.
 
 | Feld | Wirkung |
 |---|---|
-| `testpfade` | Zusätzliche Testpfade für die Edit-Sperre des Architekten; nur mit Testmerkmal (`test`, `spec`, `tests`, `__tests__`), nie reines `/src/`/`/lib/` (L1) |
+| `testpfade` | Zusätzliche Testpfade für die Edit-Sperre des Architekten; nur mit Testmerkmal (`test`, `spec`, `tests`, `__tests__`, `acceptance`), nie reines `/src/`/`/lib/` (L1) |
 | `pflichtGates` | Ändert der Worker eine Datei auf `muster`, läuft `befehl` zusätzlich im Gate (L13) |
 | `vorpruefung` | Vor jedem Versuch; `{projekt}` wird ersetzt. Fehlt `erwartet` in der Ausgabe: „Nicht bereit“, kein Versuch (L2) |
 | `worktreeVorbereitung` | Vor dem ersten Dispatch eines Laufs im Worktree. Muss **idempotent** sein — scheitert der erste Dispatch, läuft der Schritt erneut. Fehlschlag: „Nicht bereit“, kein Versuch (L15) |
