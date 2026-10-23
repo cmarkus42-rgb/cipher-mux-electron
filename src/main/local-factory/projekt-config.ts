@@ -141,9 +141,14 @@ export function parseProjektConfig(raw: unknown): ProjektConfigErgebnis {
     else hinweise.push('worktreeVorbereitung braucht befehl und wird ignoriert.')
   }
 
-  config.sauberkeitIgnoriert = liste('sauberkeitIgnoriert', raw.sauberkeitIgnoriert, hinweise, (e) =>
-    text(e) ?? new Fehler('kein Pfad.'),
-  )
+  // Nur Pfade im Repo: was hier steht, sehen Gate, Commit und Reset nicht.
+  config.sauberkeitIgnoriert = liste('sauberkeitIgnoriert', raw.sauberkeitIgnoriert, hinweise, (e) => {
+    const p = text(e)
+    if (!p) return new Fehler('kein Pfad.')
+    if (p.startsWith('/') || p.split('/').includes('..')) return new Fehler('muss relativ zur Repo-Wurzel sein, ohne „..“.')
+    if (p.replace(/^(\.\/)+/, '').replace(/\/+$/, '') === '' || /^\.\/*$/.test(p)) return new Fehler('nicht die Repo-Wurzel selbst.')
+    return p
+  })
 
   config.verboteneMuster = liste('verboteneMuster', raw.verboteneMuster, hinweise, (e) => {
     if (!istObjekt(e)) return new Fehler('kein Objekt.')

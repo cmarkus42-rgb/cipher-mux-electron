@@ -29,6 +29,13 @@ export interface Versuch {
   /** Umfang des grünen Commits (Bilanz). Fehlt, wenn die Messung scheiterte. */
   dateien?: number
   diffZeilen?: number
+  /**
+   * L12: Dieser Fehlversuch geht auf den Architekten (falscher Zuschnitt, falscher
+   * Test), nicht auf das Modell. Zählt nicht gegen MAX_VERSUCHE und nicht als Anlauf.
+   */
+  architektenfehler?: string
+  /** L16a: Begründung, mit der der Architekt ein Vorab-Rot aus dem Testcode übersteuert hat. */
+  rotGrund?: string
 }
 
 export interface Haeppchen {
@@ -59,6 +66,11 @@ export function newLauf(id: string, projekt: string, now: number, branch?: strin
   return { id, projekt, erstellt: now, weckrufe: 0, haeppchen: [], ...(branch ? { branch } : {}) }
 }
 
+/** Versuche, die gegen MAX_VERSUCHE zählen — ohne die als Architektenfehler markierten. */
+export function zaehlendeVersuche(h: Haeppchen): number {
+  return h.versuche.filter(v => !v.architektenfehler).length
+}
+
 const replaceH = (lauf: Lauf, h: Haeppchen): Lauf => ({
   ...lauf,
   haeppchen: lauf.haeppchen.map(x => (x.nummer === h.nummer ? h : x)),
@@ -66,11 +78,24 @@ const replaceH = (lauf: Lauf, h: Haeppchen): Lauf => ({
 
 export function beginVersuch(
   lauf: Lauf,
-  opts: { nummer?: number; ziel: string; now: number; mitTest?: boolean },
+  opts: { nummer?: number; ziel: string; now: number; mitTest?: boolean; architektenfehler?: string; rotGrund?: string },
+): { lauf: Lauf; nummer: number; versuch: number } | { error: string } {
+  const r = beginOhneRotGrund(lauf, opts)
+  if ('error' in r || opts.rotGrund === undefined) return r
+  // Der neue Versuch ist der letzte des Häppchens; dort steht die Begründung.
+  const h = r.lauf.haeppchen.find(x => x.nummer === r.nummer)!
+  const versuche = [...h.versuche.slice(0, -1), { ...h.versuche[h.versuche.length - 1], rotGrund: opts.rotGrund }]
+  return { ...r, lauf: replaceH(r.lauf, { ...h, versuche }) }
+}
+
+function beginOhneRotGrund(
+  lauf: Lauf,
+  opts: { nummer?: number; ziel: string; now: number; mitTest?: boolean; architektenfehler?: string },
 ): { lauf: Lauf; nummer: number; versuch: number } | { error: string } {
   if (lauf.haeppchen.some(h => h.status === 'laeuft')) {
     return { error: 'Es läuft bereits ein Worker. Nacheinander (Spec E2).' }
   }
+  if (opts.architektenfehler !== undefined) return beginNachArchitektenfehler(lauf, { ...opts, architektenfehler: opts.architektenfehler })
   if (opts.nummer === undefined) {
     const nummer = lauf.haeppchen.reduce((m, h) => Math.max(m, h.nummer), 0) + 1
     const h: Haeppchen = {
@@ -86,7 +111,7 @@ export function beginVersuch(
   }
   if (h.status === 'abgenommen') return { error: `Häppchen #${h.nummer} ist schon abgenommen.` }
   if (h.status === 'beurteilt') return { error: `Häppchen #${h.nummer} ist schon beurteilt.` }
-  if (h.versuche.length >= MAX_VERSUCHE) {
+  if (zaehlendeVersuche(h) >= MAX_VERSUCHE) {
     return { error: `Häppchen #${h.nummer} hat ${MAX_VERSUCHE} Versuche hinter sich. An den User melden.` }
   }
   const versuch = h.versuche.length + 1
@@ -94,6 +119,32 @@ export function beginVersuch(
     ...h, ziel: opts.ziel, status: 'laeuft', versuche: [...h.versuche, { nr: versuch, gestartet: opts.now }],
   }
   return { lauf: replaceH(lauf, next), nummer: h.nummer, versuch }
+}
+
+/**
+ * L12: Der letzte Fehlversuch war ein Fehler des Architekten. Er wird markiert und
+ * zählt nicht mehr; der neue Versuch beginnt — auch aus „eskaliert“ heraus. Höchstens
+ * einmal je Häppchen: wer zweimal falsch schneidet, meldet an den User.
+ */
+function beginNachArchitektenfehler(
+  lauf: Lauf,
+  opts: { nummer?: number; ziel: string; now: number; architektenfehler: string },
+): { lauf: Lauf; nummer: number; versuch: number } | { error: string } {
+  if (opts.nummer === undefined) return { error: 'architektenfehler braucht haeppchen: er markiert den letzten Fehlversuch eines Häppchens.' }
+  const h = lauf.haeppchen.find(x => x.nummer === opts.nummer)
+  if (!h) return { error: `Häppchen #${opts.nummer} gibt es in diesem Lauf nicht.` }
+  if (h.status === 'abgenommen') return { error: `Häppchen #${h.nummer} ist schon abgenommen.` }
+  if (h.status === 'beurteilt') return { error: `Häppchen #${h.nummer} ist schon beurteilt.` }
+  if (h.versuche.some(v => v.architektenfehler)) {
+    return { error: `Häppchen #${h.nummer} hat schon einen Architektenfehler (höchstens 1 je Häppchen). An den User melden.` }
+  }
+  const letzter = h.versuche.at(-1)
+  if (!letzter || letzter.verdict === 'gruen') {
+    return { error: `architektenfehler markiert einen Fehlversuch; der letzte Versuch von #${h.nummer} ist keiner.` }
+  }
+  const versuch = h.versuche.length + 1
+  const versuche = [...h.versuche.slice(0, -1), { ...letzter, architektenfehler: opts.architektenfehler }, { nr: versuch, gestartet: opts.now }]
+  return { lauf: replaceH(lauf, { ...h, ziel: opts.ziel, status: 'laeuft', versuche }), nummer: h.nummer, versuch }
 }
 
 export function endVersuch(
@@ -108,7 +159,7 @@ export function endVersuch(
   const versuche = [...h.versuche]
   versuche[versuche.length - 1] = { ...versuche[versuche.length - 1], ...patch, beendet: now }
   const status: HaeppchenStatus =
-    patch.verdict === 'gruen' ? 'wartet' : versuche.length >= MAX_VERSUCHE ? 'eskaliert' : 'wartet'
+    patch.verdict === 'gruen' ? 'wartet' : zaehlendeVersuche({ ...h, versuche }) >= MAX_VERSUCHE ? 'eskaliert' : 'wartet'
   return replaceH(lauf, { ...h, versuche, status })
 }
 

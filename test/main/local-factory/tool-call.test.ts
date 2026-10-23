@@ -73,3 +73,31 @@ describe('handleLocalFactoryCall — Workshop-Urteil', () => {
     assert.equal(r.calls.accept.length, 1)
   })
 })
+
+describe('mux_local_worker_dispatch: Paket-3-Felder', () => {
+  it('ersetzungen, architektenfehler und rotGrund gehen unverändert an dispatch', async () => {
+    const r = fakeRunner()
+    const ersetzungen = [{ datei: 'src/a.ts', alt: 'x', neu: 'y' }]
+    await handleLocalFactoryCall(r, { projekt: '/p', ersetzungen, architektenfehler: 'Test falsch', rotGrund: 'gewollt', haeppchen: 1 })
+    assert.deepEqual(r.calls.dispatch[0].ersetzungen, ersetzungen)
+    assert.equal(r.calls.dispatch[0].architektenfehler, 'Test falsch')
+    assert.equal(r.calls.dispatch[0].rotGrund, 'gewollt')
+  })
+  it('das Schema nimmt die Felder an und weist kaputte ersetzungen ab', async () => {
+    const { z } = await import('zod')
+    const { DISPATCH_INPUT_SCHEMA } = await import('../../../src/main/mcp/local-factory-tool')
+    const s = z.object(DISPATCH_INPUT_SCHEMA)
+    assert.equal(s.safeParse({ ersetzungen: [{ datei: 'a', alt: 'b', neu: '' }], architektenfehler: 'x', rotGrund: 'y' }).success, true)
+    assert.equal(s.safeParse({ ersetzungen: [{ datei: 'a' }] }).success, false)
+  })
+  it('die Beschreibung nennt die neuen Felder und die Projekt-Config, für beide Rollen', async () => {
+    const { buildDispatchDescription } = await import('../../../src/main/mcp/local-factory-tool')
+    for (const rolle of ['local-factory', 'local-workshop'] as const) {
+      const d = buildDispatchDescription(rolle)
+      for (const wort of ['ersetzungen', 'architektenfehler', 'rotGrund', '.cipher-mux/local-factory.json',
+        'pflichtGates', 'vorpruefung', 'worktreeVorbereitung', 'sauberkeitIgnoriert', 'verboteneMuster']) {
+        assert.ok(d.includes(wort), `${rolle}: ${wort} fehlt`)
+      }
+    }
+  })
+})

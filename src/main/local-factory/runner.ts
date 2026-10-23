@@ -2,16 +2,20 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { ulid } from 'ulidx'
-import { validateAuftrag, buildAuftragMd, type AuftragInput } from './auftrag'
-import { decideGate, testWarnungen, readGateRecord, type GateResult, type GateRecord, type GateDiagnose } from './gate'
+import { validateAuftrag, validateDispatchSteuerung, buildAuftragMd, type AuftragInput } from './auftrag'
+import {
+  decideGate, testWarnungen, readGateRecord, mitGruenden, pruefeErsetzungen, diffAusserhalbAuftrag, rotAusTestfehler, pruefeVerboteneMuster, configVeraendert,
+  type GateResult, type GateRecord, type GateDiagnose,
+} from './gate'
+import { ladeProjektConfig, passtGlob, PROJEKT_CONFIG_PFAD, type ProjektConfig } from './projekt-config'
 import {
   newLauf, beginVersuch, endVersuch, countWeckruf, markAbgenommen, markBeurteilt,
-  loadLauf, saveLauf, abortRunning, MAX_VERSUCHE, type Lauf,
+  loadLauf, saveLauf, abortRunning, zaehlendeVersuche, MAX_VERSUCHE, type Lauf,
 } from './lauf'
 import { classifyWorker, IDLE_SIGNAL_FILENAME } from './worker-done'
 import {
   runShell, dirtyFiles, headCommit, commitPaths, commitAll, changedSince,
-  checksums, savePatchAndReset, toRepoRelative, isRepoRoot, currentBranch, diffStat,
+  checksums, savePatchAndReset, toRepoRelative, isRepoRoot, currentBranch, diffStat, istIgnoriert, hinzugefuegteZeilen,
 } from './git-ops'
 import { PROTECTED_PATHS_FILENAME } from '../session/entity-boundaries'
 import { createWorkerLock, type WorkerLock } from './worker-lock'
@@ -78,14 +82,25 @@ export interface DispatchArgs extends AuftragInput {
   haeppchen?: number
   /** Modellprofil (Spec 2026-10-12 §4.4); fehlt = Standardprofil. */
   profil?: string
+  /** L12: Der letzte Fehlversuch dieses Häppchens war ein Fehler des Architekten — Begründung. */
+  architektenfehler?: string
+  /** L16a: Begründung, warum das Vorab-Rot des Abnahmetests trotz Fehler im Testcode richtig ist. */
+  rotGrund?: string
 }
 
-export type DispatchAccepted = { ok: true; laufId: string; nummer: number; versuch: number; laufPfad: string }
+export type DispatchAccepted = {
+  ok: true; laufId: string; nummer: number; versuch: number; laufPfad: string
+  /** Hinweise des Config-Parsers (ignorierte Einträge). Fehlt, wenn es keine gibt. */
+  hinweise?: string[]
+}
 export type DispatchRejected = { ok: false; error: string }
 export type AcceptResult = { ok: true } | { ok: false; error: string }
 
 /** So viele Pane-Zeilen nimmt die Diagnose eines hängenden Workers mit (L8). */
 export const DIAGNOSE_PANE_ZEILEN = 30
+
+/** So viel vom Ende der Ausgabe eines roten Pflicht-Gates steht im Grund (L13). */
+export const PFLICHT_GATE_AUSZUG = 1200
 
 /** Höchstlänge einer Weckzeile. Sie geht per send-keys in ein Eingabefeld. */
 export const MAX_WECKZEILE = 400
@@ -105,6 +120,18 @@ interface Attempt {
   args: DispatchArgs; prot: string[]; base: string; branch: string; sumsBefore: Record<string, string>
   laufId: string; laufPfad: string; nummer: number; versuch: number
   vorherigesGate?: { reasons: string[]; testOutput: string }
+  /** Projekt-Config, gelesen VOR dem Worker — was er daran ändert, gilt für sein Gate nicht. */
+  config: ProjektConfig
+  configHinweise: string[]
+  /** Offene Einträge unter sauberkeitIgnoriert vor dem Worker — was danach neu ist, hat er angelegt. */
+  ignoriertVorher: string[]
+  /** Bytes der Projekt-Config vor dem Worker; null = keine. */
+  configBytes: Buffer | null
+}
+
+/** Bytes der Projekt-Config; null, wenn es keine gibt. */
+function configLesen(projekt: string): Buffer | null {
+  try { return fs.readFileSync(path.join(projekt, PROJEKT_CONFIG_PFAD)) } catch { return null }
 }
 
 export class LocalFactoryRunner {
@@ -213,7 +240,7 @@ export class LocalFactoryRunner {
   }
 
   async dispatch(args: DispatchArgs): Promise<DispatchAccepted | DispatchRejected> {
-    const errs = validateAuftrag(args, { testPflicht: this.testPflicht })
+    const errs = [...validateAuftrag(args, { testPflicht: this.testPflicht }), ...validateDispatchSteuerung(args)]
     if (errs.length) return { ok: false, error: `Auftrag ungültig: ${errs.join('; ')}` }
     if (args.laufId !== undefined && !LAUF_ID.test(args.laufId)) {
       return { ok: false, error: 'laufId ungültig: nur A-Z, a-z, 0-9, _ und -, höchstens 64 Zeichen.' }
@@ -278,9 +305,35 @@ export class LocalFactoryRunner {
 
     const projekt = args.projekt
     const prot = args.geschuetzteTests.map(t => toRepoRelative(projekt, t))
+    const { config, hinweise: configHinweise } = ladeProjektConfig(projekt)
+
+    // L15: einmal je Lauf, vor seinem ersten Dispatch — Abhängigkeiten verlinken o. ä.
+    // Ein Lauf existiert erst nach einem angenommenen Dispatch; fehlt er, ist dies der erste.
+    const ersterDispatch = args.laufId === undefined || loadLauf(this.laufFile(args.laufId)) === null
+    if (config.worktreeVorbereitung && ersterDispatch) {
+      const befehl = config.worktreeVorbereitung.befehl
+      const v = await runShell(befehl, projekt, this.o.testTimeoutMs)
+      if (v.exitCode !== 0) {
+        const was = v.exitCode === null ? 'lief nicht zu Ende' : `scheiterte (Exit ${v.exitCode})`
+        return { ok: false, error: oneLine(`Nicht bereit: Worktree-Vorbereitung „${befehl}“ ${was}. Ausgabe: ${v.output.trim() || '(leer)'}. Kein Versuch gezählt.`, 1000) }
+      }
+    }
+
+    // L2: Prüft, ob der Baum benutzbar ist (z. B. ob ein Import wirklich aus diesem
+    // Worktree kommt). Vor beginVersuch: ein unbrauchbarer Baum kostet keinen Versuch.
+    if (config.vorpruefung) {
+      const befehl = config.vorpruefung.befehl.split('{projekt}').join(projekt)
+      const v = await runShell(befehl, projekt, this.o.testTimeoutMs)
+      if (v.exitCode === null || !v.output.includes(config.vorpruefung.erwartet)) {
+        const was = v.exitCode === null ? 'lief nicht zu Ende' : `Ausgabe enthält „${config.vorpruefung.erwartet}“ nicht`
+        return { ok: false, error: oneLine(`Nicht bereit: Vorprüfung „${befehl}“ ${was}. Ausgabe: ${v.output.trim() || '(leer)'}. Kein Versuch gezählt.`, 1000) }
+      }
+    }
 
     // Offene Dateien dürfen nur die geschützten Tests sein — die committet der Läufer als Basis.
-    const dirty = await dirtyFiles(projekt)
+    const dirtyAlle = await dirtyFiles(projekt)
+    const ignoriertVorher = dirtyAlle.filter(f => istIgnoriert(f, config.sauberkeitIgnoriert))
+    const dirty = dirtyAlle.filter(f => !istIgnoriert(f, config.sauberkeitIgnoriert))
     const fremd = dirty.filter(f => !prot.includes(f))
     if (fremd.length) {
       // Ein „laeuft“ im Lauf heißt: ein Versuch wurde unterbrochen (App-Neustart),
@@ -297,11 +350,30 @@ export class LocalFactoryRunner {
     if (fehlend.length) return { ok: false, error: `Abnahmetest fehlt: ${fehlend.join(', ')}` }
 
     // Ohne Abnahmetest (Workshop) gibt es nichts, was vorab rot sein müsste.
+    let rotGrund: string | undefined
     if (prot.length > 0) {
       const vorher = await runShell(args.testBefehl, projekt, this.o.testTimeoutMs)
       if (vorher.exitCode === 0) {
         return { ok: false, error: 'Der Abnahmetest ist vor der Arbeit schon grün — er prüft nichts.' }
       }
+      // L16a: rot, aber aus dem richtigen Grund? Ein Fehler mit Ursprung im Test selbst
+      // misst nichts am Produktionscode. Ein fehlendes Test-Hilfsobjekt ist nie richtig.
+      const befund = rotAusTestfehler(vorher.output, prot, projekt)
+      if (befund?.helfer) {
+        return {
+          ok: false,
+          error: `Abnahmetest rot, weil ein Test-Hilfsobjekt fehlt (\`${befund.helfer}\`), Übersteuern nicht möglich `
+            + `(${befund.fehler} in ${befund.datei}). Test korrigieren. Kein Versuch gezählt.`,
+        }
+      }
+      if (befund && args.rotGrund === undefined) {
+        return {
+          ok: false,
+          error: `Abnahmetest rot, vermutlich aus einem Fehler im Test selbst (${befund.fehler} in ${befund.datei}). `
+            + 'Test prüfen; ist das Rot so richtig, erneut mit rotGrund: "<Begründung>" dispatchen. Kein Versuch gezählt.',
+        }
+      }
+      if (befund) rotGrund = args.rotGrund
     }
 
     const laufId = args.laufId ?? ulid()
@@ -314,7 +386,9 @@ export class LocalFactoryRunner {
       lauf0 = abortRunning(lauf0)
       saveLauf(laufPfad, lauf0)
     }
-    const begun = beginVersuch(lauf0, { nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0 })
+    const begun = beginVersuch(lauf0, {
+      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0, architektenfehler: args.architektenfehler, rotGrund,
+    })
     if ('error' in begun) return { ok: false, error: begun.error }
 
     const offeneTests = dirty.filter(f => prot.includes(f))
@@ -322,6 +396,7 @@ export class LocalFactoryRunner {
     const base = await headCommit(projekt)
     const branch = branchJetzt
     const sumsBefore = checksums(projekt, prot)
+    const configBytes = configLesen(projekt)
     // Frisch laden und ohne await dazwischen speichern: `judge` ist nicht durch busy
     // geschützt und kann während der awaits oben ein Urteil geschrieben haben. Ein
     // Speichern des veralteten `begun.lauf` hätte es überschrieben (zweites Urteil, zweite Bilanz-Zeile).
@@ -330,13 +405,14 @@ export class LocalFactoryRunner {
     let basis: Lauf = loadLauf(laufPfad) ?? lauf0
     if (!basis.branch) basis = { ...basis, branch: branchJetzt }
     const frisch = beginVersuch(basis, {
-      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0,
+      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0, architektenfehler: args.architektenfehler, rotGrund,
     })
     if ('error' in frisch) return { ok: false, error: frisch.error }
     saveLauf(laufPfad, frisch.lauf)
 
     // Vorheriges Gate für einen zweiten Versuch — aus der Datei, nicht vom Architekten.
-    const prevV = args.haeppchen !== undefined
+    // Nach einem Architektenfehler nicht: der Worker scheiterte an einem falschen Auftrag.
+    const prevV = args.haeppchen !== undefined && args.architektenfehler === undefined
       ? lauf0.haeppchen.find(h => h.nummer === begun.nummer)?.versuche.at(-1)
       : undefined
     let vorherigesGate: { reasons: string[]; testOutput: string } | undefined
@@ -349,12 +425,15 @@ export class LocalFactoryRunner {
 
     this.running = this.runAttempt({
       args, prot, base, branch, sumsBefore, laufId, laufPfad,
-      nummer: begun.nummer, versuch: begun.versuch, vorherigesGate,
+      nummer: begun.nummer, versuch: begun.versuch, vorherigesGate, config, configHinweise, ignoriertVorher, configBytes,
     })
       .catch(err => this.wake(`${this.praefix} #${begun.nummer} Läuferfehler: ${String(err)}`).catch(() => {}))
       .finally(() => { this.release() })
 
-    return { ok: true, laufId, nummer: begun.nummer, versuch: begun.versuch, laufPfad }
+    return {
+      ok: true, laufId, nummer: begun.nummer, versuch: begun.versuch, laufPfad,
+      ...(configHinweise.length ? { hinweise: configHinweise } : {}),
+    }
   }
 
   private async runAttempt(a: Attempt): Promise<void> {
@@ -371,7 +450,7 @@ export class LocalFactoryRunner {
         const patch = path.join(dir, `versuch-${a.nummer}-${a.versuch}.patch`)
         // Auf einem fremden Branch kein reset --hard: er zöge diesen Branch auf die Basis.
         if ((await currentBranch(a.args.projekt)) === a.branch) {
-          await savePatchAndReset(a.args.projekt, a.base, patch)
+          await savePatchAndReset(a.args.projekt, a.base, patch, a.config.sauberkeitIgnoriert)
         }
       } catch { /* Patch/Reset best effort */ }
       try {
@@ -428,28 +507,67 @@ export class LocalFactoryRunner {
     const branchJetzt = await currentBranch(projekt)
     const branchGewechselt = branchJetzt !== a.branch
 
-    const test = state === 'fertig' && !branchGewechselt
+    const pruefen = state === 'fertig' && !branchGewechselt
+    const test = pruefen
       ? await runShell(a.args.testBefehl, projekt, this.o.testTimeoutMs)
       : { exitCode: null, output: '' }
+    // Geschützte Tests prüft der Gate auf der vollen Liste; alle übrigen Prüfungen
+    // sehen nicht, was das Projekt als Umgebung deklariert hat (L15).
+    const changedAlle = branchGewechselt ? [] : await changedSince(projekt, a.base)
+    const changed = changedAlle.filter(f => !istIgnoriert(f, a.config.sauberkeitIgnoriert))
+    const configNeu = configVeraendert(a.configBytes, configLesen(projekt))
+    const zusatz: string[] = [...configNeu]
+    const warnungen = [...a.configHinweise.map(h => `Projekt-Config: ${h}`), ...testWarnungen(test.output)]
+    let testOutput = test.output
+    if (pruefen) {
+      // L13: Pflicht-Gates des Projekts, nach dem Testbefehl, im Baum des Workers.
+      for (const pg of a.config.pflichtGates) {
+        const ausloeser = changed.find(f => passtGlob(pg.muster, f))
+        if (!ausloeser) continue
+        const r = await runShell(pg.befehl, projekt, this.o.testTimeoutMs)
+        if (r.exitCode === 0) continue
+        const auszug = r.output.length > PFLICHT_GATE_AUSZUG ? '…' + r.output.slice(-PFLICHT_GATE_AUSZUG) : r.output
+        zusatz.push(`Pflicht-Gate „${pg.befehl}“ ${r.exitCode === null ? 'lief nicht zu Ende' : `rot (Exit ${r.exitCode})`}, `
+          + `ausgelöst von ${ausloeser}. Ausgabe (Ende):\n${auszug.trimEnd()}`)
+        testOutput += `\n\n--- Pflicht-Gate: ${pg.befehl} (Exit ${r.exitCode ?? 'keiner'}) ---\n${r.output}`
+      }
+      zusatz.push(...pruefeErsetzungen(a.args.ersetzungen ?? [], datei => {
+        try { return fs.readFileSync(path.join(projekt, datei), 'utf-8') } catch { return null }
+      }))
+      if (a.config.verboteneMuster.length) {
+        zusatz.push(...pruefeVerboteneMuster(
+          await hinzugefuegteZeilen(projekt, a.base, a.config.sauberkeitIgnoriert), a.config.verboteneMuster,
+        ))
+      }
+      const fremd = diffAusserhalbAuftrag(changed, {
+        dateien: [...a.args.dateien, ...(a.args.ersetzungen ?? []).map(e => e.datei)],
+        prot: a.prot, testpfade: a.config.testpfade,
+      })
+      if (fremd.length) warnungen.push(`Diff außerhalb des Auftrags: ${fremd.join(', ')}`)
+      // Ignoriert heißt nicht unsichtbar: was der Worker dort anlegt, soll der Architekt sehen.
+      const vorher = new Set(a.ignoriertVorher)
+      const neu = a.config.sauberkeitIgnoriert.filter(e =>
+        changedAlle.some(f => !vorher.has(f) && istIgnoriert(f, [e])))
+      if (neu.length) warnungen.push(`Neu unter sauberkeitIgnoriert, vom Worker angelegt: ${neu.join(', ')}`)
+    }
     const gate: GateResult = branchGewechselt
       ? {
           verdict: 'rot',
           reasons: [`Worker hat den Branch gewechselt (${a.branch} → ${branchJetzt}). Nichts zurückgesetzt — Baum von Hand prüfen.`],
         }
-      : decideGate({
+      : mitGruenden(decideGate({
           workerFinished: state === 'fertig',
           testExitCode: test.exitCode,
           checksumsBefore: a.sumsBefore,
           checksumsAfter: checksums(projekt, a.prot),
-          changedFiles: await changedSince(projekt, a.base),
+          changedFiles: changedAlle,
           protectedFiles: a.prot,
           testPflicht: this.testPflicht,
-        })
+        }), zusatz)
 
     const dir = path.dirname(a.laufPfad)
     const gatePfad = path.join(dir, `gate-${a.nummer}-${a.versuch}.json`)
-    const warnungen = testWarnungen(test.output)
-    const record: GateRecord = { ...gate, testOutput: test.output, warnungen, ...(diagnose ? { diagnose } : {}) }
+    const record: GateRecord = { ...gate, testOutput, warnungen, ...(diagnose ? { diagnose } : {}) }
     fs.writeFileSync(gatePfad, JSON.stringify(record, null, 2), 'utf-8')
 
     let commit: string | undefined
@@ -458,7 +576,7 @@ export class LocalFactoryRunner {
     if (branchGewechselt) {
       started.settled = true
     } else if (gate.verdict === 'gruen') {
-      await commitAll(projekt, a.base, `lf: ${oneLine(a.args.ziel, 200)}`)
+      await commitAll(projekt, a.base, `lf: ${oneLine(a.args.ziel, 200)}`, a.config.sauberkeitIgnoriert)
       // Direkt nach dem commit, vor jedem weiteren await: ab hier ist der
       // Versuch entschieden; ein Fehler in headCommit darf nicht zum Reset führen.
       started.settled = true
@@ -467,8 +585,14 @@ export class LocalFactoryRunner {
       try { stat = await diffStat(projekt, a.base, commit) } catch { /* */ }
     } else {
       patchPfad = path.join(dir, `versuch-${a.nummer}-${a.versuch}.patch`)
-      await savePatchAndReset(projekt, a.base, patchPfad)
+      await savePatchAndReset(projekt, a.base, patchPfad, a.config.sauberkeitIgnoriert)
       started.settled = true
+      // Eine ignorierte oder neu angelegte Config stellt der Reset nicht wieder her.
+      if (configNeu.length) {
+        const ziel = path.join(projekt, PROJEKT_CONFIG_PFAD)
+        if (a.configBytes) fs.writeFileSync(ziel, a.configBytes)
+        else fs.rmSync(ziel, { force: true })
+      }
     }
 
     let lauf = loadLauf(a.laufPfad) ?? newLauf(a.laufId, projekt, this.o.now())
@@ -484,7 +608,9 @@ export class LocalFactoryRunner {
     const h = lauf.haeppchen.find(x => x.nummer === a.nummer)
     // ziel gekappt, damit Gate- bzw. Laufpfad am Ende der Zeile nicht abgeschnitten wird.
     const kopf = `${this.praefix} #${a.nummer} „${oneLine(a.args.ziel, 120)}“`
-    const zahl = `Versuch ${a.versuch}/${MAX_VERSUCHE}`
+    const af = h ? h.versuche.length - zaehlendeVersuche(h) : 0
+    const zahl = `Versuch ${h ? zaehlendeVersuche(h) : a.versuch}/${MAX_VERSUCHE}`
+      + (af ? ` (${af} Architektenfehler nicht gezählt)` : '')
     const line = gate.verdict === 'gruen'
       ? `${kopf}: GRÜN, ${zahl}, Commit ${commit!.slice(0, 8)}, Lauf: ${a.laufPfad}`
       : `${kopf}: ${gate.verdict === 'rot' ? 'ROT' : 'HÄNGT'}, ${zahl}, Gate: ${gatePfad}`

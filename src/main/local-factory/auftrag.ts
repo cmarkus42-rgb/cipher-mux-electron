@@ -1,4 +1,5 @@
 import * as path from 'path'
+import type { Ersetzung } from './gate'
 
 /**
  * Der Auftrag an den Worker. Pflichtfelder statt Freitext, weil in Keel Regeln
@@ -14,6 +15,8 @@ export interface AuftragInput {
   geschuetzteTests: string[]
   testBefehl: string
   nichtZiele: string[]
+  /** L11: wörtliche Ersetzungen, die der Gate nach dem Worker nachzählt. */
+  ersetzungen?: Ersetzung[]
 }
 
 /** Testausgaben enden mit dem Wichtigen; gekürzt wird vorne. */
@@ -78,6 +81,42 @@ export function validateAuftrag(a: AuftragInput, opts: { testPflicht?: boolean }
     }
   }
 
+  // ersetzungen: optional; wenn, dann jede vollständig
+  if (a.ersetzungen !== undefined) {
+    if (!Array.isArray(a.ersetzungen)) {
+      errs.push('ersetzungen: Liste erforderlich')
+    } else {
+      a.ersetzungen.forEach((e, i) => {
+        if (!e || typeof e !== 'object' || blank(e.datei) || blank(e.alt) || typeof e.neu !== 'string') {
+          errs.push(`ersetzungen[${i}]: braucht datei, alt (nicht leer) und neu`)
+        } else if (!blank(a.projekt) && path.isAbsolute(a.projekt)
+          && !path.resolve(a.projekt, e.datei).startsWith(path.resolve(a.projekt) + path.sep)) {
+          errs.push(`ersetzungen[${i}]: ${e.datei} liegt außerhalb des Projekts`)
+        }
+      })
+    }
+  }
+
+  return errs
+}
+
+/**
+ * Felder, die nicht an den Worker gehen, sondern den Dispatch selbst steuern
+ * (L12 architektenfehler, L16a rotGrund). Beide sind Begründungen: leer zählt nicht.
+ */
+export interface DispatchSteuerung {
+  haeppchen?: number
+  architektenfehler?: string
+  rotGrund?: string
+}
+
+export function validateDispatchSteuerung(d: DispatchSteuerung): string[] {
+  const errs: string[] = []
+  if (d.architektenfehler !== undefined) {
+    if (blank(d.architektenfehler)) errs.push('architektenfehler: Begründung erforderlich')
+    else if (d.haeppchen === undefined) errs.push('architektenfehler braucht haeppchen (das Häppchen, dessen letzter Versuch dein Fehler war)')
+  }
+  if (d.rotGrund !== undefined && blank(d.rotGrund)) errs.push('rotGrund: Begründung erforderlich')
   return errs
 }
 
@@ -102,6 +141,9 @@ export function buildAuftragMd(
     ...(a.geschuetzteTests.length ? [`## Abnahmetests — gesperrt, bestehen statt ändern\n\n${list(a.geschuetzteTests)}`] : []),
     `## Testbefehl (im Projekt ausführen)\n\n\`\`\`\n${a.testBefehl}\n\`\`\``,
     `## Nicht-Ziele\n\n${list(a.nichtZiele)}`,
+    ...(a.ersetzungen?.length
+      ? [`## Ersetzungen — jede Fundstelle, der Gate zählt nach\n\n${list(a.ersetzungen.map(e => `\`${e.datei}\`: \`${e.alt}\` → \`${e.neu}\``))}`]
+      : []),
   ]
   if (opts.vorherigesGate) {
     parts.push(

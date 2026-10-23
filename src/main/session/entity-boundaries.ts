@@ -163,8 +163,11 @@ export const ENTITY_BOUNDARIES: Record<string, EntityBoundary> = {
   'local-worker': {
     denyPathPatterns: ['/AUFTRAG.md'],
     denyListFile: PROTECTED_PATHS_FILENAME,
+    // Die Projekt-Config bestimmt Pflicht-Gates und verbotene Muster — wer sie aendert,
+    // aendert die eigene Pruefung. Der Gate wertet eine Aenderung zusaetzlich als ROT.
+    lockPathPatterns: ['/' + PROJECT_CONFIG_RELPATH],
     reason:
-      'Abnahmetests und Auftrag gehoeren dem Architekten. Wer den Test aendert, den er '
+      'Abnahmetests, Auftrag und Projekt-Config gehoeren dem Architekten. Wer den Test aendert, den er '
       + 'bestehen soll, beweist nichts (Keel C-001). Eigene Unit-Tests sind erlaubt.',
   },
   debugger: {
@@ -465,10 +468,11 @@ interface BoundaryDecisionFns {
   boundaryNormalizeCommand(command: string): string
   boundaryDecidePath(filePath: unknown, rules: BoundaryRules, io: BoundaryIo): BoundaryDecision
   boundaryDecideCommand(command: unknown, rules: BoundaryRules): BoundaryDecision
+  boundaryTestPathMatches(entry: string, rel: string): boolean
 }
 
 const shared = new Function(`${BOUNDARY_DECISION_SOURCE}
-return { boundaryGlobMatch, boundaryCheckTestPaths, boundaryNormalizeCommand, boundaryDecidePath, boundaryDecideCommand }`,
+return { boundaryGlobMatch, boundaryCheckTestPaths, boundaryNormalizeCommand, boundaryDecidePath, boundaryDecideCommand, boundaryTestPathMatches }`,
 )() as BoundaryDecisionFns
 
 const nodeIo: BoundaryIo = {
@@ -493,6 +497,17 @@ export function decideBoundaryCommand(command: string | null | undefined, rules:
 /** Der Befehl so, wie die Befehlssperre ihn sieht. */
 export function normalizeBoundaryCommand(command: string): string {
   return shared.boundaryNormalizeCommand(command)
+}
+
+/**
+ * Ist dieser repo-relative Pfad ein Test? Dieselben Merkmale wie die Ausnahmen der
+ * Codesperre, plus die angenommenen `testpfade` der Projekt-Config.
+ */
+export function isTestPath(relPath: string, testpfade: readonly string[] = []): boolean {
+  const rel = '/' + relPath.replace(/^\.?\/+/, '')
+  const base = rel.slice(rel.lastIndexOf('/') + 1)
+  if (TEST_PATH_MARKERS.some(p => (p.includes('/') ? rel.includes(p) : base.includes(p)))) return true
+  return checkTestPaths([...testpfade]).accepted.some(e => shared.boundaryTestPathMatches(e, rel))
 }
 
 /** `testpfade` pruefen: angenommen wird nur, was ein Testmerkmal traegt. Wirft nie. */

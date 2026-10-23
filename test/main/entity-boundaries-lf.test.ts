@@ -357,3 +357,19 @@ describe('Paritaet: dieselben Faelle gegen Funktion, Claude-Hook und opencode-Pl
     await assert.rejects(async () => pluginHook({ tool: 'shell', input: {} }), /nicht lesbar/)
   })
 })
+
+describe('local-worker: Projekt-Config gesperrt (Paket 3)', () => {
+  const W = getEntityBoundary('local-worker')!
+  const io = { read: () => null, exists: () => false }
+  it('Edit an .cipher-mux/local-factory.json wird abgelehnt, mit Begründung', () => {
+    const d = decideBoundaryPath('/repo/' + PROJECT_CONFIG_RELPATH, boundaryRules(W), io)
+    assert.equal(d.denied, true)
+    assert.match(d.reason!, /Projekt-Config/)
+  })
+  it('gewöhnlicher Code bleibt erlaubt', () => {
+    assert.equal(decideBoundaryPath('/repo/src/a.ts', boundaryRules(W), io).denied, false)
+  })
+  it('das erzeugte opencode-Plugin trägt die Sperre', () => {
+    assert.ok(buildOpenCodeBoundaryPlugin(W, '/repo/.cipher-mux-protected.json').includes(PROJECT_CONFIG_RELPATH))
+  })
+})

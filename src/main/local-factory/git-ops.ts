@@ -68,6 +68,24 @@ const lines = (s: string): string[] => s.split('\n').map(l => l.trim()).filter(B
 // und der Vergleich mit den geschützten Pfaden schlägt still fehl.
 const NO_QUOTE = ['-c', 'core.quotepath=off']
 
+/**
+ * Liegt die Datei unter einem `sauberkeitIgnoriert`-Eintrag (L15)? Ein Eintrag trifft
+ * sich selbst — Datei, Verzeichnis oder Symlink — und alles darunter. Gerade der
+ * Symlink zählt: `node_modules` als Link erscheint ohne Schrägstrich, und ein
+ * gitignore `node_modules/` erfasst ihn nicht.
+ */
+export function istIgnoriert(datei: string, eintraege: readonly string[]): boolean {
+  const d = datei.replace(/^\.\//, '')
+  return eintraege.some(e => {
+    const n = e.replace(/^\.\//, '').replace(/\/+$/, '')
+    return n !== '' && (d === n || d.startsWith(n + '/'))
+  })
+}
+
+/** Pathspecs, die ignorierte Einträge aus `git add` heraushalten. */
+const ohne = (ausnahmen: readonly string[]): string[] =>
+  ausnahmen.map(e => e.replace(/^\.\//, '').replace(/\/+$/, '')).filter(Boolean).map(e => `:(exclude,literal)${e}`)
+
 export async function dirtyFiles(projekt: string): Promise<string[]> {
   const tracked = lines(await git(projekt, [...NO_QUOTE, 'diff', '--name-only', '--no-renames', 'HEAD']))
   const untracked = lines(await git(projekt, [...NO_QUOTE, 'ls-files', '--others', '--exclude-standard']))
@@ -98,9 +116,9 @@ export async function commitPaths(projekt: string, paths: string[], message: str
  * zurück: der Läufer muss den Versuch direkt nach dem erfolgreichen commit als
  * entschieden markieren, bevor ein weiterer Aufruf (headCommit) scheitern kann.
  */
-export async function commitAll(projekt: string, base: string, message: string): Promise<void> {
+export async function commitAll(projekt: string, base: string, message: string, ausnahmen: readonly string[] = []): Promise<void> {
   await git(projekt, ['reset', '-q', '--soft', base])
-  await git(projekt, ['add', '-A'])
+  await git(projekt, ['add', '-A', '--', '.', ...ohne(ausnahmen)])
   await git(projekt, ['commit', '-q', '--no-verify', '-m', message])
 }
 
@@ -135,14 +153,18 @@ export async function isRepoRoot(projekt: string): Promise<boolean> {
   }
 }
 
-/** Achtung: git reset --hard + clean -fd. Läuft nur, wenn projekt die Repo-Wurzel ist. */
-export async function savePatchAndReset(projekt: string, base: string, patchFile: string): Promise<void> {
+/**
+ * Achtung: git reset --hard + clean -fd. Läuft nur, wenn projekt die Repo-Wurzel ist.
+ * `ausnahmen` (sauberkeitIgnoriert) bleiben liegen und stehen nicht im Patch — sonst
+ * löschte clean die vorbereitete Umgebung (L15).
+ */
+export async function savePatchAndReset(projekt: string, base: string, patchFile: string, ausnahmen: readonly string[] = []): Promise<void> {
   // reset --hard würde sonst ein umschließendes Repo komplett zurücksetzen.
   if (!(await isRepoRoot(projekt))) {
     throw new Error(`projekt ist nicht die Wurzel eines git-Repos: ${projekt}`)
   }
   // Untracked erst in den Index (intent-to-add), damit der Patch sie enthält.
-  await git(projekt, ['add', '-N', '.'])
+  await git(projekt, ['add', '-N', '--', '.', ...ohne(ausnahmen)])
   // Eigener Aufruf: großer Puffer, --binary, unbeschnitten.
   // encoding 'buffer': der Patch wird roh geschrieben. Ein UTF-8-Umweg machte
   // aus jedem Nicht-UTF-8-Byte (Latin-1-Text) ein U+FFFD, und der Patch ließe
@@ -156,7 +178,85 @@ export async function savePatchAndReset(projekt: string, base: string, patchFile
   fs.mkdirSync(path.dirname(patchFile), { recursive: true })
   fs.writeFileSync(patchFile, stdout)
   await git(projekt, ['reset', '-q', '--hard', base])
-  await git(projekt, ['clean', '-fdq'])
+  // -e: verankertes Ignoriermuster je Eintrag; clean lässt es dann stehen.
+  const behalten = ausnahmen.map(e => e.replace(/^\.\//, '').replace(/\/+$/, '')).filter(Boolean).flatMap(e => ['-e', `/${e}`])
+  await git(projekt, ['clean', '-fdq', ...behalten])
+}
+
+/** Eine hinzugefügte Zeile im Baum seit `base` (L16b). */
+export interface NeueZeile {
+  datei: string
+  zeile: number
+  text: string
+}
+
+/**
+ * Was seit `base` hinzugekommen ist, Zeile für Zeile: aus `git diff -U0` nur die
+ * +-Zeilen (der `+++`-Kopf zählt nicht), dazu neue, ungetrackte Textdateien ganz.
+ * Gelöschte Zeilen zählen nicht — wer ein Muster entfernt, verstößt nicht dagegen.
+ */
+export async function hinzugefuegteZeilen(projekt: string, base: string, ausnahmen: readonly string[] = []): Promise<NeueZeile[]> {
+  // --text/--no-textconv: Attribute des Repos (binary, diff=…) dürfen keine Zeilen verstecken.
+  const { stdout } = await execFileP('git', [...NO_QUOTE, 'diff', '-U0', '--no-renames', '--no-color', '--no-ext-diff', '--text', '--no-textconv',
+    // Feste Präfixe: diff.noprefix/mnemonicPrefix des Repos dürfen den Kopf nicht umformen.
+    '--src-prefix=a/', '--dst-prefix=b/', base], {
+    cwd: projekt, maxBuffer: 256 * 1024 * 1024, env: { ...process.env, PATH: getEnhancedPath() },
+  })
+  const out: NeueZeile[] = []
+  let datei: string | null = null
+  let nr = 0
+  // Kopfzeilen gibt es nur zwischen „diff --git“ und dem ersten @@ — danach ist
+  // jede +-Zeile Inhalt, auch eine, die mit „++ “ beginnt.
+  let imKopf = false
+  for (const l of stdout.split('\n')) {
+    if (l.startsWith('diff --git ')) { datei = null; imKopf = true; continue }
+    if (imKopf && l.startsWith('+++ ')) {
+      // Bei Leerzeichen im Namen hängt git einen Tab an den Kopf.
+      const p = unquote(l.slice(4).replace(/\t$/, ''))
+      datei = p === '/dev/null' ? null : p.replace(/^b\//, '')
+      continue
+    }
+    const hunk = l.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+    if (hunk) { nr = Number(hunk[1]); imKopf = false; continue }
+    if (imKopf) continue
+    if (datei && l.startsWith('+')) {
+      if (!istIgnoriert(datei, ausnahmen)) out.push({ datei, zeile: nr, text: l.slice(1) })
+      nr++
+    }
+  }
+  const neu = lines(await git(projekt, [...NO_QUOTE, 'ls-files', '--others', '--exclude-standard']))
+  for (const f of neu) {
+    if (istIgnoriert(f, ausnahmen)) continue
+    let buf: Buffer
+    try {
+      if (!fs.statSync(path.join(projekt, f)).isFile()) continue
+      buf = fs.readFileSync(path.join(projekt, f))
+    } catch { continue }
+    // Auch mit NUL-Bytes gelesen: ein einzelnes NUL machte die Datei sonst unsichtbar.
+    const text = buf.toString('utf-8').split('\n')
+    if (text.at(-1) === '') text.pop()
+    text.forEach((t, i) => out.push({ datei: f, zeile: i + 1, text: t }))
+  }
+  return out
+}
+
+const ESCAPES: Record<string, number> = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '"': 34, '\\': 92 }
+
+/** Pfad aus einem diff-Kopf: git setzt Namen mit `"`, `\\` oder Steuerzeichen C-artig in Anführungszeichen. */
+function unquote(p: string): string {
+  if (!p.startsWith('"') || !p.endsWith('"')) return p
+  const bytes: number[] = []
+  const inner = p.slice(1, -1)
+  for (let i = 0; i < inner.length; i++) {
+    const c = inner[i]
+    if (c !== '\\') { bytes.push(...Buffer.from(c, 'utf-8')); continue }
+    const n = inner[i + 1]
+    const okt = inner.slice(i + 1, i + 4)
+    if (/^[0-7]{3}$/.test(okt)) { bytes.push(parseInt(okt, 8)); i += 3 }
+    else if (n in ESCAPES) { bytes.push(ESCAPES[n]); i += 1 }
+    else bytes.push(92)
+  }
+  return Buffer.from(bytes).toString('utf-8')
 }
 
 /** Umfang eines Commits für die Bilanz: Dateien und Zeilen (hinzu + weg). Binärdateien zählen als Datei, nicht als Zeilen. */

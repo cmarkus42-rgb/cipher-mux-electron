@@ -1,4 +1,4 @@
-import type { Lauf } from './lauf'
+import { zaehlendeVersuche, type Lauf } from './lauf'
 
 /**
  * Die Bilanz des Local Workshops (Spec 2026-10-12 §5). Fakten misst der Läufer,
@@ -16,6 +16,10 @@ export interface BilanzZeile {
   profil: string | null; modell: string | null; mitTest: boolean; anlaeufe: number; dauerSek: number
   dateien: number; diffZeilen: number; workerTokens: { input: number; output: number } | null
   ergebnis: Ergebnis; kategorie: Kategorie; notiz: string | null
+  /** L12: Begründung, wenn ein Fehlversuch auf den Architekten ging. Fehlt in älteren Zeilen. */
+  architektenfehler?: string | null
+  /** L16a: Begründung eines übersteuerten Vorab-Rots. Fehlt in älteren Zeilen. */
+  rotGrund?: string | null
 }
 
 export function validateUrteil(u: Partial<Urteil>): string[] {
@@ -37,9 +41,12 @@ export function buildBilanzZeile(
   return {
     ts: ctx.now, projekt: lauf.projekt, workspaceId: ctx.workspaceId, laufId: lauf.id, haeppchen: nummer,
     profil: last?.profil ?? null, modell: last?.modell ?? null, mitTest: ctx.mitTest,
-    anlaeufe: h.versuche.length, dauerSek: Math.round(dauerMs / 1000),
+    // Anläufe des Modells: ein Architektenfehler ist kein Modellfehler (L12).
+    anlaeufe: zaehlendeVersuche(h), dauerSek: Math.round(dauerMs / 1000),
     dateien: last?.dateien ?? 0, diffZeilen: last?.diffZeilen ?? 0, workerTokens: last?.tokensAmEnde ?? null,
     ergebnis: u.ergebnis, kategorie: u.kategorie, notiz: u.notiz?.trim() || null,
+    architektenfehler: h.versuche.find(v => v.architektenfehler)?.architektenfehler ?? null,
+    rotGrund: [...h.versuche].reverse().find(v => v.rotGrund)?.rotGrund ?? null,
   }
 }
 
@@ -74,5 +81,20 @@ export function renderBilanzNote(zeilen: BilanzZeile[]): string {
     '',
     ...(notizen.length ? notizen : ['- (noch nichts)']),
     '',
+    ...sonderfaelle(zeilen),
   ].join('\n')
+}
+
+/** Was nicht dem Modell anzurechnen ist, steht eigens da — nur wenn es das gibt. */
+function sonderfaelle(zeilen: BilanzZeile[]): string[] {
+  const abschnitt = (titel: string, feld: 'architektenfehler' | 'rotGrund'): string[] => {
+    const zs = zeilen.filter(z => z[feld])
+    return zs.length
+      ? [titel, '', ...zs.map(z => `- ${z.ts.slice(0, 10)} · Lauf ${z.laufId} #${z.haeppchen}: ${z[feld]}`), '']
+      : []
+  }
+  return [
+    ...abschnitt('## Architektenfehler (nicht als Modellanlauf gezählt)', 'architektenfehler'),
+    ...abschnitt('## Übersteuertes Vorab-Rot (rotGrund)', 'rotGrund'),
+  ]
 }
