@@ -216,3 +216,62 @@ describe('L2 vorpruefung vor dem Versuch', () => {
     assert.equal(loadLauf(first.laufPfad!)!.haeppchen[0].versuche.length, 1)
   })
 })
+
+describe('L15 worktreeVorbereitung und sauberkeitIgnoriert (echter Symlink)', () => {
+  let extern: string
+  beforeEach(() => {
+    extern = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-p3-nm-'))
+    schreib('.gitignore', 'node_modules/\n')
+    git('add', '.gitignore'); git('commit', '-qm', 'gitignore')
+  })
+  const verlinke = () => fs.symlinkSync(extern, path.join(repo, 'node_modules'))
+
+  it('ohne Config: Symlink node_modules macht den Baum unsauber (wie bisher)', async () => {
+    verlinke()
+    const res = await lauf(runner(fakeHost()), args())
+    assert.equal(res.ok, false)
+    assert.match(res.error!, /nicht sauber.*node_modules/)
+  })
+  it('mit sauberkeitIgnoriert: Dispatch läuft, Commit ohne Symlink, keine Warnung dazu, Symlink bleibt', async () => {
+    config({ sauberkeitIgnoriert: ['node_modules'], pflichtGates: [{ muster: 'node_modules', befehl: 'exit 1' }] })
+    verlinke()
+    const host = fakeHost()
+    const res = await lauf(runner(host), args())
+    assert.equal(res.ok, true, res.error)
+    assert.match(host.wakes[0], /GRÜN/)
+    assert.doesNotMatch(host.wakes[0], /node_modules/)
+    assert.equal(git('show', '--name-only', '--format=', 'HEAD'), 'impl.txt')
+    assert.equal(fs.lstatSync(path.join(repo, 'node_modules')).isSymbolicLink(), true)
+  })
+  it('roter Versuch: Reset und clean lassen den Symlink stehen', async () => {
+    config({ sauberkeitIgnoriert: ['node_modules/'] })
+    verlinke()
+    const host = fakeHost(() => schreib('impl.txt', 'nein, nein\n'))
+    await lauf(runner(host), args())
+    assert.match(host.wakes[0], /ROT/)
+    assert.equal(fs.lstatSync(path.join(repo, 'node_modules')).isSymbolicLink(), true)
+  })
+  it('worktreeVorbereitung läuft einmal je Lauf im Projekt, nicht je Versuch', async () => {
+    const zaehler = path.join(extern, 'zaehler')
+    config({
+      worktreeVorbereitung: { befehl: `[ -e node_modules ] || ln -s "${extern}" node_modules; echo x >> "${zaehler}"` },
+      sauberkeitIgnoriert: ['node_modules'],
+    })
+    const host = fakeHost(() => schreib('impl.txt', 'nein, nein\n'))
+    const first = await lauf(runner(host), args())
+    assert.equal(first.ok, true, first.error)
+    assert.equal(fs.lstatSync(path.join(repo, 'node_modules')).isSymbolicLink(), true)
+    const second = await lauf(runner(host), { ...args(), laufId: first.laufId, haeppchen: 1 })
+    assert.equal(second.ok, true, second.error)
+    assert.equal(fs.readFileSync(zaehler, 'utf-8'), 'x\n')
+  })
+  it('worktreeVorbereitung scheitert → „Nicht bereit“, kein Lauf, kein Versuch', async () => {
+    config({ worktreeVorbereitung: { befehl: 'echo kaputt; exit 7' } })
+    const host = fakeHost()
+    const res = await lauf(runner(host), args())
+    assert.equal(res.ok, false)
+    assert.match(res.error!, /^Nicht bereit: Worktree-Vorbereitung .*Exit 7.*kaputt.*Kein Versuch gezählt/)
+    assert.equal(fs.readdirSync(laufDir).length, 0)
+    assert.equal(host.sent.length, 0)
+  })
+})

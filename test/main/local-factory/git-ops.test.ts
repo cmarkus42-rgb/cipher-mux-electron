@@ -6,7 +6,7 @@ import * as path from 'path'
 import { execFileSync } from 'child_process'
 import {
   runShell, dirtyFiles, headCommit, commitPaths, commitAll, changedSince,
-  checksums, savePatchAndReset, toRepoRelative, currentBranch, loginShell, diffStat,
+  checksums, savePatchAndReset, toRepoRelative, currentBranch, loginShell, diffStat, istIgnoriert,
 } from '../../../src/main/local-factory/git-ops'
 
 let repo: string
@@ -160,5 +160,43 @@ describe('loginShell', () => {
   it('zsh, wo es sie gibt; sonst /bin/sh (Linux-CI hat keine zsh)', () => {
     assert.equal(loginShell(() => true), '/bin/zsh')
     assert.equal(loginShell(() => false), '/bin/sh')
+  })
+})
+
+describe('L15 sauberkeitIgnoriert in git-ops', () => {
+  it('istIgnoriert: Datei, Verzeichnis, Symlink-Name; Eintrag mit oder ohne Schrägstrich', () => {
+    assert.equal(istIgnoriert('node_modules', ['node_modules']), true)
+    assert.equal(istIgnoriert('node_modules', ['node_modules/']), true)
+    assert.equal(istIgnoriert('node_modules/x/y.js', ['./node_modules']), true)
+    assert.equal(istIgnoriert('.venv', ['.venv']), true)
+    assert.equal(istIgnoriert('node_modules_alt/x', ['node_modules']), false)
+    assert.equal(istIgnoriert('src/a.ts', []), false)
+  })
+  it('Symlink ohne Schrägstrich: gitignore „node_modules/“ erfasst ihn nicht — dirtyFiles sieht ihn', async () => {
+    const ziel = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-nm-'))
+    fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules/\n'); git('add', '.'); git('commit', '-qm', 'gi')
+    fs.symlinkSync(ziel, path.join(repo, 'node_modules'))
+    assert.deepEqual(await dirtyFiles(repo), ['node_modules'])
+  })
+  it('commitAll und savePatchAndReset lassen ignorierte Einträge liegen und nehmen sie nicht auf', async () => {
+    const ziel = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-nm-'))
+    fs.symlinkSync(ziel, path.join(repo, 'node_modules'))
+    fs.mkdirSync(path.join(repo, '.venv')); fs.writeFileSync(path.join(repo, '.venv', 'x'), 'x')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'neu\n')
+    await commitAll(repo, base, 'gruen', ['node_modules', '.venv/'])
+    assert.equal(git('show', '--name-only', '--format=', 'HEAD'), 'a.txt')
+
+    const base2 = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'rot\n')
+    fs.writeFileSync(path.join(repo, 'neu.txt'), 'n\n')
+    const patch = path.join(os.tmpdir(), `lf-ign-${Date.now()}.patch`)
+    await savePatchAndReset(repo, base2, patch, ['node_modules', '.venv'])
+    assert.equal(fs.lstatSync(path.join(repo, 'node_modules')).isSymbolicLink(), true)
+    assert.equal(fs.existsSync(path.join(repo, '.venv', 'x')), true)
+    assert.equal(fs.existsSync(path.join(repo, 'neu.txt')), false)
+    const p = fs.readFileSync(patch, 'utf-8')
+    assert.match(p, /neu\.txt/)
+    assert.doesNotMatch(p, /node_modules|\.venv/)
   })
 })

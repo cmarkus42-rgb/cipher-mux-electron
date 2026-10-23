@@ -68,6 +68,24 @@ const lines = (s: string): string[] => s.split('\n').map(l => l.trim()).filter(B
 // und der Vergleich mit den geschützten Pfaden schlägt still fehl.
 const NO_QUOTE = ['-c', 'core.quotepath=off']
 
+/**
+ * Liegt die Datei unter einem `sauberkeitIgnoriert`-Eintrag (L15)? Ein Eintrag trifft
+ * sich selbst — Datei, Verzeichnis oder Symlink — und alles darunter. Gerade der
+ * Symlink zählt: `node_modules` als Link erscheint ohne Schrägstrich, und ein
+ * gitignore `node_modules/` erfasst ihn nicht.
+ */
+export function istIgnoriert(datei: string, eintraege: readonly string[]): boolean {
+  const d = datei.replace(/^\.\//, '')
+  return eintraege.some(e => {
+    const n = e.replace(/^\.\//, '').replace(/\/+$/, '')
+    return n !== '' && (d === n || d.startsWith(n + '/'))
+  })
+}
+
+/** Pathspecs, die ignorierte Einträge aus `git add` heraushalten. */
+const ohne = (ausnahmen: readonly string[]): string[] =>
+  ausnahmen.map(e => e.replace(/^\.\//, '').replace(/\/+$/, '')).filter(Boolean).map(e => `:(exclude,literal)${e}`)
+
 export async function dirtyFiles(projekt: string): Promise<string[]> {
   const tracked = lines(await git(projekt, [...NO_QUOTE, 'diff', '--name-only', '--no-renames', 'HEAD']))
   const untracked = lines(await git(projekt, [...NO_QUOTE, 'ls-files', '--others', '--exclude-standard']))
@@ -98,9 +116,9 @@ export async function commitPaths(projekt: string, paths: string[], message: str
  * zurück: der Läufer muss den Versuch direkt nach dem erfolgreichen commit als
  * entschieden markieren, bevor ein weiterer Aufruf (headCommit) scheitern kann.
  */
-export async function commitAll(projekt: string, base: string, message: string): Promise<void> {
+export async function commitAll(projekt: string, base: string, message: string, ausnahmen: readonly string[] = []): Promise<void> {
   await git(projekt, ['reset', '-q', '--soft', base])
-  await git(projekt, ['add', '-A'])
+  await git(projekt, ['add', '-A', '--', '.', ...ohne(ausnahmen)])
   await git(projekt, ['commit', '-q', '--no-verify', '-m', message])
 }
 
@@ -135,14 +153,18 @@ export async function isRepoRoot(projekt: string): Promise<boolean> {
   }
 }
 
-/** Achtung: git reset --hard + clean -fd. Läuft nur, wenn projekt die Repo-Wurzel ist. */
-export async function savePatchAndReset(projekt: string, base: string, patchFile: string): Promise<void> {
+/**
+ * Achtung: git reset --hard + clean -fd. Läuft nur, wenn projekt die Repo-Wurzel ist.
+ * `ausnahmen` (sauberkeitIgnoriert) bleiben liegen und stehen nicht im Patch — sonst
+ * löschte clean die vorbereitete Umgebung (L15).
+ */
+export async function savePatchAndReset(projekt: string, base: string, patchFile: string, ausnahmen: readonly string[] = []): Promise<void> {
   // reset --hard würde sonst ein umschließendes Repo komplett zurücksetzen.
   if (!(await isRepoRoot(projekt))) {
     throw new Error(`projekt ist nicht die Wurzel eines git-Repos: ${projekt}`)
   }
   // Untracked erst in den Index (intent-to-add), damit der Patch sie enthält.
-  await git(projekt, ['add', '-N', '.'])
+  await git(projekt, ['add', '-N', '--', '.', ...ohne(ausnahmen)])
   // Eigener Aufruf: großer Puffer, --binary, unbeschnitten.
   // encoding 'buffer': der Patch wird roh geschrieben. Ein UTF-8-Umweg machte
   // aus jedem Nicht-UTF-8-Byte (Latin-1-Text) ein U+FFFD, und der Patch ließe
@@ -156,7 +178,9 @@ export async function savePatchAndReset(projekt: string, base: string, patchFile
   fs.mkdirSync(path.dirname(patchFile), { recursive: true })
   fs.writeFileSync(patchFile, stdout)
   await git(projekt, ['reset', '-q', '--hard', base])
-  await git(projekt, ['clean', '-fdq'])
+  // -e: verankertes Ignoriermuster je Eintrag; clean lässt es dann stehen.
+  const behalten = ausnahmen.map(e => e.replace(/^\.\//, '').replace(/\/+$/, '')).filter(Boolean).flatMap(e => ['-e', `/${e}`])
+  await git(projekt, ['clean', '-fdq', ...behalten])
 }
 
 /** Umfang eines Commits für die Bilanz: Dateien und Zeilen (hinzu + weg). Binärdateien zählen als Datei, nicht als Zeilen. */

@@ -15,7 +15,7 @@ import {
 import { classifyWorker, IDLE_SIGNAL_FILENAME } from './worker-done'
 import {
   runShell, dirtyFiles, headCommit, commitPaths, commitAll, changedSince,
-  checksums, savePatchAndReset, toRepoRelative, isRepoRoot, currentBranch, diffStat,
+  checksums, savePatchAndReset, toRepoRelative, isRepoRoot, currentBranch, diffStat, istIgnoriert,
 } from './git-ops'
 import { PROTECTED_PATHS_FILENAME } from '../session/entity-boundaries'
 import { createWorkerLock, type WorkerLock } from './worker-lock'
@@ -298,6 +298,18 @@ export class LocalFactoryRunner {
     const prot = args.geschuetzteTests.map(t => toRepoRelative(projekt, t))
     const { config, hinweise: configHinweise } = ladeProjektConfig(projekt)
 
+    // L15: einmal je Lauf, vor seinem ersten Dispatch — Abhängigkeiten verlinken o. ä.
+    // Ein Lauf existiert erst nach einem angenommenen Dispatch; fehlt er, ist dies der erste.
+    const ersterDispatch = args.laufId === undefined || loadLauf(this.laufFile(args.laufId)) === null
+    if (config.worktreeVorbereitung && ersterDispatch) {
+      const befehl = config.worktreeVorbereitung.befehl
+      const v = await runShell(befehl, projekt, this.o.testTimeoutMs)
+      if (v.exitCode !== 0) {
+        const was = v.exitCode === null ? 'lief nicht zu Ende' : `scheiterte (Exit ${v.exitCode})`
+        return { ok: false, error: oneLine(`Nicht bereit: Worktree-Vorbereitung „${befehl}“ ${was}. Ausgabe: ${v.output.trim() || '(leer)'}. Kein Versuch gezählt.`, 1000) }
+      }
+    }
+
     // L2: Prüft, ob der Baum benutzbar ist (z. B. ob ein Import wirklich aus diesem
     // Worktree kommt). Vor beginVersuch: ein unbrauchbarer Baum kostet keinen Versuch.
     if (config.vorpruefung) {
@@ -310,7 +322,7 @@ export class LocalFactoryRunner {
     }
 
     // Offene Dateien dürfen nur die geschützten Tests sein — die committet der Läufer als Basis.
-    const dirty = await dirtyFiles(projekt)
+    const dirty = (await dirtyFiles(projekt)).filter(f => !istIgnoriert(f, config.sauberkeitIgnoriert))
     const fremd = dirty.filter(f => !prot.includes(f))
     if (fremd.length) {
       // Ein „laeuft“ im Lauf heißt: ein Versuch wurde unterbrochen (App-Neustart),
@@ -407,7 +419,7 @@ export class LocalFactoryRunner {
         const patch = path.join(dir, `versuch-${a.nummer}-${a.versuch}.patch`)
         // Auf einem fremden Branch kein reset --hard: er zöge diesen Branch auf die Basis.
         if ((await currentBranch(a.args.projekt)) === a.branch) {
-          await savePatchAndReset(a.args.projekt, a.base, patch)
+          await savePatchAndReset(a.args.projekt, a.base, patch, a.config.sauberkeitIgnoriert)
         }
       } catch { /* Patch/Reset best effort */ }
       try {
@@ -468,7 +480,10 @@ export class LocalFactoryRunner {
     const test = pruefen
       ? await runShell(a.args.testBefehl, projekt, this.o.testTimeoutMs)
       : { exitCode: null, output: '' }
-    const changed = branchGewechselt ? [] : await changedSince(projekt, a.base)
+    // Geschützte Tests prüft der Gate auf der vollen Liste; alle übrigen Prüfungen
+    // sehen nicht, was das Projekt als Umgebung deklariert hat (L15).
+    const changedAlle = branchGewechselt ? [] : await changedSince(projekt, a.base)
+    const changed = changedAlle.filter(f => !istIgnoriert(f, a.config.sauberkeitIgnoriert))
     const zusatz: string[] = []
     const warnungen = [...a.configHinweise.map(h => `Projekt-Config: ${h}`), ...testWarnungen(test.output)]
     let testOutput = test.output
@@ -503,7 +518,7 @@ export class LocalFactoryRunner {
           testExitCode: test.exitCode,
           checksumsBefore: a.sumsBefore,
           checksumsAfter: checksums(projekt, a.prot),
-          changedFiles: changed,
+          changedFiles: changedAlle,
           protectedFiles: a.prot,
           testPflicht: this.testPflicht,
         }), zusatz)
@@ -519,7 +534,7 @@ export class LocalFactoryRunner {
     if (branchGewechselt) {
       started.settled = true
     } else if (gate.verdict === 'gruen') {
-      await commitAll(projekt, a.base, `lf: ${oneLine(a.args.ziel, 200)}`)
+      await commitAll(projekt, a.base, `lf: ${oneLine(a.args.ziel, 200)}`, a.config.sauberkeitIgnoriert)
       // Direkt nach dem commit, vor jedem weiteren await: ab hier ist der
       // Versuch entschieden; ein Fehler in headCommit darf nicht zum Reset führen.
       started.settled = true
@@ -528,7 +543,7 @@ export class LocalFactoryRunner {
       try { stat = await diffStat(projekt, a.base, commit) } catch { /* */ }
     } else {
       patchPfad = path.join(dir, `versuch-${a.nummer}-${a.versuch}.patch`)
-      await savePatchAndReset(projekt, a.base, patchPfad)
+      await savePatchAndReset(projekt, a.base, patchPfad, a.config.sauberkeitIgnoriert)
       started.settled = true
     }
 
