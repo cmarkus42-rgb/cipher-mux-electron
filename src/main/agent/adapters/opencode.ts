@@ -560,8 +560,7 @@ export class OpenCodeAdapter implements AgentAdapter {
       fs.writeFileSync(
         boundaryPath,
         buildOpenCodeBoundaryPlugin(
-          boundary.denyPathPatterns,
-          boundary.reason,
+          boundary,
           boundary.denyListFile ? path.join(projectPath, boundary.denyListFile) : undefined,
         ),
         { encoding: 'utf-8', mode: 0o644 },
