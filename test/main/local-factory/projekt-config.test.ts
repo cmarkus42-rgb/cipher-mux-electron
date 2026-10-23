@@ -157,3 +157,11 @@ describe('passtGlob', () => {
     assert.equal(passtGlob('src/*.ts', './src/a.ts'), true)
   })
 })
+
+describe('sauberkeitIgnoriert: nur Pfade im Repo', () => {
+  it('absolute Pfade, „..“ und die Repo-Wurzel selbst werden mit Hinweis verworfen', () => {
+    const r = parseProjektConfig({ sauberkeitIgnoriert: ['/etc', '../nachbar', 'a/../../b', '.', './', 'node_modules'] })
+    assert.deepEqual(r.config.sauberkeitIgnoriert, ['node_modules'])
+    assert.equal(r.hinweise.filter(h => /sauberkeitIgnoriert/.test(h)).length, 5)
+  })
+})

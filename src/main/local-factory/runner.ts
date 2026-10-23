@@ -123,6 +123,8 @@ interface Attempt {
   /** Projekt-Config, gelesen VOR dem Worker — was er daran ändert, gilt für sein Gate nicht. */
   config: ProjektConfig
   configHinweise: string[]
+  /** Offene Einträge unter sauberkeitIgnoriert vor dem Worker — was danach neu ist, hat er angelegt. */
+  ignoriertVorher: string[]
 }
 
 export class LocalFactoryRunner {
@@ -322,7 +324,9 @@ export class LocalFactoryRunner {
     }
 
     // Offene Dateien dürfen nur die geschützten Tests sein — die committet der Läufer als Basis.
-    const dirty = (await dirtyFiles(projekt)).filter(f => !istIgnoriert(f, config.sauberkeitIgnoriert))
+    const dirtyAlle = await dirtyFiles(projekt)
+    const ignoriertVorher = dirtyAlle.filter(f => istIgnoriert(f, config.sauberkeitIgnoriert))
+    const dirty = dirtyAlle.filter(f => !istIgnoriert(f, config.sauberkeitIgnoriert))
     const fremd = dirty.filter(f => !prot.includes(f))
     if (fremd.length) {
       // Ein „laeuft“ im Lauf heißt: ein Versuch wurde unterbrochen (App-Neustart),
@@ -413,7 +417,7 @@ export class LocalFactoryRunner {
 
     this.running = this.runAttempt({
       args, prot, base, branch, sumsBefore, laufId, laufPfad,
-      nummer: begun.nummer, versuch: begun.versuch, vorherigesGate, config, configHinweise,
+      nummer: begun.nummer, versuch: begun.versuch, vorherigesGate, config, configHinweise, ignoriertVorher,
     })
       .catch(err => this.wake(`${this.praefix} #${begun.nummer} Läuferfehler: ${String(err)}`).catch(() => {}))
       .finally(() => { this.release() })
@@ -526,6 +530,11 @@ export class LocalFactoryRunner {
         prot: a.prot, testpfade: a.config.testpfade,
       })
       if (fremd.length) warnungen.push(`Diff außerhalb des Auftrags: ${fremd.join(', ')}`)
+      // Ignoriert heißt nicht unsichtbar: was der Worker dort anlegt, soll der Architekt sehen.
+      const vorher = new Set(a.ignoriertVorher)
+      const neu = a.config.sauberkeitIgnoriert.filter(e =>
+        changedAlle.some(f => !vorher.has(f) && istIgnoriert(f, [e])))
+      if (neu.length) warnungen.push(`Neu unter sauberkeitIgnoriert, vom Worker angelegt: ${neu.join(', ')}`)
     }
     const gate: GateResult = branchGewechselt
       ? {

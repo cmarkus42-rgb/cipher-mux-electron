@@ -318,3 +318,13 @@ describe('L16a Rot aus dem richtigen Grund (echter node:test-Lauf)', () => {
     assert.equal(loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0].rotGrund, undefined)
   })
 })
+
+describe('sauberkeitIgnoriert: was der Worker dort neu anlegt, bleibt sichtbar', () => {
+  it('neuer Eintrag unter einem ignorierten Pfad → Warnung im Gate', async () => {
+    config({ sauberkeitIgnoriert: ['.cache'] })
+    const host = fakeHost(() => { schreib('impl.txt', 'ok\n'); schreib('.cache/geheim.js', 'x') })
+    const res = await lauf(runner(host), args())
+    assert.match(host.wakes[0], /GRÜN/)
+    assert.ok(gateVon(res.laufPfad!).warnungen.includes('Neu unter sauberkeitIgnoriert, vom Worker angelegt: .cache'))
+  })
+})
