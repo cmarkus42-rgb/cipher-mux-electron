@@ -244,3 +244,23 @@ describe('L16b hinzugefuegteZeilen: nicht zu umgehen', () => {
     assert.deepEqual(z, [{ datei: 'src/a"b.js', zeile: 2, text: 'globalThis.__z = 1' }])
   })
 })
+
+describe('L16b hinzugefuegteZeilen: Diff-Kopf eindeutig', () => {
+  it('eine hinzugefügte Zeile „++ …“ ist Inhalt, kein +++-Kopf', async () => {
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'a\n++ globalThis.__x = 1\nweiter\n')
+    const z = await hinzugefuegteZeilen(repo, base)
+    assert.deepEqual(z, [
+      { datei: 'a.txt', zeile: 2, text: '++ globalThis.__x = 1' },
+      { datei: 'a.txt', zeile: 3, text: 'weiter' },
+    ])
+  })
+  it('diff.noprefix im Repo ändert nichts am gelesenen Pfad', async () => {
+    git('config', 'diff.noprefix', 'true')
+    fs.mkdirSync(path.join(repo, 'b')); fs.writeFileSync(path.join(repo, 'b', 'c.js'), 'x\n')
+    git('add', '.'); git('commit', '-qm', 'b')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'b', 'c.js'), 'x\ny\n')
+    assert.deepEqual(await hinzugefuegteZeilen(repo, base), [{ datei: 'b/c.js', zeile: 2, text: 'y' }])
+  })
+})

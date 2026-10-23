@@ -197,21 +197,27 @@ export interface NeueZeile {
  */
 export async function hinzugefuegteZeilen(projekt: string, base: string, ausnahmen: readonly string[] = []): Promise<NeueZeile[]> {
   // --text/--no-textconv: Attribute des Repos (binary, diff=…) dürfen keine Zeilen verstecken.
-  const { stdout } = await execFileP('git', [...NO_QUOTE, 'diff', '-U0', '--no-renames', '--no-color', '--no-ext-diff', '--text', '--no-textconv', base], {
+  const { stdout } = await execFileP('git', [...NO_QUOTE, 'diff', '-U0', '--no-renames', '--no-color', '--no-ext-diff', '--text', '--no-textconv',
+    // Feste Präfixe: diff.noprefix/mnemonicPrefix des Repos dürfen den Kopf nicht umformen.
+    '--src-prefix=a/', '--dst-prefix=b/', base], {
     cwd: projekt, maxBuffer: 256 * 1024 * 1024, env: { ...process.env, PATH: getEnhancedPath() },
   })
   const out: NeueZeile[] = []
   let datei: string | null = null
   let nr = 0
+  // Kopfzeilen gibt es nur zwischen „diff --git“ und dem ersten @@ — danach ist
+  // jede +-Zeile Inhalt, auch eine, die mit „++ “ beginnt.
+  let imKopf = false
   for (const l of stdout.split('\n')) {
-    if (l.startsWith('diff --git ')) { datei = null; continue }
-    if (l.startsWith('+++ ')) {
+    if (l.startsWith('diff --git ')) { datei = null; imKopf = true; continue }
+    if (imKopf && l.startsWith('+++ ')) {
       const p = unquote(l.slice(4))
       datei = p === '/dev/null' ? null : p.replace(/^b\//, '')
       continue
     }
     const hunk = l.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
-    if (hunk) { nr = Number(hunk[1]); continue }
+    if (hunk) { nr = Number(hunk[1]); imKopf = false; continue }
+    if (imKopf) continue
     if (datei && l.startsWith('+')) {
       if (!istIgnoriert(datei, ausnahmen)) out.push({ datei, zeile: nr, text: l.slice(1) })
       nr++
