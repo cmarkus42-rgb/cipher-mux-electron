@@ -2,7 +2,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { ulid } from 'ulidx'
-import { validateAuftrag, buildAuftragMd, type AuftragInput } from './auftrag'
+import { validateAuftrag, validateDispatchSteuerung, buildAuftragMd, type AuftragInput } from './auftrag'
 import {
   decideGate, testWarnungen, readGateRecord, mitGruenden, pruefeErsetzungen, diffAusserhalbAuftrag,
   type GateResult, type GateRecord, type GateDiagnose,
@@ -10,7 +10,7 @@ import {
 import { ladeProjektConfig, type ProjektConfig } from './projekt-config'
 import {
   newLauf, beginVersuch, endVersuch, countWeckruf, markAbgenommen, markBeurteilt,
-  loadLauf, saveLauf, abortRunning, MAX_VERSUCHE, type Lauf,
+  loadLauf, saveLauf, abortRunning, zaehlendeVersuche, MAX_VERSUCHE, type Lauf,
 } from './lauf'
 import { classifyWorker, IDLE_SIGNAL_FILENAME } from './worker-done'
 import {
@@ -82,6 +82,10 @@ export interface DispatchArgs extends AuftragInput {
   haeppchen?: number
   /** Modellprofil (Spec 2026-10-12 §4.4); fehlt = Standardprofil. */
   profil?: string
+  /** L12: Der letzte Fehlversuch dieses Häppchens war ein Fehler des Architekten — Begründung. */
+  architektenfehler?: string
+  /** L16a: Begründung, warum das Vorab-Rot des Abnahmetests trotz Fehler im Testcode richtig ist. */
+  rotGrund?: string
 }
 
 export type DispatchAccepted = { ok: true; laufId: string; nummer: number; versuch: number; laufPfad: string }
@@ -219,7 +223,7 @@ export class LocalFactoryRunner {
   }
 
   async dispatch(args: DispatchArgs): Promise<DispatchAccepted | DispatchRejected> {
-    const errs = validateAuftrag(args, { testPflicht: this.testPflicht })
+    const errs = [...validateAuftrag(args, { testPflicht: this.testPflicht }), ...validateDispatchSteuerung(args)]
     if (errs.length) return { ok: false, error: `Auftrag ungültig: ${errs.join('; ')}` }
     if (args.laufId !== undefined && !LAUF_ID.test(args.laufId)) {
       return { ok: false, error: 'laufId ungültig: nur A-Z, a-z, 0-9, _ und -, höchstens 64 Zeichen.' }
@@ -321,7 +325,9 @@ export class LocalFactoryRunner {
       lauf0 = abortRunning(lauf0)
       saveLauf(laufPfad, lauf0)
     }
-    const begun = beginVersuch(lauf0, { nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0 })
+    const begun = beginVersuch(lauf0, {
+      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0, architektenfehler: args.architektenfehler,
+    })
     if ('error' in begun) return { ok: false, error: begun.error }
 
     const offeneTests = dirty.filter(f => prot.includes(f))
@@ -337,13 +343,14 @@ export class LocalFactoryRunner {
     let basis: Lauf = loadLauf(laufPfad) ?? lauf0
     if (!basis.branch) basis = { ...basis, branch: branchJetzt }
     const frisch = beginVersuch(basis, {
-      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0,
+      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0, architektenfehler: args.architektenfehler,
     })
     if ('error' in frisch) return { ok: false, error: frisch.error }
     saveLauf(laufPfad, frisch.lauf)
 
     // Vorheriges Gate für einen zweiten Versuch — aus der Datei, nicht vom Architekten.
-    const prevV = args.haeppchen !== undefined
+    // Nach einem Architektenfehler nicht: der Worker scheiterte an einem falschen Auftrag.
+    const prevV = args.haeppchen !== undefined && args.architektenfehler === undefined
       ? lauf0.haeppchen.find(h => h.nummer === begun.nummer)?.versuche.at(-1)
       : undefined
     let vorherigesGate: { reasons: string[]; testOutput: string } | undefined
@@ -504,7 +511,9 @@ export class LocalFactoryRunner {
     const h = lauf.haeppchen.find(x => x.nummer === a.nummer)
     // ziel gekappt, damit Gate- bzw. Laufpfad am Ende der Zeile nicht abgeschnitten wird.
     const kopf = `${this.praefix} #${a.nummer} „${oneLine(a.args.ziel, 120)}“`
-    const zahl = `Versuch ${a.versuch}/${MAX_VERSUCHE}`
+    const af = h ? h.versuche.length - zaehlendeVersuche(h) : 0
+    const zahl = `Versuch ${h ? zaehlendeVersuche(h) : a.versuch}/${MAX_VERSUCHE}`
+      + (af ? ` (${af} Architektenfehler nicht gezählt)` : '')
     const line = gate.verdict === 'gruen'
       ? `${kopf}: GRÜN, ${zahl}, Commit ${commit!.slice(0, 8)}, Lauf: ${a.laufPfad}`
       : `${kopf}: ${gate.verdict === 'rot' ? 'ROT' : 'HÄNGT'}, ${zahl}, Gate: ${gatePfad}`

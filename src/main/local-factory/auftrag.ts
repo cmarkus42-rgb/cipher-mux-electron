@@ -100,6 +100,26 @@ export function validateAuftrag(a: AuftragInput, opts: { testPflicht?: boolean }
   return errs
 }
 
+/**
+ * Felder, die nicht an den Worker gehen, sondern den Dispatch selbst steuern
+ * (L12 architektenfehler, L16a rotGrund). Beide sind Begründungen: leer zählt nicht.
+ */
+export interface DispatchSteuerung {
+  haeppchen?: number
+  architektenfehler?: string
+  rotGrund?: string
+}
+
+export function validateDispatchSteuerung(d: DispatchSteuerung): string[] {
+  const errs: string[] = []
+  if (d.architektenfehler !== undefined) {
+    if (blank(d.architektenfehler)) errs.push('architektenfehler: Begründung erforderlich')
+    else if (d.haeppchen === undefined) errs.push('architektenfehler braucht haeppchen (das Häppchen, dessen letzter Versuch dein Fehler war)')
+  }
+  if (d.rotGrund !== undefined && blank(d.rotGrund)) errs.push('rotGrund: Begründung erforderlich')
+  return errs
+}
+
 function tail(s: string): string {
   return s.length <= MAX_GATE_OUTPUT_CHARS ? s : '… (gekürzt)\n' + s.slice(-MAX_GATE_OUTPUT_CHARS)
 }

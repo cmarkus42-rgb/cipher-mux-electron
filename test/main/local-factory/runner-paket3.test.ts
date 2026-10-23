@@ -114,3 +114,39 @@ describe('L11 Ersetzungen und Diff außerhalb des Auftrags', () => {
     assert.deepEqual(gateVon(res.laufPfad!).warnungen, ['Diff außerhalb des Auftrags: andere.txt'])
   })
 })
+
+describe('L12 architektenfehler beim erneuten Dispatch', () => {
+  it('nach Eskalation: neuer Versuch läuft, zählt nicht, steht in lauf.json; zweiter wird abgelehnt', async () => {
+    const host = fakeHost(() => {}, { haengt: true })
+    // timeoutMs 2000 wäre zu lang zum Hängen — eigener Läufer mit kurzer Frist
+    const kurz = new LocalFactoryRunner({
+      host, laufDir, sleep: async () => {}, pollMs: 0, startupWaitMs: 0,
+      quietMs: 1000, stallMs: 5000, timeoutMs: 50, testTimeoutMs: 5000,
+    })
+    const first = await lauf(kurz, args())
+    await lauf(kurz, { ...args(), laufId: first.laufId, haeppchen: 1 })
+    assert.match(host.wakes[1], /ESKALIERT/)
+
+    const gut = fakeHost()
+    const r2 = runner(gut)
+    const res = await lauf(r2, { ...args(), laufId: first.laufId, haeppchen: 1, architektenfehler: 'Abnahmetest prüfte die falsche Datei' })
+    assert.equal(res.ok, true, res.error)
+    assert.equal(res.versuch, 3)
+    assert.match(gut.wakes[0], /GRÜN, Versuch 2\/2 \(1 Architektenfehler nicht gezählt\)/)
+    const h = loadLauf(first.laufPfad!)!.haeppchen[0]
+    assert.equal(h.versuche[1].architektenfehler, 'Abnahmetest prüfte die falsche Datei')
+    // AUFTRAG.md des neuen Versuchs: kein „vorige Versuch“ aus einem Architektenfehler
+    const auftrag = fs.readFileSync(gut.sent[0].match(/\S+AUFTRAG\.md/)![0], 'utf-8')
+    assert.doesNotMatch(auftrag, /vorige Versuch ist durchgefallen/)
+
+    const zweiter = await r2.dispatch({ ...args(), laufId: first.laufId, haeppchen: 1, architektenfehler: 'nochmal' } as never)
+    assert.equal(zweiter.ok, false)
+  })
+  it('leerer architektenfehler oder ohne haeppchen → Auftrag ungültig', async () => {
+    const r = runner(fakeHost())
+    const leer = await r.dispatch({ ...args(), laufId: 'X', haeppchen: 1, architektenfehler: ' ' } as never) as { ok: boolean; error?: string }
+    assert.match(leer.error!, /architektenfehler/)
+    const ohne = await r.dispatch({ ...args(), architektenfehler: 'grund' } as never) as { ok: boolean; error?: string }
+    assert.match(ohne.error!, /architektenfehler.*haeppchen/)
+  })
+})

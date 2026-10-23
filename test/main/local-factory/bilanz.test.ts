@@ -57,3 +57,32 @@ describe('renderBilanzNote', () => {
     assert.match(renderBilanzNote([]), /Noch keine Aufträge/)
   })
 })
+
+describe('L12 Architektenfehler in der Bilanz', () => {
+  const mitAF: Lauf = {
+    ...lauf,
+    haeppchen: [{ ...lauf.haeppchen[0], versuche: [
+      { ...lauf.haeppchen[0].versuche[0], architektenfehler: 'Test falsch geschnitten' },
+      lauf.haeppchen[0].versuche[1],
+    ] }],
+  }
+  it('Anläufe zählen nur Modellversuche; der Architektenfehler steht eigens da', () => {
+    const z = buildBilanzZeile(mitAF, 1, { ergebnis: 'uebernommen', kategorie: 'ui' },
+      { now: '2026-10-12T10:00:00Z', workspaceId: null, mitTest: true })
+    assert.equal(z.anlaeufe, 1)
+    assert.equal(z.architektenfehler, 'Test falsch geschnitten')
+  })
+  it('ohne Architektenfehler: null', () => {
+    const z = buildBilanzZeile(lauf, 1, { ergebnis: 'uebernommen', kategorie: 'ui' },
+      { now: '2026-10-12T10:00:00Z', workspaceId: null, mitTest: true })
+    assert.equal(z.architektenfehler, null)
+  })
+  it('die Note weist Architektenfehler eigens aus', () => {
+    const z = buildBilanzZeile(mitAF, 1, { ergebnis: 'uebernommen', kategorie: 'ui' },
+      { now: '2026-10-12T10:00:00Z', workspaceId: null, mitTest: true })
+    const md = renderBilanzNote([z])
+    assert.match(md, /## Architektenfehler/)
+    assert.match(md, /Test falsch geschnitten/)
+    assert.doesNotMatch(renderBilanzNote([{ ...z, architektenfehler: null }]), /## Architektenfehler/)
+  })
+})
