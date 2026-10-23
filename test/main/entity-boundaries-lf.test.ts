@@ -58,6 +58,11 @@ describe('local-factory: Testpfade sind von der Codesperre ausgenommen', () => {
     }
   })
 
+  it('.test./.spec. zaehlen nur im Dateinamen, nicht in einem Verzeichnisnamen', () => {
+    assert.equal(denied(`${repo}/src/x.test.d/app.ts`), true)
+    assert.equal(denied(`${repo}/lib/a.spec.helpers/b.ts`), true)
+  })
+
   it('ein Wort, das nur "test" ENTHAELT, ist kein Testpfad', () => {
     assert.equal(denied(`${repo}/src/attestation.ts`), true)
     assert.equal(denied(`${repo}/src/contest/x.ts`), true)

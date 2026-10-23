@@ -56,7 +56,8 @@ export interface EntityBoundary {
    */
   denyListFile?: string
   /**
-   * Ausnahmen von `denyPathPatterns`, als Teilstring verglichen mit dem Pfad AB
+   * Ausnahmen von `denyPathPatterns`. Ein Muster ohne `/` (`.test.`) wird nur
+   * gegen den Dateinamen verglichen, eines mit `/` als Teilstring gegen den Pfad AB
    * DER REPO-WURZEL (erster Vorfahr mit `.git` oder Projekt-Config). Nicht mit
    * dem absoluten Pfad: liegt das Repo selbst unter `/test/`, oeffnete das jede
    * Datei. Ohne gefundene Wurzel wird der ganze Pfad verglichen.
@@ -402,7 +403,13 @@ function boundaryDecidePath(filePath, rules, io) {
 
   var root = filePath.charAt(0) === '/' ? boundaryFindRoot(filePath, io) : null
   var rel = root && root !== '/' ? filePath.slice(root.length) : filePath
-  if (boundaryHas(rules.allow, rel)) return { denied: false }
+  // Ein Muster ohne '/' ('.test.') zaehlt nur im Dateinamen — sonst gaebe ein
+  // Verzeichnis 'x.test.d/' allen Produktionscode darunter frei.
+  var base = rel.slice(rel.lastIndexOf('/') + 1)
+  var allowed = (rules.allow || []).some(function (p) {
+    return p.indexOf('/') === -1 ? base.indexOf(p) !== -1 : rel.indexOf(p) !== -1
+  })
+  if (allowed) return { denied: false }
 
   var hints = []
   if (rules.projectTestPaths && root) {
