@@ -7,7 +7,7 @@ import {
   decideGate, testWarnungen, readGateRecord, mitGruenden, pruefeErsetzungen, diffAusserhalbAuftrag,
   type GateResult, type GateRecord, type GateDiagnose,
 } from './gate'
-import { ladeProjektConfig, type ProjektConfig } from './projekt-config'
+import { ladeProjektConfig, passtGlob, type ProjektConfig } from './projekt-config'
 import {
   newLauf, beginVersuch, endVersuch, countWeckruf, markAbgenommen, markBeurteilt,
   loadLauf, saveLauf, abortRunning, zaehlendeVersuche, MAX_VERSUCHE, type Lauf,
@@ -88,12 +88,19 @@ export interface DispatchArgs extends AuftragInput {
   rotGrund?: string
 }
 
-export type DispatchAccepted = { ok: true; laufId: string; nummer: number; versuch: number; laufPfad: string }
+export type DispatchAccepted = {
+  ok: true; laufId: string; nummer: number; versuch: number; laufPfad: string
+  /** Hinweise des Config-Parsers (ignorierte Einträge). Fehlt, wenn es keine gibt. */
+  hinweise?: string[]
+}
 export type DispatchRejected = { ok: false; error: string }
 export type AcceptResult = { ok: true } | { ok: false; error: string }
 
 /** So viele Pane-Zeilen nimmt die Diagnose eines hängenden Workers mit (L8). */
 export const DIAGNOSE_PANE_ZEILEN = 30
+
+/** So viel vom Ende der Ausgabe eines roten Pflicht-Gates steht im Grund (L13). */
+export const PFLICHT_GATE_AUSZUG = 1200
 
 /** Höchstlänge einer Weckzeile. Sie geht per send-keys in ein Eingabefeld. */
 export const MAX_WECKZEILE = 400
@@ -115,6 +122,7 @@ interface Attempt {
   vorherigesGate?: { reasons: string[]; testOutput: string }
   /** Projekt-Config, gelesen VOR dem Worker — was er daran ändert, gilt für sein Gate nicht. */
   config: ProjektConfig
+  configHinweise: string[]
 }
 
 export class LocalFactoryRunner {
@@ -288,7 +296,7 @@ export class LocalFactoryRunner {
 
     const projekt = args.projekt
     const prot = args.geschuetzteTests.map(t => toRepoRelative(projekt, t))
-    const { config } = ladeProjektConfig(projekt)
+    const { config, hinweise: configHinweise } = ladeProjektConfig(projekt)
 
     // Offene Dateien dürfen nur die geschützten Tests sein — die committet der Läufer als Basis.
     const dirty = await dirtyFiles(projekt)
@@ -363,12 +371,15 @@ export class LocalFactoryRunner {
 
     this.running = this.runAttempt({
       args, prot, base, branch, sumsBefore, laufId, laufPfad,
-      nummer: begun.nummer, versuch: begun.versuch, vorherigesGate, config,
+      nummer: begun.nummer, versuch: begun.versuch, vorherigesGate, config, configHinweise,
     })
       .catch(err => this.wake(`${this.praefix} #${begun.nummer} Läuferfehler: ${String(err)}`).catch(() => {}))
       .finally(() => { this.release() })
 
-    return { ok: true, laufId, nummer: begun.nummer, versuch: begun.versuch, laufPfad }
+    return {
+      ok: true, laufId, nummer: begun.nummer, versuch: begun.versuch, laufPfad,
+      ...(configHinweise.length ? { hinweise: configHinweise } : {}),
+    }
   }
 
   private async runAttempt(a: Attempt): Promise<void> {
@@ -448,8 +459,20 @@ export class LocalFactoryRunner {
       : { exitCode: null, output: '' }
     const changed = branchGewechselt ? [] : await changedSince(projekt, a.base)
     const zusatz: string[] = []
-    const warnungen = testWarnungen(test.output)
+    const warnungen = [...a.configHinweise.map(h => `Projekt-Config: ${h}`), ...testWarnungen(test.output)]
+    let testOutput = test.output
     if (pruefen) {
+      // L13: Pflicht-Gates des Projekts, nach dem Testbefehl, im Baum des Workers.
+      for (const pg of a.config.pflichtGates) {
+        const ausloeser = changed.find(f => passtGlob(pg.muster, f))
+        if (!ausloeser) continue
+        const r = await runShell(pg.befehl, projekt, this.o.testTimeoutMs)
+        if (r.exitCode === 0) continue
+        const auszug = r.output.length > PFLICHT_GATE_AUSZUG ? '…' + r.output.slice(-PFLICHT_GATE_AUSZUG) : r.output
+        zusatz.push(`Pflicht-Gate „${pg.befehl}“ ${r.exitCode === null ? 'lief nicht zu Ende' : `rot (Exit ${r.exitCode})`}, `
+          + `ausgelöst von ${ausloeser}. Ausgabe (Ende):\n${auszug.trimEnd()}`)
+        testOutput += `\n\n--- Pflicht-Gate: ${pg.befehl} (Exit ${r.exitCode ?? 'keiner'}) ---\n${r.output}`
+      }
       zusatz.push(...pruefeErsetzungen(a.args.ersetzungen ?? [], datei => {
         try { return fs.readFileSync(path.join(projekt, datei), 'utf-8') } catch { return null }
       }))
@@ -476,7 +499,7 @@ export class LocalFactoryRunner {
 
     const dir = path.dirname(a.laufPfad)
     const gatePfad = path.join(dir, `gate-${a.nummer}-${a.versuch}.json`)
-    const record: GateRecord = { ...gate, testOutput: test.output, warnungen, ...(diagnose ? { diagnose } : {}) }
+    const record: GateRecord = { ...gate, testOutput, warnungen, ...(diagnose ? { diagnose } : {}) }
     fs.writeFileSync(gatePfad, JSON.stringify(record, null, 2), 'utf-8')
 
     let commit: string | undefined

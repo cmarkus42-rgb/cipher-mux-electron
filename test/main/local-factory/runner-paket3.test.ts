@@ -150,3 +150,39 @@ describe('L12 architektenfehler beim erneuten Dispatch', () => {
     assert.match(ohne.error!, /architektenfehler.*haeppchen/)
   })
 })
+
+describe('L13 pflichtGates aus der Projekt-Config', () => {
+  it('geänderte Datei passt auf muster, befehl scheitert → ROT mit Grund und Ausgabe-Auszug', async () => {
+    config({ pflichtGates: [{ muster: '*.txt', befehl: 'echo PFLICHT-KAPUTT >&2; exit 3' }] })
+    const host = fakeHost()
+    const res = await lauf(runner(host), args())
+    assert.match(host.wakes[0], /ROT/)
+    const g = gateVon(res.laufPfad!)
+    assert.match(g.reasons.join('\n'), /Pflicht-Gate „echo PFLICHT-KAPUTT >&2; exit 3“ rot \(Exit 3\), ausgelöst von impl\.txt/)
+    assert.match(g.reasons.join('\n'), /PFLICHT-KAPUTT/)
+    assert.match(g.testOutput, /PFLICHT-KAPUTT/)
+  })
+  it('läuft im Projekt nach dem Testbefehl; grün → GRÜN', async () => {
+    config({ pflichtGates: [{ muster: '**/*.txt', befehl: 'grep -q ok impl.txt' }] })
+    const host = fakeHost()
+    await lauf(runner(host), args())
+    assert.match(host.wakes[0], /GRÜN/)
+  })
+  it('keine geänderte Datei passt → befehl läuft nicht', async () => {
+    config({ pflichtGates: [{ muster: 'src/**', befehl: 'exit 1' }] })
+    const host = fakeHost()
+    await lauf(runner(host), args())
+    assert.match(host.wakes[0], /GRÜN/)
+  })
+  it('Parser-Hinweise der Config gehen als hinweise in die Antwort und als Warnung ins Gate', async () => {
+    config({ unbekannt: 1 })
+    const host = fakeHost()
+    const res = await lauf(runner(host), args())
+    assert.match(res.hinweise!.join(), /Unbekannter Schluessel "unbekannt"/)
+    assert.match(gateVon(res.laufPfad!).warnungen.join(), /Projekt-Config: Unbekannter Schluessel/)
+  })
+  it('ohne Config: keine hinweise in der Antwort', async () => {
+    const res = await lauf(runner(fakeHost()), args())
+    assert.equal(res.hinweise, undefined)
+  })
+})
