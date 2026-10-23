@@ -298,6 +298,17 @@ export class LocalFactoryRunner {
     const prot = args.geschuetzteTests.map(t => toRepoRelative(projekt, t))
     const { config, hinweise: configHinweise } = ladeProjektConfig(projekt)
 
+    // L2: Prüft, ob der Baum benutzbar ist (z. B. ob ein Import wirklich aus diesem
+    // Worktree kommt). Vor beginVersuch: ein unbrauchbarer Baum kostet keinen Versuch.
+    if (config.vorpruefung) {
+      const befehl = config.vorpruefung.befehl.split('{projekt}').join(projekt)
+      const v = await runShell(befehl, projekt, this.o.testTimeoutMs)
+      if (v.exitCode === null || !v.output.includes(config.vorpruefung.erwartet)) {
+        const was = v.exitCode === null ? 'lief nicht zu Ende' : `Ausgabe enthält „${config.vorpruefung.erwartet}“ nicht`
+        return { ok: false, error: oneLine(`Nicht bereit: Vorprüfung „${befehl}“ ${was}. Ausgabe: ${v.output.trim() || '(leer)'}. Kein Versuch gezählt.`, 1000) }
+      }
+    }
+
     // Offene Dateien dürfen nur die geschützten Tests sein — die committet der Läufer als Basis.
     const dirty = await dirtyFiles(projekt)
     const fremd = dirty.filter(f => !prot.includes(f))

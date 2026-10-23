@@ -186,3 +186,33 @@ describe('L13 pflichtGates aus der Projekt-Config', () => {
     assert.equal(res.hinweise, undefined)
   })
 })
+
+describe('L2 vorpruefung vor dem Versuch', () => {
+  it('{projekt} wird ersetzt; erwartet als Teilstring in stdout+stderr → Dispatch läuft', async () => {
+    config({ vorpruefung: { befehl: 'echo "{projekt}" >&2', erwartet: repo } })
+    const host = fakeHost()
+    const res = await lauf(runner(host), args())
+    assert.equal(res.ok, true, res.error)
+    assert.match(host.wakes[0], /GRÜN/)
+  })
+  it('erwartet fehlt → „Nicht bereit“, kein Versuch, kein Lauf, kein Worker', async () => {
+    config({ vorpruefung: { befehl: 'echo anderswo', erwartet: '/gibt/es/nicht' } })
+    const host = fakeHost()
+    const res = await lauf(runner(host), args())
+    assert.equal(res.ok, false)
+    assert.match(res.error!, /^Nicht bereit: Vorprüfung/)
+    assert.match(res.error!, /\/gibt\/es\/nicht/)
+    assert.match(res.error!, /anderswo/)
+    assert.match(res.error!, /Kein Versuch gezählt/)
+    assert.equal(host.sent.length, 0)
+    assert.equal(fs.readdirSync(laufDir).length, 0)
+  })
+  it('beim erneuten Dispatch zählt ein gescheiterter Vorlauf keinen Versuch', async () => {
+    const host = fakeHost(() => schreib('impl.txt', 'immer noch nein\n'))
+    const first = await lauf(runner(host), args())
+    config({ vorpruefung: { befehl: 'true', erwartet: 'nie' } })
+    const res = await lauf(runner(host), { ...args(), laufId: first.laufId, haeppchen: 1 })
+    assert.equal(res.ok, false)
+    assert.equal(loadLauf(first.laufPfad!)!.haeppchen[0].versuche.length, 1)
+  })
+})
