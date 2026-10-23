@@ -238,3 +238,90 @@ describe('Retry-Feld laeuferfehler im Läufer', () => {
     assert.match(r.error!, /kein Läuferfehler/)
   })
 })
+
+describe('Gate-Record: pruefungen — welche Zusatzprüfungen liefen, mit welchem Ergebnis', () => {
+  type P = { art: string; ergebnis: string; detail?: string }
+  const finde = (ps: P[], art: string) => ps.filter(p => p.art === art)
+
+  it('ohne Projekt-Config, GRÜN: jede Prüfung steht da — nicht konfiguriert, Config-Schutz bestanden', async () => {
+    const res = await lauf(runner(fakeHost()), args())
+    const ps: P[] = gateVon(res.laufPfad!).pruefungen
+    for (const art of ['vorpruefung', 'worktreeVorbereitung', 'pflichtGates', 'verboteneMuster', 'ersetzungen']) {
+      assert.deepEqual(finde(ps, art).map(p => p.ergebnis), ['nicht-konfiguriert'], art)
+    }
+    assert.deepEqual(finde(ps, 'configSchutz').map(p => p.ergebnis), ['bestanden'])
+  })
+
+  it('mit Config: Vorprüfung, Vorbereitung (erster Dispatch), Pflicht-Gates je Eintrag, Muster, Ersetzungen', async () => {
+    config({
+      vorpruefung: { befehl: 'echo {projekt}', erwartet: 'lf-fix-' },
+      worktreeVorbereitung: { befehl: 'true' },
+      pflichtGates: [{ muster: 'impl.txt', befehl: 'true' }, { muster: 'docs/**', befehl: 'false' }],
+      verboteneMuster: [{ pfad: '*.txt', regex: 'VERBOTEN', grund: 'nein' }, { pfad: '*.txt', regex: 'AUCH', grund: 'nein' }],
+    })
+    const res = await lauf(runner(fakeHost()), { ...args(), ersetzungen: [{ datei: 'impl.txt', alt: 'nein', neu: 'ok' }] })
+    const g = gateVon(res.laufPfad!)
+    assert.equal(g.verdict, 'gruen')
+    const ps: P[] = g.pruefungen
+    assert.equal(finde(ps, 'vorpruefung')[0].ergebnis, 'bestanden')
+    assert.equal(finde(ps, 'worktreeVorbereitung')[0].ergebnis, 'bestanden')
+    const pg = finde(ps, 'pflichtGates')
+    assert.equal(pg.length, 2)
+    assert.equal(pg[0].ergebnis, 'bestanden')
+    assert.match(pg[0].detail!, /ausgelöst durch impl\.txt/)
+    assert.equal(pg[1].ergebnis, 'nicht-ausgeloest')
+    assert.match(pg[1].detail!, /nicht ausgelöst/)
+    assert.equal(finde(ps, 'verboteneMuster')[0].ergebnis, 'bestanden')
+    assert.match(finde(ps, 'verboteneMuster')[0].detail!, /Treffer 0\/2/)
+    assert.equal(finde(ps, 'ersetzungen')[0].ergebnis, 'bestanden')
+  })
+
+  it('zweiter Dispatch im Lauf: Vorbereitung übersprungen; Treffer eines Musters → rot', async () => {
+    config({ worktreeVorbereitung: { befehl: 'true' }, verboteneMuster: [{ pfad: '*.txt', regex: 'VERBOTEN', grund: 'nein' }] })
+    const r1 = await lauf(runner(fakeHost()), args())
+    schreib('test/accept2.sh', 'grep -q zwei zwei.txt\n')
+    const r2 = await lauf(runner(fakeHost(() => schreib('zwei.txt', 'zwei VERBOTEN\n'))), {
+      ...args(), laufId: r1.laufId, geschuetzteTests: ['test/accept2.sh'], testBefehl: 'grep -q zwei zwei.txt', dateien: ['zwei.txt'],
+    })
+    const ps: P[] = gateVon(r2.laufPfad!, 2).pruefungen
+    assert.equal(finde(ps, 'worktreeVorbereitung')[0].ergebnis, 'uebersprungen')
+    assert.match(finde(ps, 'worktreeVorbereitung')[0].detail!, /nicht der erste Dispatch/)
+    assert.equal(finde(ps, 'verboteneMuster')[0].ergebnis, 'rot')
+    assert.match(finde(ps, 'verboteneMuster')[0].detail!, /Treffer 1\/1/)
+  })
+
+  it('Worker ändert die Projekt-Config → configSchutz rot', async () => {
+    config({})
+    const res = await lauf(runner(fakeHost(() => { schreib('impl.txt', 'ok\n'); schreib('.cipher-mux/local-factory.json', '{"testpfade":[]}') })), args())
+    assert.equal(finde(gateVon(res.laufPfad!).pruefungen, 'configSchutz')[0].ergebnis, 'rot')
+  })
+})
+
+describe('Läuferfehler nach ROTEM Gate: kein Freifahrtschein', () => {
+  it('Reset scheitert nach ROT → Ausgang bleibt rot (gezählt), Meldung vermerkt, kein laeuferfehler-Retry', async () => {
+    // Das Pflicht-Gate macht den Gate rot und sperrt den Index: Patch+Reset scheitern danach.
+    config({ pflichtGates: [{ muster: 'impl.txt', befehl: 'touch .git/index.lock; exit 1' }] })
+    const host = fakeHost()
+    const res = await lauf(runner(host), args())
+    const v = loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0]
+    assert.equal(v.verdict, 'rot')
+    assert.match(v.fehler!, /index\.lock/)
+    assert.match(host.wakes[0], /: ROT, Versuch 1\/2/)
+    assert.match(host.wakes[0], /Läuferfehler/)
+    assert.doesNotMatch(host.wakes[0], /Retry mit laeuferfehler/)
+    fs.rmSync(path.join(repo, '.git', 'index.lock'))
+    git('reset', '-q', '--hard'); git('clean', '-fdq')
+    const r2 = await lauf(runner(fakeHost()), { ...args(), laufId: res.laufId, haeppchen: 1, laeuferfehler: 'x' })
+    assert.equal(r2.ok, false)
+    assert.match(r2.error!, /kein Läuferfehler/)
+  })
+
+  it('auch wenn der Reset scheitert: die vom Worker geänderte Projekt-Config wird wiederhergestellt', async () => {
+    config({ pflichtGates: [{ muster: 'impl.txt', befehl: 'touch .git/index.lock; exit 1' }] })
+    const vorher = fs.readFileSync(path.join(repo, '.cipher-mux/local-factory.json'))
+    const host = fakeHost(() => { schreib('impl.txt', 'ok\n'); schreib('.cipher-mux/local-factory.json', '{}') })
+    const res = await lauf(runner(host), args())
+    assert.equal(loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0].verdict, 'rot')
+    assert.deepEqual(fs.readFileSync(path.join(repo, '.cipher-mux/local-factory.json')), vorher)
+  })
+})
