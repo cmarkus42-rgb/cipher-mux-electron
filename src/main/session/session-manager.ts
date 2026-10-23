@@ -36,7 +36,7 @@ import { resolveEntityWorkspace } from '../workspace/workspace-utils'
 import { getCachedGlobalRules } from '../config/global-rules'
 import { extractCharacterBlock } from '../character/character-defaults'
 import { resolvePersonaForPreset } from './persona-resolver'
-import { ensureRunDir, resolveRunDir } from './entity-run-dir'
+import { ensureRunDir, resolveRunDir, RUNS_BASE } from './entity-run-dir'
 import { claudeMdExemptions } from './entity-claudemd-exemptions'
 import { buildMcpServerConfig } from '../mcp/workspace-header'
 import { buildBoundToken, BOUND_TOKEN_ENV_VAR } from '../mcp/bound-token'
@@ -48,6 +48,7 @@ import {
   restoreAdapterId,
   formatWorkspacePrompt,
   ensureInstructionsFile,
+  ensureEntityInstructionsFile,
   workspaceProjects,
 } from './folder-session'
 
@@ -1411,10 +1412,10 @@ export class SessionManager extends EventEmitter {
     // Die Anweisungsdatei, die die CLI dieser Rolle wirklich liest. Die Preset-
     // Anweisung steht oben als CLAUDE.md im Run-Verzeichnis; opencode 2 liest die
     // nicht mehr (nur AGENTS.md), die Rolle liefe sonst ohne Preset, Persona und
-    // Global Rules — ohne jede Meldung. Ein Fehler hier ist kein Grund, den Start
-    // abzubrechen.
+    // Global Rules — ohne jede Meldung. In der AGENTS.md steht der volle Text, kein
+    // Verweis (L20a). Ein Fehler hier ist kein Grund, den Start abzubrechen.
     try {
-      ensureInstructionsFile(runDir, this.adapterForEntity(entityId))
+      ensureEntityInstructionsFile(runDir, this.adapterForEntity(entityId), RUNS_BASE)
     } catch (err) {
       console.warn('[SessionManager] Instructions file for entity failed:', err)
     }
@@ -1449,6 +1450,8 @@ export class SessionManager extends EventEmitter {
           const section = `Your cipher-mux session ID is \`${session.id}\`. Pass this as \`sessionId\` parameter in every \`mux_tts_speak\` call.`
           const updated = this.injectSection(content, 'Session Identity', section)
           fs.writeFileSync(claudeMdPath, updated, 'utf-8')
+          // Die AGENTS.md ist eine Kopie der CLAUDE.md — sie bekommt die Sektion mit.
+          ensureEntityInstructionsFile(runDir, this.adapterForEntity(entityId), RUNS_BASE)
         }
       } catch (err) {
         console.warn('[SessionManager] Session identity injection failed:', err)

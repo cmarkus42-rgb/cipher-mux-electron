@@ -595,7 +595,8 @@ export class OpenCodeAdapter implements AgentAdapter {
    * CLAUDE.md da, liest es sie") gilt nicht mehr. Deshalb wie bei Codex: immer
    * `AGENTS.md`, und fehlt sie, legt der Mux sie mit Verweis auf eine vorhandene
    * `CLAUDE.md` an, damit die Session die eigentlichen Projektanweisungen nicht
-   * verliert.
+   * verliert. Im Run-Verzeichnis einer Rolle steht statt des Verweises der volle
+   * Rollentext (`ensureEntityInstructionsFile`, L20a).
    */
   instructionsTarget(present: { agentsMd: boolean; claudeMd: boolean }): InstructionsTarget {
     return !present.agentsMd && present.claudeMd
