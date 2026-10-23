@@ -4,7 +4,7 @@ import * as path from 'path'
 import { ulid } from 'ulidx'
 import { validateAuftrag, validateDispatchSteuerung, buildAuftragMd, type AuftragInput } from './auftrag'
 import {
-  decideGate, testWarnungen, readGateRecord, mitGruenden, pruefeErsetzungen, diffAusserhalbAuftrag, rotAusTestfehler,
+  decideGate, testWarnungen, readGateRecord, mitGruenden, pruefeErsetzungen, diffAusserhalbAuftrag, rotAusTestfehler, pruefeVerboteneMuster,
   type GateResult, type GateRecord, type GateDiagnose,
 } from './gate'
 import { ladeProjektConfig, passtGlob, type ProjektConfig } from './projekt-config'
@@ -15,7 +15,7 @@ import {
 import { classifyWorker, IDLE_SIGNAL_FILENAME } from './worker-done'
 import {
   runShell, dirtyFiles, headCommit, commitPaths, commitAll, changedSince,
-  checksums, savePatchAndReset, toRepoRelative, isRepoRoot, currentBranch, diffStat, istIgnoriert,
+  checksums, savePatchAndReset, toRepoRelative, isRepoRoot, currentBranch, diffStat, istIgnoriert, hinzugefuegteZeilen,
 } from './git-ops'
 import { PROTECTED_PATHS_FILENAME } from '../session/entity-boundaries'
 import { createWorkerLock, type WorkerLock } from './worker-lock'
@@ -525,6 +525,11 @@ export class LocalFactoryRunner {
       zusatz.push(...pruefeErsetzungen(a.args.ersetzungen ?? [], datei => {
         try { return fs.readFileSync(path.join(projekt, datei), 'utf-8') } catch { return null }
       }))
+      if (a.config.verboteneMuster.length) {
+        zusatz.push(...pruefeVerboteneMuster(
+          await hinzugefuegteZeilen(projekt, a.base, a.config.sauberkeitIgnoriert), a.config.verboteneMuster,
+        ))
+      }
       const fremd = diffAusserhalbAuftrag(changed, {
         dateien: [...a.args.dateien, ...(a.args.ersetzungen ?? []).map(e => e.datei)],
         prot: a.prot, testpfade: a.config.testpfade,

@@ -6,7 +6,7 @@ import * as path from 'path'
 import { execFileSync } from 'child_process'
 import {
   runShell, dirtyFiles, headCommit, commitPaths, commitAll, changedSince,
-  checksums, savePatchAndReset, toRepoRelative, currentBranch, loginShell, diffStat, istIgnoriert,
+  checksums, savePatchAndReset, toRepoRelative, currentBranch, loginShell, diffStat, istIgnoriert, hinzugefuegteZeilen,
 } from '../../../src/main/local-factory/git-ops'
 
 let repo: string
@@ -198,5 +198,24 @@ describe('L15 sauberkeitIgnoriert in git-ops', () => {
     const p = fs.readFileSync(patch, 'utf-8')
     assert.match(p, /neu\.txt/)
     assert.doesNotMatch(p, /node_modules|\.venv/)
+  })
+})
+
+describe('L16b hinzugefuegteZeilen', () => {
+  it('nur +-Zeilen mit Zeilennummer, ohne +++-Kopf und ohne gelöschte; neue Dateien ganz; Ignoriertes nicht', async () => {
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'eins\nzwei\ndrei\n'); git('commit', '-qam', 'drei')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'eins\nZWEI\ndrei\nvier\n')
+    fs.mkdirSync(path.join(repo, 'src'))
+    fs.writeFileSync(path.join(repo, 'src', 'neu.js'), 'x = 1\n+++ kein Kopf\n')
+    fs.mkdirSync(path.join(repo, '.cache')); fs.writeFileSync(path.join(repo, '.cache', 'c.js'), 'geheim\n')
+    fs.writeFileSync(path.join(repo, 'bild.bin'), Buffer.from([0, 1, 2, 0]))
+    const z = await hinzugefuegteZeilen(repo, base, ['.cache'])
+    assert.deepEqual(z.sort((x, y) => (x.datei + x.zeile).localeCompare(y.datei + y.zeile)), [
+      { datei: 'a.txt', zeile: 2, text: 'ZWEI' },
+      { datei: 'a.txt', zeile: 4, text: 'vier' },
+      { datei: 'src/neu.js', zeile: 1, text: 'x = 1' },
+      { datei: 'src/neu.js', zeile: 2, text: '+++ kein Kopf' },
+    ])
   })
 })

@@ -10,7 +10,7 @@
  */
 
 import { normalize } from 'path/posix'
-import { isTestPath } from '../session/entity-boundaries'
+import { isTestPath, matchGlob } from '../session/entity-boundaries'
 
 export type GateVerdict = 'gruen' | 'rot' | 'haengt'
 
@@ -274,4 +274,41 @@ export function rotAusTestfehler(output: string, prot: readonly string[], projek
     befund ??= { fehler: k[1], datei, helfer: null }
   }
   return befund
+}
+
+/** So viele Fundstellen eines verbotenen Musters nennt der Grund (L16b). */
+export const MAX_FUNDSTELLEN = 5
+
+/** `pfad` aus verboteneMuster: mit `*`/`?` ein Glob, sonst ein Präfix ab Segmentgrenze. */
+function passtPfad(pfad: string, datei: string): boolean {
+  if (/[*?]/.test(pfad)) return matchGlob(pfad, datei)
+  const p = norm(pfad).replace(/\/+$/, '')
+  return datei === p || datei.startsWith(p + '/')
+}
+
+/**
+ * L16b: verbotene Muster in den hinzugefügten Zeilen (Projekt-Config). Ein Treffer
+ * ist ROT — was dort steht, gehört nicht in diesen Teil des Baums, gleich ob die
+ * Tests grün sind. Je Muster ein Grund mit den ersten Fundstellen.
+ */
+export function pruefeVerboteneMuster(
+  zeilen: readonly { datei: string; zeile: number; text: string }[],
+  muster: readonly { pfad: string; regex: string; grund: string }[],
+): string[] {
+  const reasons: string[] = []
+  for (const m of muster) {
+    let re: RegExp
+    try { re = new RegExp(m.regex) } catch { continue } // der Parser hat das schon verworfen
+    const funde = zeilen.filter(z => passtPfad(m.pfad, norm(z.datei)) && re.test(z.text))
+    if (funde.length === 0) continue
+    const orte = funde.slice(0, MAX_FUNDSTELLEN).map(z => `${norm(z.datei)}:${z.zeile} „${oneLineKurz(z.text)}“`)
+    reasons.push(`Verbotenes Muster /${m.regex}/ unter ${m.pfad}: ${m.grund} — `
+      + `${funde.length > 1 ? `${funde.length} Fundstellen: ` : ''}${orte.join('; ')}`)
+  }
+  return reasons
+}
+
+function oneLineKurz(s: string): string {
+  const t = s.trim()
+  return t.length > 120 ? t.slice(0, 119) + '…' : t
 }

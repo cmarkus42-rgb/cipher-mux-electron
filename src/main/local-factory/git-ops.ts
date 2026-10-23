@@ -183,6 +183,55 @@ export async function savePatchAndReset(projekt: string, base: string, patchFile
   await git(projekt, ['clean', '-fdq', ...behalten])
 }
 
+/** Eine hinzugefügte Zeile im Baum seit `base` (L16b). */
+export interface NeueZeile {
+  datei: string
+  zeile: number
+  text: string
+}
+
+/**
+ * Was seit `base` hinzugekommen ist, Zeile für Zeile: aus `git diff -U0` nur die
+ * +-Zeilen (der `+++`-Kopf zählt nicht), dazu neue, ungetrackte Textdateien ganz.
+ * Gelöschte Zeilen zählen nicht — wer ein Muster entfernt, verstößt nicht dagegen.
+ */
+export async function hinzugefuegteZeilen(projekt: string, base: string, ausnahmen: readonly string[] = []): Promise<NeueZeile[]> {
+  const { stdout } = await execFileP('git', [...NO_QUOTE, 'diff', '-U0', '--no-renames', '--no-color', '--no-ext-diff', base], {
+    cwd: projekt, maxBuffer: 256 * 1024 * 1024, env: { ...process.env, PATH: getEnhancedPath() },
+  })
+  const out: NeueZeile[] = []
+  let datei: string | null = null
+  let nr = 0
+  for (const l of stdout.split('\n')) {
+    if (l.startsWith('diff --git ')) { datei = null; continue }
+    if (l.startsWith('+++ ')) {
+      const p = l.slice(4)
+      datei = p === '/dev/null' ? null : p.replace(/^b\//, '')
+      continue
+    }
+    const hunk = l.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+    if (hunk) { nr = Number(hunk[1]); continue }
+    if (datei && l.startsWith('+')) {
+      if (!istIgnoriert(datei, ausnahmen)) out.push({ datei, zeile: nr, text: l.slice(1) })
+      nr++
+    }
+  }
+  const neu = lines(await git(projekt, [...NO_QUOTE, 'ls-files', '--others', '--exclude-standard']))
+  for (const f of neu) {
+    if (istIgnoriert(f, ausnahmen)) continue
+    let buf: Buffer
+    try {
+      if (!fs.statSync(path.join(projekt, f)).isFile()) continue
+      buf = fs.readFileSync(path.join(projekt, f))
+    } catch { continue }
+    if (buf.includes(0)) continue // binär
+    const text = buf.toString('utf-8').split('\n')
+    if (text.at(-1) === '') text.pop()
+    text.forEach((t, i) => out.push({ datei: f, zeile: i + 1, text: t }))
+  }
+  return out
+}
+
 /** Umfang eines Commits für die Bilanz: Dateien und Zeilen (hinzu + weg). Binärdateien zählen als Datei, nicht als Zeilen. */
 export async function diffStat(projekt: string, from: string, to: string): Promise<{ dateien: number; zeilen: number }> {
   const out = lines(await git(projekt, [...NO_QUOTE, 'diff', '--numstat', '--no-renames', from, to]))

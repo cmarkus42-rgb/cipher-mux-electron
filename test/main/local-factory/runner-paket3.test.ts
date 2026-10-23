@@ -328,3 +328,27 @@ describe('sauberkeitIgnoriert: was der Worker dort neu anlegt, bleibt sichtbar',
     assert.ok(gateVon(res.laufPfad!).warnungen.includes('Neu unter sauberkeitIgnoriert, vom Worker angelegt: .cache'))
   })
 })
+
+describe('L16b verboteneMuster im Gate', () => {
+  const muster = { verboteneMuster: [{ pfad: 'src/', regex: 'globalThis\\.__', grund: 'Testcode in der Produktion' }] }
+  it('hinzugefügte Zeile unter src/ trifft → ROT mit Grund und Fundstelle', async () => {
+    config(muster)
+    const host = fakeHost(() => { schreib('impl.txt', 'ok\n'); schreib('src/a.js', 'const x = 1\nglobalThis.__calls = []\n') })
+    const res = await lauf(runner(host), args())
+    assert.match(host.wakes[0], /ROT/)
+    assert.match(gateVon(res.laufPfad!).reasons.join(), /Testcode in der Produktion.*src\/a\.js:2/)
+  })
+  it('dasselbe in einem Test außerhalb von src/ → GRÜN', async () => {
+    config(muster)
+    const host = fakeHost(() => { schreib('impl.txt', 'ok\n'); schreib('test/hilfe.test.js', 'globalThis.__calls = []\n') })
+    await lauf(runner(host), args())
+    assert.match(host.wakes[0], /GRÜN/)
+  })
+  it('gelöschte Zeile mit dem Muster ist kein Treffer', async () => {
+    schreib('src/a.js', 'globalThis.__alt = 1\n'); git('add', 'src'); git('commit', '-qm', 'alt')
+    config(muster)
+    const host = fakeHost(() => { schreib('impl.txt', 'ok\n'); schreib('src/a.js', 'const sauber = 1\n') })
+    await lauf(runner(host), { ...args(), dateien: ['impl.txt', 'src/a.js'] })
+    assert.match(host.wakes[0], /GRÜN/)
+  })
+})
