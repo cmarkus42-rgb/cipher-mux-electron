@@ -25,6 +25,8 @@
  * never be able to silence another.
  */
 
+import { stripAnsi } from '../util/ansi'
+
 /** Which signal established readiness. */
 export type ReadySignal = 'status-line' | 'prompt'
 
@@ -97,7 +99,9 @@ export async function waitForSessionReady(
     } catch { /* no self-report available this round */ }
 
     try {
-      const captured = await probes.capturePane(sessionId)
+      // The pane comes with colour codes (capture-pane -e). A TUI that colours
+      // the parts of a marker differently would otherwise never match.
+      const captured = stripAnsi(await probes.capturePane(sessionId))
       if (markers.some(marker => captured.includes(marker))) {
         return { ready: true, via: 'prompt', attempts }
       }

@@ -71,6 +71,8 @@ export interface EntityBoundary {
   projectTestPaths?: boolean
   /** Immer gesperrt; keine Ausnahme hebt das auf. */
   lockPathPatterns?: string[]
+  /** Begruendung fuer eine Pfadsperre aus `lockPathPatterns`; ohne sie gilt `reason`. */
+  lockReason?: string
   /**
    * Regex-Quellen, geprueft gegen den normalisierten Shell-Befehl (siehe
    * `normalizeBoundaryCommand`). Claude Code: Matcher `Bash`; opencode: `shell`
@@ -142,6 +144,10 @@ export const ENTITY_BOUNDARIES: Record<string, EntityBoundary> = {
     // Die Config entscheidet, was als Test gilt. Wer sie aendern darf, hebt die
     // Grenze auf. Ueber die Shell bleibt das moeglich (offen dokumentiert).
     lockPathPatterns: ['/' + PROJECT_CONFIG_RELPATH],
+    // Der E3-Text erklaert nicht, warum die Config tabu ist (Wunsch projekt-a).
+    lockReason:
+      `Die Projekt-Config ${PROJECT_CONFIG_RELPATH} pflegen nur der User oder die Systems-Session `
+      + '— sonst schaltet sich die Factory ihre eigenen Gates ab. Änderungswunsch an den User melden.',
     // LESSONS L5/L9: `stash` liegt im gemeinsamen refs/stash aller Worktrees,
     // `checkout`/`switch`/`reset --hard` stellen einen fremden Checkout um.
     denyCommandPatterns: [
@@ -166,8 +172,12 @@ export const ENTITY_BOUNDARIES: Record<string, EntityBoundary> = {
     // Die Projekt-Config bestimmt Pflicht-Gates und verbotene Muster — wer sie aendert,
     // aendert die eigene Pruefung. Der Gate wertet eine Aenderung zusaetzlich als ROT.
     lockPathPatterns: ['/' + PROJECT_CONFIG_RELPATH],
+    lockReason:
+      `Die Projekt-Config ${PROJECT_CONFIG_RELPATH} pflegen nur der User oder die Systems-Session `
+      + '— sie legt Pflicht-Gates und verbotene Muster fest; wer sie ändert, ändert die eigene Prüfung, '
+      + 'und der Gate wertet das als ROT. Änderungswunsch im Bericht an den Architekten nennen.',
     reason:
-      'Abnahmetests, Auftrag und Projekt-Config gehoeren dem Architekten. Wer den Test aendert, den er '
+      'Abnahmetests und Auftrag gehoeren dem Architekten. Wer den Test aendert, den er '
       + 'bestehen soll, beweist nichts (Keel C-001). Eigene Unit-Tests sind erlaubt.',
   },
   debugger: {
@@ -274,6 +284,7 @@ export interface BoundaryRules {
   denyCommands: string[]
   projectTestPaths: boolean
   reason: string
+  lockReason: string
   commandReason: string
 }
 
@@ -301,6 +312,7 @@ export function boundaryRules(boundary: EntityBoundary): BoundaryRules {
     denyCommands: [...(boundary.denyCommandPatterns ?? [])],
     projectTestPaths: boundary.projectTestPaths === true,
     reason: boundary.reason,
+    lockReason: boundary.lockReason ?? boundary.reason,
     commandReason: boundary.commandReason ?? boundary.reason,
   }
 }
@@ -401,7 +413,7 @@ function boundaryHas(list, s) {
 
 function boundaryDecidePath(filePath, rules, io) {
   if (typeof filePath !== 'string' || !filePath) return { denied: false }
-  if (boundaryHas(rules.lock, filePath)) return { denied: true, reason: rules.reason }
+  if (boundaryHas(rules.lock, filePath)) return { denied: true, reason: rules.lockReason || rules.reason }
   if (!boundaryHas(rules.deny, filePath)) return { denied: false }
 
   var root = filePath.charAt(0) === '/' ? boundaryFindRoot(filePath, io) : null
@@ -687,14 +699,17 @@ export default {
       }
 
       // Die Sperrliste des Laeufers ist hart: keine Testpfad-Ausnahme hebt sie auf.
-      const rules = Object.assign({}, RULES, { lock: RULES.lock.concat(extraDeny()) })
+      // Eigene Pruefung statt Teil von RULES.lock — sonst bekaeme ein geschuetzter
+      // Abnahmetest den Grund der Config-Sperre.
+      const protectedPaths = extraDeny()
       for (const p of paths) {
         // Relative paths are the normal case; resolve them (and collapse '..')
         // before the comparison, or '/src/' never matches 'src/x.ts'. The raw
         // path is checked as well — a '..' walking out of src/ stays denied.
         const resolved = path.resolve(cwd, p)
         for (const candidate of resolved === p ? [p] : [resolved, p]) {
-          const decision = boundaryDecidePath(candidate, rules, io)
+          if (boundaryHas(protectedPaths, candidate)) throw new Error(REASON)
+          const decision = boundaryDecidePath(candidate, RULES, io)
           // The throw is what stops the call. opencode surfaces the message as
           // the tool's error, which is how the reason reaches the model.
           if (decision.denied) throw new Error(decision.reason)

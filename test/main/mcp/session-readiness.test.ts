@@ -182,6 +182,13 @@ const OPENCODE_IDLE = fs.readFileSync(
   'utf-8',
 )
 
+// Dieselbe TUI, wie der Mux sie wirklich liest: capture-pane mit -e, also mit
+// Farbcodes. Ohne -e gezogen blieb T-LFH.7 im Test gruen und live rot.
+const OPENCODE_IDLE_E = fs.readFileSync(
+  path.join(__dirname, '../../fixtures/panes/opencode-2-idle-e.txt'),
+  'utf-8',
+)
+
 describe('waitForSessionReady — Prompt-Muster des Adapters', () => {
   it('erkennt eine opencode-TUI an ihrer Eingabe, wenn die Marker vom Adapter kommen', async () => {
     const markers = new OpenCodeAdapter().promptMarkers
@@ -192,6 +199,25 @@ describe('waitForSessionReady — Prompt-Muster des Adapters', () => {
     )
     assert.equal(result.ready, true)
     assert.equal(result.via, 'prompt')
+  })
+
+  it('erkennt die opencode-TUI auch mit Farbcodes zwischen den Markerzeichen (T-LFH.7)', async () => {
+    const result = await waitForSessionReady(
+      probes({ capturePane: async () => OPENCODE_IDLE_E }),
+      'sess-1',
+      { ...FAST, promptMarkers: new OpenCodeAdapter().promptMarkers },
+    )
+    assert.equal(result.ready, true)
+    assert.equal(result.via, 'prompt')
+  })
+
+  it('erkennt den Claude-Code-Prompt auch eingefaerbt', async () => {
+    const result = await waitForSessionReady(
+      probes({ capturePane: async () => '\x1b[38;2;153;153;153m❯\x1b[39m \x1b]8;;\x07' }),
+      'sess-1',
+      { ...FAST, promptMarkers: undefined },
+    )
+    assert.equal(result.ready, true)
   })
 
   it('opencode-Marker sehen in einer Shell nach der Hilfe-Ausgabe keinen Prompt', async () => {
