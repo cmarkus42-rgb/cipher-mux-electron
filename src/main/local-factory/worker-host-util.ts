@@ -3,6 +3,7 @@ import * as path from 'path'
 import * as http from 'node:http'
 import * as https from 'node:https'
 import { resolveLocalWorkerProfile, type ProfileResult } from './local-provider'
+import { stripAnsi } from '../util/ansi'
 
 /**
  * Reine Hilfen des Hosts, ohne Electron-Abhängigkeit — damit sie sich
@@ -97,16 +98,13 @@ export async function submitLine(
   await sendKey('Enter')
 }
 
-/** CSI- und OSC-Sequenzen; capture-pane liefert mit -e die Farbcodes mit. */
-const ANSI = /\x1b\[[0-9;?]*[ -\/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g
-
 /**
  * Die letzten n sichtbaren Zeilen einer Pane, für die Diagnose eines hängenden
  * Workers (L8). Wirft nie: eine fehlende Pane ist ein Befund, kein Läuferfehler.
  */
 export async function paneTailLines(capture: () => Promise<string>, n: number): Promise<string[]> {
   try {
-    const lines = (await capture()).replace(ANSI, '').split('\n').map(l => l.replace(/\s+$/, ''))
+    const lines = stripAnsi(await capture()).split('\n').map(l => l.replace(/\s+$/, ''))
     while (lines.length && lines[lines.length - 1] === '') lines.pop()
     return lines.slice(-n)
   } catch {
