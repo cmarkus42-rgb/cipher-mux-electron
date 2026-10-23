@@ -46,7 +46,7 @@ export function buildBilanzZeile(
     dateien: last?.dateien ?? 0, diffZeilen: last?.diffZeilen ?? 0, workerTokens: last?.tokensAmEnde ?? null,
     ergebnis: u.ergebnis, kategorie: u.kategorie, notiz: u.notiz?.trim() || null,
     architektenfehler: h.versuche.find(v => v.architektenfehler)?.architektenfehler ?? null,
-    rotGrund: h.versuche.findLast(v => v.rotGrund)?.rotGrund ?? null,
+    rotGrund: [...h.versuche].reverse().find(v => v.rotGrund)?.rotGrund ?? null,
   }
 }
 
