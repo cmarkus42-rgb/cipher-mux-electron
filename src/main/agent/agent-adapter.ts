@@ -175,6 +175,13 @@ export interface AgentAdapter {
   attachStatusHook?(projectPath: string): Promise<void>
 
   // --- prompt delivery ---
+  /**
+   * Zeichenketten, an denen man im Pane sieht, dass die CLI an ihrer Eingabe
+   * steht. Eine genügt. Die Handoff-Zustellung liest damit, ob sie tippen darf
+   * (`mcp/session-readiness.ts`) — wie eine CLI sich zeichnet, weiß nur ihr
+   * Adapter. Fehlt das Feld, gelten die Marker von Claude Code.
+   */
+  readonly promptMarkers?: readonly string[]
   /** Send a prompt into the agent's tmux pane. */
   sendPrompt(tmuxTarget: string, prompt: string, opts?: SendOpts): Promise<void>
 

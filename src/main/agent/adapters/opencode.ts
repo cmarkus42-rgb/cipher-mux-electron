@@ -372,6 +372,16 @@ export class OpenCodeAdapter implements AgentAdapter {
   readonly id = 'opencode'
   readonly displayName = 'opencode'
   readonly tier = 'tier-2' as const
+  /**
+   * Woran man die TUI an ihrer Eingabe erkennt — gemessen an opencode 2 am
+   * 2026-10-23 (Probe: `test/fixtures/panes/opencode-2-idle.txt`). Die
+   * Unterkante des Eingabekastens (`╹▀▀…`) und die Fußzeile mit
+   * `ctrl+p commands`. Ein `❯` zeichnet opencode nicht; mit den Markern von
+   * Claude Code lief jede Zustellung in „neither a status-line report nor a
+   * visible prompt", gesendet wurde nichts. Eine Shell nach der Hilfe-Ausgabe
+   * zeigt keins von beiden.
+   */
+  readonly promptMarkers = ['╹▀▀', 'ctrl+p commands'] as const
 
   private readonly configReader: OpenCodeConfigReader
 

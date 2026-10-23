@@ -51,6 +51,20 @@ export class NoteSearchIndex {
     this.addToIndex(content)
   }
 
+  /**
+   * Bring one note in line with its file: re-read it, or drop it if gone.
+   *
+   * The index is built once at startup. Every write that does not go through
+   * this class afterwards — handoff notes, mux_notes_update, testcases, mirror
+   * sync, edits from outside the app — left it stale, and mux_notes_search
+   * then missed a note that mux_notes_handoff_search (reading the disk) found.
+   */
+  async syncNote(manager: NoteManager, id: string): Promise<void> {
+    const content = await manager.read(id)
+    if (content) this.addOrUpdate(content)
+    else this.remove(id)
+  }
+
   /** Remove a note from the index. */
   remove(id: string): void {
     try { this.index.remove(id) } catch { /* not in index */ }
