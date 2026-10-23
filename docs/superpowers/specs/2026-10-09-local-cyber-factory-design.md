@@ -178,6 +178,7 @@ Aus dem Betrieb an projekt-a (LESSONS L1–L20, Wellenplan „Local Factory Här
 |---|---|
 | `ersetzungen` `[{datei, alt, neu}]` | Gate ROT, wenn `alt` noch in `datei` steht oder `neu` fehlt (L11). Dazu Warnung „Diff außerhalb des Auftrags“ bei Änderungen außerhalb von `dateien` |
 | `architektenfehler` `"<Begründung>"` | Nur beim Retry (gleiche `laufId` + `haeppchen`): der letzte Fehlversuch war ein Fehler des Architekten. Zählt nicht gegen die 2 Versuche, eigens in `lauf.json` und Bilanz, **einmal je Häppchen**, auch nach Eskalation (L12) |
+| `laeuferfehler` `"<Begründung>"` | Nur beim Retry: der letzte Versuch scheiterte am Läufer, nicht am Worker (Ausgang `laeuferfehler`, oder Altfall: `haengt` mit grünem Gate). Zählt nicht gegen die 2 Versuche, eigens in `lauf.json`, Bilanz und Weckzeile, **einmal je Häppchen** — unabhängig vom Deckel für `architektenfehler`, auch nach Eskalation. Ein zweiter Läuferfehler im selben Häppchen eskaliert es. Schließt `architektenfehler` aus (Live-Test 23.10.) |
 | `rotGrund` `"<Begründung>"` | Übersteuert die Ablehnung „Abnahmetest rot, vermutlich aus einem Fehler im Test selbst“. **Nicht** möglich, wenn ein Test-Hilfsobjekt fehlt (`globalThis.*`, Bezeichner mit führendem `__`) (L16a) |
 
 **Projekt-Config `.cipher-mux/local-factory.json`** im Ziel-Repo. Pflegen nur User oder
@@ -213,8 +214,8 @@ nie geworfen.
 | `sauberkeitIgnoriert` | Bleibt bei „Arbeitsbaum sauber“, Diff und Reset außen vor (Dateien und Symlinks). Ein Symlink hier zeigt **nur auf Abhängigkeiten**, nie auf Code — dahinter sieht das Gate nichts (L15) |
 | `verboteneMuster` | Regex auf hinzugefügte Diff-Zeilen in Dateien auf `pfad`; Treffer = ROT mit `grund` (L16b) |
 
-**Rollentext `local-factory-v2`.** Der Architekten-Rollentext trägt seit dieser Welle einen
-Versionsmarker und steht in `PRESET_TEMPLATES`. Eine ältere `preset.md` (ohne Marker) zeigt im
+**Rollentext `local-factory-v3`.** Der Architekten-Rollentext trägt seit dieser Welle einen
+Versionsmarker und steht in `PRESET_TEMPLATES` (v3: Läuferfehler und Feld `laeuferfehler`). Eine ältere `preset.md` (ohne Marker) zeigt im
 Preset-Editor den Rückstand; übernommen wird nur per Knopf, mit Sicherung daneben.
 
 **Zustellung unter opencode.** Im Run-Verzeichnis einer Rolle schreibt der Mux den vollen
@@ -225,7 +226,8 @@ Verweis (L20a). In User-Projekten bleibt eine vorhandene `AGENTS.md` unangetaste
 
 Pro Lauf eine `lauf.json` im Run-Verzeichnis von `local-factory`, pro Häppchen:
 
-- Nummer, Ziel, Versuche, Ergebnis (`abgenommen` / `eskaliert` / `hängt` / `abgebrochen`)
+- Nummer, Ziel, Versuche, Ergebnis (`abgenommen` / `eskaliert` / `hängt` / `abgebrochen`);
+  Ausgang je Versuch `gruen` / `rot` / `haengt` / `laeuferfehler` (mit Meldung in `fehler`)
 - Worker-Laufzeit, lokale Tokens (aus dem Usage-Plugin), Gate-Dauer
 - Pfade zu `gate.json` und gesicherten Patches
 - Weckrufe des Architekten und seine Kontextnutzung beim Wecken
@@ -242,6 +244,7 @@ Kontextnutzung sind eine Näherung — genug für einen Trend, kein Euro-Betrag.
 |---|---|
 | Endpunkt nicht erreichbar | Vorprüfung schlägt fehl, Wecken mit „Endpunkt weg“, kein Versuch gezählt |
 | Worker hängt / Timeout | Session beenden, Patch sichern, Reset, zählt als Fehlversuch „hängt“ |
+| Läufer bricht selbst ab (Exception, z. B. git-Fehler beim Commit) | Ausgang `laeuferfehler`, nicht „hängt“. Nach dem Gate: Arbeit bleibt im Worktree, Patch daneben, Vermerk `laeuferfehler` im Gate; davor: Patch und Reset. Weckzeile `LÄUFERFEHLER`. Retry mit `laeuferfehler` zählt nicht (Deckel 1 je Häppchen). Ein Retry braucht einen sauberen Baum |
 | Abgeschnittene Ausgabe | erscheint als kaputter Edit, Gate rot, Versuch gezählt |
 | Baum beim Dispatch nicht sauber | Ablehnung mit Begründung |
 | Abnahmetest vor der Arbeit grün | Ablehnung: der Test prüft nichts |

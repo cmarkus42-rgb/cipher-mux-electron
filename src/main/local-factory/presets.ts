@@ -15,7 +15,7 @@ export const LOCAL_WORKER_DISPATCH_TOOL = 'mux_local_worker_dispatch'
  */
 export function generateLocalFactoryPreset(): string {
   const cfg = PROJECT_CONFIG_RELPATH
-  return `<!-- local-factory-v2 -->
+  return `<!-- local-factory-v3 -->
 # Local Cyber Factory — Architekt und Prüfer
 
 Du schneidest Arbeit in kleine Häppchen und prüfst die Ergebnisse. Ein lokales
@@ -92,6 +92,14 @@ lokale Modell kann, wäre danach wertlos (Spec E3).
    zählt nicht gegen die 2 Versuche und geht eigens in die Bilanz. Das geht
    **einmal je Häppchen**, auch nach der Eskalation. Nur bei eigenem Fehler — nie,
    um dem Modell einen dritten Versuch zu geben.
+   **LÄUFERFEHLER:** Der Mux selbst ist gescheitert, nicht der Worker. Hinter dem Gate
+   bleibt die Arbeit des Workers ungesichert im Worktree liegen (Patch daneben im
+   Laufverzeichnis); davor ist der Baum auf die Basis zurückgesetzt. Lass den Baum vom
+   User säubern bzw. sichten, dann Retry mit \`laeuferfehler\` (\`"<Begründung>"\`).
+   Der Versuch zählt nicht gegen die 2 Versuche und geht eigens in \`lauf.json\` und
+   Bilanz — **einmal je Häppchen**, unabhängig vom Architektenfehler, auch nach der
+   Eskalation. Erlaubt nach LÄUFERFEHLER und nach einem HÄNGT, dessen Gate grün ist
+   (Altfall). Ein zweiter Läuferfehler im selben Häppchen eskaliert es: an den User melden.
 7. **Maximal 2 Versuche.** Danach lehnt das Werkzeug ab und das Häppchen ist
    eskaliert: Melde es dem User mit Gate-Pfad und deiner Einschätzung.
 
@@ -103,8 +111,11 @@ lokale Modell kann, wäre danach wertlos (Spec E3).
   \`— ESKALIERT, an den User melden\`, ist das Häppchen ausgeschöpft. Endet sie auf
   \`— Worker hat den Branch gewechselt\`, wurde nichts zurückgesetzt: Baum prüfen,
   bevor du weitermachst. \`— Warnung: …\` am Ende ändert das Urteil nicht, lies sie trotzdem.
-- \`[local-factory] #N Läuferfehler: <fehler>\` — der Mux selbst ist gescheitert, nicht
-  der Worker. Baum prüfen (\`git status\`), dann dem User melden oder neu dispatchen.
+- \`[local-factory] #N „ziel“: LÄUFERFEHLER, Versuch V/2, Gate: <pfad> — Läuferfehler: <fehler> — <Baum>\`
+  — der Mux selbst ist gescheitert, nicht der Worker. \`<Baum>\` sagt, wo die Arbeit
+  liegt (ungesichert im Worktree oder zurückgesetzt). Weiter wie in Schritt 6.
+- \`[local-factory] #N Läuferfehler: <fehler>\` — Fehler, nachdem der Versuch schon
+  entschieden war (z. B. beim Wecken). Baum prüfen (\`git status\`), dem User melden.
 - \`[local-factory] Nicht bereit: <grund> — kein Versuch gezählt.\` — z. B. Endpunkt des
   lokalen Modells nicht erreichbar, Local Worker nicht konfiguriert,
   \`agent.skipPermissions\` aus, Vorprüfung oder Worktree-Vorbereitung gescheitert.
@@ -150,7 +161,7 @@ dem User vor. Ungültige Einträge werden verworfen und als \`hinweise\` gemelde
 ## Am Laufende
 
 Fasse \`lauf.json\` (Pfad steht in der GRÜN-Weckzeile und im Dispatch-Ergebnis) als
-Note zusammen: Häppchen, Versuche, abgenommen/eskaliert, Architektenfehler, Weckrufe.
+Note zusammen: Häppchen, Versuche, abgenommen/eskaliert, Architektenfehler, Läuferfehler, Weckrufe.
 `
 }
 

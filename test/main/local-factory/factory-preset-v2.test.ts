@@ -16,9 +16,14 @@ import { presetTemplateFor } from '../../../src/main/entity-content/preset-templ
 const p = generateLocalFactoryPreset()
 
 describe('local-factory v2 — Marker und Rückstand', () => {
-  it('trägt den Marker local-factory-v2 als erste Zeile', () => {
-    assert.ok(p.startsWith('<!-- local-factory-v2 -->\n'))
-    assert.deepEqual(parsePresetVersion(p), { entityId: 'local-factory', version: 2 })
+  it('trägt den Marker local-factory-v3 als erste Zeile (Retry-Feld laeuferfehler)', () => {
+    assert.ok(p.startsWith('<!-- local-factory-v3 -->\n'))
+    assert.deepEqual(parsePresetVersion(p), { entityId: 'local-factory', version: 3 })
+  })
+
+  it('ein v2-Text im Betrieb → Rückstand erkannt', () => {
+    const v2 = p.replace('<!-- local-factory-v3 -->', '<!-- local-factory-v2 -->')
+    assert.equal(comparePresetVersion(v2, presetTemplateFor('local-factory') as string).stale, true)
   })
 
   it('ist im Rückstands-Mechanismus eingehängt', () => {
@@ -32,7 +37,7 @@ describe('local-factory v2 — Marker und Rückstand', () => {
     assert.equal(c.stale, true)
   })
 
-  it('v2 gegen v2 → kein Rückstand', () => {
+  it('v3 gegen v3 → kein Rückstand', () => {
     const c = comparePresetVersion(p, presetTemplateFor('local-factory') as string)
     assert.equal(c.status, 'aktuell')
     assert.equal(c.stale, false)
@@ -148,5 +153,26 @@ describe('local-factory v2 — kein Widerspruch zur Werkzeugbeschreibung', () =>
     assert.match(beschreibung, /does not count against the 2 attempts, works once per item, also after escalation/)
     assert.match(p, /zählt nicht gegen die 2 Versuche/)
     assert.match(p, /auch nach der Eskalation/)
+  })
+})
+
+describe('local-factory v3 — Läuferfehler', () => {
+  const beschreibung = buildDispatchDescription('local-factory')
+
+  it('Rollentext: Weckzeile LÄUFERFEHLER, Arbeit liegt im Worktree, Retry-Feld laeuferfehler mit eigenem Deckel', () => {
+    assert.match(p, /`\[local-factory\] #N „ziel“: LÄUFERFEHLER/)
+    assert.match(p, /ungesichert im Worktree/)
+    assert.match(p, /`laeuferfehler`/)
+    assert.match(p, /zählt nicht gegen die 2 Versuche/)
+    assert.match(p, /unabhängig vom Architektenfehler/)
+    assert.match(p, /HÄNGT[^\n]*grün/)
+    assert.match(p, /zweiter Läuferfehler[^\n]*eskaliert/i)
+  })
+
+  it('Beschreibung: laeuferfehler, Deckel 1, nicht gezählt, auch nach HÄNGT mit grünem Gate', () => {
+    assert.match(beschreibung, /laeuferfehler: "<reason>"/)
+    assert.match(beschreibung, /does not count against the 2 attempts, once per item, independent of architektenfehler/)
+    assert.match(beschreibung, /green gate/)
+    assert.match(beschreibung, /second runner failure escalates/)
   })
 })
