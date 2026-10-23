@@ -232,7 +232,13 @@ describe('writeClaudeBoundaryHook — wie beim Entity-Start', () => {
 
 // ─── Paritaet: Funktion ↔ Claude-Hook ↔ opencode-Plugin ─────
 
-interface Fall { art: 'pfad' | 'befehl'; wert: string; gesperrt: boolean }
+interface Fall { art: 'pfad' | 'befehl'; wert: string; gesperrt: boolean; grund?: RegExp }
+interface Urteil { denied: boolean; reason?: string }
+
+// Die Projekt-Config hat einen eigenen Grund (Wunsch projekt-a): der E3-Text
+// „schneidet zu und prueft" erklaert nicht, warum die Config tabu ist.
+const KONFIG_GRUND = /pflegen nur der User oder die Systems-Session/
+const CODE_GRUND = /schneidet zu und prueft/
 
 describe('Paritaet: dieselben Faelle gegen Funktion, Claude-Hook und opencode-Plugin', () => {
   let tmp: string
@@ -263,10 +269,10 @@ describe('Paritaet: dieselben Faelle gegen Funktion, Claude-Hook und opencode-Pl
   after(() => { fs.rmSync(tmp, { recursive: true, force: true }) })
 
   function faelle(): Fall[] {
-    const p = (wert: string, gesperrt: boolean): Fall => ({ art: 'pfad', wert, gesperrt })
+    const p = (wert: string, gesperrt: boolean, grund?: RegExp): Fall => ({ art: 'pfad', wert, gesperrt, grund })
     const b = (wert: string, gesperrt: boolean): Fall => ({ art: 'befehl', wert, gesperrt })
     return [
-      p(`${repo}/src/app.ts`, true),
+      p(`${repo}/src/app.ts`, true, CODE_GRUND),
       p(`${repo}/lib/main.dart`, true),
       p(`${repo}/src/app.test.ts`, false),
       p(`${repo}/src/app.spec.tsx`, false),
@@ -277,7 +283,7 @@ describe('Paritaet: dieselben Faelle gegen Funktion, Claude-Hook und opencode-Pl
       p(`${repo}/src/testing/helper.ts`, false),
       p(`${repo}/src/fixtures/x.ts`, true),
       p(`${repo}/src/attestation.ts`, true),
-      p(`${repo}/${PROJECT_CONFIG_RELPATH}`, true),
+      p(`${repo}/${PROJECT_CONFIG_RELPATH}`, true, KONFIG_GRUND),
       p(`${repo}/docs/x.md`, false),
       p(`${unterTest}/src/app.ts`, true),
       b('git stash', true),
@@ -297,35 +303,42 @@ describe('Paritaet: dieselben Faelle gegen Funktion, Claude-Hook und opencode-Pl
     ]
   }
 
-  function funktion(f: Fall): boolean {
+  function funktion(f: Fall): Urteil {
     const rules = boundaryRules(LF)
-    return f.art === 'pfad' ? decideBoundaryPath(f.wert, rules).denied : decideBoundaryCommand(f.wert, rules).denied
+    const d = f.art === 'pfad' ? decideBoundaryPath(f.wert, rules) : decideBoundaryCommand(f.wert, rules)
+    return { denied: d.denied, reason: d.reason }
   }
 
-  function claudeHook(f: Fall): boolean {
+  function claudeHook(f: Fall): Urteil {
     const input = f.art === 'pfad'
       ? { tool_name: 'Edit', tool_input: { file_path: f.wert }, cwd: repo }
       : { tool_name: 'Bash', tool_input: { command: f.wert }, cwd: repo }
     const r = spawnSync(process.execPath, [hookFile], { input: JSON.stringify(input), encoding: 'utf-8' })
     assert.equal(r.status, 0, r.stderr)
-    if (!r.stdout.trim()) return false
-    return JSON.parse(r.stdout).hookSpecificOutput?.permissionDecision === 'deny'
+    if (!r.stdout.trim()) return { denied: false }
+    const out = JSON.parse(r.stdout).hookSpecificOutput
+    return { denied: out?.permissionDecision === 'deny', reason: out?.permissionDecisionReason }
   }
 
-  async function plugin(f: Fall, shellTool = 'shell'): Promise<boolean> {
+  async function plugin(f: Fall, shellTool = 'shell'): Promise<Urteil> {
     const event = f.art === 'pfad'
       ? { tool: 'edit', input: { path: f.wert, oldString: 'a', newString: 'b' } }
       : { tool: shellTool, input: { command: f.wert } }
-    try { await pluginHook(event); return false } catch { return true }
+    try { await pluginHook(event); return { denied: false } } catch (e) { return { denied: true, reason: (e as Error).message } }
   }
 
-  it('alle drei entscheiden jeden Fall gleich — und richtig', async () => {
+  it('alle drei entscheiden jeden Fall gleich — und richtig, mit demselben Grund', async () => {
     for (const f of faelle()) {
-      const erwartet = f.gesperrt
-      assert.equal(funktion(f), erwartet, `Funktion: ${f.wert}`)
-      assert.equal(claudeHook(f), erwartet, `Claude-Hook: ${f.wert}`)
-      assert.equal(await plugin(f), erwartet, `opencode-Plugin: ${f.wert}`)
-      if (f.art === 'befehl') assert.equal(await plugin(f, 'bash'), erwartet, `opencode-Plugin (bash): ${f.wert}`)
+      const urteile: Array<[string, Urteil]> = [
+        ['Funktion', funktion(f)],
+        ['Claude-Hook', claudeHook(f)],
+        ['opencode-Plugin', await plugin(f)],
+      ]
+      if (f.art === 'befehl') urteile.push(['opencode-Plugin (bash)', await plugin(f, 'bash')])
+      for (const [wer, u] of urteile) {
+        assert.equal(u.denied, f.gesperrt, `${wer}: ${f.wert}`)
+        if (f.grund) assert.match(u.reason ?? '', f.grund, `${wer}: ${f.wert}`)
+      }
     }
   })
 
@@ -358,13 +371,55 @@ describe('Paritaet: dieselben Faelle gegen Funktion, Claude-Hook und opencode-Pl
   })
 })
 
+describe('local-factory: eigener Grund fuer die Projekt-Config', () => {
+  const io = { read: () => null, exists: () => false }
+  it('die Ablehnung nennt, wer die Config pflegt — nicht den allgemeinen E3-Text', () => {
+    const d = decideBoundaryPath('/repo/' + PROJECT_CONFIG_RELPATH, boundaryRules(LF), io)
+    assert.equal(d.denied, true)
+    assert.match(d.reason!, KONFIG_GRUND)
+    assert.match(d.reason!, /Änderungswunsch an den User/)
+    assert.doesNotMatch(d.reason!, CODE_GRUND)
+  })
+  it('Produktionscode behaelt den E3-Text', () => {
+    assert.match(decideBoundaryPath('/repo/src/a.ts', boundaryRules(LF), io).reason!, CODE_GRUND)
+  })
+})
+
 describe('local-worker: Projekt-Config gesperrt (Paket 3)', () => {
   const W = getEntityBoundary('local-worker')!
   const io = { read: () => null, exists: () => false }
-  it('Edit an .cipher-mux/local-factory.json wird abgelehnt, mit Begründung', () => {
+  it('Edit an .cipher-mux/local-factory.json wird abgelehnt, mit eigenem Grund', () => {
     const d = decideBoundaryPath('/repo/' + PROJECT_CONFIG_RELPATH, boundaryRules(W), io)
     assert.equal(d.denied, true)
-    assert.match(d.reason!, /Projekt-Config/)
+    assert.match(d.reason!, KONFIG_GRUND)
+    assert.match(d.reason!, /ROT/)
+    assert.doesNotMatch(d.reason!, /Abnahmetests/)
+  })
+  it('AUFTRAG.md behaelt den Grund des Workers', () => {
+    const d = decideBoundaryPath('/run/AUFTRAG.md', boundaryRules(W), io)
+    assert.equal(d.denied, true)
+    assert.equal(d.reason, W.reason)
+  })
+  it('im Plugin: geschuetzte Abnahmetests nennen den Worker-Grund, die Config ihren eigenen', async () => {
+    const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'lf-worker-grund-')))
+    try {
+      const listFile = path.join(dir, '.cipher-mux-protected.json')
+      fs.writeFileSync(listFile, JSON.stringify([`${dir}/test/accept.test.ts`]))
+      const pluginFile = path.join(dir, 'p.mjs')
+      fs.writeFileSync(pluginFile, buildOpenCodeBoundaryPlugin(W, listFile))
+      const mod = await import(`file://${pluginFile}`)
+      let before: (e: unknown) => unknown = () => {}
+      await mod.default.setup({
+        location: { directory: dir },
+        tool: { hook: async (_n: string, cb: (e: unknown) => unknown) => { before = cb } },
+      })
+      const call = async (p: string) => before({ tool: 'edit', input: { path: p } })
+      await assert.rejects(call(`${dir}/test/accept.test.ts`), (e: Error) => e.message === W.reason)
+      await assert.rejects(call(`${dir}/${PROJECT_CONFIG_RELPATH}`), KONFIG_GRUND)
+      await call(`${dir}/src/a.ts`)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
   })
   it('gewöhnlicher Code bleibt erlaubt', () => {
     assert.equal(decideBoundaryPath('/repo/src/a.ts', boundaryRules(W), io).denied, false)

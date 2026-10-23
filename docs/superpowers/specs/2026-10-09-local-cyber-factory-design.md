@@ -182,7 +182,8 @@ Aus dem Betrieb an projekt-a (LESSONS L1–L20, Wellenplan „Local Factory Här
 
 **Projekt-Config `.cipher-mux/local-factory.json`** im Ziel-Repo. Pflegen nur User oder
 Systems-Session; für Architekt und Worker liegt sie unter der Edit-Sperre, eine Änderung durch
-den Worker macht den Gate ROT. Ungültige Einträge werden verworfen und als `hinweise` gemeldet,
+den Worker macht den Gate ROT. Die Ablehnung nennt dafür einen eigenen Grund (wer die Config
+pflegt, Änderungswunsch melden), nicht den allgemeinen E3- bzw. Abnahmetest-Text. Ungültige Einträge werden verworfen und als `hinweise` gemeldet,
 nie geworfen.
 
 ```json
