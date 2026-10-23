@@ -346,4 +346,19 @@ describe('sauberkeitIgnoriert und .gitignore zugleich (Läuferfehler lf-live)', 
     await commitAll(repo, base, 'gruen', ['gen.txt'])
     assert.equal(git('show', '--name-only', '--format=', 'HEAD'), 'a.txt')
   })
+
+  it('ignoriertes Verzeichnis mit getrackter Datei: Ausschluss bleibt, commitAll scheitert statt sie mitzunehmen', async () => {
+    // check-ignore mit Index nennt ein Verzeichnis mit getrackten Dateien „nicht ignoriert“;
+    // git add bricht dann am Ausschluss ab (fail-closed) — still committet wird nichts.
+    fs.writeFileSync(path.join(repo, '.gitignore'), 'gen\n')
+    fs.mkdirSync(path.join(repo, 'gen')); fs.writeFileSync(path.join(repo, 'gen', 'getrackt.txt'), 't\n')
+    git('add', '.gitignore'); git('add', '-f', 'gen/getrackt.txt'); git('commit', '-qm', 'gen')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'gen', 'getrackt.txt'), 'lokal\n')
+    fs.writeFileSync(path.join(repo, 'gen', 'neu.txt'), 'n\n')
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'neu\n')
+    await assert.rejects(commitAll(repo, base, 'gruen', ['gen']), /ignored/)
+    assert.equal(git('rev-parse', 'HEAD'), base)
+    assert.doesNotMatch(git('diff', '--cached', '--name-only'), /gen\//)
+  })
 })
