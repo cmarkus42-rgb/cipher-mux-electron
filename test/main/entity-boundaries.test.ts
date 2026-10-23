@@ -97,7 +97,7 @@ describe('isPathDenied', () => {
 
 describe('buildBoundaryHookScript', () => {
   it('produces a runnable node script carrying the rules', () => {
-    const script = buildBoundaryHookScript(['/src/'], 'Testgrund')
+    const script = buildBoundaryHookScript({ denyPathPatterns: ['/src/'], reason: 'Testgrund' })
     assert.ok(script.startsWith('#!/usr/bin/env node'), 'needs a shebang to be executable')
     assert.ok(script.includes('/src/'), 'the rule must be baked in, not looked up at runtime')
     assert.ok(script.includes('Testgrund'), 'the refusal must say why')
@@ -109,7 +109,7 @@ describe('buildBoundaryHookScript', () => {
   // string literal and turn generated text into generated code.
   it('embeds rule and reason as JSON literals, not as raw text', () => {
     const reason = 'Er sagte "nein" und \\ blieb dabei'
-    const script = buildBoundaryHookScript(['/src/'], reason)
+    const script = buildBoundaryHookScript({ denyPathPatterns: ['/src/'], reason })
 
     assert.ok(
       script.includes(JSON.stringify(reason)),
@@ -154,7 +154,7 @@ describe('buildOpenCodeBoundaryPlugin', () => {
     opts: { denyListFile?: string; cwd?: string } = {},
   ): Promise<LoadedBoundary> {
     const file = path.join(dir, `b${seq++}.js`)
-    fs.writeFileSync(file, buildOpenCodeBoundaryPlugin(patterns, reason, opts.denyListFile), 'utf-8')
+    fs.writeFileSync(file, buildOpenCodeBoundaryPlugin({ denyPathPatterns: [...patterns], reason }, opts.denyListFile), 'utf-8')
     const mod = await import(`file://${file}`)
     assert.equal(typeof mod.default, 'object', 'default export is not a plugin definition')
     assert.equal(typeof mod.default.setup, 'function', 'definition has no setup()')
@@ -321,7 +321,7 @@ describe('buildOpenCodeBoundaryPlugin', () => {
 
   it('embeds rule and reason as JSON literals, not as raw text', async () => {
     const reason = 'Er sagte "nein" und \\ blieb dabei'
-    const src = buildOpenCodeBoundaryPlugin(['/src/'], reason)
+    const src = buildOpenCodeBoundaryPlugin({ denyPathPatterns: ['/src/'], reason })
     assert.ok(src.includes(JSON.stringify(reason)))
     assert.ok(!src.includes(`'${reason}'`) && !src.includes(`"${reason}"`))
     // And it still loads and still carries the reason verbatim.
@@ -333,7 +333,7 @@ describe('buildOpenCodeBoundaryPlugin', () => {
   })
 
   it('is ESM, never CommonJS, and has no import of the plugin package', () => {
-    const src = buildOpenCodeBoundaryPlugin(['/src/'], 'x')
+    const src = buildOpenCodeBoundaryPlugin({ denyPathPatterns: ['/src/'], reason: 'x' })
     assert.ok(src.includes('export default'))
     assert.ok(!src.includes('module.exports'))
     assert.ok(!src.includes('require('))
@@ -389,7 +389,7 @@ describe('Local Cyber Factory boundaries', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-boundary-'))
     const listFile = path.join(dir, PROTECTED_PATHS_FILENAME)
     const pluginPath = path.join(dir, 'p.mjs')
-    fs.writeFileSync(pluginPath, buildOpenCodeBoundaryPlugin(['/AUFTRAG.md'], 'R', listFile))
+    fs.writeFileSync(pluginPath, buildOpenCodeBoundaryPlugin({ denyPathPatterns: ['/AUFTRAG.md'], reason: 'R' }, listFile))
     const mod = await import(pluginPath)
     let before: (e: unknown) => unknown = () => {}
     await mod.default.setup({
