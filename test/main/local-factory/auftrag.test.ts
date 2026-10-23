@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { validateAuftrag, buildAuftragMd, MAX_GATE_OUTPUT_CHARS } from '../../../src/main/local-factory/auftrag'
+import { validateAuftrag, validateDispatchSteuerung, buildAuftragMd, MAX_GATE_OUTPUT_CHARS } from '../../../src/main/local-factory/auftrag'
 
 const a = {
   projekt: '/abs/projekt',
@@ -116,5 +116,16 @@ describe('L11 ersetzungen im Auftrag', () => {
     const md = buildAuftragMd({ ...a, ersetzungen: [{ datei: 'src/login.ts', alt: 'alt()', neu: 'neu()' }] }, { nummer: 1, versuch: 1 })
     assert.match(md, /## Ersetzungen/)
     assert.match(md, /src\/login\.ts.*alt\(\).*neu\(\)/)
+  })
+})
+
+describe('Steuerfeld laeuferfehler', () => {
+  it('braucht eine Begründung und haeppchen', () => {
+    assert.deepEqual(validateDispatchSteuerung({ haeppchen: 1, laeuferfehler: 'Commit scheiterte' }), [])
+    assert.match(validateDispatchSteuerung({ haeppchen: 1, laeuferfehler: '  ' }).join(), /laeuferfehler: Begründung erforderlich/)
+    assert.match(validateDispatchSteuerung({ laeuferfehler: 'x' }).join(), /laeuferfehler braucht haeppchen/)
+  })
+  it('schließt architektenfehler aus — ein Versuch hat genau eine Ursache', () => {
+    assert.match(validateDispatchSteuerung({ haeppchen: 1, laeuferfehler: 'x', architektenfehler: 'y' }).join(), /schließen sich aus/)
   })
 })

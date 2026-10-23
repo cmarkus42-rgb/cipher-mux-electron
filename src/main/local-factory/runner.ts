@@ -15,7 +15,7 @@ import {
 import { classifyWorker, IDLE_SIGNAL_FILENAME } from './worker-done'
 import {
   runShell, dirtyFiles, headCommit, commitPaths, commitAll, changedSince,
-  checksums, savePatchAndReset, toRepoRelative, isRepoRoot, currentBranch, diffStat, istIgnoriert, hinzugefuegteZeilen,
+  checksums, savePatchAndReset, savePatch, toRepoRelative, isRepoRoot, currentBranch, diffStat, istIgnoriert, hinzugefuegteZeilen,
 } from './git-ops'
 import { PROTECTED_PATHS_FILENAME } from '../session/entity-boundaries'
 import { createWorkerLock, type WorkerLock } from './worker-lock'
@@ -84,6 +84,8 @@ export interface DispatchArgs extends AuftragInput {
   profil?: string
   /** L12: Der letzte Fehlversuch dieses Häppchens war ein Fehler des Architekten — Begründung. */
   architektenfehler?: string
+  /** Der letzte Fehlversuch dieses Häppchens war ein Absturz des Läufers — Begründung. */
+  laeuferfehler?: string
   /** L16a: Begründung, warum das Vorab-Rot des Abnahmetests trotz Fehler im Testcode richtig ist. */
   rotGrund?: string
 }
@@ -127,6 +129,15 @@ interface Attempt {
   ignoriertVorher: string[]
   /** Bytes der Projekt-Config vor dem Worker; null = keine. */
   configBytes: Buffer | null
+}
+
+/** Was runAttempt über den Fortschritt eines Versuchs weiß, auch wenn er abbricht. */
+interface Started {
+  sessionId?: string
+  /** Versuch entschieden (Commit bzw. Patch+Reset durch): ein Fehler danach ändert nichts mehr. */
+  settled?: boolean
+  /** Gate geschrieben: die Arbeit des Workers ist geprüft und darf nicht mehr zurückgesetzt werden. */
+  gatePfad?: string
 }
 
 /** Bytes der Projekt-Config; null, wenn es keine gibt. */
@@ -338,12 +349,17 @@ export class LocalFactoryRunner {
     if (fremd.length) {
       // Ein „laeuft“ im Lauf heißt: ein Versuch wurde unterbrochen (App-Neustart),
       // und die offenen Dateien sind sehr wahrscheinlich seine Reste.
-      const rest = args.laufId !== undefined
-        ? loadLauf(this.laufFile(args.laufId))?.haeppchen.find(h => h.status === 'laeuft')
-        : undefined
+      const vorhanden = args.laufId !== undefined ? loadLauf(this.laufFile(args.laufId)) : null
+      const rest = vorhanden?.haeppchen.find(h => h.status === 'laeuft')
+      // Nach einem Läuferfehler hinter dem Gate liegt die Arbeit des Workers absichtlich noch im Baum.
+      const lfH = vorhanden?.haeppchen.find(h => h.nummer === args.haeppchen)
+      const lfV = lfH?.versuche.at(-1)
       const hinweis = rest
         ? ` — vermutlich Rest eines unterbrochenen Versuchs #${rest.nummer} — Patch sichern oder Baum zurücksetzen`
-        : ''
+        : lfH && lfV?.verdict === 'laeuferfehler'
+          ? ` — vermutlich Rest nach dem Läuferfehler in Versuch #${lfH.nummer}.${lfV.nr}`
+            + `${lfV.patchPfad ? ` (gesichert: ${lfV.patchPfad})` : ''} — Baum vom User zurücksetzen lassen, dann erneut dispatchen`
+          : ''
       return { ok: false, error: `Arbeitsbaum nicht sauber, außer den Abnahmetests offen: ${fremd.join(', ')}${hinweis}` }
     }
     const fehlend = prot.filter(f => !fs.existsSync(path.join(projekt, f)))
@@ -378,6 +394,10 @@ export class LocalFactoryRunner {
 
     const laufId = args.laufId ?? ulid()
     const laufPfad = this.laufFile(laufId)
+    const letzterGateGruen = args.laeuferfehler !== undefined && args.haeppchen !== undefined
+      ? this.gateWarGruen(laufPfad, args.haeppchen)
+      : false
+    const steuerung = { architektenfehler: args.architektenfehler, laeuferfehler: args.laeuferfehler, letzterGateGruen }
     let lauf0: Lauf = loadLauf(laufPfad) ?? newLauf(laufId, projekt, this.o.now(), branchJetzt)
     // Läufe aus älteren Fassungen tragen keinen Branch: ab jetzt gilt der aktuelle.
     if (!lauf0.branch) lauf0 = { ...lauf0, branch: branchJetzt }
@@ -387,7 +407,7 @@ export class LocalFactoryRunner {
       saveLauf(laufPfad, lauf0)
     }
     const begun = beginVersuch(lauf0, {
-      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0, architektenfehler: args.architektenfehler, rotGrund,
+      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0, ...steuerung, rotGrund,
     })
     if ('error' in begun) return { ok: false, error: begun.error }
 
@@ -405,14 +425,15 @@ export class LocalFactoryRunner {
     let basis: Lauf = loadLauf(laufPfad) ?? lauf0
     if (!basis.branch) basis = { ...basis, branch: branchJetzt }
     const frisch = beginVersuch(basis, {
-      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0, architektenfehler: args.architektenfehler, rotGrund,
+      nummer: args.haeppchen, ziel: args.ziel, now: this.o.now(), mitTest: prot.length > 0, ...steuerung, rotGrund,
     })
     if ('error' in frisch) return { ok: false, error: frisch.error }
     saveLauf(laufPfad, frisch.lauf)
 
     // Vorheriges Gate für einen zweiten Versuch — aus der Datei, nicht vom Architekten.
     // Nach einem Architektenfehler nicht: der Worker scheiterte an einem falschen Auftrag.
-    const prevV = args.haeppchen !== undefined && args.architektenfehler === undefined
+    // Nach einem Läuferfehler auch nicht: der Worker ist gar nicht gescheitert.
+    const prevV = args.haeppchen !== undefined && args.architektenfehler === undefined && args.laeuferfehler === undefined
       ? lauf0.haeppchen.find(h => h.nummer === begun.nummer)?.versuche.at(-1)
       : undefined
     let vorherigesGate: { reasons: string[]; testOutput: string } | undefined
@@ -437,27 +458,14 @@ export class LocalFactoryRunner {
   }
 
   private async runAttempt(a: Attempt): Promise<void> {
-    const started: { sessionId?: string; settled?: boolean } = {}
+    const started: Started = {}
     try {
       await this.runAttemptInner(a, started)
     } catch (err) {
       // Nach dem Commit bzw. dem regulären Patch+Reset ist der Versuch entschieden;
       // ein späterer Fehler (Lauf speichern, Wecken) darf daran nichts mehr ändern.
       if (started.settled) throw err
-      // Aufräumen: Häppchen nicht in „laeuft“ lassen, Baum zurück auf Basis.
-      try {
-        const dir = path.dirname(a.laufPfad)
-        const patch = path.join(dir, `versuch-${a.nummer}-${a.versuch}.patch`)
-        // Auf einem fremden Branch kein reset --hard: er zöge diesen Branch auf die Basis.
-        if ((await currentBranch(a.args.projekt)) === a.branch) {
-          await savePatchAndReset(a.args.projekt, a.base, patch, a.config.sauberkeitIgnoriert)
-        }
-      } catch { /* Patch/Reset best effort */ }
-      try {
-        const lauf = loadLauf(a.laufPfad)
-        if (lauf) saveLauf(a.laufPfad, endVersuch(lauf, a.nummer, { verdict: 'haengt' }, this.o.now()))
-      } catch { /* */ }
-      throw err
+      await this.laeuferfehler(a, started, err)
     } finally {
       if (started.sessionId) {
         try { await this.o.host.stopWorker(started.sessionId) } catch { /* */ }
@@ -465,7 +473,83 @@ export class LocalFactoryRunner {
     }
   }
 
-  private async runAttemptInner(a: Attempt, started: { sessionId?: string; settled?: boolean }): Promise<void> {
+  /**
+   * Der Läufer selbst ist gescheitert — nicht der Worker. Eigener Ausgang `laeuferfehler`
+   * statt „haengt“ (Live-Test 23.10.: Gate GRÜN, Commit brach ab, Versuch stand als Hänger da).
+   * Hinter dem Gate bleibt die geprüfte Arbeit im Baum und wird zusätzlich als Patch gesichert;
+   * davor wird wie bisher gesichert und auf die Basis zurückgesetzt.
+   */
+  private async laeuferfehler(a: Attempt, started: Started, err: unknown): Promise<void> {
+    const meldung = oneLine(err instanceof Error ? err.message : String(err), 1000)
+    const patch = path.join(path.dirname(a.laufPfad), `versuch-${a.nummer}-${a.versuch}.patch`)
+    let patchPfad: string | undefined
+    let baum = 'Baum unverändert (Sichern scheiterte) — git status prüfen'
+    try {
+      if (started.gatePfad) {
+        baum = 'Worker-Änderung liegt ungesichert im Worktree (nicht committet)'
+        await savePatch(a.args.projekt, a.base, patch, a.config.sauberkeitIgnoriert)
+        patchPfad = patch
+      } else if ((await currentBranch(a.args.projekt)) === a.branch) {
+        await savePatchAndReset(a.args.projekt, a.base, patch, a.config.sauberkeitIgnoriert)
+        patchPfad = patch
+        baum = 'Baum auf die Basis zurückgesetzt'
+      } else {
+        // Auf einem fremden Branch kein reset --hard: er zöge diesen Branch auf die Basis.
+        baum = 'fremder Branch ausgecheckt, nichts zurückgesetzt'
+      }
+    } catch { /* Patch/Reset best effort */ }
+    if (started.gatePfad) {
+      try {
+        const g = readGateRecord(JSON.parse(fs.readFileSync(started.gatePfad, 'utf-8')))
+        const record: GateRecord = { ...g, laeuferfehler: { meldung, baum, ...(patchPfad ? { patchPfad } : {}) } }
+        fs.writeFileSync(started.gatePfad, JSON.stringify(record, null, 2), 'utf-8')
+      } catch { /* das Gate bleibt dann ohne den Vermerk */ }
+    }
+    let h: Lauf['haeppchen'][number] | undefined
+    try {
+      let lauf = loadLauf(a.laufPfad)
+      if (lauf) {
+        lauf = countWeckruf(endVersuch(lauf, a.nummer, {
+          verdict: 'laeuferfehler', fehler: meldung,
+          ...(started.gatePfad ? { gatePfad: started.gatePfad } : {}), ...(patchPfad ? { patchPfad } : {}),
+        }, this.o.now()))
+        saveLauf(a.laufPfad, lauf)
+        h = lauf.haeppchen.find(x => x.nummer === a.nummer)
+      }
+    } catch { /* */ }
+    // Zweiter Läuferfehler: der Versuch davor trägt schon die Markierung, der Deckel ist verbraucht.
+    const zweiter = !!h?.versuche.slice(0, -1).some(v => v.laeuferfehler)
+    await this.wake(`${this.kopf(a)}: LÄUFERFEHLER, ${this.zahl(h, a.versuch)}`
+      + (started.gatePfad ? `, Gate: ${started.gatePfad}` : '')
+      + (zweiter ? ' — zweiter Läuferfehler im Häppchen, ESKALIERT, an den User melden' : '')
+      + ` — Läuferfehler: ${oneLine(meldung, 140)} — ${baum}`
+      + (patchPfad ? `, Patch: ${path.basename(patchPfad)} daneben` : '')
+      + (zweiter ? '' : ' — Retry mit laeuferfehler: "<Begründung>" zählt nicht'))
+  }
+
+  /** ziel gekappt, damit Gate- bzw. Laufpfad am Ende der Zeile nicht abgeschnitten wird. */
+  private kopf(a: Attempt): string {
+    return `${this.praefix} #${a.nummer} „${oneLine(a.args.ziel, 120)}“`
+  }
+
+  /** „Versuch V/2“, dazu die nicht gezählten Architekten- und Läuferfehler. */
+  private zahl(h: Lauf['haeppchen'][number] | undefined, versuch: number): string {
+    if (!h) return `Versuch ${versuch}/${MAX_VERSUCHE}`
+    const af = h.versuche.filter(v => v.architektenfehler).length
+    const lf = h.versuche.filter(v => v.laeuferfehler).length
+    const nicht = [af ? `${af} Architektenfehler` : '', lf ? `${lf} Läuferfehler` : ''].filter(Boolean).join(', ')
+    return `Versuch ${zaehlendeVersuche(h)}/${MAX_VERSUCHE}` + (nicht ? ` (${nicht} nicht gezählt)` : '')
+  }
+
+  /** War das Gate des letzten Versuchs dieses Häppchens GRÜN? Altfall: ohne gatePfad im Lauf. */
+  private gateWarGruen(laufPfad: string, nummer: number): boolean {
+    const v = loadLauf(laufPfad)?.haeppchen.find(h => h.nummer === nummer)?.versuche.at(-1)
+    if (!v) return false
+    const p = v.gatePfad ?? path.join(path.dirname(laufPfad), `gate-${nummer}-${v.nr}.json`)
+    try { return readGateRecord(JSON.parse(fs.readFileSync(p, 'utf-8'))).verdict === 'gruen' } catch { return false }
+  }
+
+  private async runAttemptInner(a: Attempt, started: Started): Promise<void> {
     const { host } = this.o
     const projekt = a.args.projekt
     const { runDir, sessionId, profil, modell } = await host.startFreshWorker(projekt, a.args.profil)
@@ -569,6 +653,8 @@ export class LocalFactoryRunner {
     const gatePfad = path.join(dir, `gate-${a.nummer}-${a.versuch}.json`)
     const record: GateRecord = { ...gate, testOutput, warnungen, ...(diagnose ? { diagnose } : {}) }
     fs.writeFileSync(gatePfad, JSON.stringify(record, null, 2), 'utf-8')
+    // Ab hier liegt ein geprüftes Ergebnis vor: ein Abbruch danach setzt den Baum nicht mehr zurück.
+    started.gatePfad = gatePfad
 
     let commit: string | undefined
     let patchPfad: string | undefined
@@ -606,11 +692,8 @@ export class LocalFactoryRunner {
     saveLauf(a.laufPfad, lauf)
 
     const h = lauf.haeppchen.find(x => x.nummer === a.nummer)
-    // ziel gekappt, damit Gate- bzw. Laufpfad am Ende der Zeile nicht abgeschnitten wird.
-    const kopf = `${this.praefix} #${a.nummer} „${oneLine(a.args.ziel, 120)}“`
-    const af = h ? h.versuche.length - zaehlendeVersuche(h) : 0
-    const zahl = `Versuch ${h ? zaehlendeVersuche(h) : a.versuch}/${MAX_VERSUCHE}`
-      + (af ? ` (${af} Architektenfehler nicht gezählt)` : '')
+    const kopf = this.kopf(a)
+    const zahl = this.zahl(h, a.versuch)
     const line = gate.verdict === 'gruen'
       ? `${kopf}: GRÜN, ${zahl}, Commit ${commit!.slice(0, 8)}, Lauf: ${a.laufPfad}`
       : `${kopf}: ${gate.verdict === 'rot' ? 'ROT' : 'HÄNGT'}, ${zahl}, Gate: ${gatePfad}`

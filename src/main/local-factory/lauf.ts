@@ -12,7 +12,11 @@ import * as path from 'path'
 export const MAX_VERSUCHE = 2
 
 export type HaeppchenStatus = 'laeuft' | 'wartet' | 'abgenommen' | 'eskaliert' | 'abgebrochen' | 'beurteilt'
-type Verdict = 'gruen' | 'rot' | 'haengt'
+/**
+ * Ausgang eines Versuchs. `laeuferfehler`: der Läufer selbst ist gescheitert (Exception,
+ * z. B. git-Fehler beim Commit) — weder ein Hänger noch ein Urteil über den Worker.
+ */
+export type Verdict = 'gruen' | 'rot' | 'haengt' | 'laeuferfehler'
 
 export interface Versuch {
   nr: number
@@ -36,6 +40,13 @@ export interface Versuch {
   architektenfehler?: string
   /** L16a: Begründung, mit der der Architekt ein Vorab-Rot aus dem Testcode übersteuert hat. */
   rotGrund?: string
+  /** Meldung des Läufers bei Ausgang `laeuferfehler`. */
+  fehler?: string
+  /**
+   * Retry-Feld: dieser Fehlversuch geht auf den Läufer, nicht auf das Modell. Zählt nicht
+   * gegen MAX_VERSUCHE; Deckel 1 je Häppchen, unabhängig vom Architektenfehler.
+   */
+  laeuferfehler?: string
 }
 
 export interface Haeppchen {
@@ -66,9 +77,9 @@ export function newLauf(id: string, projekt: string, now: number, branch?: strin
   return { id, projekt, erstellt: now, weckrufe: 0, haeppchen: [], ...(branch ? { branch } : {}) }
 }
 
-/** Versuche, die gegen MAX_VERSUCHE zählen — ohne die als Architektenfehler markierten. */
+/** Versuche, die gegen MAX_VERSUCHE zählen — ohne die als Architekten- oder Läuferfehler markierten. */
 export function zaehlendeVersuche(h: Haeppchen): number {
-  return h.versuche.filter(v => !v.architektenfehler).length
+  return h.versuche.filter(v => !v.architektenfehler && !v.laeuferfehler).length
 }
 
 const replaceH = (lauf: Lauf, h: Haeppchen): Lauf => ({
@@ -78,7 +89,7 @@ const replaceH = (lauf: Lauf, h: Haeppchen): Lauf => ({
 
 export function beginVersuch(
   lauf: Lauf,
-  opts: { nummer?: number; ziel: string; now: number; mitTest?: boolean; architektenfehler?: string; rotGrund?: string },
+  opts: BeginOpts & { rotGrund?: string },
 ): { lauf: Lauf; nummer: number; versuch: number } | { error: string } {
   const r = beginOhneRotGrund(lauf, opts)
   if ('error' in r || opts.rotGrund === undefined) return r
@@ -88,14 +99,23 @@ export function beginVersuch(
   return { ...r, lauf: replaceH(r.lauf, { ...h, versuche }) }
 }
 
-function beginOhneRotGrund(
-  lauf: Lauf,
-  opts: { nummer?: number; ziel: string; now: number; mitTest?: boolean; architektenfehler?: string },
-): { lauf: Lauf; nummer: number; versuch: number } | { error: string } {
+interface BeginOpts {
+  nummer?: number; ziel: string; now: number; mitTest?: boolean; architektenfehler?: string
+  laeuferfehler?: string
+  /**
+   * Altfall lf-live: Vor dem Ausgang `laeuferfehler` endete ein Absturz des Läufers als
+   * „haengt“. War das Gate dieses Versuchs GRÜN, war es kein Hänger. Der Läufer liest
+   * das Gate; der Zustand hier bleibt ohne Platte.
+   */
+  letzterGateGruen?: boolean
+}
+
+function beginOhneRotGrund(lauf: Lauf, opts: BeginOpts): { lauf: Lauf; nummer: number; versuch: number } | { error: string } {
   if (lauf.haeppchen.some(h => h.status === 'laeuft')) {
     return { error: 'Es läuft bereits ein Worker. Nacheinander (Spec E2).' }
   }
   if (opts.architektenfehler !== undefined) return beginNachArchitektenfehler(lauf, { ...opts, architektenfehler: opts.architektenfehler })
+  if (opts.laeuferfehler !== undefined) return beginNachLaeuferfehler(lauf, { ...opts, laeuferfehler: opts.laeuferfehler })
   if (opts.nummer === undefined) {
     const nummer = lauf.haeppchen.reduce((m, h) => Math.max(m, h.nummer), 0) + 1
     const h: Haeppchen = {
@@ -147,6 +167,35 @@ function beginNachArchitektenfehler(
   return { lauf: replaceH(lauf, { ...h, ziel: opts.ziel, status: 'laeuft', versuche }), nummer: h.nummer, versuch }
 }
 
+/**
+ * Der letzte Fehlversuch ging auf den Läufer. Wie beim Architektenfehler: markiert, zählt
+ * nicht, auch aus „eskaliert“ heraus — mit eigenem Deckel 1 je Häppchen.
+ */
+function beginNachLaeuferfehler(
+  lauf: Lauf,
+  opts: BeginOpts & { laeuferfehler: string },
+): { lauf: Lauf; nummer: number; versuch: number } | { error: string } {
+  if (opts.nummer === undefined) return { error: 'laeuferfehler braucht haeppchen: er markiert den letzten Fehlversuch eines Häppchens.' }
+  const h = lauf.haeppchen.find(x => x.nummer === opts.nummer)
+  if (!h) return { error: `Häppchen #${opts.nummer} gibt es in diesem Lauf nicht.` }
+  if (h.status === 'abgenommen') return { error: `Häppchen #${h.nummer} ist schon abgenommen.` }
+  if (h.status === 'beurteilt') return { error: `Häppchen #${h.nummer} ist schon beurteilt.` }
+  if (h.versuche.some(v => v.laeuferfehler)) {
+    return { error: `Häppchen #${h.nummer} hat schon einen Läuferfehler (höchstens 1 je Häppchen) — eskaliert. An den User melden.` }
+  }
+  const letzter = h.versuche.at(-1)
+  const istLaeuferfehler = letzter?.verdict === 'laeuferfehler' || (letzter?.verdict === 'haengt' && opts.letzterGateGruen === true)
+  if (!letzter || !istLaeuferfehler) {
+    return {
+      error: `laeuferfehler markiert einen Absturz des Läufers; der letzte Versuch von #${h.nummer} war kein Läuferfehler `
+        + `(Ausgang ${letzter?.verdict ?? 'keiner'}${letzter?.verdict === 'haengt' ? ', Gate nicht grün' : ''}).`,
+    }
+  }
+  const versuch = h.versuche.length + 1
+  const versuche = [...h.versuche.slice(0, -1), { ...letzter, laeuferfehler: opts.laeuferfehler }, { nr: versuch, gestartet: opts.now }]
+  return { lauf: replaceH(lauf, { ...h, ziel: opts.ziel, status: 'laeuft', versuche }), nummer: h.nummer, versuch }
+}
+
 export function endVersuch(
   lauf: Lauf,
   nummer: number,
@@ -158,8 +207,11 @@ export function endVersuch(
   if (h.status !== 'laeuft') return lauf
   const versuche = [...h.versuche]
   versuche[versuche.length - 1] = { ...versuche[versuche.length - 1], ...patch, beendet: now }
+  // Ein zweiter Läuferfehler im selben Häppchen eskaliert: der Deckel ist verbraucht, sonst kreiste es.
+  const zweiterLaeuferfehler = patch.verdict === 'laeuferfehler' && h.versuche.some(v => v.laeuferfehler)
   const status: HaeppchenStatus =
-    patch.verdict === 'gruen' ? 'wartet' : zaehlendeVersuche({ ...h, versuche }) >= MAX_VERSUCHE ? 'eskaliert' : 'wartet'
+    patch.verdict === 'gruen' ? 'wartet'
+      : zweiterLaeuferfehler || zaehlendeVersuche({ ...h, versuche }) >= MAX_VERSUCHE ? 'eskaliert' : 'wartet'
   return replaceH(lauf, { ...h, versuche, status })
 }
 

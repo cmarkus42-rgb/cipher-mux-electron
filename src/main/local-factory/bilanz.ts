@@ -20,6 +20,8 @@ export interface BilanzZeile {
   architektenfehler?: string | null
   /** L16a: Begründung eines übersteuerten Vorab-Rots. Fehlt in älteren Zeilen. */
   rotGrund?: string | null
+  /** Absturz des Läufers: Begründung des Architekten, sonst die Meldung des Läufers. Fehlt in älteren Zeilen. */
+  laeuferfehler?: string | null
 }
 
 export function validateUrteil(u: Partial<Urteil>): string[] {
@@ -47,6 +49,8 @@ export function buildBilanzZeile(
     ergebnis: u.ergebnis, kategorie: u.kategorie, notiz: u.notiz?.trim() || null,
     architektenfehler: h.versuche.find(v => v.architektenfehler)?.architektenfehler ?? null,
     rotGrund: [...h.versuche].reverse().find(v => v.rotGrund)?.rotGrund ?? null,
+    laeuferfehler: h.versuche.find(v => v.laeuferfehler)?.laeuferfehler
+      ?? h.versuche.find(v => v.verdict === 'laeuferfehler')?.fehler ?? null,
   }
 }
 
@@ -87,7 +91,7 @@ export function renderBilanzNote(zeilen: BilanzZeile[]): string {
 
 /** Was nicht dem Modell anzurechnen ist, steht eigens da — nur wenn es das gibt. */
 function sonderfaelle(zeilen: BilanzZeile[]): string[] {
-  const abschnitt = (titel: string, feld: 'architektenfehler' | 'rotGrund'): string[] => {
+  const abschnitt = (titel: string, feld: 'architektenfehler' | 'rotGrund' | 'laeuferfehler'): string[] => {
     const zs = zeilen.filter(z => z[feld])
     return zs.length
       ? [titel, '', ...zs.map(z => `- ${z.ts.slice(0, 10)} · Lauf ${z.laufId} #${z.haeppchen}: ${z[feld]}`), '']
@@ -96,5 +100,6 @@ function sonderfaelle(zeilen: BilanzZeile[]): string[] {
   return [
     ...abschnitt('## Architektenfehler (nicht als Modellanlauf gezählt)', 'architektenfehler'),
     ...abschnitt('## Übersteuertes Vorab-Rot (rotGrund)', 'rotGrund'),
+    ...abschnitt('## Läuferfehler (Absturz des Läufers, nicht dem Modell angerechnet)', 'laeuferfehler'),
   ]
 }

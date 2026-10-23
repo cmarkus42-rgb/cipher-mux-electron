@@ -102,11 +102,13 @@ export function validateAuftrag(a: AuftragInput, opts: { testPflicht?: boolean }
 
 /**
  * Felder, die nicht an den Worker gehen, sondern den Dispatch selbst steuern
- * (L12 architektenfehler, L16a rotGrund). Beide sind Begründungen: leer zählt nicht.
+ * (L12 architektenfehler, laeuferfehler, L16a rotGrund). Alle sind Begründungen: leer zählt nicht.
  */
 export interface DispatchSteuerung {
   haeppchen?: number
   architektenfehler?: string
+  /** Der letzte Fehlversuch war ein Absturz des Läufers — Begründung. */
+  laeuferfehler?: string
   rotGrund?: string
 }
 
@@ -115,6 +117,11 @@ export function validateDispatchSteuerung(d: DispatchSteuerung): string[] {
   if (d.architektenfehler !== undefined) {
     if (blank(d.architektenfehler)) errs.push('architektenfehler: Begründung erforderlich')
     else if (d.haeppchen === undefined) errs.push('architektenfehler braucht haeppchen (das Häppchen, dessen letzter Versuch dein Fehler war)')
+  }
+  if (d.laeuferfehler !== undefined) {
+    if (blank(d.laeuferfehler)) errs.push('laeuferfehler: Begründung erforderlich')
+    else if (d.haeppchen === undefined) errs.push('laeuferfehler braucht haeppchen (das Häppchen, dessen letzter Versuch am Läufer scheiterte)')
+    if (d.architektenfehler !== undefined) errs.push('architektenfehler und laeuferfehler schließen sich aus: ein Fehlversuch hat eine Ursache')
   }
   if (d.rotGrund !== undefined && blank(d.rotGrund)) errs.push('rotGrund: Begründung erforderlich')
   return errs

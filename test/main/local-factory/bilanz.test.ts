@@ -98,3 +98,29 @@ describe('L16a rotGrund in der Bilanz', () => {
     assert.equal(buildBilanzZeile(lauf, 1, { ergebnis: 'uebernommen', kategorie: 'ui' }, { now: 'x', workspaceId: null, mitTest: true }).rotGrund, null)
   })
 })
+
+describe('Läuferfehler in der Bilanz', () => {
+  it('markierter Läuferfehler: zählt nicht als Anlauf, steht in Zeile und Note', () => {
+    const l: Lauf = { ...lauf, haeppchen: [{ ...lauf.haeppchen[0], versuche: [
+      { ...lauf.haeppchen[0].versuche[0], verdict: 'laeuferfehler', fehler: 'git failed', laeuferfehler: 'Commit an .gitignore gescheitert' },
+      lauf.haeppchen[0].versuche[1],
+    ] }] }
+    const z = buildBilanzZeile(l, 1, { ergebnis: 'uebernommen', kategorie: 'ui' }, { now: '2026-10-23T10:00:00Z', workspaceId: null, mitTest: true })
+    assert.equal(z.anlaeufe, 1)
+    assert.equal(z.laeuferfehler, 'Commit an .gitignore gescheitert')
+    assert.match(renderBilanzNote([z]), /## Läuferfehler[\s\S]*Commit an \.gitignore gescheitert/)
+  })
+  it('unmarkierter Läuferfehler: die Meldung des Läufers steht da', () => {
+    const l: Lauf = { ...lauf, haeppchen: [{ ...lauf.haeppchen[0], versuche: [
+      { ...lauf.haeppchen[0].versuche[0], verdict: 'laeuferfehler', fehler: 'git failed: index.lock' },
+      lauf.haeppchen[0].versuche[1],
+    ] }] }
+    const z = buildBilanzZeile(l, 1, { ergebnis: 'uebernommen', kategorie: 'ui' }, { now: 'x', workspaceId: null, mitTest: true })
+    assert.equal(z.laeuferfehler, 'git failed: index.lock')
+  })
+  it('ohne Läuferfehler: null, kein Abschnitt', () => {
+    const z = buildBilanzZeile(lauf, 1, { ergebnis: 'uebernommen', kategorie: 'ui' }, { now: 'x', workspaceId: null, mitTest: true })
+    assert.equal(z.laeuferfehler, null)
+    assert.doesNotMatch(renderBilanzNote([z]), /## Läuferfehler/)
+  })
+})

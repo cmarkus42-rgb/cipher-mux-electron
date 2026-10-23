@@ -114,6 +114,11 @@ export interface GateRecord extends GateResult {
   /** Hinweise, die das Urteil nicht ändern (L10). Alte Gates haben keine. */
   warnungen: string[]
   diagnose?: GateDiagnose | null
+  /**
+   * Der Läufer brach nach dem Gate ab (z. B. git-Fehler beim Commit): das Urteil oben
+   * gilt, umgesetzt wurde es nicht. `baum` sagt, wo die Arbeit des Workers liegt.
+   */
+  laeuferfehler?: { meldung: string; baum: string; patchPfad?: string }
 }
 
 /**
@@ -129,6 +134,10 @@ export function testWarnungen(output: string): string[] {
   return warnungen
 }
 
+const lf = (v: unknown): v is NonNullable<GateRecord['laeuferfehler']> =>
+  !!v && typeof v === 'object' && typeof (v as Record<string, unknown>).meldung === 'string'
+  && typeof (v as Record<string, unknown>).baum === 'string'
+
 /** Liest ein Gate tolerant: alte Gates ohne warnungen/diagnose, kaputte Felder → Leerwerte. */
 export function readGateRecord(raw: unknown): GateRecord {
   const g = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
@@ -141,6 +150,7 @@ export function readGateRecord(raw: unknown): GateRecord {
     testOutput: typeof g.testOutput === 'string' ? g.testOutput : '',
     warnungen: strings(g.warnungen),
     diagnose: d && typeof d === 'object' ? d as GateDiagnose : null,
+    ...(lf(g.laeuferfehler) ? { laeuferfehler: g.laeuferfehler } : {}),
   }
 }
 

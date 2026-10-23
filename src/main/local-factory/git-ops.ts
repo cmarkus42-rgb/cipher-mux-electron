@@ -191,8 +191,28 @@ export async function savePatchAndReset(projekt: string, base: string, patchFile
   if (!(await isRepoRoot(projekt))) {
     throw new Error(`projekt ist nicht die Wurzel eines git-Repos: ${projekt}`)
   }
+  await patchSchreiben(projekt, base, patchFile, ausnahmen, true)
+  await git(projekt, ['reset', '-q', '--hard', base])
+  // -e: verankertes Ignoriermuster je Eintrag; clean lässt es dann stehen.
+  const behalten = eintragsPfade(ausnahmen).flatMap(e => ['-e', `/${e}`])
+  await git(projekt, ['clean', '-fdq', ...behalten])
+}
+
+/**
+ * Nur sichern, nichts zurücksetzen — für einen Läuferfehler nach dem Gate: die geprüfte
+ * Arbeit bleibt im Baum. Ist der Index gesperrt, fehlen im Patch nur die neuen Dateien.
+ */
+export async function savePatch(projekt: string, base: string, patchFile: string, ausnahmen: readonly string[] = []): Promise<void> {
+  await patchSchreiben(projekt, base, patchFile, ausnahmen, false)
+}
+
+async function patchSchreiben(projekt: string, base: string, patchFile: string, ausnahmen: readonly string[], streng: boolean): Promise<void> {
   // Untracked erst in den Index (intent-to-add), damit der Patch sie enthält.
-  await git(projekt, ['add', '-N', '--', '.', ...(await ohne(projekt, ausnahmen))])
+  try {
+    await git(projekt, ['add', '-N', '--', '.', ...(await ohne(projekt, ausnahmen))])
+  } catch (err) {
+    if (streng) throw err
+  }
   // Eigener Aufruf: großer Puffer, --binary, unbeschnitten.
   // encoding 'buffer': der Patch wird roh geschrieben. Ein UTF-8-Umweg machte
   // aus jedem Nicht-UTF-8-Byte (Latin-1-Text) ein U+FFFD, und der Patch ließe
@@ -205,10 +225,6 @@ export async function savePatchAndReset(projekt: string, base: string, patchFile
   })
   fs.mkdirSync(path.dirname(patchFile), { recursive: true })
   fs.writeFileSync(patchFile, stdout)
-  await git(projekt, ['reset', '-q', '--hard', base])
-  // -e: verankertes Ignoriermuster je Eintrag; clean lässt es dann stehen.
-  const behalten = eintragsPfade(ausnahmen).flatMap(e => ['-e', `/${e}`])
-  await git(projekt, ['clean', '-fdq', ...behalten])
 }
 
 /** Eine hinzugefügte Zeile im Baum seit `base` (L16b). */
