@@ -211,7 +211,8 @@ export async function hinzugefuegteZeilen(projekt: string, base: string, ausnahm
   for (const l of stdout.split('\n')) {
     if (l.startsWith('diff --git ')) { datei = null; imKopf = true; continue }
     if (imKopf && l.startsWith('+++ ')) {
-      const p = unquote(l.slice(4))
+      // Bei Leerzeichen im Namen hängt git einen Tab an den Kopf.
+      const p = unquote(l.slice(4).replace(/\t$/, ''))
       datei = p === '/dev/null' ? null : p.replace(/^b\//, '')
       continue
     }

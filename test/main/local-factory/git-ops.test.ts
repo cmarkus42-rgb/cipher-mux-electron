@@ -264,3 +264,13 @@ describe('L16b hinzugefuegteZeilen: Diff-Kopf eindeutig', () => {
     assert.deepEqual(await hinzugefuegteZeilen(repo, base), [{ datei: 'b/c.js', zeile: 2, text: 'y' }])
   })
 })
+
+describe('L16b hinzugefuegteZeilen: Leerzeichen im Pfad', () => {
+  it('git hängt dann einen Tab an den Kopf — der Pfad bleibt richtig', async () => {
+    fs.mkdirSync(path.join(repo, 'src')); fs.writeFileSync(path.join(repo, 'src', 'mit leer.js'), 'x\n')
+    git('add', '.'); git('commit', '-qm', 'leer')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'src', 'mit leer.js'), 'x\ny\n')
+    assert.deepEqual(await hinzugefuegteZeilen(repo, base), [{ datei: 'src/mit leer.js', zeile: 2, text: 'y' }])
+  })
+})
