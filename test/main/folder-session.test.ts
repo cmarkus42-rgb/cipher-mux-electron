@@ -16,6 +16,7 @@ import { OpenCodeAdapter } from '../../src/main/agent/adapters/opencode'
 import { ClaudeCodeAdapter } from '../../src/main/agent/adapters/claude-code'
 import {
   ensureInstructionsFile,
+  ensureEntityInstructionsFile,
   resolveWorkspaceSections,
   buildFolderAutoLaunch,
   restoreAdapterId,
@@ -262,5 +263,95 @@ describe('ensureInstructionsFile — die Datei, die die CLI wirklich liest', () 
 
   it('wirft nicht, wenn das Verzeichnis fehlt', () => {
     assert.equal(ensureInstructionsFile('/gibt/es/nicht/wirklich', opencode), 'AGENTS.md')
+  })
+})
+
+describe('ensureEntityInstructionsFile — Rollentext selbst in AGENTS.md (L20a)', () => {
+  // Unter opencode stand in der AGENTS.md eines Rollen-Run-Verzeichnisses nur ein
+  // Verweis auf die CLAUDE.md. Der Rollentext kam nur an, wenn das Modell der Bitte
+  // folgte, die Datei zu lesen (Probelauf Q1/Q2, LESSONS L20a). Im Run-Verzeichnis
+  // gehoert beides dem Mux; dort steht der volle Text in der AGENTS.md.
+  const opencode = new OpenCodeAdapter({ getSkipPermissions: () => false })
+  const claude = new ClaudeCodeAdapter({ getSkipPermissions: () => false })
+  const rolle = '<!-- local-factory-v2 -->\n# Local Cyber Factory\n\n## Global Rules\n\nRegel A\n'
+  const runs = () => fs.mkdtempSync(path.join(os.tmpdir(), 'runs-'))
+  const runDir = (base: string) => {
+    const d = path.join(base, 'ws-x', 'local-factory')
+    fs.mkdirSync(d, { recursive: true })
+    return d
+  }
+
+  it('opencode: AGENTS.md enthaelt den vollen Rollentext inklusive Marker', () => {
+    const base = runs()
+    const d = runDir(base)
+    fs.writeFileSync(path.join(d, 'CLAUDE.md'), rolle)
+    assert.equal(ensureEntityInstructionsFile(d, opencode, base), 'AGENTS.md')
+    const agents = fs.readFileSync(path.join(d, 'AGENTS.md'), 'utf-8')
+    assert.equal(agents, rolle)
+    assert.match(agents, /<!-- local-factory-v2 -->/)
+    assert.ok(!/Die eigentlichen Projektanweisungen stehen in/.test(agents), 'nur ein Verweis')
+    fs.rmSync(base, { recursive: true, force: true })
+  })
+
+  it('opencode: eine alte Verweis-AGENTS.md im Run-Verzeichnis wird durch den Rollentext ersetzt', () => {
+    const base = runs()
+    const d = runDir(base)
+    fs.writeFileSync(path.join(d, 'AGENTS.md'), newInstructionsFile({ file: 'AGENTS.md', pointerTo: 'CLAUDE.md' }))
+    fs.writeFileSync(path.join(d, 'CLAUDE.md'), rolle)
+    ensureEntityInstructionsFile(d, opencode, base)
+    assert.equal(fs.readFileSync(path.join(d, 'AGENTS.md'), 'utf-8'), rolle)
+    fs.rmSync(base, { recursive: true, force: true })
+  })
+
+  it('opencode: ein neuer Start zieht einen geaenderten Rollentext nach', () => {
+    const base = runs()
+    const d = runDir(base)
+    fs.writeFileSync(path.join(d, 'CLAUDE.md'), rolle)
+    ensureEntityInstructionsFile(d, opencode, base)
+    fs.writeFileSync(path.join(d, 'CLAUDE.md'), rolle + '\n## Session Identity\n\nID s-1\n')
+    ensureEntityInstructionsFile(d, opencode, base)
+    assert.match(fs.readFileSync(path.join(d, 'AGENTS.md'), 'utf-8'), /Session Identity/)
+    fs.rmSync(base, { recursive: true, force: true })
+  })
+
+  it('Claude Code: keine AGENTS.md', () => {
+    const base = runs()
+    const d = runDir(base)
+    fs.writeFileSync(path.join(d, 'CLAUDE.md'), rolle)
+    assert.equal(ensureEntityInstructionsFile(d, claude, base), 'CLAUDE.md')
+    assert.ok(!fs.existsSync(path.join(d, 'AGENTS.md')))
+    fs.rmSync(base, { recursive: true, force: true })
+  })
+
+  it('ausserhalb der Run-Basis (User-Projekt): eine vorhandene AGENTS.md bleibt unangetastet', () => {
+    const base = runs()
+    const projekt = fs.mkdtempSync(path.join(os.tmpdir(), 'user-projekt-'))
+    fs.writeFileSync(path.join(projekt, 'AGENTS.md'), '# Eigene Regeln\n')
+    fs.writeFileSync(path.join(projekt, 'CLAUDE.md'), rolle)
+    assert.equal(ensureEntityInstructionsFile(projekt, opencode, base), 'AGENTS.md')
+    assert.equal(fs.readFileSync(path.join(projekt, 'AGENTS.md'), 'utf-8'), '# Eigene Regeln\n')
+    fs.rmSync(base, { recursive: true, force: true })
+    fs.rmSync(projekt, { recursive: true, force: true })
+  })
+
+  it('die Run-Basis selbst und ein Nachbar mit gleichem Praefix gelten nicht als Run-Verzeichnis', () => {
+    const base = runs()
+    const nachbar = base + '-nachbar'
+    fs.mkdirSync(nachbar)
+    fs.writeFileSync(path.join(nachbar, 'AGENTS.md'), '# Fremd\n')
+    fs.writeFileSync(path.join(nachbar, 'CLAUDE.md'), rolle)
+    ensureEntityInstructionsFile(nachbar, opencode, base)
+    assert.equal(fs.readFileSync(path.join(nachbar, 'AGENTS.md'), 'utf-8'), '# Fremd\n')
+    fs.rmSync(base, { recursive: true, force: true })
+    fs.rmSync(nachbar, { recursive: true, force: true })
+  })
+
+  it('ohne CLAUDE.md: Rueckfall auf den Verweis-Kopf, wirft nicht', () => {
+    const base = runs()
+    const d = runDir(base)
+    assert.equal(ensureEntityInstructionsFile(d, opencode, base), 'AGENTS.md')
+    assert.ok(fs.existsSync(path.join(d, 'AGENTS.md')))
+    assert.equal(ensureEntityInstructionsFile(path.join(base, 'gibt', 'es', 'nicht'), opencode, base), 'AGENTS.md')
+    fs.rmSync(base, { recursive: true, force: true })
   })
 })
