@@ -315,11 +315,11 @@ function oneLineKurz(s: string): string {
 
 /**
  * Config-Schutz: Die Projekt-Config bestimmt, was der Gate prüft. Ändert der Worker
- * sie, ist der Versuch ROT — auch bei grünem Test. Auf der vollen Liste geprüft,
- * nicht auf der um sauberkeitIgnoriert gekürzten.
+ * sie, ist der Versuch ROT — auch bei grünem Test. Verglichen werden die Bytes vor
+ * und nach dem Worker, nicht git: eine ignorierte oder neu angelegte Config sähe git nicht.
+ * null = Datei fehlt.
  */
-export function configVeraendert(changed: readonly string[]): string[] {
-  return changed.map(norm).includes(PROJECT_CONFIG_RELPATH)
-    ? [`Projekt-Config ${PROJECT_CONFIG_RELPATH} verändert — sie gehört dem Architekten.`]
-    : []
+export function configVeraendert(vorher: Buffer | null, nachher: Buffer | null): string[] {
+  const gleich = vorher === null || nachher === null ? vorher === nachher : vorher.equals(nachher)
+  return gleich ? [] : [`Projekt-Config ${PROJECT_CONFIG_RELPATH} verändert — sie gehört dem Architekten.`]
 }

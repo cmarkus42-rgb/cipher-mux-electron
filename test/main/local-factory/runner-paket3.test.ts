@@ -370,3 +370,24 @@ describe('Config-Schutz: der Worker ändert die Projekt-Config', () => {
     assert.match(gateVon(res.laufPfad!).reasons.join(), /Projekt-Config .* verändert/)
   })
 })
+
+describe('Config-Schutz unabhängig von git', () => {
+  beforeEach(() => {
+    schreib('.gitignore', '.cipher-mux/\n'); git('add', '.gitignore'); git('commit', '-qm', 'config ignoriert')
+  })
+  it('ignorierte Config geändert → ROT, Original zurück', async () => {
+    schreib('.cipher-mux/local-factory.json', JSON.stringify({ pflichtGates: [{ muster: '*.txt', befehl: 'true' }] }))
+    const vorher = lies('.cipher-mux/local-factory.json')
+    const host = fakeHost(() => { schreib('impl.txt', 'ok\n'); schreib('.cipher-mux/local-factory.json', '{}') })
+    const res = await lauf(runner(host), args())
+    assert.match(host.wakes[0], /ROT/)
+    assert.match(gateVon(res.laufPfad!).reasons.join(), /Projekt-Config .* verändert/)
+    assert.equal(lies('.cipher-mux/local-factory.json'), vorher)
+  })
+  it('vom Worker neu angelegte Config → ROT, wieder entfernt', async () => {
+    const host = fakeHost(() => { schreib('impl.txt', 'ok\n'); schreib('.cipher-mux/local-factory.json', '{"sauberkeitIgnoriert":["src"]}') })
+    const res = await lauf(runner(host), args())
+    assert.match(gateVon(res.laufPfad!).reasons.join(), /Projekt-Config .* verändert/)
+    assert.equal(fs.existsSync(path.join(repo, '.cipher-mux/local-factory.json')), false)
+  })
+})

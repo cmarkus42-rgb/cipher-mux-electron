@@ -7,7 +7,7 @@ import {
   decideGate, testWarnungen, readGateRecord, mitGruenden, pruefeErsetzungen, diffAusserhalbAuftrag, rotAusTestfehler, pruefeVerboteneMuster, configVeraendert,
   type GateResult, type GateRecord, type GateDiagnose,
 } from './gate'
-import { ladeProjektConfig, passtGlob, type ProjektConfig } from './projekt-config'
+import { ladeProjektConfig, passtGlob, PROJEKT_CONFIG_PFAD, type ProjektConfig } from './projekt-config'
 import {
   newLauf, beginVersuch, endVersuch, countWeckruf, markAbgenommen, markBeurteilt,
   loadLauf, saveLauf, abortRunning, zaehlendeVersuche, MAX_VERSUCHE, type Lauf,
@@ -125,6 +125,13 @@ interface Attempt {
   configHinweise: string[]
   /** Offene Einträge unter sauberkeitIgnoriert vor dem Worker — was danach neu ist, hat er angelegt. */
   ignoriertVorher: string[]
+  /** Bytes der Projekt-Config vor dem Worker; null = keine. */
+  configBytes: Buffer | null
+}
+
+/** Bytes der Projekt-Config; null, wenn es keine gibt. */
+function configLesen(projekt: string): Buffer | null {
+  try { return fs.readFileSync(path.join(projekt, PROJEKT_CONFIG_PFAD)) } catch { return null }
 }
 
 export class LocalFactoryRunner {
@@ -389,6 +396,7 @@ export class LocalFactoryRunner {
     const base = await headCommit(projekt)
     const branch = branchJetzt
     const sumsBefore = checksums(projekt, prot)
+    const configBytes = configLesen(projekt)
     // Frisch laden und ohne await dazwischen speichern: `judge` ist nicht durch busy
     // geschützt und kann während der awaits oben ein Urteil geschrieben haben. Ein
     // Speichern des veralteten `begun.lauf` hätte es überschrieben (zweites Urteil, zweite Bilanz-Zeile).
@@ -417,7 +425,7 @@ export class LocalFactoryRunner {
 
     this.running = this.runAttempt({
       args, prot, base, branch, sumsBefore, laufId, laufPfad,
-      nummer: begun.nummer, versuch: begun.versuch, vorherigesGate, config, configHinweise, ignoriertVorher,
+      nummer: begun.nummer, versuch: begun.versuch, vorherigesGate, config, configHinweise, ignoriertVorher, configBytes,
     })
       .catch(err => this.wake(`${this.praefix} #${begun.nummer} Läuferfehler: ${String(err)}`).catch(() => {}))
       .finally(() => { this.release() })
@@ -507,7 +515,8 @@ export class LocalFactoryRunner {
     // sehen nicht, was das Projekt als Umgebung deklariert hat (L15).
     const changedAlle = branchGewechselt ? [] : await changedSince(projekt, a.base)
     const changed = changedAlle.filter(f => !istIgnoriert(f, a.config.sauberkeitIgnoriert))
-    const zusatz: string[] = configVeraendert(changedAlle)
+    const configNeu = configVeraendert(a.configBytes, configLesen(projekt))
+    const zusatz: string[] = [...configNeu]
     const warnungen = [...a.configHinweise.map(h => `Projekt-Config: ${h}`), ...testWarnungen(test.output)]
     let testOutput = test.output
     if (pruefen) {
@@ -578,6 +587,12 @@ export class LocalFactoryRunner {
       patchPfad = path.join(dir, `versuch-${a.nummer}-${a.versuch}.patch`)
       await savePatchAndReset(projekt, a.base, patchPfad, a.config.sauberkeitIgnoriert)
       started.settled = true
+      // Eine ignorierte oder neu angelegte Config stellt der Reset nicht wieder her.
+      if (configNeu.length) {
+        const ziel = path.join(projekt, PROJEKT_CONFIG_PFAD)
+        if (a.configBytes) fs.writeFileSync(ziel, a.configBytes)
+        else fs.rmSync(ziel, { force: true })
+      }
     }
 
     let lauf = loadLauf(a.laufPfad) ?? newLauf(a.laufId, projekt, this.o.now())
