@@ -165,3 +165,19 @@ describe('sauberkeitIgnoriert: nur Pfade im Repo', () => {
     assert.equal(r.hinweise.filter(h => /sauberkeitIgnoriert/.test(h)).length, 5)
   })
 })
+
+describe('Testmerkmal acceptance (Konvention projekt-a)', () => {
+  it('testpfade mit acceptance werden angenommen, ohne Hinweis', () => {
+    const r = parseProjektConfig({ testpfade: ['dashboard-src/acceptance/**', '/src/acceptance-e2e/'] })
+    assert.deepEqual(r.config.testpfade, ['dashboard-src/acceptance/**', '/src/acceptance-e2e/'])
+    assert.deepEqual(r.hinweise, [])
+  })
+  it('acceptance zählt nur als ganzes Segment — „acceptancefoo“ ist kein Merkmal', () => {
+    const r = parseProjektConfig({ testpfade: ['/src/acceptancefoo/', 'src/acceptance*/**'] })
+    assert.deepEqual(r.config.testpfade, ['src/acceptance*/**'])
+  })
+  it('der Hinweis für verworfene Einträge nennt acceptance als Merkmal', () => {
+    const r = parseProjektConfig({ testpfade: ['fixtures'] })
+    assert.match(r.hinweise.join(), /acceptance/)
+  })
+})

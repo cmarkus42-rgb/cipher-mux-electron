@@ -83,6 +83,10 @@ describe('mux_local_worker_dispatch: Paket-3-Felder', () => {
     assert.equal(r.calls.dispatch[0].architektenfehler, 'Test falsch')
     assert.equal(r.calls.dispatch[0].rotGrund, 'gewollt')
   })
+  it('kein Schemafeld laeuferfehler: Läuferfehler zählen automatisch nicht (User-Entscheid)', async () => {
+    const { DISPATCH_INPUT_SCHEMA } = await import('../../../src/main/mcp/local-factory-tool')
+    assert.equal('laeuferfehler' in DISPATCH_INPUT_SCHEMA, false)
+  })
   it('das Schema nimmt die Felder an und weist kaputte ersetzungen ab', async () => {
     const { z } = await import('zod')
     const { DISPATCH_INPUT_SCHEMA } = await import('../../../src/main/mcp/local-factory-tool')

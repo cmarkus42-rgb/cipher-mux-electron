@@ -62,6 +62,8 @@ export function toRepoRelative(projekt: string, p: string): string {
 const git = (projekt: string, args: string[]): Promise<string> =>
   runCommand('git', args, { cwd: projekt, timeout: 30_000 })
 
+const execFileP = promisify(execFile)
+
 const lines = (s: string): string[] => s.split('\n').map(l => l.trim()).filter(Boolean)
 
 // core.quotepath=off: sonst maskiert git Nicht-ASCII-Namen als "\303\244.txt",
@@ -82,9 +84,37 @@ export function istIgnoriert(datei: string, eintraege: readonly string[]): boole
   })
 }
 
-/** Pathspecs, die ignorierte Einträge aus `git add` heraushalten. */
-const ohne = (ausnahmen: readonly string[]): string[] =>
-  ausnahmen.map(e => e.replace(/^\.\//, '').replace(/\/+$/, '')).filter(Boolean).map(e => `:(exclude,literal)${e}`)
+const eintragsPfade = (ausnahmen: readonly string[]): string[] =>
+  ausnahmen.map(e => e.replace(/^\.\//, '').replace(/\/+$/, '')).filter(Boolean)
+
+/** Ignoriert git den Pfad schon über .gitignore & Co.? rc 0 = ja, 1 = nein, sonst Fehler. */
+async function gitIgnoriert(projekt: string, pfad: string): Promise<boolean> {
+  try {
+    // Mit Index, also ohne --no-index: eine getrackte Datei unter einem Ignoriermuster
+    // gilt dann als nicht ignoriert und behält ihren Ausschluss — sonst nähme `add -A`
+    // ihre Änderung mit. Einen Symlink beurteilt git in beiden Varianten als Datei
+    // (Muster „node_modules/“ trifft ihn nicht, „node_modules“ schon).
+    await execFileP('git', ['check-ignore', '-q', '--', pfad], { cwd: projekt, env: { ...process.env, PATH: getEnhancedPath() } })
+    return true
+  } catch (err) {
+    if ((err as { code?: unknown }).code === 1) return false
+    throw err
+  }
+}
+
+/**
+ * Pathspecs, die ignorierte Einträge aus `git add` heraushalten — nur für Pfade, die
+ * git nicht ohnehin ignoriert. Ein Ausschluss auf einen schon ignorierten Pfad lässt
+ * `git add` mit rc=1 abbrechen („paths are ignored by one of your .gitignore files“,
+ * Läuferfehler im Live-Test 23.10.); `add` lässt solche Pfade ohnehin liegen.
+ */
+async function ohne(projekt: string, ausnahmen: readonly string[]): Promise<string[]> {
+  const out: string[] = []
+  for (const e of eintragsPfade(ausnahmen)) {
+    if (!(await gitIgnoriert(projekt, e))) out.push(`:(exclude,literal)${e}`)
+  }
+  return out
+}
 
 export async function dirtyFiles(projekt: string): Promise<string[]> {
   const tracked = lines(await git(projekt, [...NO_QUOTE, 'diff', '--name-only', '--no-renames', 'HEAD']))
@@ -118,7 +148,7 @@ export async function commitPaths(projekt: string, paths: string[], message: str
  */
 export async function commitAll(projekt: string, base: string, message: string, ausnahmen: readonly string[] = []): Promise<void> {
   await git(projekt, ['reset', '-q', '--soft', base])
-  await git(projekt, ['add', '-A', '--', '.', ...ohne(ausnahmen)])
+  await git(projekt, ['add', '-A', '--', '.', ...(await ohne(projekt, ausnahmen))])
   await git(projekt, ['commit', '-q', '--no-verify', '-m', message])
 }
 
@@ -142,8 +172,6 @@ export function checksums(projekt: string, files: string[]): Record<string, stri
   return out
 }
 
-const execFileP = promisify(execFile)
-
 export async function isRepoRoot(projekt: string): Promise<boolean> {
   try {
     const top = await git(projekt, ['rev-parse', '--show-toplevel'])
@@ -163,8 +191,28 @@ export async function savePatchAndReset(projekt: string, base: string, patchFile
   if (!(await isRepoRoot(projekt))) {
     throw new Error(`projekt ist nicht die Wurzel eines git-Repos: ${projekt}`)
   }
+  await patchSchreiben(projekt, base, patchFile, ausnahmen, true)
+  await git(projekt, ['reset', '-q', '--hard', base])
+  // -e: verankertes Ignoriermuster je Eintrag; clean lässt es dann stehen.
+  const behalten = eintragsPfade(ausnahmen).flatMap(e => ['-e', `/${e}`])
+  await git(projekt, ['clean', '-fdq', ...behalten])
+}
+
+/**
+ * Nur sichern, nichts zurücksetzen — für einen Läuferfehler nach dem Gate: die geprüfte
+ * Arbeit bleibt im Baum. Ist der Index gesperrt, fehlen im Patch nur die neuen Dateien.
+ */
+export async function savePatch(projekt: string, base: string, patchFile: string, ausnahmen: readonly string[] = []): Promise<void> {
+  await patchSchreiben(projekt, base, patchFile, ausnahmen, false)
+}
+
+async function patchSchreiben(projekt: string, base: string, patchFile: string, ausnahmen: readonly string[], streng: boolean): Promise<void> {
   // Untracked erst in den Index (intent-to-add), damit der Patch sie enthält.
-  await git(projekt, ['add', '-N', '--', '.', ...ohne(ausnahmen)])
+  try {
+    await git(projekt, ['add', '-N', '--', '.', ...(await ohne(projekt, ausnahmen))])
+  } catch (err) {
+    if (streng) throw err
+  }
   // Eigener Aufruf: großer Puffer, --binary, unbeschnitten.
   // encoding 'buffer': der Patch wird roh geschrieben. Ein UTF-8-Umweg machte
   // aus jedem Nicht-UTF-8-Byte (Latin-1-Text) ein U+FFFD, und der Patch ließe
@@ -177,10 +225,6 @@ export async function savePatchAndReset(projekt: string, base: string, patchFile
   })
   fs.mkdirSync(path.dirname(patchFile), { recursive: true })
   fs.writeFileSync(patchFile, stdout)
-  await git(projekt, ['reset', '-q', '--hard', base])
-  // -e: verankertes Ignoriermuster je Eintrag; clean lässt es dann stehen.
-  const behalten = ausnahmen.map(e => e.replace(/^\.\//, '').replace(/\/+$/, '')).filter(Boolean).flatMap(e => ['-e', `/${e}`])
-  await git(projekt, ['clean', '-fdq', ...behalten])
 }
 
 /** Eine hinzugefügte Zeile im Baum seit `base` (L16b). */

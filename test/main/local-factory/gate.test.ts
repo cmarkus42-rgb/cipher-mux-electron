@@ -129,7 +129,7 @@ describe('testWarnungen (L10)', () => {
 describe('readGateRecord (alte Gates)', () => {
   it('altes Gate ohne warnungen/diagnose → leere Warnungen, keine Diagnose', () => {
     const g = readGateRecord({ verdict: 'rot', reasons: ['x'], testOutput: 'out' })
-    assert.deepEqual(g, { verdict: 'rot', reasons: ['x'], testOutput: 'out', warnungen: [], diagnose: null })
+    assert.deepEqual(g, { verdict: 'rot', reasons: ['x'], testOutput: 'out', warnungen: [], diagnose: null, pruefungen: [] })
   })
   it('kaputte Felder werden nicht übernommen, nie ein Wurf', () => {
     const g = readGateRecord({ reasons: 'nein', warnungen: [1, 'w'], diagnose: 'x' })
@@ -212,5 +212,32 @@ describe('L16b verbotene Muster', () => {
     assert.equal(r.length, 1)
     assert.match(r[0], /8 Fundstellen/)
     assert.doesNotMatch(r[0], /src\/a\.ts:6/)
+  })
+})
+
+describe('readGateRecord: pruefungen und laeuferfehler', () => {
+  it('altes Gate ohne pruefungen → leere Liste, kein laeuferfehler', () => {
+    const g = readGateRecord({ verdict: 'gruen', reasons: [], testOutput: '' })
+    assert.deepEqual(g.pruefungen, [])
+    assert.equal(g.laeuferfehler, undefined)
+  })
+  it('kaputte Einträge werden verworfen, gültige bleiben', () => {
+    const g = readGateRecord({
+      verdict: 'gruen', reasons: [], testOutput: '',
+      pruefungen: [{ art: 'configSchutz', ergebnis: 'bestanden' }, { art: 7 }, 'x', { art: 'pflichtGates', ergebnis: 'rot', detail: 'd' }],
+    })
+    assert.deepEqual(g.pruefungen, [
+      { art: 'configSchutz', ergebnis: 'bestanden' },
+      { art: 'pflichtGates', ergebnis: 'rot', detail: 'd' },
+    ])
+  })
+})
+
+describe('Testmerkmal acceptance im Gate', () => {
+  it('eine Datei unter /acceptance/ ist kein Diff außerhalb des Auftrags', () => {
+    assert.deepEqual(diffAusserhalbAuftrag(['dashboard-src/acceptance/login.ts', 'acceptance/x.py'], { dateien: [], prot: [], testpfade: [] }), [])
+  })
+  it('über testpfade der Config: dashboard-src/acceptance/**', () => {
+    assert.deepEqual(diffAusserhalbAuftrag(['dashboard-src/acceptance-e2e/a.ts'], { dateien: [], prot: [], testpfade: ['dashboard-src/acceptance-e2e/**'] }), [])
   })
 })

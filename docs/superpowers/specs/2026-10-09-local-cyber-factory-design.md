@@ -180,6 +180,19 @@ Aus dem Betrieb an projekt-a (LESSONS L1–L20, Wellenplan „Local Factory Här
 | `architektenfehler` `"<Begründung>"` | Nur beim Retry (gleiche `laufId` + `haeppchen`): der letzte Fehlversuch war ein Fehler des Architekten. Zählt nicht gegen die 2 Versuche, eigens in `lauf.json` und Bilanz, **einmal je Häppchen**, auch nach Eskalation (L12) |
 | `rotGrund` `"<Begründung>"` | Übersteuert die Ablehnung „Abnahmetest rot, vermutlich aus einem Fehler im Test selbst“. **Nicht** möglich, wenn ein Test-Hilfsobjekt fehlt (`globalThis.*`, Bezeichner mit führendem `__`) (L16a) |
 
+**Läuferfehler** (Live-Test 23.10., User-Entscheid). Bricht der Läufer selbst ab, endet der
+Versuch im Ausgang `laeuferfehler` und zählt **automatisch nicht** gegen die 2 Versuche — kein
+Feld, der Architekt dispatcht einfach erneut mit derselben `laufId`/`haeppchen`. **Deckel 2 je
+Häppchen:** der 3. Läuferfehler eskaliert das Häppchen (Weckzeile endet auf „— ESKALIERT, an den
+User melden“, Hinweis „wiederholter Läuferfehler“). Ein `haengt` mit grünem Gate (Altfall vor
+diesem Ausgang) wird beim erneuten Dispatch zum Läuferfehler. `lauf.json` (Feld `laeuferfehler`
+je Häppchen, `fehler` je Versuch), Bilanz und Weckzeile weisen die Anzahl eigens aus.
+
+**Transparenz im Gate:** `gate-<n>-<v>.json` führt `pruefungen: [{art, ergebnis, detail?}]` —
+`vorpruefung`, `worktreeVorbereitung`, `pflichtGates` (je Eintrag), `verboteneMuster`,
+`ersetzungen`, `configSchutz`; Ergebnis `bestanden` / `rot` / `uebersprungen` /
+`nicht-konfiguriert` / `nicht-ausgeloest`. Auch bei GRÜN. Alte Gates ohne das Feld bleiben lesbar.
+
 **Projekt-Config `.cipher-mux/local-factory.json`** im Ziel-Repo. Pflegen nur User oder
 Systems-Session; für Architekt und Worker liegt sie unter der Edit-Sperre, eine Änderung durch
 den Worker macht den Gate ROT. Die Ablehnung nennt dafür einen eigenen Grund (wer die Config
@@ -206,15 +219,15 @@ nie geworfen.
 
 | Feld | Wirkung |
 |---|---|
-| `testpfade` | Zusätzliche Testpfade für die Edit-Sperre des Architekten; nur mit Testmerkmal (`test`, `spec`, `tests`, `__tests__`), nie reines `/src/`/`/lib/` (L1) |
+| `testpfade` | Zusätzliche Testpfade für die Edit-Sperre des Architekten; nur mit Testmerkmal (`test`, `spec`, `tests`, `__tests__`, `acceptance`), nie reines `/src/`/`/lib/` (L1) |
 | `pflichtGates` | Ändert der Worker eine Datei auf `muster`, läuft `befehl` zusätzlich im Gate (L13) |
 | `vorpruefung` | Vor jedem Versuch; `{projekt}` wird ersetzt. Fehlt `erwartet` in der Ausgabe: „Nicht bereit“, kein Versuch (L2) |
 | `worktreeVorbereitung` | Vor dem ersten Dispatch eines Laufs im Worktree. Muss **idempotent** sein — scheitert der erste Dispatch, läuft der Schritt erneut. Fehlschlag: „Nicht bereit“, kein Versuch (L15) |
 | `sauberkeitIgnoriert` | Bleibt bei „Arbeitsbaum sauber“, Diff und Reset außen vor (Dateien und Symlinks). Ein Symlink hier zeigt **nur auf Abhängigkeiten**, nie auf Code — dahinter sieht das Gate nichts (L15) |
 | `verboteneMuster` | Regex auf hinzugefügte Diff-Zeilen in Dateien auf `pfad`; Treffer = ROT mit `grund` (L16b) |
 
-**Rollentext `local-factory-v2`.** Der Architekten-Rollentext trägt seit dieser Welle einen
-Versionsmarker und steht in `PRESET_TEMPLATES`. Eine ältere `preset.md` (ohne Marker) zeigt im
+**Rollentext `local-factory-v3`.** Der Architekten-Rollentext trägt seit dieser Welle einen
+Versionsmarker und steht in `PRESET_TEMPLATES` (v3: Läuferfehler zählen nicht, Deckel 2 je Häppchen). Eine ältere `preset.md` (ohne Marker) zeigt im
 Preset-Editor den Rückstand; übernommen wird nur per Knopf, mit Sicherung daneben.
 
 **Zustellung unter opencode.** Im Run-Verzeichnis einer Rolle schreibt der Mux den vollen
@@ -225,7 +238,8 @@ Verweis (L20a). In User-Projekten bleibt eine vorhandene `AGENTS.md` unangetaste
 
 Pro Lauf eine `lauf.json` im Run-Verzeichnis von `local-factory`, pro Häppchen:
 
-- Nummer, Ziel, Versuche, Ergebnis (`abgenommen` / `eskaliert` / `hängt` / `abgebrochen`)
+- Nummer, Ziel, Versuche, Ergebnis (`abgenommen` / `eskaliert` / `hängt` / `abgebrochen`);
+  Ausgang je Versuch `gruen` / `rot` / `haengt` / `laeuferfehler` (mit Meldung in `fehler`)
 - Worker-Laufzeit, lokale Tokens (aus dem Usage-Plugin), Gate-Dauer
 - Pfade zu `gate.json` und gesicherten Patches
 - Weckrufe des Architekten und seine Kontextnutzung beim Wecken
@@ -242,6 +256,7 @@ Kontextnutzung sind eine Näherung — genug für einen Trend, kein Euro-Betrag.
 |---|---|
 | Endpunkt nicht erreichbar | Vorprüfung schlägt fehl, Wecken mit „Endpunkt weg“, kein Versuch gezählt |
 | Worker hängt / Timeout | Session beenden, Patch sichern, Reset, zählt als Fehlversuch „hängt“ |
+| Läufer bricht selbst ab (Exception, z. B. git-Fehler beim Commit) | Ausgang `laeuferfehler`, nicht „hängt“. Nach dem Gate: Arbeit bleibt im Worktree, Patch daneben, Vermerk `laeuferfehler` im Gate; davor: Patch und Reset. Weckzeile `LÄUFERFEHLER`. Zählt nicht, erneut dispatchen; der 3. je Häppchen eskaliert. Ein erneuter Dispatch braucht einen sauberen Baum. Bricht er nach ROT/HÄNGT beim Aufräumen ab, bleibt der Ausgang ROT/HÄNGT (gezählt) |
 | Abgeschnittene Ausgabe | erscheint als kaputter Edit, Gate rot, Versuch gezählt |
 | Baum beim Dispatch nicht sauber | Ablehnung mit Begründung |
 | Abnahmetest vor der Arbeit grün | Ablehnung: der Test prüft nichts |

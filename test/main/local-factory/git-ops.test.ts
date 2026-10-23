@@ -274,3 +274,91 @@ describe('L16b hinzugefuegteZeilen: Leerzeichen im Pfad', () => {
     assert.deepEqual(await hinzugefuegteZeilen(repo, base), [{ datei: 'src/mit leer.js', zeile: 2, text: 'y' }])
   })
 })
+
+// Live-Test 23.10. (projekt-a): `dashboard-src/.gitignore` nennt `node_modules` und
+// `.svelte-kit` ohne Schrägstrich, beide stehen zugleich unter sauberkeitIgnoriert.
+// Ein Ausschluss-Pathspec auf einen Pfad, den git ohnehin ignoriert, lässt
+// `git add` mit rc=1 abbrechen („paths are ignored by one of your .gitignore files“).
+describe('sauberkeitIgnoriert und .gitignore zugleich (Läuferfehler lf-live)', () => {
+  const EINTRAEGE = ['dashboard-src/node_modules', 'dashboard-src/.svelte-kit']
+  let ziel: string
+  beforeEach(() => {
+    ziel = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-nm-'))
+    fs.mkdirSync(path.join(repo, 'dashboard-src'))
+    fs.writeFileSync(path.join(repo, 'dashboard-src', '.gitignore'), 'node_modules\n.svelte-kit\n')
+    fs.writeFileSync(path.join(repo, 'dashboard-src', 'app.ts'), 'alt\n')
+    git('add', '.'); git('commit', '-qm', 'dashboard')
+    fs.mkdirSync(path.join(repo, 'dashboard-src', '.svelte-kit'))
+    fs.writeFileSync(path.join(repo, 'dashboard-src', '.svelte-kit', 'tsconfig.json'), '{}')
+  })
+
+  for (const art of ['Verzeichnis', 'Symlink'] as const) {
+    const lege = () => art === 'Symlink'
+      ? fs.symlinkSync(ziel, path.join(repo, 'dashboard-src', 'node_modules'))
+      : (fs.mkdirSync(path.join(repo, 'dashboard-src', 'node_modules')), fs.writeFileSync(path.join(repo, 'dashboard-src', 'node_modules', 'x.js'), 'x'))
+
+    it(`commitAll: node_modules als ${art} — Commit gelingt, ohne die ignorierten Einträge`, async () => {
+      lege()
+      const base = await headCommit(repo)
+      fs.writeFileSync(path.join(repo, 'dashboard-src', 'app.ts'), 'neu\n')
+      fs.writeFileSync(path.join(repo, 'dashboard-src', 'neu.ts'), 'n\n')
+      await commitAll(repo, base, 'gruen', EINTRAEGE)
+      assert.equal(git('rev-parse', 'HEAD~1'), base)
+      assert.deepEqual(git('show', '--name-only', '--format=', 'HEAD').split('\n').sort(), ['dashboard-src/app.ts', 'dashboard-src/neu.ts'])
+      assert.equal(git('status', '--porcelain'), '')
+    })
+
+    it(`savePatchAndReset: node_modules als ${art} — Patch und Reset gelingen, Einträge bleiben liegen`, async () => {
+      lege()
+      const base = await headCommit(repo)
+      fs.writeFileSync(path.join(repo, 'dashboard-src', 'app.ts'), 'rot\n')
+      fs.writeFileSync(path.join(repo, 'dashboard-src', 'neu.ts'), 'n\n')
+      const patch = path.join(os.tmpdir(), `lf-gi-${Date.now()}-${art}.patch`)
+      await savePatchAndReset(repo, base, patch, EINTRAEGE)
+      const p = fs.readFileSync(patch, 'utf-8')
+      assert.match(p, /dashboard-src\/neu\.ts/)
+      assert.doesNotMatch(p, /node_modules|\.svelte-kit/)
+      assert.equal(fs.readFileSync(path.join(repo, 'dashboard-src', 'app.ts'), 'utf-8'), 'alt\n')
+      assert.equal(fs.existsSync(path.join(repo, 'dashboard-src', 'neu.ts')), false)
+      assert.equal(fs.existsSync(path.join(repo, 'dashboard-src', '.svelte-kit', 'tsconfig.json')), true)
+      assert.equal(fs.existsSync(path.join(repo, 'dashboard-src', 'node_modules')), true)
+    })
+  }
+
+  it('L15 bleibt: Symlink, den .gitignore NICHT erfasst („node_modules/“), wird weiter ausgeschlossen', async () => {
+    fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules/\n'); git('add', '.gitignore'); git('commit', '-qm', 'gi')
+    fs.symlinkSync(ziel, path.join(repo, 'node_modules'))
+    fs.symlinkSync(ziel, path.join(repo, 'dashboard-src', 'node_modules'))
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'neu\n')
+    await commitAll(repo, base, 'gruen', ['node_modules', ...EINTRAEGE])
+    assert.equal(git('show', '--name-only', '--format=', 'HEAD'), 'a.txt')
+    assert.equal(fs.lstatSync(path.join(repo, 'node_modules')).isSymbolicLink(), true)
+  })
+
+  it('getrackte Datei unter einem Ignoriermuster bleibt ausgeschlossen (check-ignore mit Index)', async () => {
+    fs.writeFileSync(path.join(repo, '.gitignore'), 'gen.txt\n')
+    fs.writeFileSync(path.join(repo, 'gen.txt'), 'g\n')
+    git('add', '.gitignore'); git('add', '-f', 'gen.txt'); git('commit', '-qm', 'gen')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'gen.txt'), 'lokal\n')
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'neu\n')
+    await commitAll(repo, base, 'gruen', ['gen.txt'])
+    assert.equal(git('show', '--name-only', '--format=', 'HEAD'), 'a.txt')
+  })
+
+  it('ignoriertes Verzeichnis mit getrackter Datei: Ausschluss bleibt, commitAll scheitert statt sie mitzunehmen', async () => {
+    // check-ignore mit Index nennt ein Verzeichnis mit getrackten Dateien „nicht ignoriert“;
+    // git add bricht dann am Ausschluss ab (fail-closed) — still committet wird nichts.
+    fs.writeFileSync(path.join(repo, '.gitignore'), 'gen\n')
+    fs.mkdirSync(path.join(repo, 'gen')); fs.writeFileSync(path.join(repo, 'gen', 'getrackt.txt'), 't\n')
+    git('add', '.gitignore'); git('add', '-f', 'gen/getrackt.txt'); git('commit', '-qm', 'gen')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'gen', 'getrackt.txt'), 'lokal\n')
+    fs.writeFileSync(path.join(repo, 'gen', 'neu.txt'), 'n\n')
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'neu\n')
+    await assert.rejects(commitAll(repo, base, 'gruen', ['gen']), /ignored/)
+    assert.equal(git('rev-parse', 'HEAD'), base)
+    assert.doesNotMatch(git('diff', '--cached', '--name-only'), /gen\//)
+  })
+})

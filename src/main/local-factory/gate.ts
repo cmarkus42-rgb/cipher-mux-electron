@@ -108,12 +108,33 @@ export interface GateDiagnose {
   paneTail: string[]
 }
 
+/** Zusatzprüfungen des Läufers neben Testbefehl und Testschutz. */
+export type PruefungsArt = 'vorpruefung' | 'worktreeVorbereitung' | 'pflichtGates' | 'verboteneMuster' | 'ersetzungen' | 'configSchutz'
+export type PruefungsErgebnis = 'bestanden' | 'rot' | 'uebersprungen' | 'nicht-konfiguriert' | 'nicht-ausgeloest'
+
+/**
+ * Eine Zeile Transparenz: lief die Prüfung, und mit welchem Ergebnis? Auch bei GRÜN —
+ * sonst ist „grün“ nicht von „nichts geprüft“ zu unterscheiden.
+ */
+export interface Pruefung {
+  art: PruefungsArt
+  ergebnis: PruefungsErgebnis
+  detail?: string
+}
+
 /** Was als gate-<n>-<v>.json auf der Platte liegt. */
 export interface GateRecord extends GateResult {
   testOutput: string
   /** Hinweise, die das Urteil nicht ändern (L10). Alte Gates haben keine. */
   warnungen: string[]
   diagnose?: GateDiagnose | null
+  /** Welche Zusatzprüfungen liefen. Alte Gates haben keine: dann leer. */
+  pruefungen: Pruefung[]
+  /**
+   * Der Läufer brach nach dem Gate ab (z. B. git-Fehler beim Commit): das Urteil oben
+   * gilt, umgesetzt wurde es nicht. `baum` sagt, wo die Arbeit des Workers liegt.
+   */
+  laeuferfehler?: { meldung: string; baum: string; patchPfad?: string }
 }
 
 /**
@@ -129,7 +150,17 @@ export function testWarnungen(output: string): string[] {
   return warnungen
 }
 
-/** Liest ein Gate tolerant: alte Gates ohne warnungen/diagnose, kaputte Felder → Leerwerte. */
+const istPruefung = (v: unknown): v is Pruefung => {
+  if (!v || typeof v !== 'object') return false
+  const p = v as Record<string, unknown>
+  return typeof p.art === 'string' && typeof p.ergebnis === 'string' && (p.detail === undefined || typeof p.detail === 'string')
+}
+
+const lf = (v: unknown): v is NonNullable<GateRecord['laeuferfehler']> =>
+  !!v && typeof v === 'object' && typeof (v as Record<string, unknown>).meldung === 'string'
+  && typeof (v as Record<string, unknown>).baum === 'string'
+
+/** Liest ein Gate tolerant: alte Gates ohne warnungen/diagnose/pruefungen, kaputte Felder → Leerwerte. */
 export function readGateRecord(raw: unknown): GateRecord {
   const g = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const strings = (v: unknown): string[] => Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
@@ -141,6 +172,8 @@ export function readGateRecord(raw: unknown): GateRecord {
     testOutput: typeof g.testOutput === 'string' ? g.testOutput : '',
     warnungen: strings(g.warnungen),
     diagnose: d && typeof d === 'object' ? d as GateDiagnose : null,
+    pruefungen: Array.isArray(g.pruefungen) ? g.pruefungen.filter(istPruefung) : [],
+    ...(lf(g.laeuferfehler) ? { laeuferfehler: g.laeuferfehler } : {}),
   }
 }
 

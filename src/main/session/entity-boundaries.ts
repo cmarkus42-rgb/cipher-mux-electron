@@ -94,7 +94,7 @@ export const PROJECT_CONFIG_RELPATH = '.cipher-mux/local-factory.json'
  * einen Test zu schreiben ist nicht, den Code zu schreiben (LESSONS L1: unter
  * SvelteKit liegen die vitest-Tests in `src/`).
  */
-const TEST_PATH_MARKERS = ['.test.', '.spec.', '/tests/', '/__tests__/', '/test/']
+const TEST_PATH_MARKERS = ['.test.', '.spec.', '/tests/', '/__tests__/', '/test/', '/acceptance/']
 
 /**
  * Only roles the project itself describes as non-building appear here.
@@ -331,7 +331,8 @@ export function boundaryRules(boundary: EntityBoundary): BoundaryRules {
  * Template-Literal), Dateizugriff ueber das uebergebene `io`.
  */
 const BOUNDARY_DECISION_SOURCE = String.raw`
-var BOUNDARY_TEST_MARKER = /(^|[\/._-])(test|spec)/i
+// acceptance nur als ganzes Segment: „acceptanceHelpers“ ist kein Testmerkmal.
+var BOUNDARY_TEST_MARKER = /(^|[\/._-])(test|spec|acceptance(?=$|[\/._*?-]))/i
 var BOUNDARY_CONFIG_RELPATH = '.cipher-mux/local-factory.json'
 
 // Glob mit *, ** und ?, gegen den ganzen Pfad. Kein Paket: der Text laeuft ohne node_modules.
@@ -372,7 +373,7 @@ function boundaryCheckTestPaths(list) {
     var rest = entry.replace(/(^|\/)(src|lib)(?=\/|$)/g, '').replace(/[\/.*?]/g, '')
     if (!rest || !BOUNDARY_TEST_MARKER.test(entry)) {
       hints.push('testpfade-Eintrag ' + JSON.stringify(entry)
-        + ' traegt kein Testmerkmal (test, spec, tests, __tests__) und wird ignoriert.')
+        + ' traegt kein Testmerkmal (test, spec, tests, __tests__, acceptance) und wird ignoriert.')
       continue
     }
     accepted.push(entry)

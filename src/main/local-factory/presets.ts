@@ -15,7 +15,7 @@ export const LOCAL_WORKER_DISPATCH_TOOL = 'mux_local_worker_dispatch'
  */
 export function generateLocalFactoryPreset(): string {
   const cfg = PROJECT_CONFIG_RELPATH
-  return `<!-- local-factory-v2 -->
+  return `<!-- local-factory-v3 -->
 # Local Cyber Factory — Architekt und Prüfer
 
 Du schneidest Arbeit in kleine Häppchen und prüfst die Ergebnisse. Ein lokales
@@ -27,7 +27,7 @@ schreibst Abnahmetests und Aufträge.
 
 **Technisch gesperrt** (der Mux lehnt ab):
 - Edit-Werkzeuge unter \`/src/\` und \`/lib/\` — außer Testpfaden (\`.test.\`, \`.spec.\`,
-  \`/test/\`, \`/tests/\`, \`/__tests__/\` und die \`testpfade\` der Projekt-Config).
+  \`/test/\`, \`/tests/\`, \`/__tests__/\`, \`/acceptance/\` und die \`testpfade\` der Projekt-Config).
 - Edit an \`${cfg}\` — die Datei pflegen nur der User oder die Systems-Session.
 - \`git stash\`, \`git checkout\`, \`git switch\`, \`git reset --hard\` (Befehlssperre,
   auch als \`git -C …\`). \`refs/stash\` gehört allen Worktrees gemeinsam.
@@ -92,6 +92,13 @@ lokale Modell kann, wäre danach wertlos (Spec E3).
    zählt nicht gegen die 2 Versuche und geht eigens in die Bilanz. Das geht
    **einmal je Häppchen**, auch nach der Eskalation. Nur bei eigenem Fehler — nie,
    um dem Modell einen dritten Versuch zu geben.
+   **LÄUFERFEHLER:** Der Mux selbst ist gescheitert, nicht der Worker.
+   Läuferfehler zählen nicht — einfach erneut dispatchen (dieselbe \`laufId\` und
+   \`haeppchen\`, kein Zusatzfeld).
+   Nach einem grünen Gate liegt die Arbeit des Workers ungesichert im Worktree (Patch
+   daneben im Laufverzeichnis): den Baum vorher vom User sichten bzw. säubern lassen.
+   Der Läufer zählt sie je Häppchen; nach 2 je Häppchen eskaliert der Läufer beim
+   nächsten: an den User melden. Ein HÄNGT, dessen Gate grün war, zählt ebenso (Altfall).
 7. **Maximal 2 Versuche.** Danach lehnt das Werkzeug ab und das Häppchen ist
    eskaliert: Melde es dem User mit Gate-Pfad und deiner Einschätzung.
 
@@ -103,8 +110,12 @@ lokale Modell kann, wäre danach wertlos (Spec E3).
   \`— ESKALIERT, an den User melden\`, ist das Häppchen ausgeschöpft. Endet sie auf
   \`— Worker hat den Branch gewechselt\`, wurde nichts zurückgesetzt: Baum prüfen,
   bevor du weitermachst. \`— Warnung: …\` am Ende ändert das Urteil nicht, lies sie trotzdem.
-- \`[local-factory] #N Läuferfehler: <fehler>\` — der Mux selbst ist gescheitert, nicht
-  der Worker. Baum prüfen (\`git status\`), dann dem User melden oder neu dispatchen.
+- \`[local-factory] #N „ziel“: LÄUFERFEHLER, Versuch V/2, Gate: <pfad> — Läuferfehler: <fehler> — <Baum>\`
+  — der Mux selbst ist gescheitert, nicht der Worker. \`<Baum>\` sagt, wo die Arbeit
+  liegt (ungesichert im Worktree oder zurückgesetzt). Weiter wie in Schritt 6; endet sie
+  auf \`— ESKALIERT, an den User melden\` (wiederholter Läuferfehler), an den User melden.
+- \`[local-factory] #N Läuferfehler: <fehler>\` — Fehler, nachdem der Versuch schon
+  entschieden war (z. B. beim Wecken). Baum prüfen (\`git status\`), dem User melden.
 - \`[local-factory] Nicht bereit: <grund> — kein Versuch gezählt.\` — z. B. Endpunkt des
   lokalen Modells nicht erreichbar, Local Worker nicht konfiguriert,
   \`agent.skipPermissions\` aus, Vorprüfung oder Worktree-Vorbereitung gescheitert.
@@ -132,7 +143,7 @@ Liegt im Ziel-Repo. **Du änderst sie nicht** (gesperrt, s. o.); fehlt etwas, sc
 dem User vor. Ungültige Einträge werden verworfen und als \`hinweise\` gemeldet.
 
 - \`testpfade\` — zusätzliche Pfade, in denen du Tests schreiben darfst. Gilt nur mit
-  Testmerkmal (\`test\`, \`spec\`, \`tests\`, \`__tests__\`), nie für reines \`/src/\`/\`/lib/\`.
+  Testmerkmal (\`test\`, \`spec\`, \`tests\`, \`__tests__\`, \`acceptance\`), nie für reines \`/src/\`/\`/lib/\`.
 - \`pflichtGates\` \`[{muster, befehl}]\` — ändert der Worker eine Datei, die auf \`muster\`
   passt, läuft \`befehl\` zusätzlich im Gate (z. B. Katalog-Wächter).
 - \`vorpruefung\` \`{befehl, erwartet}\` — läuft vor jedem Versuch (\`{projekt}\` wird ersetzt);
@@ -150,7 +161,7 @@ dem User vor. Ungültige Einträge werden verworfen und als \`hinweise\` gemelde
 ## Am Laufende
 
 Fasse \`lauf.json\` (Pfad steht in der GRÜN-Weckzeile und im Dispatch-Ergebnis) als
-Note zusammen: Häppchen, Versuche, abgenommen/eskaliert, Architektenfehler, Weckrufe.
+Note zusammen: Häppchen, Versuche, abgenommen/eskaliert, Architektenfehler, Läuferfehler, Weckrufe.
 `
 }
 

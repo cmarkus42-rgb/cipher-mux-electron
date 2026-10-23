@@ -98,3 +98,23 @@ describe('L16a rotGrund in der Bilanz', () => {
     assert.equal(buildBilanzZeile(lauf, 1, { ergebnis: 'uebernommen', kategorie: 'ui' }, { now: 'x', workspaceId: null, mitTest: true }).rotGrund, null)
   })
 })
+
+describe('Läuferfehler in der Bilanz', () => {
+  const mitLF: Lauf = { ...lauf, haeppchen: [{ ...lauf.haeppchen[0], laeuferfehler: 1, versuche: [
+    { ...lauf.haeppchen[0].versuche[0], verdict: 'laeuferfehler', fehler: 'git failed: index.lock' },
+    lauf.haeppchen[0].versuche[1],
+  ] }] }
+  it('zählt nicht als Anlauf; Anzahl und letzte Meldung stehen in Zeile und Note', () => {
+    const z = buildBilanzZeile(mitLF, 1, { ergebnis: 'uebernommen', kategorie: 'ui' }, { now: '2026-10-23T10:00:00Z', workspaceId: null, mitTest: true })
+    assert.equal(z.anlaeufe, 1)
+    assert.equal(z.laeuferfehler, 1)
+    assert.equal(z.laeuferfehlerMeldung, 'git failed: index.lock')
+    assert.match(renderBilanzNote([z]), /## Läuferfehler[\s\S]*1× — git failed: index\.lock/)
+  })
+  it('ohne Läuferfehler: 0, kein Abschnitt', () => {
+    const z = buildBilanzZeile(lauf, 1, { ergebnis: 'uebernommen', kategorie: 'ui' }, { now: 'x', workspaceId: null, mitTest: true })
+    assert.equal(z.laeuferfehler, 0)
+    assert.equal(z.laeuferfehlerMeldung, null)
+    assert.doesNotMatch(renderBilanzNote([z]), /## Läuferfehler/)
+  })
+})
