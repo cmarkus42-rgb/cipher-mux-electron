@@ -11,6 +11,9 @@ import {
   type HandoffError,
 } from '../../../src/main/mcp/handoff-kernel'
 import type { ToolContext } from '../../../src/main/mcp/mcp-tools'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import { OpenCodeAdapter } from '../../../src/main/agent/adapters/opencode'
 import type { SessionInfo, EntityId } from '../../../src/shared/types'
 
 // ─── Mock Helpers ──────────────────────────────────────────
@@ -36,6 +39,8 @@ interface MockCtxOpts {
   singleInstance?: boolean
   startEntityResult?: SessionInfo
   startEntityError?: string
+  /** Adapter je Session, wie ihn der SessionManager fuehrt. */
+  adapters?: Record<string, unknown>
 }
 
 function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[][]; sendKeyCalls: string[][]; messageBusCalls: any[]; visibleAddCalls: any[]; noteCreateCalls: any[] } {
@@ -80,6 +85,7 @@ function makeCtx(opts: MockCtxOpts = {}): ToolContext & { sendKeysCalls: string[
     },
     activeCount: () => sessions.filter(s => s.status === 'active').length,
     capture: async () => opts.captureOutput ?? '❯',
+    getAdapterForSession: (id: string) => opts.adapters?.[id],
     // Expose tmux for isBusy check
     tmux: {
       getPaneCommand: async () => opts.paneCommand ?? 'zsh',
@@ -167,6 +173,53 @@ describe('handoff-kernel: existing sessions are not assumed ready', () => {
 
     assert.equal(result.ok, true)
     assert.ok(ctx.sendKeysCalls.length > 0, 'a ready session must receive the payload')
+  })
+})
+
+// L18: Die Prompt-Erkennung kannte nur Claude Code. Eine opencode-Session an
+// ihrer Eingabe wurde als nicht bereit abgewiesen, gesendet wurde nichts.
+describe('handoff-kernel: Bereitschaft nach dem Adapter der Ziel-Session', () => {
+  const OPENCODE_IDLE = fs.readFileSync(
+    path.join(__dirname, '../../fixtures/panes/opencode-2-idle.txt'),
+    'utf-8',
+  )
+
+  it('sendet in eine opencode-Session, die an ihrer Eingabe steht', async () => {
+    const existing = makeSession({ id: 'sess-oc', entityId: 'local-worker', name: 'local-worker' })
+    const ctx = makeCtx({
+      sessions: [existing],
+      captureOutput: OPENCODE_IDLE,
+      adapters: { 'sess-oc': new OpenCodeAdapter() },
+    })
+
+    const result = await executeHandoff(ctx, {
+      targetEntityId: 'local-worker',
+      senderEntityId: 'test',
+      sessionName: 'local-worker',
+      payload: { text: 'hallo' },
+    })
+
+    assert.equal(result.ok, true, (result as HandoffError).error)
+    assert.ok(ctx.sendKeysCalls.length > 0)
+  })
+
+  it('nimmt fuer opencode nicht die Claude-Marker', async () => {
+    const existing = makeSession({ id: 'sess-oc', entityId: 'local-worker', name: 'local-worker' })
+    const ctx = makeCtx({
+      sessions: [existing],
+      captureOutput: 'cipher@mini ~ % ❯ ',
+      adapters: { 'sess-oc': new OpenCodeAdapter() },
+    })
+
+    const result = await executeHandoff(ctx, {
+      targetEntityId: 'local-worker',
+      senderEntityId: 'test',
+      sessionName: 'local-worker',
+      payload: { text: 'hallo' },
+    })
+
+    assert.equal(result.ok, false)
+    assert.equal(ctx.sendKeysCalls.length, 0)
   })
 })
 

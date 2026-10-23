@@ -55,6 +55,11 @@ export interface ReadinessOptions {
    */
   since: number
   delays?: number[]
+  /**
+   * Prompt markers of the target session's adapter. Absent = Claude Code's.
+   * How a CLI draws its input is the adapter's knowledge, not this loop's.
+   */
+  promptMarkers?: readonly string[]
 }
 
 /** Markers Claude Code draws when it is waiting for input. */
@@ -73,6 +78,7 @@ export async function waitForSessionReady(
 ): Promise<ReadinessResult> {
   const delays = opts.delays ?? DEFAULT_BACKOFF
   const sleep = probes.sleep ?? defaultSleep
+  const markers = opts.promptMarkers ?? PROMPT_MARKERS
   let attempts = 0
 
   for (const delay of delays) {
@@ -92,7 +98,7 @@ export async function waitForSessionReady(
 
     try {
       const captured = await probes.capturePane(sessionId)
-      if (PROMPT_MARKERS.some(marker => captured.includes(marker))) {
+      if (markers.some(marker => captured.includes(marker))) {
         return { ready: true, via: 'prompt', attempts }
       }
     } catch { /* pane not capturable this round */ }

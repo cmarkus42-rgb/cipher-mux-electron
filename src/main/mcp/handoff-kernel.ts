@@ -289,6 +289,7 @@ export async function executeHandoff(
       targetSession.id,
       {
         since: startedAt,
+        promptMarkers: ctx.sessionManager.getAdapterForSession(targetSession.id)?.promptMarkers,
         ...(wasExisting ? { delays: [250, 500, 1000] } : {}),
       },
     )
