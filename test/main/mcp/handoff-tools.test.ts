@@ -60,6 +60,8 @@ function makeCtx(opts: MockCtxOpts = {}) {
     },
     activeCount: () => sessions.filter(s => s.status === 'active').length,
     capture: async () => opts.captureOutput ?? '❯',
+    // Kein Adapter bekannt = Prompt-Marker von Claude Code, wie im Kernel.
+    getAdapterForSession: () => undefined,
     tmux: {
       getPaneCommand: async () => opts.paneCommand ?? 'zsh',
     },
