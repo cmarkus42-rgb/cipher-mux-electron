@@ -94,3 +94,27 @@ describe('validateAuftrag — geschuetzteTests kein Array (Final-Fix 3)', () => 
     assert.ok(validateAuftrag({ ...a, geschuetzteTests: undefined as never }, { testPflicht: false }).includes('geschuetzteTests: Liste erforderlich'))
   })
 })
+
+describe('L11 ersetzungen im Auftrag', () => {
+  it('gültige Ersetzungen → keine Fehler, fehlende Liste auch nicht', () => {
+    assert.deepEqual(validateAuftrag({ ...a, ersetzungen: [{ datei: 'src/login.ts', alt: 'x', neu: 'y' }] }), [])
+    assert.deepEqual(validateAuftrag({ ...a, ersetzungen: [{ datei: 'src/login.ts', alt: 'x', neu: '' }] }), [])
+  })
+  it('kaputte Einträge werden einzeln benannt', () => {
+    const errs = validateAuftrag({ ...a, ersetzungen: [{ datei: '', alt: 'x', neu: 'y' }, { datei: 'a', alt: '', neu: 'y' }, 'z' as never] })
+    assert.match(errs.join(), /ersetzungen\[0\]/)
+    assert.match(errs.join(), /ersetzungen\[1\]/)
+    assert.match(errs.join(), /ersetzungen\[2\]/)
+  })
+  it('keine Liste → Fehler', () => {
+    assert.match(validateAuftrag({ ...a, ersetzungen: 'x' as never }).join(), /ersetzungen: Liste/)
+  })
+  it('Datei außerhalb des Projekts → Fehler', () => {
+    assert.match(validateAuftrag({ ...a, ersetzungen: [{ datei: '../x.ts', alt: 'a', neu: 'b' }] }).join(), /außerhalb/)
+  })
+  it('AUFTRAG.md nennt die Ersetzungen', () => {
+    const md = buildAuftragMd({ ...a, ersetzungen: [{ datei: 'src/login.ts', alt: 'alt()', neu: 'neu()' }] }, { nummer: 1, versuch: 1 })
+    assert.match(md, /## Ersetzungen/)
+    assert.match(md, /src\/login\.ts.*alt\(\).*neu\(\)/)
+  })
+})

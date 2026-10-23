@@ -10,6 +10,7 @@
  */
 
 import { normalize } from 'path/posix'
+import { isTestPath } from '../session/entity-boundaries'
 
 export type GateVerdict = 'gruen' | 'rot' | 'haengt'
 
@@ -86,6 +87,16 @@ export function decideGate(input: GateInput): GateResult {
 }
 
 /**
+ * Weitere ROT-Gründe aus den Prüfungen des Läufers (Ersetzungen, Pflicht-Gates,
+ * verbotene Muster, Config-Schutz). Ein grünes Urteil wird rot; ein hängendes
+ * bleibt hängend, bekommt die Gründe aber mit.
+ */
+export function mitGruenden(gate: GateResult, gruende: readonly string[]): GateResult {
+  if (gruende.length === 0) return gate
+  return { verdict: gate.verdict === 'gruen' ? 'rot' : gate.verdict, reasons: [...gate.reasons, ...gruende] }
+}
+
+/**
  * Lagebild eines hängenden Workers (L8), aufgenommen VOR dem Stoppen — danach
  * ist die Pane weg. Was der Läufer nicht weiß, steht als null da, nicht geschätzt.
  */
@@ -131,4 +142,56 @@ export function readGateRecord(raw: unknown): GateRecord {
     warnungen: strings(g.warnungen),
     diagnose: d && typeof d === 'object' ? d as GateDiagnose : null,
   }
+}
+
+/** Eine wörtliche Ersetzung aus dem Auftrag (L11). */
+export interface Ersetzung {
+  datei: string
+  alt: string
+  neu: string
+}
+
+function vorkommen(text: string, teil: string): number {
+  if (!teil) return 0
+  let n = 0
+  for (let i = text.indexOf(teil); i !== -1; i = text.indexOf(teil, i + teil.length)) n++
+  return n
+}
+
+/**
+ * Prüft die Ersetzungen am Baum nach dem Worker (L11). Ein grüner Test sagt nicht,
+ * dass jede Fundstelle umgestellt ist — die Zählung schon. Enthält `neu` den Text
+ * `alt`, zählen die Vorkommen innerhalb von `neu` nicht als Rest.
+ */
+export function pruefeErsetzungen(ersetzungen: readonly Ersetzung[], lesen: (datei: string) => string | null): string[] {
+  const reasons: string[] = []
+  for (const e of ersetzungen) {
+    const inhalt = lesen(e.datei)
+    if (inhalt === null) {
+      reasons.push(`Ersetzung in ${e.datei}: Datei nicht lesbar.`)
+      continue
+    }
+    const rest = vorkommen(inhalt, e.alt) - vorkommen(e.neu, e.alt) * vorkommen(inhalt, e.neu)
+    if (rest > 0) reasons.push(`Ersetzung in ${e.datei}: „${e.alt}“ kommt noch ${rest}× vor.`)
+    if (e.neu && !inhalt.includes(e.neu)) reasons.push(`Ersetzung in ${e.datei}: „${e.neu}“ fehlt.`)
+  }
+  return reasons
+}
+
+/**
+ * Geänderte Dateien, die der Auftrag nicht nennt (L11): weder in `dateien` (ein
+ * Eintrag auf `/` gilt als Verzeichnis) noch geschützter Test noch Testpfad.
+ * Nur ein Hinweis — der Worker darf Hilfsdateien anlegen, der Architekt soll es sehen.
+ */
+export function diffAusserhalbAuftrag(
+  changed: readonly string[],
+  auftrag: { dateien: readonly string[]; prot: readonly string[]; testpfade: readonly string[] },
+): string[] {
+  const dateien = auftrag.dateien.map(norm)
+  const prot = new Set(auftrag.prot.map(norm))
+  return changed.map(norm).filter(f =>
+    !prot.has(f)
+    && !dateien.some(d => d === f || (d.endsWith('/') && f.startsWith(d)))
+    && !isTestPath(f, auftrag.testpfade),
+  )
 }

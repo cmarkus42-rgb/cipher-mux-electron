@@ -3,7 +3,11 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { ulid } from 'ulidx'
 import { validateAuftrag, buildAuftragMd, type AuftragInput } from './auftrag'
-import { decideGate, testWarnungen, readGateRecord, type GateResult, type GateRecord, type GateDiagnose } from './gate'
+import {
+  decideGate, testWarnungen, readGateRecord, mitGruenden, pruefeErsetzungen, diffAusserhalbAuftrag,
+  type GateResult, type GateRecord, type GateDiagnose,
+} from './gate'
+import { ladeProjektConfig, type ProjektConfig } from './projekt-config'
 import {
   newLauf, beginVersuch, endVersuch, countWeckruf, markAbgenommen, markBeurteilt,
   loadLauf, saveLauf, abortRunning, MAX_VERSUCHE, type Lauf,
@@ -105,6 +109,8 @@ interface Attempt {
   args: DispatchArgs; prot: string[]; base: string; branch: string; sumsBefore: Record<string, string>
   laufId: string; laufPfad: string; nummer: number; versuch: number
   vorherigesGate?: { reasons: string[]; testOutput: string }
+  /** Projekt-Config, gelesen VOR dem Worker — was er daran ändert, gilt für sein Gate nicht. */
+  config: ProjektConfig
 }
 
 export class LocalFactoryRunner {
@@ -278,6 +284,7 @@ export class LocalFactoryRunner {
 
     const projekt = args.projekt
     const prot = args.geschuetzteTests.map(t => toRepoRelative(projekt, t))
+    const { config } = ladeProjektConfig(projekt)
 
     // Offene Dateien dürfen nur die geschützten Tests sein — die committet der Läufer als Basis.
     const dirty = await dirtyFiles(projekt)
@@ -349,7 +356,7 @@ export class LocalFactoryRunner {
 
     this.running = this.runAttempt({
       args, prot, base, branch, sumsBefore, laufId, laufPfad,
-      nummer: begun.nummer, versuch: begun.versuch, vorherigesGate,
+      nummer: begun.nummer, versuch: begun.versuch, vorherigesGate, config,
     })
       .catch(err => this.wake(`${this.praefix} #${begun.nummer} Läuferfehler: ${String(err)}`).catch(() => {}))
       .finally(() => { this.release() })
@@ -428,27 +435,40 @@ export class LocalFactoryRunner {
     const branchJetzt = await currentBranch(projekt)
     const branchGewechselt = branchJetzt !== a.branch
 
-    const test = state === 'fertig' && !branchGewechselt
+    const pruefen = state === 'fertig' && !branchGewechselt
+    const test = pruefen
       ? await runShell(a.args.testBefehl, projekt, this.o.testTimeoutMs)
       : { exitCode: null, output: '' }
+    const changed = branchGewechselt ? [] : await changedSince(projekt, a.base)
+    const zusatz: string[] = []
+    const warnungen = testWarnungen(test.output)
+    if (pruefen) {
+      zusatz.push(...pruefeErsetzungen(a.args.ersetzungen ?? [], datei => {
+        try { return fs.readFileSync(path.join(projekt, datei), 'utf-8') } catch { return null }
+      }))
+      const fremd = diffAusserhalbAuftrag(changed, {
+        dateien: [...a.args.dateien, ...(a.args.ersetzungen ?? []).map(e => e.datei)],
+        prot: a.prot, testpfade: a.config.testpfade,
+      })
+      if (fremd.length) warnungen.push(`Diff außerhalb des Auftrags: ${fremd.join(', ')}`)
+    }
     const gate: GateResult = branchGewechselt
       ? {
           verdict: 'rot',
           reasons: [`Worker hat den Branch gewechselt (${a.branch} → ${branchJetzt}). Nichts zurückgesetzt — Baum von Hand prüfen.`],
         }
-      : decideGate({
+      : mitGruenden(decideGate({
           workerFinished: state === 'fertig',
           testExitCode: test.exitCode,
           checksumsBefore: a.sumsBefore,
           checksumsAfter: checksums(projekt, a.prot),
-          changedFiles: await changedSince(projekt, a.base),
+          changedFiles: changed,
           protectedFiles: a.prot,
           testPflicht: this.testPflicht,
-        })
+        }), zusatz)
 
     const dir = path.dirname(a.laufPfad)
     const gatePfad = path.join(dir, `gate-${a.nummer}-${a.versuch}.json`)
-    const warnungen = testWarnungen(test.output)
     const record: GateRecord = { ...gate, testOutput: test.output, warnungen, ...(diagnose ? { diagnose } : {}) }
     fs.writeFileSync(gatePfad, JSON.stringify(record, null, 2), 'utf-8')
 

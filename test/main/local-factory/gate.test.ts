@@ -1,6 +1,8 @@
 import { describe, it } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { decideGate, touchedProtected, testWarnungen, readGateRecord } from '../../../src/main/local-factory/gate'
+import {
+  decideGate, touchedProtected, testWarnungen, readGateRecord, pruefeErsetzungen, diffAusserhalbAuftrag,
+} from '../../../src/main/local-factory/gate'
 
 const base = {
   workerFinished: true,
@@ -139,5 +141,46 @@ describe('readGateRecord (alte Gates)', () => {
   it('Diagnose bleibt erhalten', () => {
     const diagnose = { laufzeitSek: 12, tokens: null, letzteAktivitaet: null, paneTail: ['a'] }
     assert.deepEqual(readGateRecord({ verdict: 'haengt', reasons: [], testOutput: '', diagnose }).diagnose, diagnose)
+  })
+})
+
+describe('L11 Ersetzungen', () => {
+  const datei = (inhalt: string | null) => () => inhalt
+  it('alt weg, neu da → kein Grund', () => {
+    assert.deepEqual(pruefeErsetzungen([{ datei: 'a.ts', alt: 'foo', neu: 'bar' }], datei('x bar y')), [])
+  })
+  it('alt noch da → ROT-Grund mit Datei und Anzahl', () => {
+    const r = pruefeErsetzungen([{ datei: 'a.ts', alt: 'foo', neu: 'bar' }], datei('bar foo foo'))
+    assert.equal(r.length, 1)
+    assert.match(r[0], /a\.ts/)
+    assert.match(r[0], /„foo“ kommt noch 2× vor/)
+  })
+  it('neu fehlt → ROT-Grund', () => {
+    const r = pruefeErsetzungen([{ datei: 'a.ts', alt: 'foo', neu: 'bar' }], datei('nichts'))
+    assert.match(r.join(), /„bar“ fehlt/)
+  })
+  it('neu enthält alt: Vorkommen werden verrechnet', () => {
+    const e = [{ datei: 'a.ts', alt: 'foo', neu: 'foo()' }]
+    assert.deepEqual(pruefeErsetzungen(e, datei('x foo() y foo()')), [])
+    assert.match(pruefeErsetzungen(e, datei('foo foo()')).join(), /kommt noch 1× vor/)
+  })
+  it('Datei fehlt → ROT-Grund', () => {
+    assert.match(pruefeErsetzungen([{ datei: 'weg.ts', alt: 'a', neu: 'b' }], datei(null)).join(), /weg\.ts.*nicht lesbar/)
+  })
+  it('leeres neu (Löschung) prüft nur alt', () => {
+    assert.deepEqual(pruefeErsetzungen([{ datei: 'a.ts', alt: 'foo', neu: '' }], datei('bar')), [])
+  })
+})
+
+describe('L11 Diff außerhalb des Auftrags', () => {
+  it('meldet nur Dateien, die weder Auftrag noch geschützter Test noch Testpfad sind', () => {
+    const w = diffAusserhalbAuftrag(
+      ['impl.txt', 'andere.txt', 'test/accept.sh', 'src/x.test.ts', 'e2e-tests/fall.py', 'lib/b.ts'],
+      { dateien: ['impl.txt', 'lib/'], prot: ['test/accept.sh'], testpfade: ['e2e-tests/'] },
+    )
+    assert.deepEqual(w, ['andere.txt'])
+  })
+  it('alles im Auftrag → leer', () => {
+    assert.deepEqual(diffAusserhalbAuftrag(['./impl.txt'], { dateien: ['impl.txt'], prot: [], testpfade: [] }), [])
   })
 })

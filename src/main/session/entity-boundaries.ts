@@ -465,10 +465,11 @@ interface BoundaryDecisionFns {
   boundaryNormalizeCommand(command: string): string
   boundaryDecidePath(filePath: unknown, rules: BoundaryRules, io: BoundaryIo): BoundaryDecision
   boundaryDecideCommand(command: unknown, rules: BoundaryRules): BoundaryDecision
+  boundaryTestPathMatches(entry: string, rel: string): boolean
 }
 
 const shared = new Function(`${BOUNDARY_DECISION_SOURCE}
-return { boundaryGlobMatch, boundaryCheckTestPaths, boundaryNormalizeCommand, boundaryDecidePath, boundaryDecideCommand }`,
+return { boundaryGlobMatch, boundaryCheckTestPaths, boundaryNormalizeCommand, boundaryDecidePath, boundaryDecideCommand, boundaryTestPathMatches }`,
 )() as BoundaryDecisionFns
 
 const nodeIo: BoundaryIo = {
@@ -493,6 +494,17 @@ export function decideBoundaryCommand(command: string | null | undefined, rules:
 /** Der Befehl so, wie die Befehlssperre ihn sieht. */
 export function normalizeBoundaryCommand(command: string): string {
   return shared.boundaryNormalizeCommand(command)
+}
+
+/**
+ * Ist dieser repo-relative Pfad ein Test? Dieselben Merkmale wie die Ausnahmen der
+ * Codesperre, plus die angenommenen `testpfade` der Projekt-Config.
+ */
+export function isTestPath(relPath: string, testpfade: readonly string[] = []): boolean {
+  const rel = '/' + relPath.replace(/^\.?\/+/, '')
+  const base = rel.slice(rel.lastIndexOf('/') + 1)
+  if (TEST_PATH_MARKERS.some(p => (p.includes('/') ? rel.includes(p) : base.includes(p)))) return true
+  return checkTestPaths([...testpfade]).accepted.some(e => shared.boundaryTestPathMatches(e, rel))
 }
 
 /** `testpfade` pruefen: angenommen wird nur, was ein Testmerkmal traegt. Wirft nie. */
