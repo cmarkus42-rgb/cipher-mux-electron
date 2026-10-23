@@ -159,20 +159,19 @@ describe('local-factory v2 — kein Widerspruch zur Werkzeugbeschreibung', () =>
 describe('local-factory v3 — Läuferfehler', () => {
   const beschreibung = buildDispatchDescription('local-factory')
 
-  it('Rollentext: Weckzeile LÄUFERFEHLER, Arbeit liegt im Worktree, Retry-Feld laeuferfehler mit eigenem Deckel', () => {
+  it('Rollentext: Weckzeile LÄUFERFEHLER, zählt nicht, einfach erneut dispatchen, nach 2 je Häppchen eskaliert', () => {
     assert.match(p, /`\[local-factory\] #N „ziel“: LÄUFERFEHLER/)
     assert.match(p, /ungesichert im Worktree/)
-    assert.match(p, /`laeuferfehler`/)
-    assert.match(p, /zählt nicht gegen die 2 Versuche/)
-    assert.match(p, /unabhängig vom Architektenfehler/)
-    assert.match(p, /HÄNGT[^\n]*grün/)
-    assert.match(p, /zweiter Läuferfehler[^\n]*eskaliert/i)
+    assert.match(p, /Läuferfehler zählen nicht/)
+    assert.match(p, /einfach erneut dispatchen/)
+    assert.match(p, /nach 2 je Häppchen eskaliert/)
+    assert.doesNotMatch(p, /`laeuferfehler`/)
   })
 
-  it('Beschreibung: laeuferfehler, Deckel 1, nicht gezählt, auch nach HÄNGT mit grünem Gate', () => {
-    assert.match(beschreibung, /laeuferfehler: "<reason>"/)
-    assert.match(beschreibung, /does not count against the 2 attempts, once per item, independent of architektenfehler/)
-    assert.match(beschreibung, /green gate/)
-    assert.match(beschreibung, /second runner failure escalates/)
+  it('Beschreibung: runner failure does not count, dispatch again, escalates after 2 per item', () => {
+    assert.match(beschreibung, /LÄUFERFEHLER/)
+    assert.match(beschreibung, /does not count against the 2 attempts; just dispatch again/)
+    assert.match(beschreibung, /third runner failure in an item escalates/)
+    assert.doesNotMatch(beschreibung, /laeuferfehler:/)
   })
 })

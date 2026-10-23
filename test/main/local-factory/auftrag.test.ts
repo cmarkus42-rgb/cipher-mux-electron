@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { validateAuftrag, validateDispatchSteuerung, buildAuftragMd, MAX_GATE_OUTPUT_CHARS } from '../../../src/main/local-factory/auftrag'
+import { validateAuftrag, buildAuftragMd, MAX_GATE_OUTPUT_CHARS } from '../../../src/main/local-factory/auftrag'
 
 const a = {
   projekt: '/abs/projekt',
@@ -119,13 +119,3 @@ describe('L11 ersetzungen im Auftrag', () => {
   })
 })
 
-describe('Steuerfeld laeuferfehler', () => {
-  it('braucht eine Begründung und haeppchen', () => {
-    assert.deepEqual(validateDispatchSteuerung({ haeppchen: 1, laeuferfehler: 'Commit scheiterte' }), [])
-    assert.match(validateDispatchSteuerung({ haeppchen: 1, laeuferfehler: '  ' }).join(), /laeuferfehler: Begründung erforderlich/)
-    assert.match(validateDispatchSteuerung({ laeuferfehler: 'x' }).join(), /laeuferfehler braucht haeppchen/)
-  })
-  it('schließt architektenfehler aus — ein Versuch hat genau eine Ursache', () => {
-    assert.match(validateDispatchSteuerung({ haeppchen: 1, laeuferfehler: 'x', architektenfehler: 'y' }).join(), /schließen sich aus/)
-  })
-})

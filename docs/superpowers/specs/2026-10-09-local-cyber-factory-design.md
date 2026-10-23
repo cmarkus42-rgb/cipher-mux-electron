@@ -178,8 +178,20 @@ Aus dem Betrieb an projekt-a (LESSONS L1–L20, Wellenplan „Local Factory Här
 |---|---|
 | `ersetzungen` `[{datei, alt, neu}]` | Gate ROT, wenn `alt` noch in `datei` steht oder `neu` fehlt (L11). Dazu Warnung „Diff außerhalb des Auftrags“ bei Änderungen außerhalb von `dateien` |
 | `architektenfehler` `"<Begründung>"` | Nur beim Retry (gleiche `laufId` + `haeppchen`): der letzte Fehlversuch war ein Fehler des Architekten. Zählt nicht gegen die 2 Versuche, eigens in `lauf.json` und Bilanz, **einmal je Häppchen**, auch nach Eskalation (L12) |
-| `laeuferfehler` `"<Begründung>"` | Nur beim Retry: der letzte Versuch scheiterte am Läufer, nicht am Worker (Ausgang `laeuferfehler`, oder Altfall: `haengt` mit grünem Gate). Zählt nicht gegen die 2 Versuche, eigens in `lauf.json`, Bilanz und Weckzeile, **einmal je Häppchen** — unabhängig vom Deckel für `architektenfehler`, auch nach Eskalation. Ein zweiter Läuferfehler im selben Häppchen eskaliert es. Schließt `architektenfehler` aus (Live-Test 23.10.) |
 | `rotGrund` `"<Begründung>"` | Übersteuert die Ablehnung „Abnahmetest rot, vermutlich aus einem Fehler im Test selbst“. **Nicht** möglich, wenn ein Test-Hilfsobjekt fehlt (`globalThis.*`, Bezeichner mit führendem `__`) (L16a) |
+
+**Läuferfehler** (Live-Test 23.10., User-Entscheid). Bricht der Läufer selbst ab, endet der
+Versuch im Ausgang `laeuferfehler` und zählt **automatisch nicht** gegen die 2 Versuche — kein
+Feld, der Architekt dispatcht einfach erneut mit derselben `laufId`/`haeppchen`. **Deckel 2 je
+Häppchen:** der 3. Läuferfehler eskaliert das Häppchen (Weckzeile endet auf „— ESKALIERT, an den
+User melden“, Hinweis „wiederholter Läuferfehler“). Ein `haengt` mit grünem Gate (Altfall vor
+diesem Ausgang) wird beim erneuten Dispatch zum Läuferfehler. `lauf.json` (Feld `laeuferfehler`
+je Häppchen, `fehler` je Versuch), Bilanz und Weckzeile weisen die Anzahl eigens aus.
+
+**Transparenz im Gate:** `gate-<n>-<v>.json` führt `pruefungen: [{art, ergebnis, detail?}]` —
+`vorpruefung`, `worktreeVorbereitung`, `pflichtGates` (je Eintrag), `verboteneMuster`,
+`ersetzungen`, `configSchutz`; Ergebnis `bestanden` / `rot` / `uebersprungen` /
+`nicht-konfiguriert` / `nicht-ausgeloest`. Auch bei GRÜN. Alte Gates ohne das Feld bleiben lesbar.
 
 **Projekt-Config `.cipher-mux/local-factory.json`** im Ziel-Repo. Pflegen nur User oder
 Systems-Session; für Architekt und Worker liegt sie unter der Edit-Sperre, eine Änderung durch
@@ -215,7 +227,7 @@ nie geworfen.
 | `verboteneMuster` | Regex auf hinzugefügte Diff-Zeilen in Dateien auf `pfad`; Treffer = ROT mit `grund` (L16b) |
 
 **Rollentext `local-factory-v3`.** Der Architekten-Rollentext trägt seit dieser Welle einen
-Versionsmarker und steht in `PRESET_TEMPLATES` (v3: Läuferfehler und Feld `laeuferfehler`). Eine ältere `preset.md` (ohne Marker) zeigt im
+Versionsmarker und steht in `PRESET_TEMPLATES` (v3: Läuferfehler zählen nicht, Deckel 2 je Häppchen). Eine ältere `preset.md` (ohne Marker) zeigt im
 Preset-Editor den Rückstand; übernommen wird nur per Knopf, mit Sicherung daneben.
 
 **Zustellung unter opencode.** Im Run-Verzeichnis einer Rolle schreibt der Mux den vollen
@@ -244,7 +256,7 @@ Kontextnutzung sind eine Näherung — genug für einen Trend, kein Euro-Betrag.
 |---|---|
 | Endpunkt nicht erreichbar | Vorprüfung schlägt fehl, Wecken mit „Endpunkt weg“, kein Versuch gezählt |
 | Worker hängt / Timeout | Session beenden, Patch sichern, Reset, zählt als Fehlversuch „hängt“ |
-| Läufer bricht selbst ab (Exception, z. B. git-Fehler beim Commit) | Ausgang `laeuferfehler`, nicht „hängt“. Nach dem Gate: Arbeit bleibt im Worktree, Patch daneben, Vermerk `laeuferfehler` im Gate; davor: Patch und Reset. Weckzeile `LÄUFERFEHLER`. Retry mit `laeuferfehler` zählt nicht (Deckel 1 je Häppchen). Ein Retry braucht einen sauberen Baum |
+| Läufer bricht selbst ab (Exception, z. B. git-Fehler beim Commit) | Ausgang `laeuferfehler`, nicht „hängt“. Nach dem Gate: Arbeit bleibt im Worktree, Patch daneben, Vermerk `laeuferfehler` im Gate; davor: Patch und Reset. Weckzeile `LÄUFERFEHLER`. Zählt nicht, erneut dispatchen; der 3. je Häppchen eskaliert. Ein erneuter Dispatch braucht einen sauberen Baum. Bricht er nach ROT/HÄNGT beim Aufräumen ab, bleibt der Ausgang ROT/HÄNGT (gezählt) |
 | Abgeschnittene Ausgabe | erscheint als kaputter Edit, Gate rot, Versuch gezählt |
 | Baum beim Dispatch nicht sauber | Ablehnung mit Begründung |
 | Abnahmetest vor der Arbeit grün | Ablehnung: der Test prüft nichts |

@@ -10,7 +10,7 @@ import {
 import { ladeProjektConfig, passtGlob, PROJEKT_CONFIG_PFAD, type ProjektConfig } from './projekt-config'
 import {
   newLauf, beginVersuch, endVersuch, countWeckruf, markAbgenommen, markBeurteilt,
-  loadLauf, saveLauf, abortRunning, zaehlendeVersuche, MAX_VERSUCHE, type Lauf,
+  loadLauf, saveLauf, abortRunning, zaehlendeVersuche, MAX_VERSUCHE, MAX_LAEUFERFEHLER, type Lauf,
 } from './lauf'
 import { classifyWorker, IDLE_SIGNAL_FILENAME } from './worker-done'
 import {
@@ -84,8 +84,6 @@ export interface DispatchArgs extends AuftragInput {
   profil?: string
   /** L12: Der letzte Fehlversuch dieses Häppchens war ein Fehler des Architekten — Begründung. */
   architektenfehler?: string
-  /** Der letzte Fehlversuch dieses Häppchens war ein Absturz des Läufers — Begründung. */
-  laeuferfehler?: string
   /** L16a: Begründung, warum das Vorab-Rot des Abnahmetests trotz Fehler im Testcode richtig ist. */
   rotGrund?: string
 }
@@ -408,10 +406,9 @@ export class LocalFactoryRunner {
 
     const laufId = args.laufId ?? ulid()
     const laufPfad = this.laufFile(laufId)
-    const letzterGateGruen = args.laeuferfehler !== undefined && args.haeppchen !== undefined
-      ? this.gateWarGruen(laufPfad, args.haeppchen)
-      : false
-    const steuerung = { architektenfehler: args.architektenfehler, laeuferfehler: args.laeuferfehler, letzterGateGruen }
+    // Altfall lf-live: ein „haengt“, dessen Gate GRÜN war, wird zum Läuferfehler (zählt nicht).
+    const letzterGateGruen = args.haeppchen !== undefined ? this.gateWarGruen(laufPfad, args.haeppchen) : false
+    const steuerung = { architektenfehler: args.architektenfehler, letzterGateGruen }
     let lauf0: Lauf = loadLauf(laufPfad) ?? newLauf(laufId, projekt, this.o.now(), branchJetzt)
     // Läufe aus älteren Fassungen tragen keinen Branch: ab jetzt gilt der aktuelle.
     if (!lauf0.branch) lauf0 = { ...lauf0, branch: branchJetzt }
@@ -447,8 +444,10 @@ export class LocalFactoryRunner {
     // Vorheriges Gate für einen zweiten Versuch — aus der Datei, nicht vom Architekten.
     // Nach einem Architektenfehler nicht: der Worker scheiterte an einem falschen Auftrag.
     // Nach einem Läuferfehler auch nicht: der Worker ist gar nicht gescheitert.
-    const prevV = args.haeppchen !== undefined && args.architektenfehler === undefined && args.laeuferfehler === undefined
-      ? lauf0.haeppchen.find(h => h.nummer === begun.nummer)?.versuche.at(-1)
+    const letzterV = lauf0.haeppchen.find(h => h.nummer === begun.nummer)?.versuche.at(-1)
+    const prevV = args.haeppchen !== undefined && args.architektenfehler === undefined
+      && letzterV?.verdict !== 'laeuferfehler' && !letzterGateGruen
+      ? letzterV
       : undefined
     let vorherigesGate: { reasons: string[]; testOutput: string } | undefined
     if (prevV?.gatePfad) {
@@ -552,14 +551,17 @@ export class LocalFactoryRunner {
         + ` — danach Läuferfehler beim Aufräumen: ${oneLine(meldung, 140)} — ${baum}`)
       return
     }
-    // Zweiter Läuferfehler: der Versuch davor trägt schon die Markierung, der Deckel ist verbraucht.
-    const zweiter = !!h?.versuche.slice(0, -1).some(v => v.laeuferfehler)
-    await this.wake(`${this.kopf(a)}: LÄUFERFEHLER, ${this.zahl(h, a.versuch)}`
+    // Über dem Deckel eskaliert das Häppchen (lauf.ts); die Zeile muss darauf enden.
+    const k = h?.laeuferfehler ?? 1
+    const eskaliert = k > MAX_LAEUFERFEHLER
+    const schluss = eskaliert ? ` — wiederholter Läuferfehler (${k}×) — ESKALIERT, an den User melden` : ' — einfach erneut dispatchen'
+    // Wo die Arbeit liegt, steht vor der Meldung: gekappt wird zuerst der Fehlertext.
+    const rumpf = `${this.kopf(a)}: LÄUFERFEHLER ${eskaliert ? `(${k}. im Häppchen)` : `${k}/${MAX_LAEUFERFEHLER}, zählt nicht`}`
       + (started.gatePfad ? `, Gate: ${started.gatePfad}` : '')
-      + (zweiter ? ' — zweiter Läuferfehler im Häppchen, ESKALIERT, an den User melden' : '')
-      + ` — Läuferfehler: ${oneLine(meldung, 140)} — ${baum}`
-      + (patchPfad ? `, Patch: ${path.basename(patchPfad)} daneben` : '')
-      + (zweiter ? '' : ' — Retry mit laeuferfehler: "<Begründung>" zählt nicht'))
+      + ` — ${baum}` + (patchPfad ? `, Patch: ${path.basename(patchPfad)} daneben` : '')
+      + ` — Läuferfehler: ${meldung}`
+    // Gekappt wird der Rumpf, nie der Schluss: die Eskalation darf nicht abgeschnitten werden.
+    await this.wake(oneLine(rumpf, MAX_WECKZEILE - schluss.length) + schluss)
   }
 
   /** ziel gekappt, damit Gate- bzw. Laufpfad am Ende der Zeile nicht abgeschnitten wird. */
@@ -571,7 +573,7 @@ export class LocalFactoryRunner {
   private zahl(h: Lauf['haeppchen'][number] | undefined, versuch: number): string {
     if (!h) return `Versuch ${versuch}/${MAX_VERSUCHE}`
     const af = h.versuche.filter(v => v.architektenfehler).length
-    const lf = h.versuche.filter(v => v.laeuferfehler).length
+    const lf = h.versuche.filter(v => v.verdict === 'laeuferfehler').length
     const nicht = [af ? `${af} Architektenfehler` : '', lf ? `${lf} Läuferfehler` : ''].filter(Boolean).join(', ')
     return `Versuch ${zaehlendeVersuche(h)}/${MAX_VERSUCHE}` + (nicht ? ` (${nicht} nicht gezählt)` : '')
   }

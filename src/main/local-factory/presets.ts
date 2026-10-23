@@ -92,14 +92,13 @@ lokale Modell kann, wäre danach wertlos (Spec E3).
    zählt nicht gegen die 2 Versuche und geht eigens in die Bilanz. Das geht
    **einmal je Häppchen**, auch nach der Eskalation. Nur bei eigenem Fehler — nie,
    um dem Modell einen dritten Versuch zu geben.
-   **LÄUFERFEHLER:** Der Mux selbst ist gescheitert, nicht der Worker. Hinter dem Gate
-   bleibt die Arbeit des Workers ungesichert im Worktree liegen (Patch daneben im
-   Laufverzeichnis); davor ist der Baum auf die Basis zurückgesetzt. Lass den Baum vom
-   User säubern bzw. sichten, dann Retry mit \`laeuferfehler\` (\`"<Begründung>"\`).
-   Der Versuch zählt nicht gegen die 2 Versuche und geht eigens in \`lauf.json\` und
-   Bilanz — **einmal je Häppchen**, unabhängig vom Architektenfehler, auch nach der
-   Eskalation. Erlaubt nach LÄUFERFEHLER und nach einem HÄNGT, dessen Gate grün ist
-   (Altfall). Ein zweiter Läuferfehler im selben Häppchen eskaliert es: an den User melden.
+   **LÄUFERFEHLER:** Der Mux selbst ist gescheitert, nicht der Worker.
+   Läuferfehler zählen nicht — einfach erneut dispatchen (dieselbe \`laufId\` und
+   \`haeppchen\`, kein Zusatzfeld).
+   Nach einem grünen Gate liegt die Arbeit des Workers ungesichert im Worktree (Patch
+   daneben im Laufverzeichnis): den Baum vorher vom User sichten bzw. säubern lassen.
+   Der Läufer zählt sie je Häppchen; nach 2 je Häppchen eskaliert der Läufer beim
+   nächsten: an den User melden. Ein HÄNGT, dessen Gate grün war, zählt ebenso (Altfall).
 7. **Maximal 2 Versuche.** Danach lehnt das Werkzeug ab und das Häppchen ist
    eskaliert: Melde es dem User mit Gate-Pfad und deiner Einschätzung.
 
@@ -113,7 +112,8 @@ lokale Modell kann, wäre danach wertlos (Spec E3).
   bevor du weitermachst. \`— Warnung: …\` am Ende ändert das Urteil nicht, lies sie trotzdem.
 - \`[local-factory] #N „ziel“: LÄUFERFEHLER, Versuch V/2, Gate: <pfad> — Läuferfehler: <fehler> — <Baum>\`
   — der Mux selbst ist gescheitert, nicht der Worker. \`<Baum>\` sagt, wo die Arbeit
-  liegt (ungesichert im Worktree oder zurückgesetzt). Weiter wie in Schritt 6.
+  liegt (ungesichert im Worktree oder zurückgesetzt). Weiter wie in Schritt 6; endet sie
+  auf \`— ESKALIERT, an den User melden\` (wiederholter Läuferfehler), an den User melden.
 - \`[local-factory] #N Läuferfehler: <fehler>\` — Fehler, nachdem der Versuch schon
   entschieden war (z. B. beim Wecken). Baum prüfen (\`git status\`), dem User melden.
 - \`[local-factory] Nicht bereit: <grund> — kein Versuch gezählt.\` — z. B. Endpunkt des

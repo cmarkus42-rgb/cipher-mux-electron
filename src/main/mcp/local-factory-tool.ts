@@ -57,10 +57,10 @@ export function buildDispatchDescription(rolle: RunnerRolle): string {
     + 'Optional: ersetzungen [{datei, alt, neu}] — the gate turns red if alt is still in datei or neu is missing. '
     + 'architektenfehler: "<reason>" on a retry (same laufId + haeppchen) marks the last failed attempt as your mistake '
     + '(wrong cut or test); it does not count against the 2 attempts, works once per item, also after escalation. '
-    + 'laeuferfehler: "<reason>" on a retry marks the last attempt as a runner failure (wake line LÄUFERFEHLER — the mux '
-    + 'itself broke, e.g. git failed at the commit; the worker change stays in the worktree, a patch lies next to the gate), '
-    + 'or a HÄNGT with a green gate file (old case); it does not count against the 2 attempts, once per item, independent of architektenfehler, '
-    + 'also after escalation; a second runner failure escalates the item. The worktree must be clean again before the retry. '
+    + 'A runner failure (wake line LÄUFERFEHLER — the mux itself broke, e.g. git failed at the commit; after a green gate '
+    + 'the worker change stays in the worktree, a patch lies next to the gate) does not count against the 2 attempts; '
+    + 'just dispatch again (same laufId + haeppchen, no extra field) once the worktree is clean. A HÄNGT whose gate file is '
+    + 'green counts the same way (old case). The third runner failure in an item escalates it. '
     + 'rotGrund: "<reason>" overrides the refusal when the acceptance test is red from an error in the test file itself '
     + '(not possible when a test helper such as globalThis.x or __x is missing). '
     + 'The target repo may carry .cipher-mux/local-factory.json (yours, the worker may not change it): '
@@ -92,8 +92,6 @@ export const DISPATCH_INPUT_SCHEMA = {
     .describe('Dispatch: literal replacements the gate counts after the worker (repo-relative datei)'),
   architektenfehler: z.string().optional()
     .describe('Retry only: reason why the last failed attempt was your mistake; not counted, once per item'),
-  laeuferfehler: z.string().optional()
-    .describe('Retry only: reason why the last attempt failed in the runner, not the worker; not counted, once per item'),
   rotGrund: z.string().optional()
     .describe('Dispatch: reason why the acceptance test is rightly red despite an error located in the test file'),
 }

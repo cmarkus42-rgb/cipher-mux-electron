@@ -10,7 +10,7 @@ import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
 import { LocalFactoryRunner, type WorkerHost, type RunnerRolle } from '../../../src/main/local-factory/runner'
-import { loadLauf } from '../../../src/main/local-factory/lauf'
+import { loadLauf, zaehlendeVersuche } from '../../../src/main/local-factory/lauf'
 import { IDLE_SIGNAL_FILENAME } from '../../../src/main/local-factory/worker-done'
 
 let repo: string
@@ -147,7 +147,8 @@ describe('Läuferfehler: eigener Ausgang statt „haengt“', () => {
     assert.match(g.laeuferfehler.meldung, /index\.lock/)
     assert.match(g.laeuferfehler.baum, /ungesichert im Worktree/)
     assert.equal(host.wakes.length, 1)
-    assert.match(host.wakes[0], /#1 „impl sagt ok“: LÄUFERFEHLER, Versuch 1\/2/)
+    assert.match(host.wakes[0], /#1 „impl sagt ok“: LÄUFERFEHLER 1\/2, zählt nicht/)
+    assert.match(host.wakes[0], /einfach erneut dispatchen/)
     assert.match(host.wakes[0], /Worker-Änderung liegt ungesichert im Worktree/)
     assert.match(host.wakes[0], /Läuferfehler: git failed/)
     assert.doesNotMatch(host.wakes[0], /HÄNGT/)
@@ -167,14 +168,14 @@ describe('Läuferfehler: eigener Ausgang statt „haengt“', () => {
   it('Retry ohne sauberen Baum: die Ablehnung nennt den Läuferfehler und den Patch', async () => {
     const res = await lauf(runner(fakeHost()), { ...args(), testBefehl: SPERRT_COMMIT })
     fs.rmSync(path.join(repo, '.git', 'index.lock'))
-    const r2 = await lauf(runner(fakeHost()), { ...args(), laufId: res.laufId, haeppchen: 1, laeuferfehler: 'index.lock' })
+    const r2 = await lauf(runner(fakeHost()), { ...args(), laufId: res.laufId, haeppchen: 1 })
     assert.equal(r2.ok, false)
     assert.match(r2.error!, /nicht sauber.*impl\.txt/)
     assert.match(r2.error!, /Läuferfehler in Versuch #1\.1.*versuch-1-1\.patch/)
   })
 })
 
-describe('Retry-Feld laeuferfehler im Läufer', () => {
+describe('Erneuter Dispatch nach Läuferfehler — ohne Feld, nicht gezählt, Deckel 2', () => {
   const aufraeumen = () => {
     fs.rmSync(path.join(repo, '.git', 'index.lock'), { force: true })
     git('reset', '-q', '--hard'); git('clean', '-fdq')
@@ -184,47 +185,55 @@ describe('Retry-Feld laeuferfehler im Läufer', () => {
     const res = await lauf(runner(fakeHost()), { ...args(), testBefehl: SPERRT_COMMIT })
     aufraeumen()
     const gut = fakeHost()
-    const r2 = await lauf(runner(gut), { ...args(), laufId: res.laufId, haeppchen: 1, laeuferfehler: 'Commit scheiterte an index.lock' })
+    const r2 = await lauf(runner(gut), { ...args(), laufId: res.laufId, haeppchen: 1 })
     assert.equal(r2.ok, true, r2.error)
     assert.equal(r2.versuch, 2)
     assert.match(gut.wakes[0], /GRÜN, Versuch 1\/2 \(1 Läuferfehler nicht gezählt\)/)
-    assert.equal(loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0].laeuferfehler, 'Commit scheiterte an index.lock')
+    const h = loadLauf(res.laufPfad!)!.haeppchen[0]
+    assert.equal(h.laeuferfehler, 1)
+    assert.equal(zaehlendeVersuche(h), 1)
     const auftrag = fs.readFileSync(gut.sent[0].match(/\S+AUFTRAG\.md/)![0], 'utf-8')
     assert.doesNotMatch(auftrag, /vorige Versuch ist durchgefallen/)
   })
 
-  it('zweiter Läuferfehler im selben Häppchen → ESKALIERT, weiteres Markieren abgelehnt', async () => {
+  it('der dritte Läuferfehler im Häppchen eskaliert: Weckzeile endet auf ESKALIERT, weiterer Dispatch abgelehnt', async () => {
     const res = await lauf(runner(fakeHost()), { ...args(), testBefehl: SPERRT_COMMIT })
     aufraeumen()
-    const host = fakeHost()
-    await lauf(runner(host), { ...args(), testBefehl: SPERRT_COMMIT, laufId: res.laufId, haeppchen: 1, laeuferfehler: 'eins' })
-    assert.match(host.wakes[0], /LÄUFERFEHLER.*zweiter Läuferfehler.*ESKALIERT, an den User melden/)
+    const zweiter = fakeHost()
+    await lauf(runner(zweiter), { ...args(), testBefehl: SPERRT_COMMIT, laufId: res.laufId, haeppchen: 1 })
+    assert.match(zweiter.wakes[0], /LÄUFERFEHLER 2\/2, zählt nicht/)
+    aufraeumen()
+    const dritter = fakeHost()
+    await lauf(runner(dritter), { ...args(), testBefehl: SPERRT_COMMIT, laufId: res.laufId, haeppchen: 1 })
+    assert.match(dritter.wakes[0], /wiederholter Läuferfehler/)
+    assert.match(dritter.wakes[0], /— ESKALIERT, an den User melden$/)
+    assert.ok(dritter.wakes[0].length <= 400)
     assert.equal(loadLauf(res.laufPfad!)!.haeppchen[0].status, 'eskaliert')
     aufraeumen()
-    const r3 = await lauf(runner(fakeHost()), { ...args(), laufId: res.laufId, haeppchen: 1, laeuferfehler: 'zwei' })
-    assert.equal(r3.ok, false)
-    assert.match(r3.error!, /höchstens 1/)
+    const r4 = await lauf(runner(fakeHost()), { ...args(), laufId: res.laufId, haeppchen: 1 })
+    assert.equal(r4.ok, false)
+    assert.match(r4.error!, /eskaliert/)
   })
 
-  it('Altfall lf-live: „haengt“ mit grünem Gate lässt sich als Läuferfehler markieren', async () => {
+  it('Altfall lf-live: „haengt“ mit grünem Gate zählt beim erneuten Dispatch als Läuferfehler', async () => {
     const laufId = 'LFLIVE'
     const dir = path.join(laufDir, laufId)
     fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(path.join(dir, 'gate-1-1.json'), JSON.stringify({ verdict: 'gruen', reasons: [], testOutput: '31 passed' }))
     git('add', 'test'); git('commit', '-qm', 'lf: Abnahmetest #1')
-    const branch = git('rev-parse', '--abbrev-ref', 'HEAD')
     fs.writeFileSync(path.join(dir, 'lauf.json'), JSON.stringify({
-      id: laufId, projekt: repo, erstellt: 1, weckrufe: 1, branch,
+      id: laufId, projekt: repo, erstellt: 1, weckrufe: 1, branch: git('rev-parse', '--abbrev-ref', 'HEAD'),
       // So stand es nach dem Abbruch da: kein gatePfad, Ausgang haengt.
       haeppchen: [{ nummer: 1, ziel: 'impl sagt ok', status: 'wartet', mitTest: true, versuche: [{ nr: 1, gestartet: 1, beendet: 2, verdict: 'haengt' }] }],
     }))
     const host = fakeHost()
-    const r = await lauf(runner(host), { ...args(), laufId, haeppchen: 1, laeuferfehler: 'Commit brach an .gitignore ab (lf-live)' })
+    const r = await lauf(runner(host), { ...args(), laufId, haeppchen: 1 })
     assert.equal(r.ok, true, r.error)
     assert.match(host.wakes[0], /GRÜN, Versuch 1\/2 \(1 Läuferfehler nicht gezählt\)/)
+    assert.equal(loadLauf(path.join(dir, 'lauf.json'))!.haeppchen[0].versuche[0].verdict, 'laeuferfehler')
   })
 
-  it('„haengt“ mit rotem oder fehlendem Gate ist kein Läuferfehler', async () => {
+  it('„haengt“ ohne grünes Gate bleibt ein gezählter Hänger', async () => {
     const laufId = 'LHAENGT'
     const dir = path.join(laufDir, laufId)
     fs.mkdirSync(dir, { recursive: true })
@@ -233,9 +242,10 @@ describe('Retry-Feld laeuferfehler im Läufer', () => {
       id: laufId, projekt: repo, erstellt: 1, weckrufe: 1, branch: git('rev-parse', '--abbrev-ref', 'HEAD'),
       haeppchen: [{ nummer: 1, ziel: 'z', status: 'wartet', versuche: [{ nr: 1, gestartet: 1, beendet: 2, verdict: 'haengt' }] }],
     }))
-    const r = await lauf(runner(fakeHost()), { ...args(), laufId, haeppchen: 1, laeuferfehler: 'x' })
-    assert.equal(r.ok, false)
-    assert.match(r.error!, /kein Läuferfehler/)
+    const host = fakeHost()
+    await lauf(runner(host), { ...args(), laufId, haeppchen: 1 })
+    assert.match(host.wakes[0], /GRÜN, Versuch 2\/2/)
+    assert.doesNotMatch(host.wakes[0], /Läuferfehler/)
   })
 })
 
@@ -298,7 +308,7 @@ describe('Gate-Record: pruefungen — welche Zusatzprüfungen liefen, mit welche
 })
 
 describe('Läuferfehler nach ROTEM Gate: kein Freifahrtschein', () => {
-  it('Reset scheitert nach ROT → Ausgang bleibt rot (gezählt), Meldung vermerkt, kein laeuferfehler-Retry', async () => {
+  it('Reset scheitert nach ROT → Ausgang bleibt rot (gezählt), Meldung vermerkt, gezählt wie jedes ROT', async () => {
     // Das Pflicht-Gate macht den Gate rot und sperrt den Index: Patch+Reset scheitern danach.
     config({ pflichtGates: [{ muster: 'impl.txt', befehl: 'touch .git/index.lock; exit 1' }] })
     const host = fakeHost()
@@ -308,12 +318,8 @@ describe('Läuferfehler nach ROTEM Gate: kein Freifahrtschein', () => {
     assert.match(v.fehler!, /index\.lock/)
     assert.match(host.wakes[0], /: ROT, Versuch 1\/2/)
     assert.match(host.wakes[0], /Läuferfehler/)
-    assert.doesNotMatch(host.wakes[0], /Retry mit laeuferfehler/)
-    fs.rmSync(path.join(repo, '.git', 'index.lock'))
-    git('reset', '-q', '--hard'); git('clean', '-fdq')
-    const r2 = await lauf(runner(fakeHost()), { ...args(), laufId: res.laufId, haeppchen: 1, laeuferfehler: 'x' })
-    assert.equal(r2.ok, false)
-    assert.match(r2.error!, /kein Läuferfehler/)
+    assert.doesNotMatch(host.wakes[0], /zählt nicht/)
+    assert.equal(zaehlendeVersuche(loadLauf(res.laufPfad!)!.haeppchen[0]), 1)
   })
 
   it('auch wenn der Reset scheitert: die vom Worker geänderte Projekt-Config wird wiederhergestellt', async () => {
