@@ -61,3 +61,33 @@ describe('rotAusTestfehler: kein Block', () => {
     assert.equal(rotAusTestfehler('AssertionError: expected 1 to be 2\n ❯ test/a.test.ts:3:4', ['test/a.test.ts'], R), null)
   })
 })
+
+describe('rotAusTestfehler: echte vitest-4.1.8-Ausgabe (projekt-a)', () => {
+  const T = ['src/lib/zaehler.test.ts']
+  const zeilen = P.vitestEcht.split('\n')
+  // Fall n: vom n-ten „ FAIL “-Kopf bis vor den nächsten
+  const fall = (n: number): string => {
+    const koepfe = zeilen.map((z, i) => (z.startsWith(' FAIL ') ? i : -1)).filter(i => i >= 0)
+    return zeilen.slice(koepfe[n - 1], koepfe[n] ?? zeilen.length).join('\n')
+  }
+  it('Fall 1: TypeError G.__calls → nicht übersteuerbar', () => {
+    assert.deepEqual(rotAusTestfehler(fall(1), T, R), { fehler: 'TypeError', datei: 'src/lib/zaehler.test.ts', helfer: '__calls' })
+  })
+  it('Fall 2: ReferenceError nichtDa → blockt, übersteuerbar', () => {
+    assert.deepEqual(rotAusTestfehler(fall(2), T, R), { fehler: 'ReferenceError', datei: 'src/lib/zaehler.test.ts', helfer: null })
+  })
+  it('Fall 3: TypeError m.teile (Ort im Test) → blockt, übersteuerbar', () => {
+    assert.deepEqual(rotAusTestfehler(fall(3), T, R), { fehler: 'TypeError', datei: 'src/lib/zaehler.test.ts', helfer: null })
+  })
+  it('Fall 4: AssertionError → kein Block', () => {
+    assert.equal(rotAusTestfehler(fall(4), T, R), null)
+  })
+  it('Gesamtausgabe → nicht übersteuerbar wegen Fall 1', () => {
+    assert.equal(rotAusTestfehler(P.vitestEcht, T, R)?.helfer, '__calls')
+  })
+  it('Fehlerklasse nur im Testnamen (Übersicht, Codeauszug) ist kein Fehler — Kopf + Fall 4 → kein Block', () => {
+    const kopf = zeilen.slice(0, zeilen.findIndex(z => z.startsWith(' FAIL ')))
+    assert.ok(kopf.some(z => z.includes('ReferenceError im Test')))
+    assert.equal(rotAusTestfehler([...kopf, fall(4)].join('\n'), T, R), null)
+  })
+})

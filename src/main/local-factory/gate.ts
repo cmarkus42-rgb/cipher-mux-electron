@@ -204,7 +204,9 @@ export interface TestfehlerBefund {
   helfer: string | null
 }
 
-const FEHLERKLASSE = /\b(ReferenceError|TypeError|NameError|AttributeError)\b/
+// Nur in Meldungsform: „TypeError: …“, „TypeError [ERR_…]“, TAP „name: 'TypeError'“, pytest
+// „…py:6: NameError“. Ein Testname wie „× ReferenceError im Test“ ist keine Fehlerzeile.
+const FEHLERKLASSE = /(?:^|[\s'"(])(ReferenceError|TypeError|NameError|AttributeError)(?=:|'|"|\s\[|\s*$)/
 // pytest, langes Format: Absturzzeile „tests/test_x.py:6: NameError“
 const PY_ABSTURZ = /^\s*(\S+\.py):\d+: (ReferenceError|TypeError|NameError|AttributeError)\b/
 // Python-Rahmen: „File "x.py", line 3“ (Traceback) oder „tests/x.py:6: in test_y“ (pytest kurz)
