@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'preact/hooks'
 import type { Character } from '../../shared/types'
 import { PRESET_PERSONA_DEFAULTS } from '../../shared/constants'
+import { resolveEffectiveAdapterId } from '../../shared/effective-adapter'
 
 /** Clipboard copy button with checkmark feedback. */
 function CopyButton({ getText }: { getText: () => string }) {
@@ -178,6 +179,8 @@ export function PresetEditor() {
   const [adapters, setAdapters] = useState<AdapterInfo[]>([])
   const [defaultAdapterId, setDefaultAdapterId] = useState<string>('claude-code')
   const [adapterOverrideId, setAdapterOverrideId] = useState<string | null>(null)
+  /** Was die Registry der Rolle mitgibt (Local Worker: opencode). `null` = keiner. */
+  const [roleDefaultAdapterId, setRoleDefaultAdapterId] = useState<string | null>(null)
 
   // Welches Modell diese Rolle faehrt. Leer = keine Praeferenz, die CLI
   // entscheidet selbst — dieselbe Drei-Zustands-Disziplin wie bei der CLI.
@@ -234,6 +237,9 @@ export function PresetEditor() {
     api.agent.getEntityAdapter(selectedId).then((id: string | null) => {
       setAdapterOverrideId(id)
     }).catch(() => setAdapterOverrideId(null))
+    api.agent.getEntityAdapterDefault(selectedId).then((id: string | null) => {
+      setRoleDefaultAdapterId(id)
+    }).catch(() => setRoleDefaultAdapterId(null))
     api.agent.getEntityModel(selectedId).then((m: string | null) => {
       setModelOverride(m ?? '')
     }).catch(() => setModelOverride(''))
@@ -252,8 +258,18 @@ export function PresetEditor() {
   }, [selectedId])
 
   // Die Modellliste haengt an der **wirksamen** CLI, nicht an der gewaehlten:
-  // steht die Rolle auf „Default", gilt der globale Adapter.
-  const effectiveAdapterId = adapterOverrideId ?? defaultAdapterId
+  // steht die Rolle auf „Default", gilt ihr Rollen-Default, sonst der globale.
+  const effectiveAdapterId = resolveEffectiveAdapterId({
+    override: adapterOverrideId,
+    roleDefault: roleDefaultAdapterId,
+    globalDefault: defaultAdapterId,
+  })
+  // Was „Default" fuer diese Rolle heisst — ohne die eigene Wahl.
+  const defaultForRoleId = resolveEffectiveAdapterId({
+    override: null,
+    roleDefault: roleDefaultAdapterId,
+    globalDefault: defaultAdapterId,
+  })
   useEffect(() => {
     if (!effectiveAdapterId) return
     let abgebrochen = false
@@ -561,7 +577,7 @@ export function PresetEditor() {
                   style={{ flex: 1, padding: '4px 8px', fontSize: '12px', background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
                 >
                   <option value="">{(() => {
-                    const def = adapters.find(a => a.id === defaultAdapterId)
+                    const def = adapters.find(a => a.id === defaultForRoleId)
                     return def ? `Default (${def.displayName})` : 'Default'
                   })()}</option>
                   {adapters.map(a => (
@@ -576,7 +592,7 @@ export function PresetEditor() {
                 // hinein. Ein `false` heisst im Adapter „nicht gemessen" oder
                 // „nicht vorhanden" — beides bedeutet fuer den Nutzer dasselbe:
                 // dieses Stueck Mux fehlt in dieser Rolle.
-                const eff = adapters.find(a => a.id === (adapterOverrideId ?? defaultAdapterId))
+                const eff = adapters.find(a => a.id === effectiveAdapterId)
                 if (!eff?.capabilities) return null
                 const missing = NAMED_CAPABILITIES
                   .filter(([key]) => eff.capabilities?.[key] === false)
@@ -589,7 +605,7 @@ export function PresetEditor() {
                 )
               })()}
               <div class="pp-hint" style={{ marginTop: '2px' }}>
-                Gilt ab dem naechsten Session-Start dieser Rolle. „Default" folgt der globalen Einstellung.
+                Gilt ab dem naechsten Session-Start dieser Rolle. „Default" folgt dem Rollen-Default, ohne einen der globalen Einstellung.
               </div>
             </div>
           )}

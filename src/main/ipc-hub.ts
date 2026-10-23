@@ -1909,6 +1909,13 @@ export class IpcHub {
       return readEntityOverride(configStore.get('app').entityAdapters, entityId)
     })
 
+    // Der mittlere Schritt der Kette. Ohne ihn zeigt der Preset-Editor fuer eine
+    // Rolle ohne eigene Wahl den globalen Default — beim Local Worker also
+    // Claude Code, obwohl opencode startet.
+    ipcMain.handle(IPC.ENTITY_ADAPTER_DEFAULT_GET, (_e, entityId: string) => {
+      return this.sessionManager.getEntityRegistry().get(entityId as EntityId)?.adapterId ?? null
+    })
+
     // Modellliste pro Adapter. Zwischengespeichert fuer die Laufzeit der App:
     // `codex debug models` und `opencode models` starten je einen Unterprozess,
     // und ein Dropdown, das beim Aufklappen eine Sekunde haengt, benutzt niemand.

@@ -432,6 +432,9 @@ const api = {
     /** `null` = keine Praeferenz fuer diese Rolle, nicht „Adapter mit leerem Namen". */
     getEntityAdapter: (entityId: string): Promise<string | null> =>
       ipcRenderer.invoke(IPC.ENTITY_ADAPTER_GET, entityId),
+    /** Rollen-Default aus der Registry. `null` = die Rolle nennt keinen, es gilt der globale. */
+    getEntityAdapterDefault: (entityId: string): Promise<string | null> =>
+      ipcRenderer.invoke(IPC.ENTITY_ADAPTER_DEFAULT_GET, entityId),
     setEntityAdapter: (entityId: string, adapterId: string | null): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke(IPC.ENTITY_ADAPTER_SET, entityId, adapterId),
     /**
