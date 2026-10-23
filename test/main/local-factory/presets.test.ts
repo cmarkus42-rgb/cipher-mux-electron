@@ -48,8 +48,8 @@ describe('Architekten-Preset — Ablauf (Final-Fix 2)', () => {
       assert.ok(p.includes(s), s)
     }
   })
-  it('während ein Worker läuft: Ziel-Repo nicht anfassen', () => {
-    assert.match(p, /Ziel-Repo\s+nicht\s+an/)
+  it('während ein Worker läuft: sein Worktree ist tabu (L4 eingegrenzt, nicht mehr das ganze Repo)', () => {
+    assert.match(p, /Während der Worker läuft, ist sein Worktree tabu/)
   })
   it('accept-Aufruf wie das Schema ihn nimmt: nur accept, laufId, haeppchen', () => {
     assert.match(p, /\{ accept: true, laufId: "…", haeppchen: N \}/)
