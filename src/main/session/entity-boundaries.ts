@@ -331,7 +331,8 @@ export function boundaryRules(boundary: EntityBoundary): BoundaryRules {
  * Template-Literal), Dateizugriff ueber das uebergebene `io`.
  */
 const BOUNDARY_DECISION_SOURCE = String.raw`
-var BOUNDARY_TEST_MARKER = /(^|[\/._-])(test|spec|acceptance)/i
+// acceptance nur als ganzes Segment: „acceptanceHelpers“ ist kein Testmerkmal.
+var BOUNDARY_TEST_MARKER = /(^|[\/._-])(test|spec|acceptance(?=$|[\/._*?-]))/i
 var BOUNDARY_CONFIG_RELPATH = '.cipher-mux/local-factory.json'
 
 // Glob mit *, ** und ?, gegen den ganzen Pfad. Kein Paket: der Text laeuft ohne node_modules.
