@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-10-24
+
+Kontext-Diät und Modell-Routing. Gemessen vom 25.09. bis 24.10.: 85 % der Tokens liefen auf Opus,
+96,5 % davon Cache-Reads — weil `~/.claude/settings.json` global `opus` setzt und keine
+Mux-Session ein Modell mitgab. Spec und Messung:
+`docs/superpowers/specs/2026-10-24-kontext-diaet-modellrouting-se-vorschlag.md`.
+
+### Added
+- **Rolle Systems Engineer** (aus cipher keel übersetzt): führt das Projekt, schreibt keinen Code,
+  liest keine Diffs, Übergaben laufen über ihn. Einzige Rolle auf Opus, einmal pro Workspace.
+  Brief ≤ 300 Tokens, Report ≤ 500, Gate-Urteil mit strukturellem und inhaltlichem Befund
+  getrennt, eine Steuer-Note pro Projekt.
+- **Modell-Defaults pro Rolle:** Sonnet für Bau und Prüfung, Haiku für Launcher und Voice-Relay.
+  Gilt nur unter Claude Code — Rollen auf Codex oder opencode behalten ihr Modell. Ein Override in
+  den Einstellungen schlägt weiter alles.
+- **Sessions ohne Rolle starten auf Sonnet** (`agent.sessionModel`), Subagenten ebenso
+  (`CLAUDE_CODE_SUBAGENT_MODEL` aus `agent.subagentModel`). Im Launcher wählt das Feld „Modell"
+  beim Ordner-Start bewusst etwas anderes.
+- **Eskalation:** Opus für eine andere Rolle nur mit `eskalation.grund`; der Mux legt dazu eine
+  Note an. Ohne Grund lehnt er den Start ab.
+- `scripts/model-share.py` — Modellanteile aus den Session-JSONL, dedupliziert.
+
+### Changed
+- **Global Rules 8.074 → 1.880 Zeichen.** Werkzeugregeln stehen in den Tool-Beschreibungen,
+  Companion Memory nur bei der Companion, Testcase-Konventionen beim Testing Assistant; die
+  Lessons-Learned-Bäume aus neun Rollen sind eine Regel. Warnschwelle 4.000 Zeichen.
+- **Projekt-CLAUDE.md 54.944 → 25.505 Zeichen:** Codex, opencode, Local Factory, Gateway, Tags,
+  Capabilities wörtlich nach `docs/`, in der CLAUDE.md bleiben die stillen Fallen und ein Zeiger.
+
 ## [0.13.0] — 2026-10-14
 
 ### Changed
