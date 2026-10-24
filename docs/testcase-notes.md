@@ -50,14 +50,15 @@ jemand die App benutzt hat.
   keine Tabellen, keine verschachtelten Listen, keine Code-Fences
 - Text vor dem ersten H2 ignoriert der Parser — dort dürfen Voraussetzungen in Prosa stehen
 
-**Beim Anlegen via MCP:** `mux_notes_create` mit Tag `testcase` — der Tag setzt
+**Beim Anlegen via MCP:** `mux_notes_create` mit Tag `kind:testcase` — der Tag setzt
 `noteType: testcase` automatisch.
 
 ## Konventionen
 
-- Testcases gehören in die Notes-System-Testcase-Note (ID `01KQNBDCH1D4G11PMAEM60TPTX`),
-  NICHT in Dateien unter `docs/archiv/`. Die `TestcaseView` rendert nur Notes mit
-  `noteType: testcase`.
+- Testcases gehören in eine Testcase-Note **pro Abnahmegegenstand** (Titel „Testcases: …",
+  Tag `kind:testcase`), NICHT in Dateien unter `docs/archiv/`. Die `TestcaseView` rendert nur
+  Notes mit `noteType: testcase`. Die früher hier genannte Sammel-Note (`01KQNBDCH1D4G11PMAEM60TPTX`,
+  Smoketest vom Mai) trägt seit dem Tag-Umzug `kind:reference` und ist keine Testcase-Note mehr.
 - Neue Testcases ans Ende anhängen, unter einer neuen `## Section`-Überschrift.
 
 ## Bestehende Abnahmelisten

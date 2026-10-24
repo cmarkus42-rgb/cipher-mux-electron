@@ -55,6 +55,16 @@ export function subagentModelFor(cfg: ModelRoutingConfig | undefined): string | 
   return readModelSetting(cfg?.subagentModel, DEFAULT_SUBAGENT_MODEL)
 }
 
+/**
+ * Darf dieser Modellname in eine Startzeile? Die Zeile wird per tmux in eine
+ * Shell getippt, und der Name kommt aus MCP-Aufrufen. Erlaubt ist, was echte
+ * Namen brauchen (`anthropic/claude-sonnet-5-5`, `opus[1m]`, `qwen3.8:27b`),
+ * kein Leerzeichen, kein Shell-Zeichen, kein führender Bindestrich.
+ */
+export function isSafeModelName(model: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._:/@\[\]-]{0,127}$/.test(model)
+}
+
 /** Alias (`opus`), volle ID (`claude-opus-5-5`) oder mit Anbieter (`anthropic/…`). */
 export function isOpusModel(model: string | undefined): boolean {
   return typeof model === 'string' && /opus/i.test(model)
@@ -76,6 +86,9 @@ export function checkEscalation(args: {
   entityId?: string
   grund?: string
 }): EscalationCheck {
+  if (args.model !== undefined && !isSafeModelName(args.model)) {
+    return { ok: false, error: `Ungueltiger Modellname: ${JSON.stringify(args.model)}` }
+  }
   if (!isOpusModel(args.model)) return { ok: true, escalated: false }
   if (args.entityId === OPUS_ROLE) return { ok: true, escalated: false }
   if (typeof args.grund === 'string' && args.grund.trim() !== '') {
