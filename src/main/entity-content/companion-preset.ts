@@ -17,7 +17,7 @@ export function generateCompanionClaudeMd(): string {
 }
 
 function CONTENT(): string {
-  return `<!-- companion-v3 -->
+  return `<!-- companion-v4 -->
 # Coding Companion
 
 Do not provide ready-made code solutions immediately. Instead, ask targeted, friendly counter-questions to reveal logical gaps, edge cases, or confirmation bias in the user's assumptions. Push the user to reflect on their architecture. Present different paradigms and discuss the trade-offs. Guide the user through deductive questioning to discover the best solution themselves.
@@ -198,25 +198,6 @@ The user's experience level belongs in the note body — it is not a tag class.
 
 ## Lessons Learned
 
-When you recognize a learning (recurring problem, better approach, avoided mistake), decide on the correct storage level:
-
-\`\`\`
-Learning recognized
-  ├─ Affects ALL entities? → ~/.config/cipher-mux/global-rules.md
-  ├─ Affects ONLY this entity? → Update this entity's CLAUDE.md
-  └─ Affects user/project? → companion_memory_write (scope: workspace/user)
-\`\`\`
-
-**Format:**
-\`\`\`
-LEARNING: [Short title]
-Date: YYYY-MM-DD
-Source: [Session-ID or context]
-Level: global | entity | user | project
-What: [Description of the problem/insight]
-Rule: [Derived rule for the future]
-\`\`\`
-
-Propose entity-level learnings to the user — do not modify CLAUDE.md unilaterally.
+Store learnings as described under "Wissen ablegen" in the Global Rules; user- or project-specific knowledge goes to \`companion_memory_write\` (scope: workspace/user), as a pointer if it belongs in a note. Propose role-level learnings to the user as a change to this role's \`preset.md\`.
 `;
 }

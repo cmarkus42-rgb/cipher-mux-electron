@@ -18,7 +18,7 @@ export type AdapterCapabilities = Record<AdapterFeature, boolean>
 // ─── Entity Framework ─────────────────────────────────────
 
 /** Well-known entity identifiers. Extensible via string for dynamic/scanned entities. */
-export type BuiltinEntityId = 'workshop' | 'cyber-factory' | 'launcher' | 'companion' | 'refinement' | 'voice-relay' | 'audit' | 'ideation-partner' | 'debugger' | 'testing-assistant' | 'bugreport' | 'local-factory' | 'local-worker' | 'local-workshop'
+export type BuiltinEntityId = 'workshop' | 'cyber-factory' | 'launcher' | 'companion' | 'refinement' | 'voice-relay' | 'audit' | 'ideation-partner' | 'debugger' | 'testing-assistant' | 'bugreport' | 'local-factory' | 'local-worker' | 'local-workshop' | 'systems-engineer'
 export type EntityId = BuiltinEntityId | (string & {})
 
 /**
@@ -89,6 +89,11 @@ export interface SessionInfo {
   workspaceId?: string | null
   /** Number of sendKeys calls this session received. 0 = never used. */
   interactionCount?: number
+  /**
+   * Modell, mit dem der Mux die CLI gestartet hat. Fehlt = die CLI hat selbst
+   * entschieden (oder die Session ist älter als das Feld).
+   */
+  model?: string
 }
 
 export interface StartSessionOpts {
@@ -343,6 +348,17 @@ export interface AppConfig {
     localWorkerProfiles?: Record<string, LocalWorkerConfig>
     /** Profil, das ein Auftrag ohne `profil` bekommt. */
     localWorkerDefaultProfile?: string
+    /**
+     * Modell einer Claude-Code-Session ohne Rolle (Ordner-Start,
+     * `mux_create_session`). Fehlt = `sonnet`; leer = die CLI entscheidet
+     * (dann gilt `~/.claude/settings.json`). Siehe agent/model-routing.ts.
+     */
+    sessionModel?: string
+    /**
+     * Modell der Subagenten jeder Claude-Code-Session des Mux, als
+     * `CLAUDE_CODE_SUBAGENT_MODEL`. Fehlt = `sonnet`; leer = Subagenten erben.
+     */
+    subagentModel?: string
   }
   /** LLM provider configuration (Ollama, external APIs). */
   llm: {

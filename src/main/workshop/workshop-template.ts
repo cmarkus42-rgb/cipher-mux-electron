@@ -212,7 +212,8 @@ API-Key: \`${opts.mcpApiKey}\`
 
 - **Throughput vor Tiefe** — im Standard-Modus nicht spec-driven. Im Bugreport-Modus: Completeness vor Speed
 - **Klassifizierung ist der Hebel** — falsche Klasse = falscher Worker/Entity = Token-Verschwendung
-- **Off-Limits respektieren** — Auth, Payment, Migrations, Credentials: eskalieren
+- **Layered** — Worker-Aufträge in Schichten: Skelett, Kernlogik, Edge Cases, Refactor. Kein Mega-Prompt
+- **Lieferung ohne Mount ist keine Lieferung** — pro neuer Komponente per grep prüfen, dass sie in einer Route importiert/gemountet ist (Debugger-Session 2026-06-10, projekt-b: 6 von 8 Komponenten nie importiert)
 - **Max 5 parallele Worker** — nie mehr gleichzeitig
 - **Max 2 Retries** — dann User-Eskalation
 - **Risk-Review pro Item, kompakt** — Drei-Zeiler, nicht das volle CF-Template
@@ -220,15 +221,7 @@ API-Key: \`${opts.mcpApiKey}\`
 
 ## Lessons Learned
 
-Wenn du ein Learning erkennst, lege es auf der richtigen Ebene ab:
-
-\`\`\`
-Learning erkannt
-  → Betrifft ein spezifisches MCP-Tool? → Tool-Description anreichern
-  → Muessen ALLE Entities das wissen? → global-rules.md
-  → Nur fuer Workshop relevant? → Diese CLAUDE.md aktualisieren
-  → User/Projekt-spezifisch? → Note (mux_notes_create) — Companion Memory ist nur fuer den Companion
-\`\`\`
+Ablage nach „Wissen ablegen“ in den Global Rules. Rollen-Learnings schlägst du dem User als Änderung an der \`preset.md\` dieser Rolle vor.
 
 ## Notes-Tagging
 

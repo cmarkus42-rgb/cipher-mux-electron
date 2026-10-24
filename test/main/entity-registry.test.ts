@@ -90,16 +90,16 @@ describe('EntityRegistry', () => {
 })
 
 describe('registerBuiltinEntities()', () => {
-  it('registers all 12 builtin entities', () => {
+  it('registers all 14 builtin entities', () => {
     const registry = new EntityRegistry()
     registerBuiltinEntities(registry)
     const entities = registry.list()
-    assert.strictEqual(entities.length, 13)
+    assert.strictEqual(entities.length, 14)
     const ids = entities.map((e: any) => e.id).sort()
     assert.deepStrictEqual(ids, [
       'audit', 'companion', 'cyber-factory', 'debugger',
       'ideation-partner', 'launcher', 'local-factory', 'local-worker', 'local-workshop', 'refinement',
-      'testing-assistant', 'voice-relay', 'workshop',
+      'systems-engineer', 'testing-assistant', 'voice-relay', 'workshop',
     ])
   })
 

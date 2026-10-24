@@ -92,3 +92,34 @@ describe('resolveEntityRuntime — robustness', () => {
     assert.equal(resolveEntityRuntime(entity({ model: 'haiku' }), bad).model, 'haiku')
   })
 })
+
+// ─── Rollen-Default nur fuer Claude Code (2026-10-24) ─────────
+//
+// Die Registry-Defaults sind Claude-Code-Namen. Audit, Testing Assistant,
+// Companion und Ideation Partner laufen beim User ueber Codex; ein `sonnet`
+// dort waere ein Modell, das Codex nicht kennt.
+
+describe('resolveEntityRuntime — Rollen-Default und Adapter', () => {
+  it('Rollen-Default greift unter claude-code (auch als globaler Default)', () => {
+    assert.equal(resolveEntityRuntime(entity({ model: 'sonnet' }), { defaultAdapterId: 'claude-code' }).model, 'sonnet')
+    assert.equal(resolveEntityRuntime(entity({ model: 'sonnet' }), {}).model, 'sonnet')
+  })
+  it('Rollen-Default faellt weg, wenn der User die Rolle auf Codex legt', () => {
+    const rt = resolveEntityRuntime(entity({ model: 'sonnet' }), { entityAdapters: { refinement: 'codex' } })
+    assert.equal(rt.model, undefined)
+    assert.equal(rt.adapterId, 'codex')
+  })
+  it('Rollen-Default faellt weg, wenn der globale Default nicht claude-code ist', () => {
+    assert.equal(resolveEntityRuntime(entity({ model: 'sonnet' }), { defaultAdapterId: 'opencode' }).model, undefined)
+  })
+  it('Rollen-Default faellt weg bei eigenem Nicht-Claude-Adapter der Rolle', () => {
+    assert.equal(resolveEntityRuntime(entity({ model: 'sonnet', adapterId: 'opencode' }), {}).model, undefined)
+  })
+  it('ein User-Override gilt auch unter Codex', () => {
+    const rt = resolveEntityRuntime(entity({ model: 'sonnet' }), {
+      entityAdapters: { refinement: 'codex' },
+      entityModels: { refinement: 'gpt-6-astra' },
+    })
+    assert.equal(rt.model, 'gpt-6-astra')
+  })
+})

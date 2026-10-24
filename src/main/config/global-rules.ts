@@ -6,7 +6,7 @@
 //
 // REQ-GLOBAL-001: Read global-rules.md at app start, skip silently if missing/empty
 // REQ-GLOBAL-002: Inject into every session prompt (Layer 1 in 5-layer model)
-// REQ-GLOBAL-003: Warn if file exceeds ~2000 tokens (approx 1500 words / 8000 chars)
+// REQ-GLOBAL-003: Warn if file exceeds ~1000 tokens (4000 chars; Kontext-Diät 2026-10-24, vorher 8000)
 
 import * as fs from 'fs'
 import * as path from 'path'
@@ -19,92 +19,45 @@ export const GLOBAL_RULES_PATH = path.join(
 )
 
 /**
- * Approximate character threshold for ~2000 tokens.
+ * Approximate character threshold for ~1000 tokens.
  * Rough heuristic: 1 token ≈ 4 chars for mixed German/English text.
+ * Ziel des Defaults sind 3.000 Zeichen; die Schwelle lässt Luft für eigene Regeln.
  */
-export const TOKEN_WARNING_CHAR_THRESHOLD = 8000
+export const TOKEN_WARNING_CHAR_THRESHOLD = 4000
 
-/** Default global rules text (from 02-base-rules.md, condensed for injection). */
-export const DEFAULT_GLOBAL_RULES = `### Universelle Regeln
+/**
+ * Default global rules text.
+ *
+ * Nur, was jede Rolle in jedem Turn braucht (Kontext-Diät 2026-10-24): alles
+ * Tool-spezifische steht in der Tool-Beschreibung, Rollen-spezifische in der
+ * preset.md, Projekt-spezifisches in der Projekt-CLAUDE.md. Diese Sektion
+ * landet in jeder Rollen- und Workspace-Projekt-CLAUDE.md — jedes Zeichen hier
+ * wird in jedem Turn jeder Session neu gelesen.
+ */
+export const DEFAULT_GLOBAL_RULES = `### Grundregeln
 
-1. **Plan vor Code.** Nicht-triviale Aenderungen brauchen einen Plan: betroffene Dateien, Reihenfolge, Tests. Plan zeigen, Bestaetigung abwarten.
-2. **Spec ist Wahrheitsquelle.** Code, der von der Spec abweicht, ist verdaechtig. Spec zuerst aendern, nicht den Code.
-3. **Test-First.** Neuer Code braucht Tests — Verhaltens-Tests, keine Implementations-Tests.
-4. **Layered Implementation.** Skelett zuerst, dann Kernlogik, dann Edge Cases, dann Refactor. Kein Mega-Prompt.
-5. **Off-Limits respektieren.** Auth, Payment, Migrations, .env, Credentials — ohne expliziten Auftrag tabu.
-6. **Risk-Review vor Commit.** Was geaendert, was geloescht, was bricht potenziell.
-7. **"Weiss ich nicht" ist valide.** Keine erfundenen Library-Namen, API-Endpunkte oder Versionen.
-8. **Token-Disziplin.** Antwort-Laenge passt zur Frage. Kein Wiederholen, keine Floskeln, kein "Hoffe das hilft".
-9. **Sicherheit.** Keine PII leaken, keine Credentials lesen/zitieren, keine Default-Geheimnisse in Code.
+1. **Plan vor Code.** Nicht-Triviales: betroffene Dateien, Reihenfolge, Tests zeigen, Bestätigung abwarten. Die Spec ist Wahrheitsquelle; weicht Code ab, zuerst die Spec ändern. Neuer Code braucht Verhaltenstests.
+2. **Off-Limits ohne Auftrag:** Auth, Payment, Migrationen, \`.env\`, Credentials. Keine PII leaken, keine Geheimnisse lesen, zitieren oder in Code schreiben.
+3. **Risk-Review vor Commit:** was geändert, was gelöscht, was bricht.
+4. **„Weiß ich nicht" ist valide.** Keine erfundenen Bibliotheken, Endpunkte, Versionen.
 
-### Companion Memory
+### Pre-Work-Check
 
-Alle Entities haben Zugriff auf persistente Memory-Tools:
-- \`companion_memory_write\` — Erinnerung speichern (mit scope: user/workspace/session)
-- \`companion_memory_recall\` — letzte Eintraege abrufen (mit scope-Filter)
-- \`companion_memory_search\` — Volltextsuche in Erinnerungen
-- \`companion_memory_forget\` — Eintrag loeschen
+Vor jedem Arbeitsbeginn, auch bei klarem Handoff — Handoffs und Specs können veraltet sein:
 
-Nutze Memory fuer projekt- oder user-spezifisches Wissen das ueber die Session hinaus gilt: Konventionen, Entscheidungen, Praeferenzen. Nicht fuer temporaere Notizen (dafuer \`mux_notes_create\`).
+1. **Schon gebaut?** Ist-Zustand per grep gegen den Auftrag prüfen. Vorhanden → nicht neu bauen, Vollständigkeit prüfen und melden.
+2. **Arbeitet schon jemand dran?** \`mux_sessions\`, ggf. \`capture-pane\`. Läuft etwas am selben Repo → koordinieren, nicht in denselben Working-Tree schreiben.
+3. **Parallel schreibende Worker** → je eigener Worktree und Branch, Merge nach \`main\` erst nach Grün.
 
-### MCP-Tool-Grundregeln
+### Wissen ablegen
 
-- **Session-Handoff Timing:** Nach \`mux_create_session\` mindestens 8-10s warten bevor Instruktionen gesendet werden. tmux + Shell + Claude CLI brauchen Startzeit.
-- **mux_send vs. tmux send-keys:** \`mux_send\` ist fuer Inter-Session-Kommunikation (Message Bus), NICHT fuer Prompt-Input. Direkte Instruktionen via \`tmux send-keys\`.
-- **Context-Monitoring:** Bei laufenden Worker-Sessions regelmaessig \`mux_context_usage\` pruefen. Bei >80% proaktiv handeln.
-- **Task-Updates:** Tasks zeitnah updaten — nicht erst am Ende. Andere Sessions verlassen sich auf aktuelle Task-Stati.
-- **Notes fuer Persistenz:** Wichtige Erkenntnisse, die ueber die Session hinaus gelten, als Notes anlegen (\`mux_notes_create\`).
+Was über die Session hinaus gilt, wird sichtbar: Note (\`mux_notes_create\`) oder Übergabe (\`mux_notes_handoff_create\` + \`_dispatch\`). Notes beim **Titel** nennen, nie bei der ID. Ein Learning gehört an genau eine Stelle: Tool-spezifisch → Tool-Beschreibung, eine Rolle → deren \`preset.md\`, ein Projekt → dessen CLAUDE.md, alle Rollen → hier, Nachschlagewissen → \`docs/\` mit Zeiger. Format hier: \`- **Titel:** was ab jetzt gilt. Quelle: woher.\`
 
-### TTS-Guardrail
+### Kontext
 
-- **Baseline:** \`mux_tts_speak\` fuer Kernaussagen: Zusammenfassungen, Meilensteine, direkte Antworten. Saetze kurz und klar.
-- **Nie per TTS:** Code, Pfade, IDs, technische Details — gehoeren in schriftlichen Output.
-- **Override:** Entity-CLAUDE.md kann TTS erweitern (voice-relay), einschraenken oder deaktivieren (cyber-factory, debugger).
+Zuschnitt statt Vorladen: lies, was der Auftrag braucht, nicht, was es gibt. Wer Arbeit weitergibt, gibt Zeiger (Pfad, Note-Titel), keinen kopierten Inhalt.
 
-### mux_send Push-Delivery
-
-- **Separates Enter noetig:** Nach \`mux_send\` mit Push-Delivery wird der Text in die Session eingefuegt, aber NICHT submitted. Ein zweites \`mux_send\` mit \`"\\n"\` (oder tmux send-keys Enter) ist Pflicht.
-- **Pattern:** \`mux_send(text)\` → 1-2s Pause → \`mux_send("\\n")\` = Submit.
-- **Ohne:** Text steht in der Eingabezeile, Session wartet — sieht aus als waere nichts angekommen.
-
-### Lessons Learned — Entscheidungsbaum
-
-Wenn du ein Learning erkennst (etwas das beim naechsten Mal anders laufen soll), lege es auf der richtigen Ebene ab:
-
-\`\`\`
-Learning erkannt
-  → Betrifft ein spezifisches MCP-Tool?
-      → JA: Tool-Description anreichern (in mcp-tools.ts)
-  → Muessen ALLE Entities das wissen?
-      → JA: Hier eintragen (global-rules.md)
-  → Nur fuer EINE Entity relevant?
-      → JA: Entity-CLAUDE.md (unter ~/.config/cipher-mux/entities/<id>/)
-  → User/Projekt-spezifisch?
-      → JA: Companion Memory (companion_memory_write)
-\`\`\`
-
-**Format fuer Eintraege hier:**
-\`\`\`
-- **[Kurztitel]:** [Was ab jetzt gilt]. Quelle: [woher das Learning kommt].
-\`\`\`
-
-### Inter-Entity-Kommunikation
-
-- **Direkt antworten per \`mux_send\`:** Wenn du eine Nachricht von einer anderen Entity via \`mux_send\` erhaeltst (z.B. eine Rueckfrage, einen Handoff, ein Ergebnis), antworte direkt per \`mux_send\` an die sendende Session zurueck. Nicht nur Text an den User ausgeben — die anfragende Entity wartet auf die Antwort in ihrem Kontext.
-- **Pattern:** Nachricht empfangen → verarbeiten → \`mux_send\` an die Quell-Session mit der Antwort.
-- **Ohne:** Die anfragende Entity bekommt keine Antwort und blockiert oder wiederholt die Frage.
-
-### Notes-Status-Pflege
-
-- **Status-Tag aktualisieren:** Wenn du eine Note bearbeitest oder ihren Inhalt aenderst, MUSS der \`status:\`-Tag aktualisiert werden: \`status:open\` → \`status:in-progress\` → \`status:done\`.
-- **Regel:** Kein \`mux_notes_update\` ohne passenden Status-Tag-Update. Offene Notes die aktiv bearbeitet werden → \`status:in-progress\`. Abgeschlossene Arbeit → \`status:done\`.
-- **Gilt fuer alle Entities:** Jede Entity die Notes anlegt oder bearbeitet muss diese Konvention einhalten.
-
-### Testcase-Konventionen
-
-- **Testcases gehoeren in eine dedizierte Notes-System-Testcase-Note** (noteType: testcase). NICHT in Dateien unter \`docs/archiv/\`. Der TestcaseView rendert nur Notes mit \`noteType: testcase\`.
-- **Format:** \`- [ ] **T-PREFIX.N** Beschreibung\` — der Parser braucht dieses exakte Checkbox+Bold-ID-Format.
-- **Neue Testcases ans Ende anhaengen**, unter einer neuen \`## Section\`-Ueberschrift.`
+Läuft im Workspace ein Systems Engineer, gehen Übergaben und Reports an ihn, nicht an die Folgerolle: höchstens ~500 Tokens — Ergebnis, offene Punkte, Pfad oder Note-Titel der Langfassung.`
 
 /**
  * Ensure the global-rules.md file exists. Creates it with DEFAULT_GLOBAL_RULES
@@ -144,7 +97,7 @@ let cachedGlobalRules: string | null = null
 /**
  * Load global-rules.md at app start (REQ-GLOBAL-001).
  * Caches the content for injection into sessions.
- * Logs a warning if file exceeds ~2000 tokens (REQ-GLOBAL-003).
+ * Logs a warning if file exceeds ~1000 tokens (REQ-GLOBAL-003).
  * Returns the loaded content (empty string if file missing/empty).
  */
 export function loadGlobalRulesOnStartup(): string {
@@ -161,7 +114,7 @@ export function loadGlobalRulesOnStartup(): string {
   if (content.length > TOKEN_WARNING_CHAR_THRESHOLD) {
     console.warn(
       `[GlobalRules] WARNING: global-rules.md is ${content.length} chars (~${Math.round(content.length / 4)} tokens). ` +
-      `Recommended max is ~2000 tokens (${TOKEN_WARNING_CHAR_THRESHOLD} chars). Large rules consume context in every session.`,
+      `Recommended max is ~1000 tokens (${TOKEN_WARNING_CHAR_THRESHOLD} chars). Large rules consume context in every session.`,
     )
   }
 

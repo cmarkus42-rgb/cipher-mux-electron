@@ -34,6 +34,7 @@ const ENTITY_COLORS: Record<EntityId, string> = {
   'local-factory': '#8e24aa',
   'local-worker': '#6d4c41',
   'local-workshop': '#00897b',
+  'systems-engineer': '#ffd54f',
 }
 
 function contextColorClass(pct: number): string {

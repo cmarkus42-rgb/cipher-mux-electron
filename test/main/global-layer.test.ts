@@ -9,7 +9,7 @@ import * as os from 'os'
  *
  * REQ-001: Read global-rules.md at app start, skip silently if missing/empty
  * REQ-002: Inject content into every session's CLAUDE.md
- * REQ-003: Warn if file > ~2000 tokens (8000 chars)
+ * REQ-003: Warn if file > ~1000 tokens (4000 chars)
  */
 
 describe('Global Layer: loadGlobalRulesOnStartup (REQ-GLOBAL-001)', () => {
@@ -30,7 +30,7 @@ describe('Global Layer: loadGlobalRulesOnStartup (REQ-GLOBAL-001)', () => {
 
   it('exports TOKEN_WARNING_CHAR_THRESHOLD constant', async () => {
     const mod = await import('../../src/main/config/global-rules')
-    assert.equal(mod.TOKEN_WARNING_CHAR_THRESHOLD, 8000)
+    assert.equal(mod.TOKEN_WARNING_CHAR_THRESHOLD, 4000)
   })
 })
 
@@ -49,18 +49,18 @@ describe('Global Layer: Token warning (REQ-GLOBAL-003)', () => {
 
   it('should not warn for content under threshold', () => {
     const content = '# Rules\n\n1. Be good.'
-    assert.ok(content.length < 8000)
+    assert.ok(content.length < 4000)
   })
 
-  it('should detect content over 8000 chars as exceeding threshold', () => {
-    const content = 'x'.repeat(8001)
-    assert.ok(content.length > 8000, 'Content exceeds TOKEN_WARNING_CHAR_THRESHOLD')
+  it('should detect content over 4000 chars as exceeding threshold', () => {
+    const content = 'x'.repeat(4001)
+    assert.ok(content.length > 4000, 'Content exceeds TOKEN_WARNING_CHAR_THRESHOLD')
   })
 
   it('estimates tokens as chars / 4', () => {
-    const chars = 8000
+    const chars = 4000
     const estimatedTokens = Math.round(chars / 4)
-    assert.equal(estimatedTokens, 2000)
+    assert.equal(estimatedTokens, 1000)
   })
 })
 

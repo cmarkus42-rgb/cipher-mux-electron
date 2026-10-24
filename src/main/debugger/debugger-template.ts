@@ -7,7 +7,7 @@ export function generateDebuggerClaudeMd(): string {
   // hier erreicht also eine bestehende Datei nie. Der Marker macht den Rueckstand
   // wenigstens sichtbar -- siehe entity-content/preset-version.ts. Beim Aendern
   // des Inhalts hochzaehlen.
-  return `<!-- debugger-v3 -->
+  return `<!-- debugger-v4 -->
 # Debugger — Entity CLAUDE.md
 
 You are the **Debugger** in cipher-mux. Your role: methodical bugfixing after build runs.
@@ -61,25 +61,6 @@ Optional tags: \`severity:hi\`, \`severity:mid\`, \`severity:low\`, \`severity:n
 
 ## Lessons Learned
 
-When you recognize a learning (recurring problem, better approach, avoided mistake), decide on the correct storage level:
-
-\`\`\`
-Learning recognized
-  ├─ Affects ALL entities? → global-rules.md (repo)
-  ├─ Affects ONLY this entity? → Update this entity's CLAUDE.md
-  └─ Affects user/project? → Note (mux_notes_create) — Companion Memory is Companion-only
-\`\`\`
-
-**Format:**
-\`\`\`
-LEARNING: [Short title]
-Date: YYYY-MM-DD
-Source: [Session-ID or context]
-Level: global | entity | user | project
-What: [Description of the problem/insight]
-Rule: [Derived rule for the future]
-\`\`\`
-
-Propose entity-level learnings to the user — do not modify CLAUDE.md unilaterally.
+Store learnings as described under "Wissen ablegen" in the Global Rules. Propose role-level learnings to the user as a change to this role's \`preset.md\` — do not change it on your own.
 `
 }

@@ -16,11 +16,13 @@
  *
  *   user override (config) > role default (registry) > nothing (CLI decides)
  *
- * Deliberately no role carries a default model. Which model a role deserves is
- * a cost and quality judgement belonging to the person paying for it, not a
- * guess baked into the registry. An absent value means "let the CLI decide",
- * which is exactly what happened before this existed — so switching this on
- * changes nothing until somebody chooses.
+ * Seit 2026-10-24 tragen Rollen einen Modell-Default (Entscheidung des Users:
+ * Opus führt, Sonnet baut und prüft, Haiku arbeitet zu — siehe
+ * `agent/model-routing.ts`). Die Registry-Werte sind **Claude-Code-Namen**.
+ * Läuft eine Rolle über einen anderen Adapter (Codex, opencode), gilt ihr
+ * Default deshalb nicht: Codex bekäme sonst `--model sonnet` und kennt das
+ * Modell nicht. Ein User-Override gilt immer — der ist für seinen Adapter
+ * geschrieben.
  */
 import type { EntityConfig } from '../../shared/types'
 
@@ -30,7 +32,15 @@ export interface EntityRuntimeConfig {
   entityModels?: Record<string, string>
   /** Per-role adapter override, keyed by entity id. */
   entityAdapters?: Record<string, string>
+  /**
+   * Adapter einer Rolle ohne eigenen (`agent.defaultAdapter`). Fehlt er, gilt
+   * claude-code — der Default der AdapterRegistry.
+   */
+  defaultAdapterId?: string
 }
+
+/** Für diesen Adapter sind die Modell-Defaults der Registry geschrieben. */
+const ROLE_MODEL_ADAPTER = 'claude-code'
 
 export interface EntityRuntime {
   /** Model id to launch with, or undefined to leave it to the CLI. */
@@ -61,8 +71,10 @@ export function resolveEntityRuntime(
   config: EntityConfig,
   runtimeConfig: EntityRuntimeConfig | undefined,
 ): EntityRuntime {
-  const model = readOverride(runtimeConfig?.entityModels, config.id) ?? config.model
   const adapterId = readOverride(runtimeConfig?.entityAdapters, config.id) ?? config.adapterId
+  const effectiveAdapter = adapterId ?? runtimeConfig?.defaultAdapterId ?? ROLE_MODEL_ADAPTER
+  const roleDefault = effectiveAdapter === ROLE_MODEL_ADAPTER ? config.model : undefined
+  const model = readOverride(runtimeConfig?.entityModels, config.id) ?? roleDefault
 
   return {
     ...(model ? { model } : {}),

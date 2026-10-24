@@ -26,7 +26,15 @@ export interface PathStartOpts {
   workspaceId?: string | null
   /** Absent = the default CLI. */
   adapterId?: string
+  /** Absent = das Session-Modell aus `agent.sessionModel` (Standard: sonnet). Nur Claude Code. */
+  model?: string
 }
+
+/**
+ * Modellwahl beim Ordner-Start. Claude-Code-Aliase; Opus ist eine bewusste Wahl,
+ * kein Default (Modell-Routing 2026-10-24, agent/model-routing.ts).
+ */
+const FOLDER_MODELS = ['sonnet', 'opus', 'haiku'] as const
 
 type TabMode = 'presets' | 'path' | 'notes'
 
@@ -114,6 +122,8 @@ export function EntityPickerPopup({
   const [pathAdapterId, setPathAdapterId] = useState<string>('')
   const [adapters, setAdapters] = useState<Array<{ id: string; displayName: string }>>([])
   const [defaultAdapterId, setDefaultAdapterId] = useState<string>('')
+  const [pathModel, setPathModel] = useState<string>('')
+  const [defaultSessionModel, setDefaultSessionModel] = useState<string>('sonnet')
 
   // Notes
   const { notes } = useNotes()
@@ -154,7 +164,15 @@ export function EntityPickerPopup({
       setAdapters((list ?? []).map((a: { id: string; displayName: string }) => ({ id: a.id, displayName: a.displayName })))
       setDefaultAdapterId(def ?? '')
     }).catch(() => { /* older backend */ })
+    cipherApi().config.get('agent').then((cfg: { sessionModel?: unknown } | undefined) => {
+      const m = typeof cfg?.sessionModel === 'string' ? cfg.sessionModel.trim() : 'sonnet'
+      setDefaultSessionModel(m || 'CLI')
+    }).catch(() => { /* Default bleibt sonnet */ })
   }, [allowWorkspaceChoice])
+
+  // Das Modellfeld gilt nur für Claude Code — die Aliase kennt keine andere CLI.
+  const effectiveAdapterId = pathAdapterId || defaultAdapterId
+  const showModel = !shellOnly && effectiveAdapterId === 'claude-code'
 
   // Escape to close
   useEffect(() => {
@@ -176,6 +194,7 @@ export function EntityPickerPopup({
       ...(allowWorkspaceChoice ? {
         workspaceId: pathWorkspaceId || null,
         ...(pathAdapterId ? { adapterId: pathAdapterId } : {}),
+        ...(showModel && pathModel ? { model: pathModel } : {}),
       } : {}),
     })
     // Save to recent paths
@@ -185,7 +204,7 @@ export function EntityPickerPopup({
       cipherApi().config.set('app', { ...cfg, recentPaths: updated }).catch(() => {})
     }).catch(() => {})
     setPath('')
-  }, [path, shellOnly, fork, resume, skipPermissions, onSelectPath, allowWorkspaceChoice, pathWorkspaceId, pathAdapterId])
+  }, [path, shellOnly, fork, resume, skipPermissions, onSelectPath, allowWorkspaceChoice, pathWorkspaceId, pathAdapterId, showModel, pathModel])
 
   const handlePathKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -382,6 +401,20 @@ export function EntityPickerPopup({
                       })}</option>
                       {adapters.map(a => (
                         <option key={a.id} value={a.id}>{a.displayName}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {showModel && (
+                  <label class="unified-dialog__field">
+                    <span>{t('unified.model')}</span>
+                    <select
+                      value={pathModel}
+                      onChange={(e) => setPathModel((e.target as HTMLSelectElement).value)}
+                    >
+                      <option value="">{t('unified.modelDefault', { name: defaultSessionModel })}</option>
+                      {FOLDER_MODELS.map(m => (
+                        <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
                   </label>

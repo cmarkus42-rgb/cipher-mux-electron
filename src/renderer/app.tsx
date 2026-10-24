@@ -1044,6 +1044,7 @@ export function App() {
         // CLAUDE.md wie bisher unangetastet.
         ...(opts.workspaceId !== undefined ? { workspaceId: opts.workspaceId } : {}),
         ...(opts.adapterId ? { adapterId: opts.adapterId } : {}),
+        ...(opts.model ? { model: opts.model } : {}),
         folderLaunch: {
           shellOnly: opts.shellOnly,
           resume: opts.resume,

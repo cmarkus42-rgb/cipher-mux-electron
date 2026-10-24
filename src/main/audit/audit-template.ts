@@ -160,26 +160,6 @@ This session is NOT for:
 
 ## Lessons Learned
 
-When you recognize a learning (recurring problem, better approach, avoided mistake), decide on the right storage level:
-
-\`\`\`
-Learning recognized
-  ├─ Affects ALL entities? → global-rules.md (repo)
-  ├─ Affects ONLY this entity? → propose a change to this entity's preset
-  └─ Affects user/project? → Note (mux_notes_create) — Companion Memory is Companion-only
-\`\`\`
-
-**Format:**
-\`\`\`
-LEARNING: [Short title]
-Date: YYYY-MM-DD
-Source: [session ID or context]
-Level: global | entity | user | project
-What: [description of the problem/insight]
-Rule: [derived rule for the future]
-\`\`\`
-
-Phrase entity-level learnings as a proposal to the user — do not change the preset on your own.
-
+Store learnings as described under "Wissen ablegen" in the Global Rules. Propose role-level learnings to the user as a change to this role's \`preset.md\` — do not change it on your own.
 `
 }

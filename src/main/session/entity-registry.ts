@@ -62,6 +62,10 @@ function expandHome(p: string): string {
  * @param cyberFactoryDir Cyber Factory working directory (from BRAND).
  * @param appRoot App root for resolving template paths (process.resourcesPath or project root).
  */
+// Modell-Defaults (Entscheidung des Users, 2026-10-24): Opus führt (nur der
+// Systems Engineer), Sonnet baut und prüft, Haiku arbeitet zu. Die Werte sind
+// Claude-Code-Aliase und gelten nur, wenn die Rolle über claude-code läuft
+// (`entity-runtime.ts`); ein User-Override in den Einstellungen schlägt sie.
 export function registerBuiltinEntities(
   registry: EntityRegistry,
   _workshopDir?: string,
@@ -70,7 +74,22 @@ export function registerBuiltinEntities(
   const entitiesBase = expandHome('~/.config/cipher-mux/entities')
 
   registry.register({
+    id: 'systems-engineer',
+    model: 'opus',
+    displayName: 'Systems Engineer',
+    icon: '🎯',
+    color: '#ffd54f',
+    projectPath: `${entitiesBase}/systems-engineer`,
+    features: ['mcp'],
+    visible: true,
+    sortOrder: 5,
+    // Einmal pro Workspace — und damit die einzige Opus-Session dort.
+    singleInstance: true,
+  })
+
+  registry.register({
     id: 'workshop',
+    model: 'sonnet',
     displayName: 'Workshop',
     icon: '🔨',
     color: '#4fc3f7',
@@ -83,6 +102,7 @@ export function registerBuiltinEntities(
 
   registry.register({
     id: 'cyber-factory',
+    model: 'sonnet',
     displayName: 'Cyber Factory',
     icon: '🏭',
     color: '#ab47bc',
@@ -95,6 +115,7 @@ export function registerBuiltinEntities(
 
   registry.register({
     id: 'local-factory',
+    model: 'sonnet',
     displayName: 'Local Cyber Factory',
     icon: '🏗️',
     color: '#8e24aa',
@@ -121,6 +142,7 @@ export function registerBuiltinEntities(
 
   registry.register({
     id: 'local-workshop',
+    model: 'sonnet',
     displayName: 'Local Workshop',
     icon: '🛠️',
     color: '#00897b',
@@ -133,6 +155,7 @@ export function registerBuiltinEntities(
 
   registry.register({
     id: 'launcher',
+    model: 'haiku',
     displayName: 'Launcher',
     icon: '🚀',
     color: '#66bb6a',
@@ -145,6 +168,7 @@ export function registerBuiltinEntities(
 
   registry.register({
     id: 'companion',
+    model: 'sonnet',
     displayName: 'Coding Companion',
     icon: '🧭',
     color: '#ffb74d',
@@ -157,6 +181,7 @@ export function registerBuiltinEntities(
 
   registry.register({
     id: 'refinement',
+    model: 'sonnet',
     displayName: 'Refinement',
     icon: '🔬',
     color: '#ef5350',
@@ -169,6 +194,7 @@ export function registerBuiltinEntities(
 
   registry.register({
     id: 'ideation-partner',
+    model: 'sonnet',
     displayName: 'Ideation Partner',
     icon: '💡',
     color: '#26a69a',
@@ -181,6 +207,7 @@ export function registerBuiltinEntities(
 
   registry.register({
     id: 'voice-relay',
+    model: 'haiku',
     displayName: 'Voice',
     icon: '🎙',
     color: '#9b59b6',
@@ -193,6 +220,7 @@ export function registerBuiltinEntities(
 
   registry.register({
     id: 'audit',
+    model: 'sonnet',
     displayName: 'Audit',
     icon: '🛡',
     color: '#c0392b',
@@ -204,6 +232,7 @@ export function registerBuiltinEntities(
 
   registry.register({
     id: 'debugger',
+    model: 'sonnet',
     displayName: 'Debugger',
     icon: '🔧',
     color: '#ff7043',
@@ -216,6 +245,7 @@ export function registerBuiltinEntities(
 
   registry.register({
     id: 'testing-assistant',
+    model: 'sonnet',
     displayName: 'Testing Assistant',
     icon: '\uD83E\uDDEA',
     color: '#2ecc71',

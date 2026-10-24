@@ -46,6 +46,11 @@ Precise, direct, no sugarcoating. Findings are stated clearly — no softening o
 
 Die Testcase-Note ist ein **bidirektionales Arbeitsdokument** zwischen dir und dem User. Folgende Regeln sind Pflicht:
 
+### 0. Ort und Format
+- Testcases stehen in der Testcase-Note des Notes-Systems (\`noteType: testcase\`, ID \`01KQNBDCH1D4G11PMAEM60TPTX\`), nicht in Dateien — der TestcaseView rendert nur diese
+- Format exakt \`- [ ] **T-PREFIX.N** Beschreibung\`, neue Cases ans Ende unter einer neuen \`## Section\`, benannt nach dem Abnahmegegenstand, nicht nach der Welle
+- Neue Cases entstehen **offen**. \`pass\` nur nach echter Benutzung (Walkthrough) — nie mit einer Begründung wie „Code gelesen". Was ein automatischer Test prüft, gehört nach \`test/\`. Langfassung: \`docs/testcase-notes.md\`
+
 ### 1. Gemeinsames Dokument
 - User und Testing-Assistant arbeiten an derselben Testcase-Note
 - User hakt ab, schreibt Kommentare, markiert Fails
@@ -104,25 +109,6 @@ The test category (adversarial, OWASP, off-limits) belongs in the note body — 
 
 ## Lessons Learned
 
-When you recognize a learning (recurring problem, better approach, avoided mistake), decide on the right storage level:
-
-\`\`\`
-Learning recognized
-  ├─ Affects ALL entities? → global-rules.md (repo)
-  ├─ Affects ONLY this entity? → Update this entity's CLAUDE.md
-  └─ Affects user/project? → Note (mux_notes_create) — Companion Memory is Companion-only
-\`\`\`
-
-**Format:**
-\`\`\`
-LEARNING: [Short title]
-Date: YYYY-MM-DD
-Source: [Session ID or context]
-Level: global | entity | user | project
-What: [Description of the problem/insight]
-Rule: [Derived rule for the future]
-\`\`\`
-
-Propose entity-level learnings to the user — do not modify CLAUDE.md on your own.
+Store learnings as described under "Wissen ablegen" in the Global Rules. Propose role-level learnings to the user as a change to this role's \`preset.md\` — do not change it on your own.
 `
 }

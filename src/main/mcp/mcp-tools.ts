@@ -14,7 +14,8 @@ import type { NoteSearchIndex } from '../notes/note-search-index'
 import type { MemoryStore } from '../companion/memory-store'
 import type { TagClassRepo } from '../notes/tag-repository'
 import { IPC } from '../../shared/ipc-channels'
-import { registerAllHandoffTools, executeHandoff, callerWorkspace } from './handoff-kernel'
+import { registerAllHandoffTools, executeHandoff, callerWorkspace, recordEscalation } from './handoff-kernel'
+import { checkEscalation } from '../agent/model-routing'
 import { resolveAnchorCommit } from '../notes/handoff-delta'
 import { mayUseCompanionMemory, mayUseLocalWorkerDispatch } from './entity-header'
 import { registerLocalFactoryTool } from './local-factory-tool'
@@ -181,7 +182,9 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   registerMuxTool(server, 
     'mux_send',
     {
-      description: 'Send a message to the cipher-mux message bus. Optionally push-deliver to a target session via tmux send-keys.',
+      description: 'Send a message to the cipher-mux message bus. Optionally push-deliver to a target session via tmux send-keys. '
+        + 'Inter-session messages only — NOT prompt input for a session (use tmux send-keys for that). '
+        + 'When another entity asks you something via mux_send, answer with mux_send to that session; it is waiting.',
       inputSchema: {
         topic: z.string().describe('Message topic (status, bug, review, chat, system)'),
         sender: z.string().describe('Sender identifier'),
@@ -310,10 +313,13 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         'Create a new cipher-mux session in projectPath and launch an agent CLI there. '
         + 'adapter picks the CLI (claude-code | opencode | codex, default claude-code); the launch '
         + 'line, MCP wiring, model and usage tracking all come from that adapter. model is passed '
-        + 'through as is (e.g. "opus" for Claude Code, "anthropic/claude-opus-5-5" for opencode). '
+        + 'through as is (e.g. "sonnet" for Claude Code, "anthropic/claude-sonnet-5-5" for opencode); '
+        + 'without one, Claude Code starts on the configured session model (default sonnet) and the result names it. '
+        + 'Opus is an escalation: pass eskalation.grund, otherwise the start is refused; the Mux logs it as a note. '
         + 'workspaceId: omitted = your own workspace (if you have none, the one the user has open), null = no workspace. '
         + 'shellOnly: true opens a plain terminal; command replaces the launch entirely — then name '
-        + 'the adapter too, or the session is filed under the default CLI.',
+        + 'the adapter too, or the session is filed under the default CLI. '
+        + 'Worker startup: wait 8–10 s, check with tmux capture-pane, then send the prompt via tmux send-keys (not mux_send).',
       inputSchema: {
         name: z.string().describe('Session name'),
         projectPath: z.string().describe('Project directory path'),
@@ -325,9 +331,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         model: z.string().optional().describe('Model for the CLI, passed through unchanged'),
         workspaceId: z.string().nullable().optional().describe('Workspace ID; omitted = caller workspace, else the open one; null = unbound'),
         subProjektId: z.string().optional().describe('Cyber Factory SubProjekt ID — auto-resolves model from SubProjekt if no explicit model given'),
+        eskalation: z.object({ grund: z.string() }).optional().describe('Required when the model is Opus'),
       },
     },
-    async (args: CreateSessionArgs & { visible?: boolean; subProjektId?: string }) => {
+    async (args: CreateSessionArgs & { visible?: boolean; subProjektId?: string; eskalation?: { grund?: string } }) => {
       try {
         // Resolve model from SubProjekt if not explicitly provided
         let effectiveModel = args.model
@@ -340,6 +347,9 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           }
         }
 
+        const check = checkEscalation({ model: effectiveModel, grund: args.eskalation?.grund })
+        if (!check.ok) throw new Error(check.error)
+
         if (typeof args.workspaceId === 'string') {
           const { configStore: cs } = await import('../config/config-store')
           const known = (cs.get('workspaces') ?? []).some(w => w.id === args.workspaceId)
@@ -349,6 +359,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         const session = await ctx.sessionManager.start(
           buildCreateSessionOpts({ ...args, model: effectiveModel }, callerWorkspace(ctx)),
         )
+
+        if (check.escalated) {
+          await recordEscalation(ctx, { target: `Session ${args.name}`, model: effectiveModel!, grund: args.eskalation!.grund!, sessionName: session.name })
+        }
 
         if (args.visible && ctx.windowManager) {
           ctx.windowManager.sendToMainWindow(IPC.SESSION_VISIBLE_ADD, { sessionId: session.id })
@@ -402,7 +416,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   registerMuxTool(server, 
     'mux_context_usage',
     {
-      description: 'Get context usage for sessions (from statusLine monitor)',
+      description: 'Get context usage for sessions (from statusLine monitor). '
+        + 'Whoever runs worker sessions checks this regularly and acts before 80 %.',
       inputSchema: {
         sessionId: z.string().optional().describe('Session ID — omit to get all sessions'),
       },
@@ -594,7 +609,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   registerMuxTool(server, 
     'mux_task_update',
     {
-      description: 'Update a task state or progress in the cipher-mux task queue',
+      description: 'Update a task state or progress in the cipher-mux task queue. '
+        + 'Update as you go, not at the end — other sessions rely on current task states.',
       inputSchema: {
         task_id: z.string().describe('Task ID'),
         state: z.enum(['dispatched', 'running', 'done', 'failed']).optional().describe('New task state'),
@@ -971,7 +987,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       description:
         'Structured update for testcase notes. Use this instead of mux_notes_update to modify testcase items. '
         + 'Supports: set_status (open/pass/fail), set_comment, add_item (to a section), add_section, '
-        + 'set_resolution (in_review/addressed/fixed/wont_fix/unresolved — only on fail items).',
+        + 'set_resolution (in_review/addressed/fixed/wont_fix/unresolved — only on fail items). '
+        + 'Testcases are manual acceptance: add items open, set pass only after actually using the software — never because the code reads right. '
+        + 'Item format "- [ ] **T-PREFIX.N** description"; new items go into a new section at the end, named after what is accepted. '
+        + 'Details: docs/testcase-notes.md.',
       inputSchema: {
         noteId: z.string().describe('Note ID (ULID) of the testcase note'),
         operations: z.array(z.union([

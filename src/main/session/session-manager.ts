@@ -3,7 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import { ulid } from 'ulidx'
-import type { SessionInfo, StartSessionOpts, RecoveryResult, EntityId } from '../../shared/types'
+import type { SessionInfo, StartSessionOpts, RecoveryResult, EntityId, EntityConfig } from '../../shared/types'
 import { MAX_SESSIONS } from '../../shared/constants'
 import { BRAND } from '../../shared/brand'
 import { TmuxManager } from '../tmux/tmux-manager'
@@ -28,6 +28,8 @@ import { injectStatusLineHook } from '../monitoring/statusline-hook'
 import { COMPANION_ENTITY_ID } from '../mcp/entity-header'
 import { getEntityBoundary, buildBoundaryHookScript, buildBoundaryHookSettings } from './entity-boundaries'
 import { resolveEntityRuntime, type EntityRuntimeConfig } from './entity-runtime'
+import { generateSystemsEngineerPreset, deploySystemsEngineerCapabilities } from '../systems-engineer/se-preset'
+import { sessionModelFor, subagentModelFor, SUBAGENT_MODEL_ENV, writeZuarbeitAgents, type ModelRoutingConfig } from '../agent/model-routing'
 import type { PersistedGridState } from './session-store'
 import type { AgentAdapter } from '../agent/agent-adapter'
 import type { AdapterRegistry } from '../agent/registry'
@@ -310,6 +312,26 @@ export class SessionManager extends EventEmitter {
       ? this.resolveAdapter(opts.adapterId)
       : this.adapterForEntity(opts.entityId ?? null)
 
+    // Modell-Routing (agent/model-routing.ts). Nur Claude Code: die Namen sind
+    // Claude-Code-Aliase, und nur Claude Code liest die Subagent-Variable.
+    //
+    // Session-Modell: nur für eine Session ohne Rolle, die eine CLI startet
+    // (Ordner-Start, mux_create_session, Fork). Eine Rolle bringt ihr Modell aus
+    // der Registry mit, ein ausdrückliches `opts.model` gewinnt immer.
+    let model = opts.model
+    if (adapter.id === 'claude-code') {
+      try {
+        const routing = configStore.get('agent') as ModelRoutingConfig | undefined
+        const launchesCli = (opts.folderLaunch && !opts.folderLaunch.shellOnly) || !!opts.forkFromClaudeSessionId
+        if (!model && !opts.entityId && launchesCli) model = sessionModelFor(routing)
+        const subagentModel = subagentModelFor(routing)
+        if (subagentModel && !env[SUBAGENT_MODEL_ENV]) env = { ...env, [SUBAGENT_MODEL_ENV]: subagentModel }
+      } catch (err) {
+        // Init-Kette einer Session: lieber ohne Default starten als gar nicht.
+        console.warn('[SessionManager] Modell-Routing fehlgeschlagen:', err)
+      }
+    }
+
     // Merge MCP env vars if config is set
     if (this.mcpConfig) {
       const mcpUrl = `http://${this.mcpConfig.mcpHost}:${this.mcpConfig.mcpPort}`
@@ -339,7 +361,7 @@ export class SessionManager extends EventEmitter {
             sessionId: id,
             workspaceId: opts.workspaceId ?? null,
             entityId: opts.entityId ?? null,
-            ...(opts.model ? { model: opts.model } : {}),
+            ...(model ? { model } : {}),
           })
         } catch (err) {
           console.warn('[SessionManager] Adapter MCP injection failed:', err)
@@ -424,6 +446,7 @@ export class SessionManager extends EventEmitter {
       adapterId: adapter.id,
       capabilities: adapter.getCapabilities(),
       workspaceId: opts.workspaceId ?? null,
+      ...(model ? { model } : {}),
     }
 
     this.sessions.set(id, session)
@@ -445,7 +468,7 @@ export class SessionManager extends EventEmitter {
           resume: opts.folderLaunch.resume,
           forkLatest: opts.folderLaunch.forkLatest,
           skipPermissions: opts.folderLaunch.skipPermissions,
-          model: opts.model,
+          model,
         }))
       : undefined)
 
@@ -461,7 +484,7 @@ export class SessionManager extends EventEmitter {
         projectPath: opts.projectPath || os.homedir(),
         sessionName: opts.name,
         forkFromClaudeSessionId: opts.forkFromClaudeSessionId,
-        model: opts.model,
+        model,
       })
       const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
       this.setPendingLaunch(id, `clear; ${cmdStr}\n`)
@@ -1255,6 +1278,11 @@ export class SessionManager extends EventEmitter {
         if (!fs.existsSync(presetMdPath)) {
           fs.writeFileSync(presetMdPath, generateLocalWorkshopPreset(), 'utf-8')
         }
+      } else if (config.id === 'systems-engineer') {
+        if (!fs.existsSync(presetMdPath)) {
+          fs.writeFileSync(presetMdPath, generateSystemsEngineerPreset(), 'utf-8')
+        }
+        deploySystemsEngineerCapabilities(config.projectPath)
       } else if (config.id === 'local-worker') {
         // Bei jedem Start neu: der Worker hat keine Handarbeit zu bewahren,
         // und ein veralteter Rollentext wäre still wirksam.
@@ -1268,7 +1296,7 @@ export class SessionManager extends EventEmitter {
       // above have populated their targets in the entity dir (on a brand-new
       // entity these targets do not exist before this point — ensureRunDir
       // silently skips names whose target is missing).
-      ensureRunDir(workspaceId, entityId, entityDir, ['skills', 'guides', 'ref', 'brain', 'deliverables', '.claude/commands'])
+      ensureRunDir(workspaceId, entityId, entityDir, ['skills', 'guides', 'ref', 'brain', 'deliverables', 'capabilities', '.claude/commands'])
 
       // Always update MCP connection file for entities that use MCP
       if (config.features.includes('mcp') && this.mcpConfig) {
@@ -1449,11 +1477,18 @@ export class SessionManager extends EventEmitter {
       console.warn('[SessionManager] Instructions file for entity failed:', err)
     }
 
+    // Haiku-Zuarbeit nur für Claude Code — nur das liest `.claude/agents/`.
+    try {
+      if (this.adapterForEntity(entityId).id === 'claude-code') writeZuarbeitAgents(runDir)
+    } catch (err) {
+      console.warn('[SessionManager] Zuarbeit-Agenten fehlgeschlagen:', err)
+    }
+
     // Das Rollen-Modell muss bis zu postLaunchInjection reichen: opencode 2 hat am
     // Top-Level kein --model, das Modell reist dort als `model` in der Config.
     let roleModel: string | undefined
     try {
-      roleModel = resolveEntityRuntime(config, configStore.get('app') as EntityRuntimeConfig).model ?? undefined
+      roleModel = this.roleRuntime(config).model ?? undefined
     } catch (err) {
       console.warn('[SessionManager] Role model resolution failed:', err)
     }
@@ -1510,7 +1545,7 @@ export class SessionManager extends EventEmitter {
    * For multi-instance entities, targets the most recently added session.
    * Use queueEntityClaudeForSession() to target a specific session.
    */
-  queueEntityClaude(entityId: EntityId, targetSessionId?: string): void {
+  queueEntityClaude(entityId: EntityId, targetSessionId?: string, opts?: { model?: string }): void {
     const sessionId = targetSessionId ?? this.getFirstEntitySessionId(entityId)
     if (!sessionId) {
       throw new Error(`${entityId} is not running`)
@@ -1520,7 +1555,7 @@ export class SessionManager extends EventEmitter {
 
     // Role -> model / adapter. Absent values keep the previous behaviour
     // exactly: registry default adapter, no --model, CLI decides.
-    const runtime = resolveEntityRuntime(config, configStore.get('app') as EntityRuntimeConfig)
+    const runtime = this.roleRuntime(config)
     const adapter = this.resolveAdapter(runtime.adapterId)
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: config.projectPath,
@@ -1529,11 +1564,27 @@ export class SessionManager extends EventEmitter {
       isCyberFactory: entityId === 'cyber-factory',
       entityId,
       workDir: this.sessions.get(sessionId)?.projectPath ?? undefined,
-      ...(runtime.model ? { model: runtime.model } : {}),
+      // Ein ausdrücklich verlangtes Modell (Eskalation über mux_entity_start)
+      // schlägt die Rolle — sonst baute die Startzeile es wieder weg.
+      ...((opts?.model ?? runtime.model) ? { model: opts?.model ?? runtime.model } : {}),
     })
     const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
     this.autoLaunchedSessions.add(sessionId)
     this.setPendingLaunch(sessionId, `clear; ${cmdStr}\n`)
+  }
+
+  /**
+   * Rolle → Modell/Adapter, mit dem globalen Default-Adapter. Den braucht die
+   * Auflösung, weil ein Rollen-Modell nur unter claude-code gilt
+   * (`entity-runtime.ts`). Eine Stelle für alle fünf Aufrufer — liefen sie
+   * auseinander, startete die Rolle mit einem anderen Modell, als ihre
+   * MCP-Injektion annimmt.
+   */
+  private roleRuntime(config: EntityConfig) {
+    return resolveEntityRuntime(config, {
+      ...(configStore.get('app') as EntityRuntimeConfig),
+      defaultAdapterId: this.adapterRegistry.getDefault().id,
+    })
   }
 
   /**
@@ -1549,7 +1600,7 @@ export class SessionManager extends EventEmitter {
     const config = this.entityRegistry.get(entityId as EntityId)
     if (!config) return this.adapterRegistry.getDefault()
     try {
-      const runtime = resolveEntityRuntime(config, configStore.get('app') as EntityRuntimeConfig)
+      const runtime = this.roleRuntime(config)
       return this.resolveAdapter(runtime.adapterId)
     } catch (err) {
       // Ein Wurf hier liegt in der Init-Kette einer Session. Der Default ist
@@ -1630,7 +1681,7 @@ export class SessionManager extends EventEmitter {
     const session = await this.startEntity(entityId, { workspaceId: effectiveWorkspaceId })
 
     // Queue Claude launch resuming the prior conversation
-    const runtime = resolveEntityRuntime(config, configStore.get('app') as EntityRuntimeConfig)
+    const runtime = this.roleRuntime(config)
     const adapter = this.resolveAdapter(runtime.adapterId)
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: config.projectPath,

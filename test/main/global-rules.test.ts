@@ -8,11 +8,12 @@ import {
 
 describe('DEFAULT_GLOBAL_RULES', () => {
   it('contains key rules', () => {
+    // Token-Disziplin steht seit 2026-10-24 nur noch in der Persona.
     assert.ok(DEFAULT_GLOBAL_RULES.includes('Plan vor Code'))
-    assert.ok(DEFAULT_GLOBAL_RULES.includes('Test-First'))
+    assert.ok(DEFAULT_GLOBAL_RULES.includes('Verhaltenstests'))
     assert.ok(DEFAULT_GLOBAL_RULES.includes('Off-Limits'))
-    assert.ok(DEFAULT_GLOBAL_RULES.includes('Token-Disziplin'))
-    assert.ok(DEFAULT_GLOBAL_RULES.includes('Sicherheit'))
+    assert.ok(DEFAULT_GLOBAL_RULES.includes('Credentials'))
+    assert.ok(DEFAULT_GLOBAL_RULES.includes('Pre-Work-Check'))
   })
 })
 

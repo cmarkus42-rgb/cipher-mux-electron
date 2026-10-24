@@ -10,7 +10,7 @@ import * as os from 'os'
 const ENTITIES_DIR = path.join(os.homedir(), '.config/cipher-mux/entities')
 const REFINEMENT_DIR = path.join(ENTITIES_DIR, 'refinement')
 const CLAUDE_MD_PATH = path.join(REFINEMENT_DIR, 'CLAUDE.md')
-const V2_MARKER = '<!-- refinement-v3 -->'
+const V2_MARKER = '<!-- refinement-v4 -->'
 
 /**
  * Check if the current CLAUDE.md is already v2.
@@ -251,25 +251,6 @@ The maturity of the requirements is read from the note body (requirements-parser
 
 ## Lessons Learned
 
-When you recognize a learning (recurring problem, better approach, avoided mistake), decide on the right storage level:
-
-\`\`\`
-Learning recognized
-  ├─ Affects ALL entities? → global-rules.md (repo)
-  ├─ Affects ONLY this entity? → Update this entity's CLAUDE.md
-  └─ Affects user/project? → Note (mux_notes_create) — Companion Memory is Companion-only
-\`\`\`
-
-**Format:**
-\`\`\`
-LEARNING: [Short title]
-Datum: YYYY-MM-DD
-Quelle: [Session-ID or context]
-Ebene: global | entity | user | projekt
-Was: [Description of the problem/insight]
-Regel: [Derived rule for the future]
-\`\`\`
-
-Entity-level learnings should be formulated as suggestions to the user — do not modify CLAUDE.md on your own.
+Store learnings as described under "Wissen ablegen" in the Global Rules. Propose role-level learnings to the user as a change to this role's \`preset.md\` — do not change it on your own.
 `
 }

@@ -480,6 +480,8 @@
   "unified.fork": "Letzte Unterhaltung abzweigen (fork)",
   "unified.cli": "CLI",
   "unified.cliDefault": "Standard ({{name}})",
+  "unified.model": "Modell",
+  "unified.modelDefault": "Standard ({{name}})",
   "unified.workspace": "Workspace",
   "unified.workspaceNone": "ohne",
   "unified.cancel": "Abbrechen",

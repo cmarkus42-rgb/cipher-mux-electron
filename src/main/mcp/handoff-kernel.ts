@@ -16,6 +16,7 @@ import type { ToolContext } from './mcp-tools'
 import type { Topic } from '../../shared/types'
 import { findEntitySessions } from '../session/entity-session-lookup'
 import { registerMuxTool } from './register-tool'
+import { checkEscalation, buildEscalationNote } from '../agent/model-routing'
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -202,6 +203,27 @@ function formatPayload(senderEntityId: string, payload: Record<string, unknown>)
   return lines.join('\n')
 }
 
+// ─── Eskalation (agent/model-routing.ts) ───────────────────
+
+/**
+ * Eine Eskalation als Note festhalten. Best effort: die Session läuft schon,
+ * eine gescheiterte Note darf sie nicht zurücknehmen — sie steht dann im Log.
+ */
+export async function recordEscalation(
+  ctx: ToolContext,
+  args: { target: string; model: string; grund: string; sessionName?: string },
+): Promise<void> {
+  if (!ctx.noteManager) return
+  try {
+    const n = buildEscalationNote({ ...args, caller: ctx.entityId ?? null })
+    const note = await ctx.noteManager.create(n.title, n.body, n.tags)
+    ctx.noteSearchIndex?.addOrUpdate({ info: note, body: n.body })
+    ctx.windowManager?.sendToMainWindow(IPC.NOTES_CHANGED, { action: 'created', note })
+  } catch (err) {
+    console.warn('[recordEscalation] Note fehlgeschlagen:', err)
+  }
+}
+
 // ─── Entity Start (REQ-HANDOFF-006) ────────────────────────
 
 /**
@@ -211,17 +233,18 @@ function formatPayload(senderEntityId: string, payload: Record<string, unknown>)
 export async function startEntitySession(
   ctx: ToolContext,
   entityId: EntityId,
-  opts?: { projectPath?: string; name?: string },
+  opts?: { projectPath?: string; name?: string; model?: string },
 ): Promise<SessionInfo> {
   const session = await ctx.sessionManager.startEntity(entityId, {
     name: opts?.name ?? entityId,
     workspaceId: callerWorkspace(ctx),
     ...(opts?.projectPath ? { projectPath: opts.projectPath } : {}),
+    ...(opts?.model ? { model: opts.model } : {}),
   })
 
   // Launch Claude CLI in the new tmux session (matches UI path in ipc-hub ENTITY_START)
   try {
-    ctx.sessionManager.queueEntityClaude(entityId, session.id)
+    ctx.sessionManager.queueEntityClaude(entityId, session.id, opts?.model ? { model: opts.model } : undefined)
     ctx.sessionManager.scheduleStartupGreeting(entityId)
   } catch (err) {
     console.error(`[startEntitySession] Failed to queue Claude for ${entityId}:`, err)
@@ -442,25 +465,40 @@ function registerEntityStartTool(server: McpServer, ctx: ToolContext): void {
       description:
         'Start an entity session (same code path as UI preset button). '
         + 'Use for Workshop, Cyber Factory, Refinement, Ideation Partner, '
-        + 'Testing Assistant, Debugger, Audit, etc.',
+        + 'Testing Assistant, Debugger, Audit, Systems Engineer, etc. '
+        + 'The model comes from the role (Sonnet for build/review roles, Opus only for the Systems Engineer). '
+        + 'Opus for any other role is an escalation: pass model "opus" plus eskalation.grund — '
+        + 'without a reason the start is refused, with one the Mux logs a note "Eskalation: …". '
+        + 'After the start allow 8–10 s, check with capture-pane, then send instructions via tmux send-keys.',
       inputSchema: {
         entityId: z.string().describe('Entity identifier (e.g. "cyber-factory", "refinement", "debugger")'),
         projectPath: z.string().optional().describe('Project directory to hand the entity as context — NOT the session working directory (that is always the entity\'s run directory). Listed under Context Directories in its CLAUDE.md.'),
         name: z.string().optional().describe('Override display name (optional)'),
+        model: z.string().optional().describe('Model for this one session instead of the role default. Opus needs eskalation.grund.'),
+        eskalation: z.object({ grund: z.string() }).optional().describe('Required when model is Opus and the role is not the Systems Engineer'),
       },
     },
-    async (args: { entityId: string; projectPath?: string; name?: string }) => {
+    async (args: { entityId: string; projectPath?: string; name?: string; model?: string; eskalation?: { grund?: string } }) => {
       try {
+        const check = checkEscalation({ model: args.model, entityId: args.entityId, grund: args.eskalation?.grund })
+        if (!check.ok) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: check.error }) }], isError: true }
+        }
         const session = await startEntitySession(ctx, args.entityId as EntityId, {
           projectPath: args.projectPath,
           name: args.name,
+          ...(args.model ? { model: args.model } : {}),
         })
+        if (check.escalated) {
+          await recordEscalation(ctx, { target: args.entityId, model: args.model!, grund: args.eskalation!.grund!, sessionName: session.name })
+        }
 
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             ok: true,
             sessionId: session.id,
             entityId: args.entityId,
+            model: session.model ?? null,
           }) }],
         }
       } catch (err) {

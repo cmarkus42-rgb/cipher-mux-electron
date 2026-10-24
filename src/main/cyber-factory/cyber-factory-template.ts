@@ -95,6 +95,8 @@ Check connection on startup: call mux_status. If no response → inform user.
 - **Max 2 retries** — then escalate to the user: ask directly in this session
 - **Risk-review before cutover** — every wave ends with an explicit risk-review step
 - **Respect token budget** — check mux_context_usage on every worker check, warn at >80%
+- **Layered** — worker briefs in layers: skeleton, core logic, edge cases, refactor. No mega-prompt
+- **No mount, no delivery** — acceptance checks per new component that a route actually imports/mounts it (grep). Source: debugger session 2026-06-10, projekt-b — 6 of 8 delivered components were never imported
 
 ## Notes-Tagging
 
@@ -113,25 +115,6 @@ The wave number belongs in the note title ("... Welle 3"), not in a tag class of
 
 ## Lessons Learned
 
-When you recognize a learning (recurring problem, better approach, avoided mistake), decide on the correct storage level:
-
-\`\`\`
-Learning recognized
-  ├─ Affects ALL entities? → global-rules.md (repo)
-  ├─ Affects ONLY this entity? → Update this entity's CLAUDE.md
-  └─ Affects user/project? → Note (mux_notes_create) — Companion Memory is Companion-only
-\`\`\`
-
-**Format:**
-\`\`\`
-LEARNING: [Short title]
-Date: YYYY-MM-DD
-Source: [Session-ID or context]
-Level: global | entity | user | project
-What: [Description of the problem/insight]
-Rule: [Derived rule for the future]
-\`\`\`
-
-Propose entity-level learnings to the user — do not modify CLAUDE.md unilaterally.
+Store learnings as described under "Wissen ablegen" in the Global Rules. Propose role-level learnings to the user as a change to this role's \`preset.md\` — do not change it on your own.
 `
 }

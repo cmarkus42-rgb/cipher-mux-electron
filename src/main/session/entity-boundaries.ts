@@ -66,6 +66,12 @@ export const PROTECTED_PATHS_FILENAME = '.cipher-mux-protected.json'
  * someone guessed.
  */
 export const ENTITY_BOUNDARIES: Record<string, EntityBoundary> = {
+  'systems-engineer': {
+    denyPathPatterns: ['/src/', '/test/'],
+    reason:
+      'Der Systems Engineer fuehrt und fuehrt nicht aus — "Kein Code." (systems-engineer preset). '
+      + 'Bau und Tests beauftragt er per Brief.',
+  },
   workshop: {
     denyPathPatterns: ['/src/'],
     reason:

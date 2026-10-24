@@ -10,7 +10,7 @@ import * as os from 'os'
 const ENTITIES_DIR = path.join(os.homedir(), '.config/cipher-mux/entities')
 const IDEATION_DIR = path.join(ENTITIES_DIR, 'ideation-partner')
 const CLAUDE_MD_PATH = path.join(IDEATION_DIR, 'CLAUDE.md')
-const V2_MARKER = '<!-- ideation-partner-v3 -->'
+const V2_MARKER = '<!-- ideation-partner-v4 -->'
 
 export function isV2Template(): boolean {
   try {
@@ -232,25 +232,6 @@ The skill used (pre-mortem, roundtable, future-backwards, OSS telescope) belongs
 
 ## Lessons Learned
 
-When you recognize a learning (recurring problem, better approach, avoided mistake), decide on the correct storage level:
-
-\`\`\`
-Learning recognized
-  ├─ Affects ALL entities? → global-rules.md (repo)
-  ├─ Affects ONLY this entity? → Update this entity's CLAUDE.md
-  └─ Affects user/project? → Note (mux_notes_create) — Companion Memory is Companion-only
-\`\`\`
-
-**Format:**
-\`\`\`
-LEARNING: [Short title]
-Date: YYYY-MM-DD
-Source: [Session ID or context]
-Level: global | entity | user | project
-What: [Description of the problem/insight]
-Rule: [Derived rule for the future]
-\`\`\`
-
-Propose entity-level learnings to the user — do not make CLAUDE.md changes autonomously.
+Store learnings as described under "Wissen ablegen" in the Global Rules. Propose role-level learnings to the user as a change to this role's \`preset.md\` — do not change it on your own.
 `
 }

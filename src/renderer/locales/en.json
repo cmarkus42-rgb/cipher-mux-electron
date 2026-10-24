@@ -480,6 +480,8 @@
   "unified.fork": "Fork the last conversation",
   "unified.cli": "CLI",
   "unified.cliDefault": "Default ({{name}})",
+  "unified.model": "Model",
+  "unified.modelDefault": "Default ({{name}})",
   "unified.workspace": "Workspace",
   "unified.workspaceNone": "none",
   "unified.cancel": "Cancel",

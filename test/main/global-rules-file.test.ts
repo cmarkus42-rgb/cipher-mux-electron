@@ -90,21 +90,30 @@ describe('global-rules file operations', () => {
 })
 
 describe('DEFAULT_GLOBAL_RULES seed content', () => {
-  it('contains MCP-Tool-Grundregeln section', async () => {
+  // Kontext-Diät 2026-10-24: nur, was jede Rolle in jedem Turn braucht. Die
+  // Tool-Regeln (Worker-Startup, mux_send, Context-Monitoring, Task-Updates)
+  // stehen jetzt in den Tool-Beschreibungen, Companion Memory nur bei der
+  // Companion, Testcases beim Testing Assistant.
+  it('enthaelt Grundregeln, Pre-Work-Check, Wissen ablegen, Kontext', async () => {
     const { DEFAULT_GLOBAL_RULES } = await import('../../src/main/config/global-rules')
-    assert.ok(DEFAULT_GLOBAL_RULES.includes('### MCP-Tool-Grundregeln'))
-    assert.ok(DEFAULT_GLOBAL_RULES.includes('Session-Handoff Timing'))
-    assert.ok(DEFAULT_GLOBAL_RULES.includes('mux_send vs. tmux send-keys'))
-    assert.ok(DEFAULT_GLOBAL_RULES.includes('Context-Monitoring'))
-    assert.ok(DEFAULT_GLOBAL_RULES.includes('Task-Updates'))
-    assert.ok(DEFAULT_GLOBAL_RULES.includes('Notes fuer Persistenz'))
+    for (const h of ['### Grundregeln', '### Pre-Work-Check', '### Wissen ablegen', '### Kontext']) {
+      assert.ok(DEFAULT_GLOBAL_RULES.includes(h), h)
+    }
+    assert.ok(DEFAULT_GLOBAL_RULES.includes('Plan vor Code'))
+    assert.ok(DEFAULT_GLOBAL_RULES.includes('Off-Limits'))
   })
 
-  it('contains Universelle Regeln section', async () => {
+  it('bleibt unter 3.000 Zeichen und damit unter der Warnschwelle', async () => {
+    const { DEFAULT_GLOBAL_RULES, TOKEN_WARNING_CHAR_THRESHOLD } = await import('../../src/main/config/global-rules')
+    assert.ok(DEFAULT_GLOBAL_RULES.length <= 3000, `${DEFAULT_GLOBAL_RULES.length} Zeichen`)
+    assert.ok(DEFAULT_GLOBAL_RULES.length < TOKEN_WARNING_CHAR_THRESHOLD)
+  })
+
+  it('traegt keine rollen- oder toolspezifischen Bloecke mehr', async () => {
     const { DEFAULT_GLOBAL_RULES } = await import('../../src/main/config/global-rules')
-    assert.ok(DEFAULT_GLOBAL_RULES.includes('### Universelle Regeln'))
-    assert.ok(DEFAULT_GLOBAL_RULES.includes('Plan vor Code'))
-    assert.ok(DEFAULT_GLOBAL_RULES.includes('Sicherheit'))
+    for (const gone of ['companion_memory_', 'T-PREFIX', 'mux_tts_speak', '8-10s', 'MCP-Tool-Grundregeln']) {
+      assert.ok(!DEFAULT_GLOBAL_RULES.includes(gone), gone)
+    }
   })
 
   it('exports GLOBAL_RULES_PATH pointing to config dir', async () => {
