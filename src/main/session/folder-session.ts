@@ -176,6 +176,38 @@ export function ensureInstructionsFile(
   return target.file
 }
 
+/** Liegt `dir` echt unterhalb von `base`? Die Basis selbst und Nachbarn mit gleichem Praefix nicht. */
+function liegtUnter(dir: string, base: string): boolean {
+  const rel = path.relative(path.resolve(base), path.resolve(dir))
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)
+}
+
+/**
+ * Die Anweisungsdatei einer **Rolle** in ihrem Run-Verzeichnis. Liest die CLI
+ * `AGENTS.md` (opencode, Codex), steht dort der volle Rollentext — eine Kopie der
+ * eben zusammengesetzten `CLAUDE.md`, inklusive Versionsmarker —, nicht nur ein
+ * Verweis. Mit Verweis kam der Rollentext nur an, wenn das Modell der Bitte folgte,
+ * die Datei zu lesen (LESSONS L20a).
+ *
+ * Ueberschreiben ist nur hier vertretbar: das Run-Verzeichnis gehoert dem Mux, und
+ * die `CLAUDE.md` daneben wird ohnehin bei jedem Start neu geschrieben. Liegt
+ * `runDir` nicht unter `runsBase`, oder fehlt die `CLAUDE.md`, gilt
+ * `ensureInstructionsFile` — eine vorhandene AGENTS.md bleibt dann unangetastet.
+ */
+export function ensureEntityInstructionsFile(
+  runDir: string,
+  adapter: { instructionsTarget?: (present: { agentsMd: boolean; claudeMd: boolean }) => InstructionsTarget },
+  runsBase: string,
+): string {
+  const claudeMd = path.join(runDir, 'CLAUDE.md')
+  const target = adapter.instructionsTarget?.({ agentsMd: false, claudeMd: fs.existsSync(claudeMd) }) ?? { file: 'CLAUDE.md' as const }
+  if (target.file !== 'AGENTS.md' || !liegtUnter(runDir, runsBase) || !fs.existsSync(claudeMd)) {
+    return ensureInstructionsFile(runDir, adapter)
+  }
+  fs.writeFileSync(path.join(runDir, 'AGENTS.md'), fs.readFileSync(claudeMd, 'utf-8'), 'utf-8')
+  return target.file
+}
+
 function shellQuote(s: string): string {
   return `'${s.replace(/'/g, "'\\''")}'`
 }

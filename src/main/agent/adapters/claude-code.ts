@@ -15,6 +15,7 @@ import type { AdapterFeature, AdapterCapabilities } from '../../../shared/types'
 import { runCommand } from '../../util/exec-util'
 import { buildMcpServerConfig } from '../../mcp/workspace-header'
 import { CLAUDE_CODE_MODEL_ALIASES } from '../adapter-models'
+import { PROMPT_MARKERS } from '../../mcp/session-readiness'
 
 /** Minimal interface for reading the agent config section. */
 export interface AgentConfigReader {
@@ -61,6 +62,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
   readonly id = 'claude-code'
   readonly displayName = 'Claude Code'
   readonly tier = 'tier-1' as const
+  readonly promptMarkers = PROMPT_MARKERS
 
   private readonly configReader: AgentConfigReader
 

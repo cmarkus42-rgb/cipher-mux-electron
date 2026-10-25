@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import * as assert from 'node:assert/strict'
 import {
-  endpointProbeUrl, readUsageFile, probeEndpoint, checkWorkerReady, submitLine, type ProbeResult,
+  endpointProbeUrl, readUsageFile, probeEndpoint, checkWorkerReady, submitLine, paneTailLines, type ProbeResult,
 } from '../../../src/main/local-factory/worker-host-util'
 import { resolveLocalWorkerProfile } from '../../../src/main/local-factory/local-provider'
 import * as http from 'node:http'
@@ -116,5 +116,15 @@ describe('checkWorkerReady mit Profil', () => {
     })
     assert.match(r!, /Profil „mac" unbekannt/)
     assert.equal(probed, false)
+  })
+})
+
+describe('paneTailLines (L8)', () => {
+  it('letzte n Zeilen, ohne Farbcodes und ohne leeren Schwanz', async () => {
+    const pane = 'eins\n\x1b[31mzwei\x1b[0m\ndrei\nvier\n\n\n'
+    assert.deepEqual(await paneTailLines(async () => pane, 3), ['zwei', 'drei', 'vier'])
+  })
+  it('Capture wirft → leeres Array, kein Wurf', async () => {
+    assert.deepEqual(await paneTailLines(async () => { throw new Error('weg') }, 30), [])
   })
 })

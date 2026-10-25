@@ -254,6 +254,8 @@ export const IPC = {
   AGENT_DEFAULT_ADAPTER_GET: 'cipher-mux:agent:default-adapter:get',
   AGENT_DEFAULT_ADAPTER_SET: 'cipher-mux:agent:default-adapter:set',
   ENTITY_ADAPTER_GET: 'cipher-mux:entity:adapter:get',
+  /** Rollen-Default aus der Registry (`EntityConfig.adapterId`), unabhaengig von der Wahl pro Rolle. */
+  ENTITY_ADAPTER_DEFAULT_GET: 'cipher-mux:entity:adapter-default:get',
   ENTITY_ADAPTER_SET: 'cipher-mux:entity:adapter:set',
 
   // Welches Modell eine Rolle fährt. Dieselbe Auflösungskette wie die CLI —

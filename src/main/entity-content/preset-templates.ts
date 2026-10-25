@@ -14,6 +14,7 @@
 import { generateCompanionClaudeMd } from './companion-preset'
 import { generateRefinementClaudeMd, generateIdeationPartnerClaudeMd } from './index'
 import { generateLocalWorkshopPreset } from '../local-factory/workshop-preset'
+import { generateLocalFactoryPreset } from '../local-factory/presets'
 import { generateDebuggerClaudeMd } from '../debugger/debugger-template'
 import { generateSystemsEngineerPreset } from '../systems-engineer/se-preset'
 
@@ -24,6 +25,7 @@ export const PRESET_TEMPLATES: Readonly<Record<string, () => string>> = {
   debugger: generateDebuggerClaudeMd,
   'local-workshop': generateLocalWorkshopPreset,
   'systems-engineer': generateSystemsEngineerPreset,
+  'local-factory': generateLocalFactoryPreset,
 }
 
 /** Die Vorlage einer Rolle, oder `null` wenn sie keine hat. */

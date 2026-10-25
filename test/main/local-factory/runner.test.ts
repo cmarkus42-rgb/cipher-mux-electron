@@ -47,6 +47,7 @@ function fakeHost(behaviour: Behaviour): WorkerHost & { wakes: string[]; sent: s
       fs.writeFileSync(path.join(runDir, IDLE_SIGNAL_FILENAME), String(Date.now() + 1000))
     },
     async stopWorker() {},
+    async paneTail() { return [] },
     lastActivityAt() { return behaviour === 'haengt' ? 0 : Date.now() - 60_000 },
     tokensAt() { return { input: 10, output: 5 } },
     async wakeArchitect(line) { wakes.push(line) },
@@ -440,5 +441,92 @@ describe('LocalFactoryRunner — Branch-Bindung des Laufs', () => {
     const res = await fast(fakeHost('brav')).dispatch({ ...args(), laufId: id }) as Res
     assert.equal(res.ok, false)
     assert.match(res.error!, /anderes Projekt|\/ganz\/anderes\/projekt/)
+  })
+
+})
+
+describe('LocalFactoryRunner — Diagnose und Warnungen im Gate', () => {
+  it('HÄNGT: Diagnose steht im Gate, Pane-Schwanz vor stopWorker gelesen (L8)', async () => {
+    const host = fakeHost('haengt')
+    const reihenfolge: string[] = []
+    let n = 0
+    host.paneTail = async (_id, k) => { n = k; reihenfolge.push('paneTail'); return ['> denke nach', '█'] }
+    host.stopWorker = async () => { reihenfolge.push('stop') }
+    const r = fast(host)
+    const res = await r.dispatch(args()) as Res; await r.whenIdle()
+    assert.match(host.wakes[0], /HÄNGT/)
+    assert.equal(reihenfolge[0], 'paneTail')
+    assert.ok(reihenfolge.includes('stop'))
+    assert.ok(n >= 20 && n <= 50)
+    const g = JSON.parse(fs.readFileSync(loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0].gatePfad!, 'utf-8'))
+    assert.equal(g.verdict, 'haengt')
+    assert.deepEqual(g.diagnose.paneTail, ['> denke nach', '█'])
+    assert.deepEqual(g.diagnose.tokens, { input: 10, output: 5 })
+    // lastActivityAt 0 = unbekannt → null, nicht geraten
+    assert.equal(g.diagnose.letzteAktivitaet, null)
+    assert.equal(typeof g.diagnose.laufzeitSek, 'number')
+    assert.deepEqual(g.warnungen, [])
+  })
+
+  it('HÄNGT: bekannte Aktivität als Zeitpunkt, fehlende Tokens → null, paneTail wirft → []', async () => {
+    const host = fakeHost('haengt')
+    const t = Date.now() - 5_000
+    host.lastActivityAt = () => t
+    host.tokensAt = () => null
+    host.paneTail = async () => { throw new Error('tmux weg') }
+    // stallMs knapp, damit die junge Aktivität den Lauf nicht offen hält
+    const r = new LocalFactoryRunner({
+      host, laufDir, sleep: async () => {}, pollMs: 0, startupWaitMs: 0,
+      quietMs: 1000, stallMs: 1, timeoutMs: 50, testTimeoutMs: 5000,
+    })
+    const res = await r.dispatch(args()) as Res; await r.whenIdle()
+    const g = JSON.parse(fs.readFileSync(loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0].gatePfad!, 'utf-8'))
+    assert.equal(g.verdict, 'haengt')
+    assert.equal(g.diagnose.tokens, null)
+    assert.equal(g.diagnose.letzteAktivitaet, new Date(t).toISOString())
+    assert.deepEqual(g.diagnose.paneTail, [])
+  })
+
+  it('GRÜN: keine Diagnose im Gate, Warnungen leer', async () => {
+    const host = fakeHost('brav')
+    let gelesen = false
+    host.paneTail = async () => { gelesen = true; return [] }
+    const r = fast(host)
+    const res = await r.dispatch(args()) as Res; await r.whenIdle()
+    const g = JSON.parse(fs.readFileSync(loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0].gatePfad!, 'utf-8'))
+    assert.equal(g.diagnose, undefined)
+    assert.deepEqual(g.warnungen, [])
+    assert.equal(gelesen, false)
+  })
+
+  it('pytest „41 deselected“: Warnung im Gate und in der Weckzeile, Urteil bleibt GRÜN (L10)', async () => {
+    const host = fakeHost('brav')
+    const r = fast(host)
+    const res = await r.dispatch({
+      ...args(), testBefehl: `${TEST_CMD} && echo "== 3 passed, 41 deselected in 0.5s =="`,
+    }) as Res
+    await r.whenIdle()
+    assert.match(host.wakes[0], /GRÜN, Versuch 1\/2, Commit/)
+    assert.match(host.wakes[0], /41 Tests deselected/)
+    const v = loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0]
+    assert.equal(v.verdict, 'gruen')
+    const g = JSON.parse(fs.readFileSync(v.gatePfad!, 'utf-8'))
+    assert.equal(g.verdict, 'gruen')
+    assert.equal(g.warnungen.length, 1)
+    assert.match(g.warnungen[0], /41 Tests deselected/)
+  })
+
+  it('altes Gate ohne warnungen/diagnose: zweiter Versuch liest es trotzdem', async () => {
+    const host = fakeHost('haengt')
+    const r = fast(host)
+    const first = await r.dispatch(args()) as Res; await r.whenIdle()
+    const gp = loadLauf(first.laufPfad!)!.haeppchen[0].versuche[0].gatePfad!
+    fs.writeFileSync(gp, JSON.stringify({ verdict: 'rot', reasons: ['alter Grund'], testOutput: 'alte Ausgabe' }))
+    const second = await r.dispatch({ ...args(), laufId: first.laufId, haeppchen: 1 }) as Res
+    assert.equal(second.ok, true)
+    await r.whenIdle()
+    const auftrag = fs.readFileSync(host.sent[1].match(/\S+AUFTRAG\.md/)![0], 'utf-8')
+    assert.match(auftrag, /alter Grund/)
+    assert.match(auftrag, /alte Ausgabe/)
   })
 })

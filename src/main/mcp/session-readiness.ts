@@ -25,6 +25,8 @@
  * never be able to silence another.
  */
 
+import { stripAnsi } from '../util/ansi'
+
 /** Which signal established readiness. */
 export type ReadySignal = 'status-line' | 'prompt'
 
@@ -55,6 +57,11 @@ export interface ReadinessOptions {
    */
   since: number
   delays?: number[]
+  /**
+   * Prompt markers of the target session's adapter. Absent = Claude Code's.
+   * How a CLI draws its input is the adapter's knowledge, not this loop's.
+   */
+  promptMarkers?: readonly string[]
 }
 
 /** Markers Claude Code draws when it is waiting for input. */
@@ -73,6 +80,7 @@ export async function waitForSessionReady(
 ): Promise<ReadinessResult> {
   const delays = opts.delays ?? DEFAULT_BACKOFF
   const sleep = probes.sleep ?? defaultSleep
+  const markers = opts.promptMarkers ?? PROMPT_MARKERS
   let attempts = 0
 
   for (const delay of delays) {
@@ -91,8 +99,10 @@ export async function waitForSessionReady(
     } catch { /* no self-report available this round */ }
 
     try {
-      const captured = await probes.capturePane(sessionId)
-      if (PROMPT_MARKERS.some(marker => captured.includes(marker))) {
+      // The pane comes with colour codes (capture-pane -e). A TUI that colours
+      // the parts of a marker differently would otherwise never match.
+      const captured = stripAnsi(await probes.capturePane(sessionId))
+      if (markers.some(marker => captured.includes(marker))) {
         return { ready: true, via: 'prompt', attempts }
       }
     } catch { /* pane not capturable this round */ }

@@ -5,7 +5,7 @@ import * as os from 'os'
 import * as path from 'path'
 import {
   newLauf, beginVersuch, endVersuch, markAbgenommen, markBeurteilt, abortRunning, countWeckruf,
-  parseLauf, loadLauf, saveLauf, MAX_VERSUCHE, type Lauf,
+  parseLauf, loadLauf, saveLauf, MAX_VERSUCHE, zaehlendeVersuche, type Lauf,
 } from '../../../src/main/local-factory/lauf'
 
 const ok = <T>(r: T | { error: string }): T => {
@@ -166,5 +166,112 @@ describe('Lauf — Urteil', () => {
   it('parseLauf kennt den Status beurteilt', () => {
     const l = parseLauf({ id: 'L', projekt: '/p', haeppchen: [{ nummer: 1, ziel: 'a', status: 'beurteilt', versuche: [] }] })!
     assert.equal(l.haeppchen[0].status, 'beurteilt')
+  })
+})
+
+describe('L12 architektenfehler', () => {
+  const zweiRot = (): Lauf => {
+    let l = ok(beginVersuch(newLauf('L', '/p', 0), { ziel: 'a', now: 1 })).lauf
+    l = endVersuch(l, 1, { verdict: 'rot' }, 2)
+    l = ok(beginVersuch(l, { nummer: 1, ziel: 'a', now: 3 })).lauf
+    return endVersuch(l, 1, { verdict: 'rot' }, 4)
+  }
+  it('aus eskaliert heraus: markiert den letzten Fehlversuch, neuer Versuch zählt nicht gegen MAX_VERSUCHE', () => {
+    const l = zweiRot()
+    assert.equal(l.haeppchen[0].status, 'eskaliert')
+    const r = ok(beginVersuch(l, { nummer: 1, ziel: 'a', now: 5, architektenfehler: 'Test prüfte falsche Datei' }))
+    assert.equal(r.versuch, 3)
+    const h = r.lauf.haeppchen[0]
+    assert.equal(h.status, 'laeuft')
+    assert.equal(h.versuche[1].architektenfehler, 'Test prüfte falsche Datei')
+    assert.equal(h.versuche[0].architektenfehler, undefined)
+    assert.equal(zaehlendeVersuche(h), 2)
+    // rot im dritten Versuch: jetzt (wieder) ausgeschöpft
+    assert.equal(endVersuch(r.lauf, 1, { verdict: 'rot' }, 6).haeppchen[0].status, 'eskaliert')
+  })
+  it('nach einem Fehlversuch: es bleibt noch der reguläre zweite Versuch', () => {
+    let l = ok(beginVersuch(newLauf('L', '/p', 0), { ziel: 'a', now: 1 })).lauf
+    l = endVersuch(l, 1, { verdict: 'haengt' }, 2)
+    l = ok(beginVersuch(l, { nummer: 1, ziel: 'a', now: 3, architektenfehler: 'Zuschnitt zu groß' })).lauf
+    l = endVersuch(l, 1, { verdict: 'rot' }, 4)
+    assert.equal(l.haeppchen[0].status, 'wartet')
+    assert.equal(ok(beginVersuch(l, { nummer: 1, ziel: 'a', now: 5 })).versuch, 3)
+  })
+  it('Deckel 1 je Häppchen: ein zweiter architektenfehler wird abgelehnt', () => {
+    let l = ok(beginVersuch(zweiRot(), { nummer: 1, ziel: 'a', now: 5, architektenfehler: 'eins' })).lauf
+    l = endVersuch(l, 1, { verdict: 'rot' }, 6)
+    const r = beginVersuch(l, { nummer: 1, ziel: 'a', now: 7, architektenfehler: 'zwei' })
+    assert.ok('error' in r)
+    assert.match(r.error, /schon einen Architektenfehler/)
+    assert.match(r.error, /höchstens 1/)
+  })
+  it('ohne Fehlversuch nicht möglich: grüner letzter Versuch oder neues Häppchen', () => {
+    let l = ok(beginVersuch(newLauf('L', '/p', 0), { ziel: 'a', now: 1 })).lauf
+    l = endVersuch(l, 1, { verdict: 'gruen' }, 2)
+    const g = beginVersuch(l, { nummer: 1, ziel: 'a', now: 3, architektenfehler: 'x' })
+    assert.ok('error' in g && /Fehlversuch/.test(g.error))
+    const neu = beginVersuch(l, { ziel: 'b', now: 3, architektenfehler: 'x' })
+    assert.ok('error' in neu && /haeppchen/.test(neu.error))
+  })
+  it('architektenfehler übersteht Speichern und Laden', () => {
+    const l = ok(beginVersuch(zweiRot(), { nummer: 1, ziel: 'a', now: 5, architektenfehler: 'grund' })).lauf
+    assert.equal(parseLauf(JSON.parse(JSON.stringify(l)))!.haeppchen[0].versuche[1].architektenfehler, 'grund')
+  })
+})
+
+// Live-Test 23.10.: bricht der Läufer selbst ab, ist das kein Hänger des Workers.
+// User-Entscheid: Läuferfehler zählen automatisch nicht; Deckel 2 je Häppchen.
+describe('Läuferfehler: eigener Ausgang, zählt nicht, Deckel 2 je Häppchen', () => {
+  const lf = (l: Lauf, t: number): Lauf => {
+    const r = ok(beginVersuch(l, { ...(l.haeppchen.length ? { nummer: 1 } : {}), ziel: 'a', now: t }))
+    return endVersuch(r.lauf, 1, { verdict: 'laeuferfehler', fehler: `git failed ${t}` }, t + 1)
+  }
+
+  it('Ausgang laeuferfehler mit Meldung, Häppchen wartet, übersteht Speichern und Laden', () => {
+    const l = lf(newLauf('L', '/p', 0), 1)
+    const h = parseLauf(JSON.parse(JSON.stringify(l)))!.haeppchen[0]
+    assert.equal(h.status, 'wartet')
+    assert.equal(h.versuche[0].verdict, 'laeuferfehler')
+    assert.equal(h.versuche[0].fehler, 'git failed 1')
+    assert.equal(h.laeuferfehler, 1)
+  })
+
+  it('zählt automatisch nicht gegen MAX_VERSUCHE — erneuter Dispatch ohne Feld', () => {
+    const l = lf(newLauf('L', '/p', 0), 1)
+    assert.equal(zaehlendeVersuche(l.haeppchen[0]), 0)
+    const r = ok(beginVersuch(l, { nummer: 1, ziel: 'a', now: 5 }))
+    assert.equal(r.versuch, 2)
+  })
+
+  it('nach zwei roten Versuchen gibt es keinen Neustart — ein Läuferfehler im zweiten Versuch lässt ihn offen', () => {
+    let l = ok(beginVersuch(newLauf('L', '/p', 0), { ziel: 'a', now: 1 })).lauf
+    l = endVersuch(l, 1, { verdict: 'rot' }, 2)
+    l = lf(l, 3)
+    assert.equal(l.haeppchen[0].status, 'wartet')
+    assert.equal(ok(beginVersuch(l, { nummer: 1, ziel: 'a', now: 5 })).versuch, 3)
+  })
+
+  it('Deckel 2: der dritte Läuferfehler im Häppchen eskaliert', () => {
+    let l = lf(newLauf('L', '/p', 0), 1)
+    l = lf(l, 3)
+    assert.equal(l.haeppchen[0].status, 'wartet')
+    l = lf(l, 5)
+    assert.equal(l.haeppchen[0].status, 'eskaliert')
+    assert.equal(l.haeppchen[0].laeuferfehler, 3)
+    const r = beginVersuch(l, { nummer: 1, ziel: 'a', now: 7 })
+    assert.ok('error' in r && /eskaliert/.test(r.error))
+  })
+
+  it('Altfall lf-live: „haengt“ mit grünem Gate wird beim erneuten Dispatch zum Läuferfehler', () => {
+    const haengt = endVersuch(ok(beginVersuch(newLauf('L', '/p', 0), { ziel: 'a', now: 1 })).lauf, 1, { verdict: 'haengt' }, 2)
+    const ohne = ok(beginVersuch(haengt, { nummer: 1, ziel: 'a', now: 3 }))
+    assert.equal(ohne.lauf.haeppchen[0].versuche[0].verdict, 'haengt')
+    assert.equal(zaehlendeVersuche(ohne.lauf.haeppchen[0]), 2)
+    const mit = ok(beginVersuch(haengt, { nummer: 1, ziel: 'a', now: 3, letzterGateGruen: true }))
+    const h = mit.lauf.haeppchen[0]
+    assert.equal(h.versuche[0].verdict, 'laeuferfehler')
+    assert.match(h.versuche[0].fehler!, /haengt mit grünem Gate/)
+    assert.equal(h.laeuferfehler, 1)
+    assert.equal(zaehlendeVersuche(h), 1)
   })
 })

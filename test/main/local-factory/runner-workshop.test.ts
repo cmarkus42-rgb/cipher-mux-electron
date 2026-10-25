@@ -50,6 +50,7 @@ function fakeHost(behaviour: Behaviour): WorkerHost & { wakes: string[]; sent: s
       fs.writeFileSync(path.join(runDir, IDLE_SIGNAL_FILENAME), String(Date.now() + 1000))
     },
     async stopWorker() {},
+    async paneTail() { return [] },
     lastActivityAt() { return behaviour === 'haengt' ? 0 : Date.now() - 60_000 },
     tokensAt() { return { input: 10, output: 5 } },
     async wakeArchitect(line, rolle?: RunnerRolle) { wakes.push(line); wakeRollen.push(rolle) },

@@ -1,0 +1,15 @@
+   Ich kann im Rahmen dieser Tit +
+        rule-templates und orchestrator.rules.templates. Das Gate schließt diese
+        eine Datei mit ':!tests/test_heater.py' aus, sonst wäre es nie leer.
+     3. Löschung: Das Löschen von templates.py kann ich im Gate nur über den
+        Test und git grep prüfen, nicht direkt.
+
+     Build · Claude Sonnet 5.5 (Anthropic API) · 2m 24s · 115.2 tok/s
+
+  ┃
+  ┃
+  ┃
+  ┃  Build · Claude Sonnet 5.5 (Anthropic API) · high
+  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  …/runs/ws-1779806802206/local-factory    120.3K (12%) · $1.58  ctrl+p commands
+

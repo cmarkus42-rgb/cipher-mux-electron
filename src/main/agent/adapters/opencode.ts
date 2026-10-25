@@ -373,6 +373,16 @@ export class OpenCodeAdapter implements AgentAdapter {
   readonly id = 'opencode'
   readonly displayName = 'opencode'
   readonly tier = 'tier-2' as const
+  /**
+   * Woran man die TUI an ihrer Eingabe erkennt — gemessen an opencode 2 am
+   * 2026-10-23 (Probe: `test/fixtures/panes/opencode-2-idle.txt`). Die
+   * Unterkante des Eingabekastens (`╹▀▀…`) und die Fußzeile mit
+   * `ctrl+p commands`. Ein `❯` zeichnet opencode nicht; mit den Markern von
+   * Claude Code lief jede Zustellung in „neither a status-line report nor a
+   * visible prompt", gesendet wurde nichts. Eine Shell nach der Hilfe-Ausgabe
+   * zeigt keins von beiden.
+   */
+  readonly promptMarkers = ['╹▀▀', 'ctrl+p commands'] as const
 
   private readonly configReader: OpenCodeConfigReader
 
@@ -561,8 +571,7 @@ export class OpenCodeAdapter implements AgentAdapter {
       fs.writeFileSync(
         boundaryPath,
         buildOpenCodeBoundaryPlugin(
-          boundary.denyPathPatterns,
-          boundary.reason,
+          boundary,
           boundary.denyListFile ? path.join(projectPath, boundary.denyListFile) : undefined,
         ),
         { encoding: 'utf-8', mode: 0o644 },
@@ -587,7 +596,8 @@ export class OpenCodeAdapter implements AgentAdapter {
    * CLAUDE.md da, liest es sie") gilt nicht mehr. Deshalb wie bei Codex: immer
    * `AGENTS.md`, und fehlt sie, legt der Mux sie mit Verweis auf eine vorhandene
    * `CLAUDE.md` an, damit die Session die eigentlichen Projektanweisungen nicht
-   * verliert.
+   * verliert. Im Run-Verzeichnis einer Rolle steht statt des Verweises der volle
+   * Rollentext (`ensureEntityInstructionsFile`, L20a).
    */
   instructionsTarget(present: { agentsMd: boolean; claudeMd: boolean }): InstructionsTarget {
     return !present.agentsMd && present.claudeMd

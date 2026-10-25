@@ -57,3 +57,64 @@ describe('renderBilanzNote', () => {
     assert.match(renderBilanzNote([]), /Noch keine Aufträge/)
   })
 })
+
+describe('L12 Architektenfehler in der Bilanz', () => {
+  const mitAF: Lauf = {
+    ...lauf,
+    haeppchen: [{ ...lauf.haeppchen[0], versuche: [
+      { ...lauf.haeppchen[0].versuche[0], architektenfehler: 'Test falsch geschnitten' },
+      lauf.haeppchen[0].versuche[1],
+    ] }],
+  }
+  it('Anläufe zählen nur Modellversuche; der Architektenfehler steht eigens da', () => {
+    const z = buildBilanzZeile(mitAF, 1, { ergebnis: 'uebernommen', kategorie: 'ui' },
+      { now: '2026-10-12T10:00:00Z', workspaceId: null, mitTest: true })
+    assert.equal(z.anlaeufe, 1)
+    assert.equal(z.architektenfehler, 'Test falsch geschnitten')
+  })
+  it('ohne Architektenfehler: null', () => {
+    const z = buildBilanzZeile(lauf, 1, { ergebnis: 'uebernommen', kategorie: 'ui' },
+      { now: '2026-10-12T10:00:00Z', workspaceId: null, mitTest: true })
+    assert.equal(z.architektenfehler, null)
+  })
+  it('die Note weist Architektenfehler eigens aus', () => {
+    const z = buildBilanzZeile(mitAF, 1, { ergebnis: 'uebernommen', kategorie: 'ui' },
+      { now: '2026-10-12T10:00:00Z', workspaceId: null, mitTest: true })
+    const md = renderBilanzNote([z])
+    assert.match(md, /## Architektenfehler/)
+    assert.match(md, /Test falsch geschnitten/)
+    assert.doesNotMatch(renderBilanzNote([{ ...z, architektenfehler: null }]), /## Architektenfehler/)
+  })
+})
+
+describe('L16a rotGrund in der Bilanz', () => {
+  it('übersteuertes Vorab-Rot steht als rotGrund in Zeile und Note', () => {
+    const l: Lauf = { ...lauf, haeppchen: [{ ...lauf.haeppchen[0], versuche: [
+      { ...lauf.haeppchen[0].versuche[0], rotGrund: 'Fehler im Test ist Absicht' }, lauf.haeppchen[0].versuche[1],
+    ] }] }
+    const z = buildBilanzZeile(l, 1, { ergebnis: 'uebernommen', kategorie: 'ui' }, { now: '2026-10-12T10:00:00Z', workspaceId: null, mitTest: true })
+    assert.equal(z.rotGrund, 'Fehler im Test ist Absicht')
+    assert.match(renderBilanzNote([z]), /## Übersteuertes Vorab-Rot[\s\S]*Fehler im Test ist Absicht/)
+    assert.equal(buildBilanzZeile(lauf, 1, { ergebnis: 'uebernommen', kategorie: 'ui' }, { now: 'x', workspaceId: null, mitTest: true }).rotGrund, null)
+  })
+})
+
+describe('Läuferfehler in der Bilanz', () => {
+  const mitLF: Lauf = { ...lauf, haeppchen: [{ ...lauf.haeppchen[0], laeuferfehler: 1, versuche: [
+    { ...lauf.haeppchen[0].versuche[0], verdict: 'laeuferfehler', fehler: 'git failed: index.lock' },
+    lauf.haeppchen[0].versuche[1],
+  ] }] }
+  it('zählt nicht als Anlauf; Anzahl und letzte Meldung stehen in Zeile und Note', () => {
+    const z = buildBilanzZeile(mitLF, 1, { ergebnis: 'uebernommen', kategorie: 'ui' }, { now: '2026-10-23T10:00:00Z', workspaceId: null, mitTest: true })
+    assert.equal(z.anlaeufe, 1)
+    assert.equal(z.laeuferfehler, 1)
+    assert.equal(z.laeuferfehlerMeldung, 'git failed: index.lock')
+    assert.match(renderBilanzNote([z]), /## Läuferfehler[\s\S]*1× — git failed: index\.lock/)
+  })
+  it('ohne Läuferfehler: 0, kein Abschnitt', () => {
+    const z = buildBilanzZeile(lauf, 1, { ergebnis: 'uebernommen', kategorie: 'ui' }, { now: 'x', workspaceId: null, mitTest: true })
+    assert.equal(z.laeuferfehler, 0)
+    assert.equal(z.laeuferfehlerMeldung, null)
+    assert.doesNotMatch(renderBilanzNote([z]), /## Läuferfehler/)
+  })
+})

@@ -53,30 +53,53 @@ export function buildDispatchDescription(rolle: RunnerRolle): string {
     + 'accept=true with laufId and haeppchen (and nothing else required) marks a green item as accepted '
     + 'after you reviewed the commit. All other fields are required for a dispatch. '
     + 'local-workshop: accept=true carries the verdict (ergebnis, kategorie, notiz — notiz required for nachgebessert) and also works for an exhausted item. '
-    + 'For local-workshop: geschuetzteTests may be empty (routine without its own test); testBefehl is still required.'
+    + 'For local-workshop: geschuetzteTests may be empty (routine without its own test); testBefehl is still required. '
+    + 'Optional: ersetzungen [{datei, alt, neu}] — the gate turns red if alt is still in datei or neu is missing. '
+    + 'architektenfehler: "<reason>" on a retry (same laufId + haeppchen) marks the last failed attempt as your mistake '
+    + '(wrong cut or test); it does not count against the 2 attempts, works once per item, also after escalation. '
+    + 'A runner failure (wake line LÄUFERFEHLER — the mux itself broke, e.g. git failed at the commit; after a green gate '
+    + 'the worker change stays in the worktree, a patch lies next to the gate) does not count against the 2 attempts; '
+    + 'just dispatch again (same laufId + haeppchen, no extra field) once the worktree is clean. A HÄNGT whose gate file is '
+    + 'green counts the same way (old case). The third runner failure in an item escalates it. '
+    + 'rotGrund: "<reason>" overrides the refusal when the acceptance test is red from an error in the test file itself '
+    + '(not possible when a test helper such as globalThis.x or __x is missing). '
+    + 'The target repo may carry .cipher-mux/local-factory.json (yours, the worker may not change it): '
+    + 'pflichtGates [{muster, befehl}] extra commands for matching changed files, vorpruefung {befehl, erwartet} '
+    + '({projekt} placeholder) and worktreeVorbereitung {befehl} before the attempt ("Nicht bereit" counts no attempt), '
+    + 'sauberkeitIgnoriert [paths] left out of clean-tree check, diff and reset, '
+    + 'verboteneMuster [{pfad, regex, grund}] checked on added lines. Parser hints come back as hinweise.'
+}
+
+/** Eingaben des Werkzeugs; exportiert, damit das Schema sich testen lässt. */
+export const DISPATCH_INPUT_SCHEMA = {
+  // Optional im Schema, Pflicht beim Dispatch (validateAuftrag) — ein accept braucht sie nicht.
+  projekt: z.string().optional().describe('Dispatch: absolute path of the target git repo'),
+  ziel: z.string().optional().describe('Dispatch: required'),
+  dateien: z.array(z.string()).optional().describe('Dispatch: required'),
+  akzeptanzkriterium: z.string().optional().describe('Dispatch: required'),
+  geschuetzteTests: z.array(z.string()).optional()
+    .describe('Dispatch: acceptance tests plus every file the test command depends on, repo-relative or absolute'),
+  testBefehl: z.string().optional().describe('Dispatch: shell command run in the repo; exit 0 = green'),
+  nichtZiele: z.array(z.string()).optional().describe('Dispatch: required (may be empty)'),
+  laufId: z.string().optional().describe('Returned by the first dispatch; pass it on every later item and retry'),
+  haeppchen: z.number().int().positive().optional().describe('Item number; pass it for a retry and for accept'),
+  profil: z.string().optional().describe('Dispatch: model profile name from the settings; omit for the default'),
+  accept: z.boolean().optional(),
+  ergebnis: z.enum(ERGEBNISSE).optional().describe('local-workshop verdict with accept=true'),
+  kategorie: z.enum(KATEGORIEN).optional().describe('local-workshop verdict with accept=true'),
+  notiz: z.string().optional().describe('local-workshop verdict; required for ergebnis=nachgebessert'),
+  ersetzungen: z.array(z.object({ datei: z.string(), alt: z.string(), neu: z.string() })).optional()
+    .describe('Dispatch: literal replacements the gate counts after the worker (repo-relative datei)'),
+  architektenfehler: z.string().optional()
+    .describe('Retry only: reason why the last failed attempt was your mistake; not counted, once per item'),
+  rotGrund: z.string().optional()
+    .describe('Dispatch: reason why the acceptance test is rightly red despite an error located in the test file'),
 }
 
 export function registerLocalFactoryTool(server: McpServer, ctx: ToolContext): void {
   registerMuxTool(server, LOCAL_WORKER_DISPATCH_TOOL, {
     description: buildDispatchDescription(ctx.entityId === 'local-workshop' ? 'local-workshop' : 'local-factory'),
-    inputSchema: {
-      // Optional im Schema, Pflicht beim Dispatch (validateAuftrag) — ein accept braucht sie nicht.
-      projekt: z.string().optional().describe('Dispatch: absolute path of the target git repo'),
-      ziel: z.string().optional().describe('Dispatch: required'),
-      dateien: z.array(z.string()).optional().describe('Dispatch: required'),
-      akzeptanzkriterium: z.string().optional().describe('Dispatch: required'),
-      geschuetzteTests: z.array(z.string()).optional()
-        .describe('Dispatch: acceptance tests plus every file the test command depends on, repo-relative or absolute'),
-      testBefehl: z.string().optional().describe('Dispatch: shell command run in the repo; exit 0 = green'),
-      nichtZiele: z.array(z.string()).optional().describe('Dispatch: required (may be empty)'),
-      laufId: z.string().optional().describe('Returned by the first dispatch; pass it on every later item and retry'),
-      haeppchen: z.number().int().positive().optional().describe('Item number; pass it for a retry and for accept'),
-      profil: z.string().optional().describe('Dispatch: model profile name from the settings; omit for the default'),
-      accept: z.boolean().optional(),
-      ergebnis: z.enum(ERGEBNISSE).optional().describe('local-workshop verdict with accept=true'),
-      kategorie: z.enum(KATEGORIEN).optional().describe('local-workshop verdict with accept=true'),
-      notiz: z.string().optional().describe('local-workshop verdict; required for ergebnis=nachgebessert'),
-    },
+    inputSchema: DISPATCH_INPUT_SCHEMA,
   }, async (args: ToolArgs) => {
     try {
       const { result, isError } = await handleLocalFactoryCall(getRunner(ctx), args, ctx.entityId === 'local-workshop' ? 'local-workshop' : 'local-factory')

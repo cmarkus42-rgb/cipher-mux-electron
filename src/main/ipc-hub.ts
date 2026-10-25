@@ -225,6 +225,11 @@ export class IpcHub {
     this.noteWatcher = new NoteWatcher(notesDir, (noteId) => {
       console.log(`[NoteWatcher] External change detected: ${noteId}`)
       this.tagIndex.rebuild()
+      // Jeder Schreibweg ausserhalb der Oberflaeche landet hier (MCP-Werkzeuge
+      // unterdruecken das Ereignis nicht). Ohne diese Zeile blieb der Suchindex
+      // auf dem Stand des App-Starts.
+      this.noteSearchIndex.syncNote(this.noteManager, noteId).catch(err =>
+        console.warn(`[NoteWatcher] Suchindex fuer ${noteId} nicht aktualisiert:`, err))
       this.windowManager.sendToAllWindows(IPC.NOTES_CHANGED, {
         action: 'external-update',
         id: noteId,
@@ -1907,6 +1912,13 @@ export class IpcHub {
 
     ipcMain.handle(IPC.ENTITY_ADAPTER_GET, (_e, entityId: string) => {
       return readEntityOverride(configStore.get('app').entityAdapters, entityId)
+    })
+
+    // Der mittlere Schritt der Kette. Ohne ihn zeigt der Preset-Editor fuer eine
+    // Rolle ohne eigene Wahl den globalen Default — beim Local Worker also
+    // Claude Code, obwohl opencode startet.
+    ipcMain.handle(IPC.ENTITY_ADAPTER_DEFAULT_GET, (_e, entityId: string) => {
+      return this.sessionManager.getEntityRegistry().get(entityId as EntityId)?.adapterId ?? null
     })
 
     // Modellliste pro Adapter. Zwischengespeichert fuer die Laufzeit der App:

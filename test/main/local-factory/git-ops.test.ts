@@ -6,7 +6,7 @@ import * as path from 'path'
 import { execFileSync } from 'child_process'
 import {
   runShell, dirtyFiles, headCommit, commitPaths, commitAll, changedSince,
-  checksums, savePatchAndReset, toRepoRelative, currentBranch, loginShell, diffStat,
+  checksums, savePatchAndReset, toRepoRelative, currentBranch, loginShell, diffStat, istIgnoriert, hinzugefuegteZeilen,
 } from '../../../src/main/local-factory/git-ops'
 
 let repo: string
@@ -160,5 +160,205 @@ describe('loginShell', () => {
   it('zsh, wo es sie gibt; sonst /bin/sh (Linux-CI hat keine zsh)', () => {
     assert.equal(loginShell(() => true), '/bin/zsh')
     assert.equal(loginShell(() => false), '/bin/sh')
+  })
+})
+
+describe('L15 sauberkeitIgnoriert in git-ops', () => {
+  it('istIgnoriert: Datei, Verzeichnis, Symlink-Name; Eintrag mit oder ohne Schrägstrich', () => {
+    assert.equal(istIgnoriert('node_modules', ['node_modules']), true)
+    assert.equal(istIgnoriert('node_modules', ['node_modules/']), true)
+    assert.equal(istIgnoriert('node_modules/x/y.js', ['./node_modules']), true)
+    assert.equal(istIgnoriert('.venv', ['.venv']), true)
+    assert.equal(istIgnoriert('node_modules_alt/x', ['node_modules']), false)
+    assert.equal(istIgnoriert('src/a.ts', []), false)
+  })
+  it('Symlink ohne Schrägstrich: gitignore „node_modules/“ erfasst ihn nicht — dirtyFiles sieht ihn', async () => {
+    const ziel = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-nm-'))
+    fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules/\n'); git('add', '.'); git('commit', '-qm', 'gi')
+    fs.symlinkSync(ziel, path.join(repo, 'node_modules'))
+    assert.deepEqual(await dirtyFiles(repo), ['node_modules'])
+  })
+  it('commitAll und savePatchAndReset lassen ignorierte Einträge liegen und nehmen sie nicht auf', async () => {
+    const ziel = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-nm-'))
+    fs.symlinkSync(ziel, path.join(repo, 'node_modules'))
+    fs.mkdirSync(path.join(repo, '.venv')); fs.writeFileSync(path.join(repo, '.venv', 'x'), 'x')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'neu\n')
+    await commitAll(repo, base, 'gruen', ['node_modules', '.venv/'])
+    assert.equal(git('show', '--name-only', '--format=', 'HEAD'), 'a.txt')
+
+    const base2 = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'rot\n')
+    fs.writeFileSync(path.join(repo, 'neu.txt'), 'n\n')
+    const patch = path.join(os.tmpdir(), `lf-ign-${Date.now()}.patch`)
+    await savePatchAndReset(repo, base2, patch, ['node_modules', '.venv'])
+    assert.equal(fs.lstatSync(path.join(repo, 'node_modules')).isSymbolicLink(), true)
+    assert.equal(fs.existsSync(path.join(repo, '.venv', 'x')), true)
+    assert.equal(fs.existsSync(path.join(repo, 'neu.txt')), false)
+    const p = fs.readFileSync(patch, 'utf-8')
+    assert.match(p, /neu\.txt/)
+    assert.doesNotMatch(p, /node_modules|\.venv/)
+  })
+})
+
+describe('L16b hinzugefuegteZeilen', () => {
+  it('nur +-Zeilen mit Zeilennummer, ohne +++-Kopf und ohne gelöschte; neue Dateien ganz; Ignoriertes nicht', async () => {
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'eins\nzwei\ndrei\n'); git('commit', '-qam', 'drei')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'eins\nZWEI\ndrei\nvier\n')
+    fs.mkdirSync(path.join(repo, 'src'))
+    fs.writeFileSync(path.join(repo, 'src', 'neu.js'), 'x = 1\n+++ kein Kopf\n')
+    fs.mkdirSync(path.join(repo, '.cache')); fs.writeFileSync(path.join(repo, '.cache', 'c.js'), 'geheim\n')
+    const z = await hinzugefuegteZeilen(repo, base, ['.cache'])
+    assert.deepEqual(z.sort((x, y) => (x.datei + x.zeile).localeCompare(y.datei + y.zeile)), [
+      { datei: 'a.txt', zeile: 2, text: 'ZWEI' },
+      { datei: 'a.txt', zeile: 4, text: 'vier' },
+      { datei: 'src/neu.js', zeile: 1, text: 'x = 1' },
+      { datei: 'src/neu.js', zeile: 2, text: '+++ kein Kopf' },
+    ])
+  })
+})
+
+describe('L16b hinzugefuegteZeilen: nicht zu umgehen', () => {
+  it('.gitattributes „binary“ versteckt keine Zeilen', async () => {
+    fs.writeFileSync(path.join(repo, '.gitattributes'), '*.js binary\n')
+    fs.mkdirSync(path.join(repo, 'src')); fs.writeFileSync(path.join(repo, 'src', 'a.js'), 'alt\n')
+    git('add', '.'); git('commit', '-qm', 'attr')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'src', 'a.js'), 'alt\nglobalThis.__x = 1\n')
+    const z = await hinzugefuegteZeilen(repo, base)
+    assert.deepEqual(z, [{ datei: 'src/a.js', zeile: 2, text: 'globalThis.__x = 1' }])
+  })
+  it('NUL-Byte in einer neuen Datei versteckt sie nicht', async () => {
+    const base = await headCommit(repo)
+    fs.mkdirSync(path.join(repo, 'src')); fs.writeFileSync(path.join(repo, 'src', 'b.js'), 'globalThis.__y = 1\n\u0000\n')
+    const z = await hinzugefuegteZeilen(repo, base)
+    assert.ok(z.some(x => x.datei === 'src/b.js' && x.text === 'globalThis.__y = 1'))
+  })
+  it('Pfad mit Anführungszeichen (git quotet ihn) wird richtig gelesen', async () => {
+    fs.mkdirSync(path.join(repo, 'src')); fs.writeFileSync(path.join(repo, 'src', 'a"b.js'), 'x\n')
+    git('add', '.'); git('commit', '-qm', 'quote')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'src', 'a"b.js'), 'x\nglobalThis.__z = 1\n')
+    const z = await hinzugefuegteZeilen(repo, base)
+    assert.deepEqual(z, [{ datei: 'src/a"b.js', zeile: 2, text: 'globalThis.__z = 1' }])
+  })
+})
+
+describe('L16b hinzugefuegteZeilen: Diff-Kopf eindeutig', () => {
+  it('eine hinzugefügte Zeile „++ …“ ist Inhalt, kein +++-Kopf', async () => {
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'a\n++ globalThis.__x = 1\nweiter\n')
+    const z = await hinzugefuegteZeilen(repo, base)
+    assert.deepEqual(z, [
+      { datei: 'a.txt', zeile: 2, text: '++ globalThis.__x = 1' },
+      { datei: 'a.txt', zeile: 3, text: 'weiter' },
+    ])
+  })
+  it('diff.noprefix im Repo ändert nichts am gelesenen Pfad', async () => {
+    git('config', 'diff.noprefix', 'true')
+    fs.mkdirSync(path.join(repo, 'b')); fs.writeFileSync(path.join(repo, 'b', 'c.js'), 'x\n')
+    git('add', '.'); git('commit', '-qm', 'b')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'b', 'c.js'), 'x\ny\n')
+    assert.deepEqual(await hinzugefuegteZeilen(repo, base), [{ datei: 'b/c.js', zeile: 2, text: 'y' }])
+  })
+})
+
+describe('L16b hinzugefuegteZeilen: Leerzeichen im Pfad', () => {
+  it('git hängt dann einen Tab an den Kopf — der Pfad bleibt richtig', async () => {
+    fs.mkdirSync(path.join(repo, 'src')); fs.writeFileSync(path.join(repo, 'src', 'mit leer.js'), 'x\n')
+    git('add', '.'); git('commit', '-qm', 'leer')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'src', 'mit leer.js'), 'x\ny\n')
+    assert.deepEqual(await hinzugefuegteZeilen(repo, base), [{ datei: 'src/mit leer.js', zeile: 2, text: 'y' }])
+  })
+})
+
+// Live-Test 23.10. (projekt-a): `dashboard-src/.gitignore` nennt `node_modules` und
+// `.svelte-kit` ohne Schrägstrich, beide stehen zugleich unter sauberkeitIgnoriert.
+// Ein Ausschluss-Pathspec auf einen Pfad, den git ohnehin ignoriert, lässt
+// `git add` mit rc=1 abbrechen („paths are ignored by one of your .gitignore files“).
+describe('sauberkeitIgnoriert und .gitignore zugleich (Läuferfehler lf-live)', () => {
+  const EINTRAEGE = ['dashboard-src/node_modules', 'dashboard-src/.svelte-kit']
+  let ziel: string
+  beforeEach(() => {
+    ziel = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-nm-'))
+    fs.mkdirSync(path.join(repo, 'dashboard-src'))
+    fs.writeFileSync(path.join(repo, 'dashboard-src', '.gitignore'), 'node_modules\n.svelte-kit\n')
+    fs.writeFileSync(path.join(repo, 'dashboard-src', 'app.ts'), 'alt\n')
+    git('add', '.'); git('commit', '-qm', 'dashboard')
+    fs.mkdirSync(path.join(repo, 'dashboard-src', '.svelte-kit'))
+    fs.writeFileSync(path.join(repo, 'dashboard-src', '.svelte-kit', 'tsconfig.json'), '{}')
+  })
+
+  for (const art of ['Verzeichnis', 'Symlink'] as const) {
+    const lege = () => art === 'Symlink'
+      ? fs.symlinkSync(ziel, path.join(repo, 'dashboard-src', 'node_modules'))
+      : (fs.mkdirSync(path.join(repo, 'dashboard-src', 'node_modules')), fs.writeFileSync(path.join(repo, 'dashboard-src', 'node_modules', 'x.js'), 'x'))
+
+    it(`commitAll: node_modules als ${art} — Commit gelingt, ohne die ignorierten Einträge`, async () => {
+      lege()
+      const base = await headCommit(repo)
+      fs.writeFileSync(path.join(repo, 'dashboard-src', 'app.ts'), 'neu\n')
+      fs.writeFileSync(path.join(repo, 'dashboard-src', 'neu.ts'), 'n\n')
+      await commitAll(repo, base, 'gruen', EINTRAEGE)
+      assert.equal(git('rev-parse', 'HEAD~1'), base)
+      assert.deepEqual(git('show', '--name-only', '--format=', 'HEAD').split('\n').sort(), ['dashboard-src/app.ts', 'dashboard-src/neu.ts'])
+      assert.equal(git('status', '--porcelain'), '')
+    })
+
+    it(`savePatchAndReset: node_modules als ${art} — Patch und Reset gelingen, Einträge bleiben liegen`, async () => {
+      lege()
+      const base = await headCommit(repo)
+      fs.writeFileSync(path.join(repo, 'dashboard-src', 'app.ts'), 'rot\n')
+      fs.writeFileSync(path.join(repo, 'dashboard-src', 'neu.ts'), 'n\n')
+      const patch = path.join(os.tmpdir(), `lf-gi-${Date.now()}-${art}.patch`)
+      await savePatchAndReset(repo, base, patch, EINTRAEGE)
+      const p = fs.readFileSync(patch, 'utf-8')
+      assert.match(p, /dashboard-src\/neu\.ts/)
+      assert.doesNotMatch(p, /node_modules|\.svelte-kit/)
+      assert.equal(fs.readFileSync(path.join(repo, 'dashboard-src', 'app.ts'), 'utf-8'), 'alt\n')
+      assert.equal(fs.existsSync(path.join(repo, 'dashboard-src', 'neu.ts')), false)
+      assert.equal(fs.existsSync(path.join(repo, 'dashboard-src', '.svelte-kit', 'tsconfig.json')), true)
+      assert.equal(fs.existsSync(path.join(repo, 'dashboard-src', 'node_modules')), true)
+    })
+  }
+
+  it('L15 bleibt: Symlink, den .gitignore NICHT erfasst („node_modules/“), wird weiter ausgeschlossen', async () => {
+    fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules/\n'); git('add', '.gitignore'); git('commit', '-qm', 'gi')
+    fs.symlinkSync(ziel, path.join(repo, 'node_modules'))
+    fs.symlinkSync(ziel, path.join(repo, 'dashboard-src', 'node_modules'))
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'neu\n')
+    await commitAll(repo, base, 'gruen', ['node_modules', ...EINTRAEGE])
+    assert.equal(git('show', '--name-only', '--format=', 'HEAD'), 'a.txt')
+    assert.equal(fs.lstatSync(path.join(repo, 'node_modules')).isSymbolicLink(), true)
+  })
+
+  it('getrackte Datei unter einem Ignoriermuster bleibt ausgeschlossen (check-ignore mit Index)', async () => {
+    fs.writeFileSync(path.join(repo, '.gitignore'), 'gen.txt\n')
+    fs.writeFileSync(path.join(repo, 'gen.txt'), 'g\n')
+    git('add', '.gitignore'); git('add', '-f', 'gen.txt'); git('commit', '-qm', 'gen')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'gen.txt'), 'lokal\n')
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'neu\n')
+    await commitAll(repo, base, 'gruen', ['gen.txt'])
+    assert.equal(git('show', '--name-only', '--format=', 'HEAD'), 'a.txt')
+  })
+
+  it('ignoriertes Verzeichnis mit getrackter Datei: Ausschluss bleibt, commitAll scheitert statt sie mitzunehmen', async () => {
+    // check-ignore mit Index nennt ein Verzeichnis mit getrackten Dateien „nicht ignoriert“;
+    // git add bricht dann am Ausschluss ab (fail-closed) — still committet wird nichts.
+    fs.writeFileSync(path.join(repo, '.gitignore'), 'gen\n')
+    fs.mkdirSync(path.join(repo, 'gen')); fs.writeFileSync(path.join(repo, 'gen', 'getrackt.txt'), 't\n')
+    git('add', '.gitignore'); git('add', '-f', 'gen/getrackt.txt'); git('commit', '-qm', 'gen')
+    const base = await headCommit(repo)
+    fs.writeFileSync(path.join(repo, 'gen', 'getrackt.txt'), 'lokal\n')
+    fs.writeFileSync(path.join(repo, 'gen', 'neu.txt'), 'n\n')
+    fs.writeFileSync(path.join(repo, 'a.txt'), 'neu\n')
+    await assert.rejects(commitAll(repo, base, 'gruen', ['gen']), /ignored/)
+    assert.equal(git('rev-parse', 'HEAD'), base)
+    assert.doesNotMatch(git('diff', '--cached', '--name-only'), /gen\//)
   })
 })

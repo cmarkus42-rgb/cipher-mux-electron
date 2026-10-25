@@ -1,0 +1,333 @@
+// test/main/local-factory/runner-lauffix.test.ts
+//
+// Läuferfehler aus dem Live-Test 23.10. (projekt-a): Gate GRÜN, dann brach der
+// Commit ab, und der Versuch stand als „haengt“ da. Echtes git-Repo; der
+// Fake-Worker tut, was der Test ihm aufträgt.
+import { describe, it, beforeEach } from 'node:test'
+import * as assert from 'node:assert/strict'
+import * as fs from 'fs'
+import * as os from 'os'
+import * as path from 'path'
+import { execFileSync } from 'child_process'
+import { LocalFactoryRunner, type WorkerHost, type RunnerRolle } from '../../../src/main/local-factory/runner'
+import { loadLauf, zaehlendeVersuche } from '../../../src/main/local-factory/lauf'
+import { IDLE_SIGNAL_FILENAME } from '../../../src/main/local-factory/worker-done'
+
+let repo: string
+let laufDir: string
+const git = (...a: string[]) => execFileSync('git', a, { cwd: repo, encoding: 'utf-8' }).trim()
+const schreib = (rel: string, inhalt: string) => {
+  fs.mkdirSync(path.dirname(path.join(repo, rel)), { recursive: true })
+  fs.writeFileSync(path.join(repo, rel), inhalt)
+}
+
+const TEST_CMD = 'grep -q ok impl.txt'
+
+type Arbeit = (repo: string) => void
+const loest: Arbeit = () => schreib('impl.txt', 'ok\n')
+
+function fakeHost(arbeit: Arbeit = loest) {
+  let runDir = ''
+  const wakes: string[] = []
+  const sent: string[] = []
+  const host: WorkerHost & { wakes: string[]; sent: string[] } = {
+    wakes, sent,
+    async workerReady() { return null },
+    async startFreshWorker() {
+      runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-run-'))
+      return { runDir, sessionId: 's1' }
+    },
+    async sendToWorker(_id, line) {
+      sent.push(line)
+      arbeit(repo)
+      fs.writeFileSync(path.join(runDir, 'REPORT.md'), 'fertig')
+      fs.writeFileSync(path.join(runDir, IDLE_SIGNAL_FILENAME), String(Date.now() + 1000))
+    },
+    async stopWorker() {},
+    async paneTail() { return [] },
+    lastActivityAt() { return Date.now() - 60_000 },
+    tokensAt() { return { input: 10, output: 5 } },
+    async wakeArchitect(line: string, _rolle?: RunnerRolle) { wakes.push(line) },
+  }
+  return host
+}
+
+const runner = (host: WorkerHost, rolle?: RunnerRolle) => new LocalFactoryRunner({
+  host, laufDir, sleep: async () => {}, pollMs: 0, startupWaitMs: 0,
+  quietMs: 1000, stallMs: 5000, timeoutMs: 2000, testTimeoutMs: 5000, ...(rolle ? { rolle } : {}),
+})
+
+const args = () => ({
+  projekt: repo,
+  ziel: 'impl sagt ok',
+  dateien: ['impl.txt'],
+  akzeptanzkriterium: 'impl.txt enthält ok',
+  geschuetzteTests: ['test/accept.sh'],
+  testBefehl: TEST_CMD,
+  nichtZiele: [] as string[],
+})
+
+function config(c: unknown): void {
+  schreib('.cipher-mux/local-factory.json', JSON.stringify(c))
+  git('add', '.cipher-mux'); git('commit', '-qm', 'config')
+}
+
+type Res = { ok: boolean; error?: string; laufId?: string; laufPfad?: string; versuch?: number }
+async function lauf(r: LocalFactoryRunner, a: Record<string, unknown>): Promise<Res> {
+  const res = await r.dispatch(a as never) as Res
+  await r.whenIdle()
+  return res
+}
+
+beforeEach(() => {
+  repo = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'lf-fix-')))
+  laufDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-fix-lauf-'))
+  git('init', '-q'); git('config', 'user.email', 't@t'); git('config', 'user.name', 't')
+  schreib('impl.txt', 'nein\n')
+  git('add', '.'); git('commit', '-qm', 'init')
+  schreib('test/accept.sh', `${TEST_CMD}\n`)
+})
+
+describe('Konstellation projekt-a: sauberkeitIgnoriert zugleich von einer Unter-.gitignore erfasst', () => {
+  let extern: string
+  beforeEach(() => {
+    extern = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-fix-nm-'))
+    schreib('dashboard-src/.gitignore', 'node_modules\n.svelte-kit\n')
+    git('add', 'dashboard-src'); git('commit', '-qm', 'dashboard')
+    config({ sauberkeitIgnoriert: ['node_modules', 'dashboard-src/node_modules', 'dashboard-src/.svelte-kit'] })
+    fs.symlinkSync(extern, path.join(repo, 'dashboard-src', 'node_modules'))
+    schreib('dashboard-src/.svelte-kit/tsconfig.json', '{}')
+  })
+
+  it('GRÜN wird committet: kein Läuferfehler, Commit nur mit der Arbeit des Workers', async () => {
+    const host = fakeHost()
+    const res = await lauf(runner(host), args())
+    assert.equal(res.ok, true, res.error)
+    assert.match(host.wakes[0], /GRÜN/)
+    assert.equal(git('show', '--name-only', '--format=', 'HEAD'), 'impl.txt')
+    assert.equal(loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0].verdict, 'gruen')
+  })
+
+  it('ROT: Patch und Reset gelingen, die ignorierten Einträge bleiben liegen', async () => {
+    const host = fakeHost(() => schreib('impl.txt', 'nein, nein\n'))
+    const res = await lauf(runner(host), args())
+    assert.match(host.wakes[0], /ROT/)
+    const v = loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0]
+    assert.equal(v.verdict, 'rot')
+    assert.match(fs.readFileSync(v.patchPfad!, 'utf-8'), /impl\.txt/)
+    assert.equal(fs.readFileSync(path.join(repo, 'impl.txt'), 'utf-8'), 'nein\n')
+    assert.equal(fs.lstatSync(path.join(repo, 'dashboard-src', 'node_modules')).isSymbolicLink(), true)
+    assert.equal(fs.existsSync(path.join(repo, 'dashboard-src', '.svelte-kit', 'tsconfig.json')), true)
+  })
+})
+
+// Der Testbefehl legt nach grünem Test eine index.lock an — ein echter git-Fehler
+// beim Commit, wie im Live-Test, nur mit anderer Ursache.
+const SPERRT_COMMIT = `${TEST_CMD} && touch .git/index.lock`
+const gateVon = (laufPfad: string, nummer = 1, v = -1) => {
+  const versuch = loadLauf(laufPfad)!.haeppchen.find(h => h.nummer === nummer)!.versuche.at(v)!
+  return JSON.parse(fs.readFileSync(versuch.gatePfad!, 'utf-8'))
+}
+
+describe('Läuferfehler: eigener Ausgang statt „haengt“', () => {
+  it('Commit scheitert nach GRÜN → laeuferfehler in lauf.json, Gate und Weckzeile; Arbeit bleibt im Worktree', async () => {
+    const host = fakeHost()
+    const res = await lauf(runner(host), { ...args(), testBefehl: SPERRT_COMMIT })
+    assert.equal(res.ok, true, res.error)
+    const h = loadLauf(res.laufPfad!)!.haeppchen[0]
+    const v = h.versuche[0]
+    assert.equal(v.verdict, 'laeuferfehler')
+    assert.match(v.fehler!, /index\.lock/)
+    assert.equal(h.status, 'wartet')
+    // Die Arbeit des Workers ist nicht verloren: im Baum und als Patch.
+    assert.equal(fs.readFileSync(path.join(repo, 'impl.txt'), 'utf-8'), 'ok\n')
+    assert.match(fs.readFileSync(v.patchPfad!, 'utf-8'), /impl\.txt/)
+    const g = gateVon(res.laufPfad!)
+    assert.equal(g.verdict, 'gruen')
+    assert.match(g.laeuferfehler.meldung, /index\.lock/)
+    assert.match(g.laeuferfehler.baum, /ungesichert im Worktree/)
+    assert.equal(host.wakes.length, 1)
+    assert.match(host.wakes[0], /#1 „impl sagt ok“: LÄUFERFEHLER 1\/2, zählt nicht/)
+    assert.match(host.wakes[0], /einfach erneut dispatchen/)
+    assert.match(host.wakes[0], /Worker-Änderung liegt ungesichert im Worktree/)
+    assert.match(host.wakes[0], /Läuferfehler: git failed/)
+    assert.doesNotMatch(host.wakes[0], /HÄNGT/)
+  })
+
+  it('Läuferfehler vor dem Gate (sendToWorker wirft) → laeuferfehler, Baum auf Basis wie bisher', async () => {
+    const host = fakeHost()
+    host.sendToWorker = async () => { schreib('impl.txt', 'kaputt\n'); throw new Error('boom') }
+    const res = await lauf(runner(host), args())
+    const v = loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0]
+    assert.equal(v.verdict, 'laeuferfehler')
+    assert.match(v.fehler!, /boom/)
+    assert.equal(fs.readFileSync(path.join(repo, 'impl.txt'), 'utf-8'), 'nein\n')
+    assert.match(host.wakes[0], /LÄUFERFEHLER.*Baum auf die Basis zurückgesetzt/)
+  })
+
+  it('Retry ohne sauberen Baum: die Ablehnung nennt den Läuferfehler und den Patch', async () => {
+    const res = await lauf(runner(fakeHost()), { ...args(), testBefehl: SPERRT_COMMIT })
+    fs.rmSync(path.join(repo, '.git', 'index.lock'))
+    const r2 = await lauf(runner(fakeHost()), { ...args(), laufId: res.laufId, haeppchen: 1 })
+    assert.equal(r2.ok, false)
+    assert.match(r2.error!, /nicht sauber.*impl\.txt/)
+    assert.match(r2.error!, /Läuferfehler in Versuch #1\.1.*versuch-1-1\.patch/)
+  })
+})
+
+describe('Erneuter Dispatch nach Läuferfehler — ohne Feld, nicht gezählt, Deckel 2', () => {
+  const aufraeumen = () => {
+    fs.rmSync(path.join(repo, '.git', 'index.lock'), { force: true })
+    git('reset', '-q', '--hard'); git('clean', '-fdq')
+  }
+
+  it('nach Läuferfehler: neuer Versuch zählt nicht, Weckzeile und lauf.json weisen ihn aus, kein „vorige Versuch“', async () => {
+    const res = await lauf(runner(fakeHost()), { ...args(), testBefehl: SPERRT_COMMIT })
+    aufraeumen()
+    const gut = fakeHost()
+    const r2 = await lauf(runner(gut), { ...args(), laufId: res.laufId, haeppchen: 1 })
+    assert.equal(r2.ok, true, r2.error)
+    assert.equal(r2.versuch, 2)
+    assert.match(gut.wakes[0], /GRÜN, Versuch 1\/2 \(1 Läuferfehler nicht gezählt\)/)
+    const h = loadLauf(res.laufPfad!)!.haeppchen[0]
+    assert.equal(h.laeuferfehler, 1)
+    assert.equal(zaehlendeVersuche(h), 1)
+    const auftrag = fs.readFileSync(gut.sent[0].match(/\S+AUFTRAG\.md/)![0], 'utf-8')
+    assert.doesNotMatch(auftrag, /vorige Versuch ist durchgefallen/)
+  })
+
+  it('der dritte Läuferfehler im Häppchen eskaliert: Weckzeile endet auf ESKALIERT, weiterer Dispatch abgelehnt', async () => {
+    const res = await lauf(runner(fakeHost()), { ...args(), testBefehl: SPERRT_COMMIT })
+    aufraeumen()
+    const zweiter = fakeHost()
+    await lauf(runner(zweiter), { ...args(), testBefehl: SPERRT_COMMIT, laufId: res.laufId, haeppchen: 1 })
+    assert.match(zweiter.wakes[0], /LÄUFERFEHLER 2\/2, zählt nicht/)
+    aufraeumen()
+    const dritter = fakeHost()
+    await lauf(runner(dritter), { ...args(), testBefehl: SPERRT_COMMIT, laufId: res.laufId, haeppchen: 1 })
+    assert.match(dritter.wakes[0], /wiederholter Läuferfehler/)
+    assert.match(dritter.wakes[0], /— ESKALIERT, an den User melden$/)
+    assert.ok(dritter.wakes[0].length <= 400)
+    assert.equal(loadLauf(res.laufPfad!)!.haeppchen[0].status, 'eskaliert')
+    aufraeumen()
+    const r4 = await lauf(runner(fakeHost()), { ...args(), laufId: res.laufId, haeppchen: 1 })
+    assert.equal(r4.ok, false)
+    assert.match(r4.error!, /eskaliert/)
+  })
+
+  it('Altfall lf-live: „haengt“ mit grünem Gate zählt beim erneuten Dispatch als Läuferfehler', async () => {
+    const laufId = 'LFLIVE'
+    const dir = path.join(laufDir, laufId)
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'gate-1-1.json'), JSON.stringify({ verdict: 'gruen', reasons: [], testOutput: '31 passed' }))
+    git('add', 'test'); git('commit', '-qm', 'lf: Abnahmetest #1')
+    fs.writeFileSync(path.join(dir, 'lauf.json'), JSON.stringify({
+      id: laufId, projekt: repo, erstellt: 1, weckrufe: 1, branch: git('rev-parse', '--abbrev-ref', 'HEAD'),
+      // So stand es nach dem Abbruch da: kein gatePfad, Ausgang haengt.
+      haeppchen: [{ nummer: 1, ziel: 'impl sagt ok', status: 'wartet', mitTest: true, versuche: [{ nr: 1, gestartet: 1, beendet: 2, verdict: 'haengt' }] }],
+    }))
+    const host = fakeHost()
+    const r = await lauf(runner(host), { ...args(), laufId, haeppchen: 1 })
+    assert.equal(r.ok, true, r.error)
+    assert.match(host.wakes[0], /GRÜN, Versuch 1\/2 \(1 Läuferfehler nicht gezählt\)/)
+    assert.equal(loadLauf(path.join(dir, 'lauf.json'))!.haeppchen[0].versuche[0].verdict, 'laeuferfehler')
+  })
+
+  it('„haengt“ ohne grünes Gate bleibt ein gezählter Hänger', async () => {
+    const laufId = 'LHAENGT'
+    const dir = path.join(laufDir, laufId)
+    fs.mkdirSync(dir, { recursive: true })
+    git('add', 'test'); git('commit', '-qm', 'lf: Abnahmetest #1')
+    fs.writeFileSync(path.join(dir, 'lauf.json'), JSON.stringify({
+      id: laufId, projekt: repo, erstellt: 1, weckrufe: 1, branch: git('rev-parse', '--abbrev-ref', 'HEAD'),
+      haeppchen: [{ nummer: 1, ziel: 'z', status: 'wartet', versuche: [{ nr: 1, gestartet: 1, beendet: 2, verdict: 'haengt' }] }],
+    }))
+    const host = fakeHost()
+    await lauf(runner(host), { ...args(), laufId, haeppchen: 1 })
+    assert.match(host.wakes[0], /GRÜN, Versuch 2\/2/)
+    assert.doesNotMatch(host.wakes[0], /Läuferfehler/)
+  })
+})
+
+describe('Gate-Record: pruefungen — welche Zusatzprüfungen liefen, mit welchem Ergebnis', () => {
+  type P = { art: string; ergebnis: string; detail?: string }
+  const finde = (ps: P[], art: string) => ps.filter(p => p.art === art)
+
+  it('ohne Projekt-Config, GRÜN: jede Prüfung steht da — nicht konfiguriert, Config-Schutz bestanden', async () => {
+    const res = await lauf(runner(fakeHost()), args())
+    const ps: P[] = gateVon(res.laufPfad!).pruefungen
+    for (const art of ['vorpruefung', 'worktreeVorbereitung', 'pflichtGates', 'verboteneMuster', 'ersetzungen']) {
+      assert.deepEqual(finde(ps, art).map(p => p.ergebnis), ['nicht-konfiguriert'], art)
+    }
+    assert.deepEqual(finde(ps, 'configSchutz').map(p => p.ergebnis), ['bestanden'])
+  })
+
+  it('mit Config: Vorprüfung, Vorbereitung (erster Dispatch), Pflicht-Gates je Eintrag, Muster, Ersetzungen', async () => {
+    config({
+      vorpruefung: { befehl: 'echo {projekt}', erwartet: 'lf-fix-' },
+      worktreeVorbereitung: { befehl: 'true' },
+      pflichtGates: [{ muster: 'impl.txt', befehl: 'true' }, { muster: 'docs/**', befehl: 'false' }],
+      verboteneMuster: [{ pfad: '*.txt', regex: 'VERBOTEN', grund: 'nein' }, { pfad: '*.txt', regex: 'AUCH', grund: 'nein' }],
+    })
+    const res = await lauf(runner(fakeHost()), { ...args(), ersetzungen: [{ datei: 'impl.txt', alt: 'nein', neu: 'ok' }] })
+    const g = gateVon(res.laufPfad!)
+    assert.equal(g.verdict, 'gruen')
+    const ps: P[] = g.pruefungen
+    assert.equal(finde(ps, 'vorpruefung')[0].ergebnis, 'bestanden')
+    assert.equal(finde(ps, 'worktreeVorbereitung')[0].ergebnis, 'bestanden')
+    const pg = finde(ps, 'pflichtGates')
+    assert.equal(pg.length, 2)
+    assert.equal(pg[0].ergebnis, 'bestanden')
+    assert.match(pg[0].detail!, /ausgelöst durch impl\.txt/)
+    assert.equal(pg[1].ergebnis, 'nicht-ausgeloest')
+    assert.match(pg[1].detail!, /nicht ausgelöst/)
+    assert.equal(finde(ps, 'verboteneMuster')[0].ergebnis, 'bestanden')
+    assert.match(finde(ps, 'verboteneMuster')[0].detail!, /Treffer 0\/2/)
+    assert.equal(finde(ps, 'ersetzungen')[0].ergebnis, 'bestanden')
+  })
+
+  it('zweiter Dispatch im Lauf: Vorbereitung übersprungen; Treffer eines Musters → rot', async () => {
+    config({ worktreeVorbereitung: { befehl: 'true' }, verboteneMuster: [{ pfad: '*.txt', regex: 'VERBOTEN', grund: 'nein' }] })
+    const r1 = await lauf(runner(fakeHost()), args())
+    schreib('test/accept2.sh', 'grep -q zwei zwei.txt\n')
+    const r2 = await lauf(runner(fakeHost(() => schreib('zwei.txt', 'zwei VERBOTEN\n'))), {
+      ...args(), laufId: r1.laufId, geschuetzteTests: ['test/accept2.sh'], testBefehl: 'grep -q zwei zwei.txt', dateien: ['zwei.txt'],
+    })
+    const ps: P[] = gateVon(r2.laufPfad!, 2).pruefungen
+    assert.equal(finde(ps, 'worktreeVorbereitung')[0].ergebnis, 'uebersprungen')
+    assert.match(finde(ps, 'worktreeVorbereitung')[0].detail!, /nicht der erste Dispatch/)
+    assert.equal(finde(ps, 'verboteneMuster')[0].ergebnis, 'rot')
+    assert.match(finde(ps, 'verboteneMuster')[0].detail!, /Treffer 1\/1/)
+  })
+
+  it('Worker ändert die Projekt-Config → configSchutz rot', async () => {
+    config({})
+    const res = await lauf(runner(fakeHost(() => { schreib('impl.txt', 'ok\n'); schreib('.cipher-mux/local-factory.json', '{"testpfade":[]}') })), args())
+    assert.equal(finde(gateVon(res.laufPfad!).pruefungen, 'configSchutz')[0].ergebnis, 'rot')
+  })
+})
+
+describe('Läuferfehler nach ROTEM Gate: kein Freifahrtschein', () => {
+  it('Reset scheitert nach ROT → Ausgang bleibt rot (gezählt), Meldung vermerkt, gezählt wie jedes ROT', async () => {
+    // Das Pflicht-Gate macht den Gate rot und sperrt den Index: Patch+Reset scheitern danach.
+    config({ pflichtGates: [{ muster: 'impl.txt', befehl: 'touch .git/index.lock; exit 1' }] })
+    const host = fakeHost()
+    const res = await lauf(runner(host), args())
+    const v = loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0]
+    assert.equal(v.verdict, 'rot')
+    assert.match(v.fehler!, /index\.lock/)
+    assert.match(host.wakes[0], /: ROT, Versuch 1\/2/)
+    assert.match(host.wakes[0], /Läuferfehler/)
+    assert.doesNotMatch(host.wakes[0], /zählt nicht/)
+    assert.equal(zaehlendeVersuche(loadLauf(res.laufPfad!)!.haeppchen[0]), 1)
+  })
+
+  it('auch wenn der Reset scheitert: die vom Worker geänderte Projekt-Config wird wiederhergestellt', async () => {
+    config({ pflichtGates: [{ muster: 'impl.txt', befehl: 'touch .git/index.lock; exit 1' }] })
+    const vorher = fs.readFileSync(path.join(repo, '.cipher-mux/local-factory.json'))
+    const host = fakeHost(() => { schreib('impl.txt', 'ok\n'); schreib('.cipher-mux/local-factory.json', '{}') })
+    const res = await lauf(runner(host), args())
+    assert.equal(loadLauf(res.laufPfad!)!.haeppchen[0].versuche[0].verdict, 'rot')
+    assert.deepEqual(fs.readFileSync(path.join(repo, '.cipher-mux/local-factory.json')), vorher)
+  })
+})

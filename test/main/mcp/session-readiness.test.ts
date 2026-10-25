@@ -1,6 +1,10 @@
 import { describe, it } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { waitForSessionReady } from '../../../src/main/mcp/session-readiness'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import { waitForSessionReady, PROMPT_MARKERS } from '../../../src/main/mcp/session-readiness'
+import { OpenCodeAdapter } from '../../../src/main/agent/adapters/opencode'
+import { ClaudeCodeAdapter } from '../../../src/main/agent/adapters/claude-code'
 import type { ReadinessProbes } from '../../../src/main/mcp/session-readiness'
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -164,5 +168,87 @@ describe('waitForSessionReady', () => {
     )
 
     assert.equal(result.via, 'status-line', 'the session\'s own report outranks reading its screen')
+  })
+})
+
+// ─── Prompt-Muster je Adapter (L18) ─────────────────────────
+//
+// Die Prompt-Erkennung kannte nur Claude Code. Gegen eine opencode-TUI kam
+// zweimal „neither a status-line report nor a visible prompt", gesendet wurde
+// nichts. Das Muster gehoert dem Adapter der Ziel-Session, nicht dem Kernel.
+
+const OPENCODE_IDLE = fs.readFileSync(
+  path.join(__dirname, '../../fixtures/panes/opencode-2-idle.txt'),
+  'utf-8',
+)
+
+// Dieselbe TUI, wie der Mux sie wirklich liest: capture-pane mit -e, also mit
+// Farbcodes. Ohne -e gezogen blieb T-LFH.7 im Test gruen und live rot.
+const OPENCODE_IDLE_E = fs.readFileSync(
+  path.join(__dirname, '../../fixtures/panes/opencode-2-idle-e.txt'),
+  'utf-8',
+)
+
+describe('waitForSessionReady — Prompt-Muster des Adapters', () => {
+  it('erkennt eine opencode-TUI an ihrer Eingabe, wenn die Marker vom Adapter kommen', async () => {
+    const markers = new OpenCodeAdapter().promptMarkers
+    const result = await waitForSessionReady(
+      probes({ capturePane: async () => OPENCODE_IDLE }),
+      'sess-1',
+      { ...FAST, promptMarkers: markers },
+    )
+    assert.equal(result.ready, true)
+    assert.equal(result.via, 'prompt')
+  })
+
+  it('erkennt die opencode-TUI auch mit Farbcodes zwischen den Markerzeichen (T-LFH.7)', async () => {
+    const result = await waitForSessionReady(
+      probes({ capturePane: async () => OPENCODE_IDLE_E }),
+      'sess-1',
+      { ...FAST, promptMarkers: new OpenCodeAdapter().promptMarkers },
+    )
+    assert.equal(result.ready, true)
+    assert.equal(result.via, 'prompt')
+  })
+
+  it('erkennt den Claude-Code-Prompt auch eingefaerbt', async () => {
+    const result = await waitForSessionReady(
+      probes({ capturePane: async () => '\x1b[38;2;153;153;153m❯\x1b[39m \x1b]8;;\x07' }),
+      'sess-1',
+      { ...FAST, promptMarkers: undefined },
+    )
+    assert.equal(result.ready, true)
+  })
+
+  it('opencode-Marker sehen in einer Shell nach der Hilfe-Ausgabe keinen Prompt', async () => {
+    // opencode 2 druckt bei unbekannter Option die Hilfe und beendet sich;
+    // im Pane steht danach eine Shell. Das ist keine bereite Session.
+    const shell = [
+      'Commands:',
+      '  opencode run [message..]   run opencode with a message',
+      '  opencode models            list all available models',
+      '',
+      'cipher@mini local-factory % ',
+    ].join('\n')
+    const result = await waitForSessionReady(
+      probes({ capturePane: async () => shell }),
+      'sess-1',
+      { ...FAST, promptMarkers: new OpenCodeAdapter().promptMarkers },
+    )
+    assert.equal(result.ready, false)
+    assert.equal(result.via, null)
+  })
+
+  it('ohne Adapter-Marker bleibt es bei denen von Claude Code', async () => {
+    const result = await waitForSessionReady(
+      probes({ capturePane: async () => '❯ ' }),
+      'sess-1',
+      { ...FAST, promptMarkers: undefined },
+    )
+    assert.equal(result.ready, true)
+  })
+
+  it('Claude Code fuehrt seine Marker selbst', () => {
+    assert.deepEqual([...(new ClaudeCodeAdapter().promptMarkers ?? [])], PROMPT_MARKERS)
   })
 })
