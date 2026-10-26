@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] — 2026-10-26
+
+Holt die Local-Factory-Härtung nach `main` (Merge `lf-haertung`). 0.14.0 war von `main` vor
+diesem Merge gebaut und hatte einen installierten Härtungsstand überschrieben.
+
+### Added
+- **Local-Factory-Härtung:** Auftrag mit `ersetzungen`, `architektenfehler` (zählt nicht gegen
+  die Versuche), `pflichtGates`, Vorprüfung vor dem Versuch, `verboteneMuster` auf hinzugefügte
+  Diff-Zeilen, Projekt-Config gegen den Worker geschützt, Ausgang `laeuferfehler` mit Deckel 2,
+  `pruefungen` im Gate-Record, Rollentext `local-factory-v3`, Läufer-Diagnose bei HÄNGT.
+- **Grenzen:** Testpfade für die Local Factory frei, `git stash/checkout/switch/reset --hard`
+  abgelehnt, eigener Ablehnungsgrund für die Projekt-Config.
+
+### Fixed
+- Handoff-Bereitschaft nach dem Adapter der Ziel-Session (opencode wird erkannt).
+- Preset-Editor zeigt die CLI, die wirklich startet.
+- `mux_notes_search` findet Übergaben (Suchindex folgt jeder Schreibung).
+
 ## [0.14.0] — 2026-10-24
 
 Kontext-Diät und Modell-Routing. Gemessen vom 25.09. bis 24.10.: 85 % der Tokens liefen auf Opus,
