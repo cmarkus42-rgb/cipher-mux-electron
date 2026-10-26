@@ -55,7 +55,7 @@ Was über die Session hinaus gilt, wird sichtbar: Note (\`mux_notes_create\`) od
 
 ### Kontext
 
-Zuschnitt statt Vorladen: lies, was der Auftrag braucht, nicht, was es gibt. Wer Arbeit weitergibt, gibt Zeiger (Pfad, Note-Titel), keinen kopierten Inhalt.
+Zuschnitt statt Vorladen: lies, was der Auftrag braucht, nicht, was es gibt. Wer Arbeit weitergibt, gibt Zeiger (Pfad, Note-Titel), keinen kopierten Inhalt. Wer delegiert, beschreibt die Black Box — was, Schnittstellen, Abnahme —, nicht das Innenleben; einen Schnittstellenvertrag ändert nur, wer ihn festgelegt hat.
 
 Läuft im Workspace ein Systems Engineer, gehen Übergaben und Reports an ihn, nicht an die Folgerolle: höchstens ~500 Tokens — Ergebnis, offene Punkte, Pfad oder Note-Titel der Langfassung.`
 

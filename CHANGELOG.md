@@ -20,6 +20,13 @@ diesem Merge gebaut und hatte einen installierten Härtungsstand überschrieben.
 - **Grenzen:** Testpfade für die Local Factory frei, `git stash/checkout/switch/reset --hard`
   abgelehnt, eigener Ablehnungsgrund für die Projekt-Config.
 
+- **Systems Engineer v2 — Denkweise MBSE/INCOSE:** System · Subsystem · Element, White Box für
+  das System, Black Box für jedes Subsystem, Anforderungen auf jeder Ebene (jede Ebene nur ihre),
+  Schnittstellenverträge über den SE, ein homogenes Ganzes. Neue Capability `systemaufbau.md`
+  (Note „System: <Projekt>"), Gate prüft die Verträge der berührten Schnittstellen.
+- **Global Rules:** Wer delegiert, beschreibt die Black Box, nicht das Innenleben; einen
+  Schnittstellenvertrag ändert nur, wer ihn festgelegt hat.
+
 ### Fixed
 - Handoff-Bereitschaft nach dem Adapter der Ziel-Session (opencode wird erkannt).
 - Preset-Editor zeigt die CLI, die wirklich startet.

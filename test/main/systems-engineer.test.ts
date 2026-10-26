@@ -48,7 +48,21 @@ describe('Systems Engineer: Preset', () => {
   const md = generateSystemsEngineerPreset()
 
   it('bleibt knapp — das Preset ist selbst Kontext', () => {
-    assert.ok(md.length <= 2600, `${md.length} Zeichen`)
+    // v2 (2026-10-26): + Denkweise Systems Engineering, rund 1.300 Zeichen
+    assert.ok(md.length <= 4200, `${md.length} Zeichen`)
+  })
+
+  it('denkt in System, Subsystem, Element — mit Black Box und Verträgen', () => {
+    assert.match(md, /System · Subsystem · Element/)
+    assert.match(md, /Black Box für jedes Subsystem/)
+    assert.match(md, /Verträge überwachst du/)
+    assert.match(md, /kaust du nicht vor/)
+    assert.match(md, /homogenes Ganzes/)
+  })
+
+  it('prüft am Gate auch die Schnittstellenverträge', () => {
+    assert.match(SE_CAPABILITIES['gate-urteil.md'], /Schnittstellen/)
+    assert.match(SE_CAPABILITIES['systemaufbau.md'], /Vertrag/)
   })
 
   it('nennt die vier Grenzen', () => {
