@@ -83,6 +83,20 @@ function severityToLabels(severity?: string, tags?: string[]): string[] {
 }
 
 /**
+ * Ob gerade ein Testlauf laeuft. `node --test` setzt `NODE_TEST_CONTEXT` in
+ * jedem Testprozess. Das Repo ist oeffentlich: ein Test, der hier ankommt, legt
+ * ein echtes Issue an — bis 2026-11-01 waren es rund 1.680. Die Sperre ist das
+ * Netz unter der Injektion im `BugreportManager`, nicht ihr Ersatz.
+ */
+export function zustellungImTestGesperrt(
+  env: NodeJS.ProcessEnv = process.env,
+  execArgv: readonly string[] = process.execArgv,
+): boolean {
+  // `--test-isolation=none` setzt NODE_TEST_CONTEXT nicht, laesst `--test` aber im execArgv.
+  return Boolean(env.NODE_TEST_CONTEXT) || execArgv.includes('--test')
+}
+
+/**
  * Deliver a bug report to GitHub. Tries `gh` CLI first, falls back to browser.
  *
  * @param title - Issue title
@@ -96,6 +110,7 @@ export async function deliverToGitHub(
   severity?: string,
   tags?: string[],
 ): Promise<GitHubDeliveryResult> {
+  if (zustellungImTestGesperrt()) return { ok: true, method: 'skipped' }
   const delivery = configStore.get('bugreportDelivery')
   if (!delivery || delivery.mode !== 'github') {
     return { ok: true, method: 'skipped' }

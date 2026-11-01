@@ -9,12 +9,19 @@ export class BugreportTaskSource implements TaskSource {
   private watcher: fs.FSWatcher | null = null
   private seenFiles = new Set<string>()
 
-  constructor(watchPath: string) {
+  /**
+   * @param knownTitles Titel, zu denen es schon einen Task gibt. `seenFiles`
+   *   lebt nur im Speicher: ohne diese Liste legte jeder App-Start fuer jede
+   *   Datei in der outbox erneut einen Task an — bis 2026-11-01 rund 9.800,
+   *   und `mux_task_list` wurde so gross, dass der MCP-Client abbrach.
+   */
+  constructor(watchPath: string, private readonly knownTitles: () => Iterable<string> = () => []) {
     this.watchPath = watchPath
   }
 
   start(emit: TaskEmitter): void {
     this._emit = emit
+    for (const title of this.knownTitles()) this.seenFiles.add(`${title}.md`)
     fs.mkdirSync(this.watchPath, { recursive: true })
     this.scanDir(emit)
 

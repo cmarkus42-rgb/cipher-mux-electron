@@ -182,6 +182,9 @@ describe('Prompt und Parser passen zueinander', () => {
   })
 })
 
+// Kein Test erreicht GitHub oder das Gateway (das Repo ist oeffentlich).
+const offline = { deliver: async () => ({ ok: true, method: 'skipped' as const }), enrich: async () => ({ enriched: null, fehler: 'Test' }) }
+
 describe('enrichBugreport', () => {
   before(starteServer)
   after(() => new Promise<void>((r) => server.close(() => r())))
@@ -261,7 +264,7 @@ describe('Die Notiz-Ablage wird spaet ausgewertet', () => {
     const halter: { ablage?: { create(t: string, b: string, tags: string[], o: NoteOpts): Promise<{ id: string }> } } = {}
 
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bugreport-note-'))
-    const mgr = new BugreportManager({ outboxDir: tmp, noteManager: () => halter.ablage })
+    const mgr = new BugreportManager({ ...offline, outboxDir: tmp, noteManager: () => halter.ablage })
     assert.equal(halter.ablage, undefined, 'Vorbedingung: beim Bau ist die Ablage noch nicht da')
 
     // ... erst jetzt entsteht sie
@@ -285,7 +288,7 @@ describe('Die Notiz-Ablage wird spaet ausgewertet', () => {
   it('ohne Ablage geht der Report trotzdem raus', async () => {
     const { BugreportManager } = await import('../../src/main/bugreport/bugreport-manager')
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bugreport-ohne-'))
-    const mgr = new BugreportManager({ outboxDir: tmp })
+    const mgr = new BugreportManager({ ...offline, outboxDir: tmp })
     const res = await mgr.submit('text', [], undefined, tmp, undefined, 'bug')
     assert.ok(res.id)
     assert.equal(res.noteId, undefined)
@@ -301,6 +304,7 @@ describe('Die Notiz-Ablage wird spaet ausgewertet', () => {
     const gesehen: string[][] = []
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bugreport-tags-'))
     const mgr = new BugreportManager({
+      ...offline,
       outboxDir: tmp,
       noteManager: () => ({ async create(_t: string, _b: string, tags: string[]) { gesehen.push(tags); return { id: 'N' } } }),
     })

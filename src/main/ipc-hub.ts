@@ -365,7 +365,9 @@ export class IpcHub {
         const outboxPath = rawPath.startsWith('~/')
           ? path.join(app.getPath('home'), rawPath.slice(2))
           : rawPath
-        this.bugreportSource = new BugreportTaskSource(outboxPath)
+        this.bugreportSource = new BugreportTaskSource(outboxPath, () =>
+          this.taskManager!.list({ source: 'bugreport' }).map((t) => t.title),
+        )
         this.bugreportSource.start((opts) => this.taskManager!.create(opts))
       }
     }

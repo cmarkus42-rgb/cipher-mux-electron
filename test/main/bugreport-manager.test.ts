@@ -5,6 +5,9 @@ import * as path from 'path'
 import * as os from 'os'
 import { BugreportManager } from '../../src/main/bugreport/bugreport-manager'
 
+// Kein Test erreicht GitHub oder das Gateway (das Repo ist oeffentlich).
+const offline = { deliver: async () => ({ ok: true, method: 'skipped' as const }), enrich: async () => ({ enriched: null, fehler: 'Test' }) }
+
 // Minimal MessageBus stub
 class StubMessageBus {
   sent: Array<{ topic: string; sender: string; payload: Record<string, unknown> }> = []
@@ -22,7 +25,7 @@ describe('BugreportManager', () => {
   beforeEach(() => {
     bus = new StubMessageBus()
     outboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bugreport-test-'))
-    mgr = new BugreportManager({ messageBus: bus as any, outboxDir })
+    mgr = new BugreportManager({ messageBus: bus as any, outboxDir, ...offline })
   })
 
   afterEach(() => {
@@ -48,8 +51,17 @@ describe('BugreportManager', () => {
   })
 
   it('submit works without messageBus (graceful)', async () => {
-    const mgrNoBus = new BugreportManager({ outboxDir })
+    const mgrNoBus = new BugreportManager({ outboxDir, ...offline })
     const { id } = await mgrNoBus.submit('test bug', [])
     assert.ok(id.startsWith('BUG-'))
+  })
+})
+
+describe('GitHub-Zustellung im Testlauf', () => {
+  it('ist gesperrt, sobald node --test laeuft', async () => {
+    const { zustellungImTestGesperrt } = await import('../../src/main/bugreport/github-delivery')
+    assert.equal(zustellungImTestGesperrt({ NODE_TEST_CONTEXT: 'child-v8' }, []), true)
+    assert.equal(zustellungImTestGesperrt({}, ['--test', '--import', 'tsx']), true)
+    assert.equal(zustellungImTestGesperrt({}, []), false)
   })
 })

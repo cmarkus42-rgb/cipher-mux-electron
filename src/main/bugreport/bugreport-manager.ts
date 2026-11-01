@@ -32,6 +32,13 @@ export interface BugreportManagerOptions {
    * alles.
    */
   noteManager?: () => NoteAblage | undefined
+  /**
+   * Zustellung und Aufbereitung, austauschbar fuer Tests. Bis 2026-11-01 rief
+   * jeder Testlauf die echten auf: rund 1.680 Issues „test bug" im oeffentlichen
+   * Repo und je Lauf sechs Aufrufe gegen das LLM-Gateway.
+   */
+  deliver?: typeof deliverToGitHub
+  enrich?: typeof enrichBugreport
 }
 
 /**
@@ -84,11 +91,15 @@ export class BugreportManager {
   private messageBus: MessageBus | undefined
   private outboxDir: string
   private noteManager: (() => NoteAblage | undefined) | undefined
+  private deliver: typeof deliverToGitHub
+  private enrich: typeof enrichBugreport
 
   constructor(opts: BugreportManagerOptions = {}) {
     this.messageBus = opts.messageBus
     this.outboxDir = opts.outboxDir ?? DEFAULT_OUTBOX_DIR
     this.noteManager = opts.noteManager
+    this.deliver = opts.deliver ?? deliverToGitHub
+    this.enrich = opts.enrich ?? enrichBugreport
   }
 
   /**
@@ -213,7 +224,7 @@ export class BugreportManager {
     // `enrichBugreport` wirft nie, sondern liefert im Zweifel einen Grund, und
     // `baueReportText` macht daraus einen Report mit sichtbarem Vermerk. Ein
     // Bugreport, der an seiner Veredelung scheitert, waere der schlechteste Fall.
-    const angereichert = await enrichBugreport(description, { typ: type })
+    const angereichert = await this.enrich(description, { typ: type })
     const beschreibung = baueReportText(description, angereichert)
     const titel = angereichert.enriched?.title ?? description.trim().split('\n')[0].slice(0, 80)
 
@@ -234,7 +245,7 @@ export class BugreportManager {
     const issueBody = `${beschreibung}\n\n---\n*Filed via cipher-mux bugreport (${id})*`
     let issueUrl: string | undefined
     try {
-      const ghResult = await deliverToGitHub(id, issueBody)
+      const ghResult = await this.deliver(id, issueBody)
       issueUrl = ghResult.issueUrl
     } catch (err) {
       console.error('[BugreportManager] GitHub delivery failed:', err)

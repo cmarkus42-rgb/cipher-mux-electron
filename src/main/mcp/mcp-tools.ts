@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { taskListAntwort } from '../task/task-list-view'
 import { readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 import matter from 'gray-matter'
@@ -664,8 +665,9 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   registerMuxTool(server, 
     'mux_task_list',
     {
-      description: 'List tasks in the cipher-mux task queue with optional filters',
+      description: 'List tasks in the cipher-mux task queue with optional filters. Returns an overview (newest first, default 50, max 500) with id, title, state, source — no description or result; use mux_task_get for the full task. `total` counts all matches.',
       inputSchema: {
+        limit: z.number().int().positive().optional().describe('Max tasks to return (default 50, max 500)'),
         state: z.string().optional().describe('Filter by state'),
         source: z.string().optional().describe('Filter by source'),
         parent_id: z.string().optional().describe('Filter by parent task ID'),
@@ -673,6 +675,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     async (args: {
+      limit?: number
       state?: string
       source?: string
       parent_id?: string
@@ -689,7 +692,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
       const tasks = ctx.taskManager.list(Object.keys(filter).length > 0 ? filter as any : undefined)
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify(tasks, null, 2) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(taskListAntwort(tasks, args.limit), null, 2) }],
       }
     }
   )

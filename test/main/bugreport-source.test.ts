@@ -103,4 +103,16 @@ describe('BugreportTaskSource', () => {
     // Should only have been emitted once (deduplication by filename)
     assert.equal(emitted.length, 1)
   })
+
+  it('legt fuer eine Datei mit bestehendem Task beim Start keinen neuen an', () => {
+    fs.writeFileSync(path.join(tmpDir, 'BUG-alt.md'), 'schon erfasst')
+    fs.writeFileSync(path.join(tmpDir, 'BUG-neu.md'), 'noch nicht erfasst')
+
+    const emitted: CreateTaskOpts[] = []
+    const source = new BugreportTaskSource(tmpDir, () => ['BUG-alt'])
+    source.start((opts) => emitted.push(opts))
+    source.stop()
+
+    assert.deepEqual(emitted.map((e) => e.title), ['BUG-neu'])
+  })
 })
