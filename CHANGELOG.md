@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.2] — 2026-11-01
+
+### Fixed
+- **Die Testsuite legte echte GitHub-Issues an** — sechs je Lauf, seit Mai rund 1.680 im
+  öffentlichen Repo, dazu Aufrufe gegen das LLM-Gateway. Zustellung und Aufbereitung sind im
+  `BugreportManager` jetzt austauschbar und in den Tests ersetzt; `deliverToGitHub` sperrt sich
+  zusätzlich unter `node --test`.
+- **Bugreports wurden bei jedem App-Start erneut als Task angelegt** (rund 9.800 Kopien). Die
+  Task-Quelle kennt beim Start die schon erfassten Reports.
+- **`mux_task_list` war für Sessions nicht lesbar** (13 MB, der MCP-Client brach ab). Das
+  Werkzeug liefert eine Übersicht ohne Volltext, neueste zuerst, `limit` (50, max. 500) und
+  `total`; den Volltext liefert `mux_task_get`.
+
 ## [0.14.1] — 2026-10-26
 
 Holt die Local-Factory-Härtung nach `main` (Merge `lf-haertung`). 0.14.0 war von `main` vor
