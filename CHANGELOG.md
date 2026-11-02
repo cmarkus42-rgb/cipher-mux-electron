@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.3] — 2026-11-02
+
+### Changed
+
+- **Projektverzeichnisse ohne Injektion.** Der Mux schreibt Global Rules, Workspace Prompt und Context Directories nicht mehr in die CLAUDE.md eines Projekts. Der Sitzungskontext liegt unter `~/.config/cipher-mux/runs/folder/` und reist beim Start mit: Claude Code `--append-system-prompt-file` (Kontextordner per `--add-dir`), Codex `-c developer_instructions`. opencode hat keinen Startweg und bekommt ihn nur in eine AGENTS.md, die der Mux selbst angelegt hat. Rollen unverändert.
+- **Workspace-Zellen** starten über den Adapter statt fest mit `claude --dangerously-skip-permissions` — mit Sitzungsmodell (`--model sonnet`) und Kontext.
+
 ## [0.14.2] — 2026-11-01
 
 ### Fixed
