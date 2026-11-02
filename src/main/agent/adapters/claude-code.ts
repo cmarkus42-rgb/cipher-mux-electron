@@ -13,7 +13,7 @@ import type {
 } from '../agent-adapter'
 import type { AdapterFeature, AdapterCapabilities } from '../../../shared/types'
 import { runCommand } from '../../util/exec-util'
-import { buildMcpServerConfig } from '../../mcp/workspace-header'
+import { buildResilientMcpEntry } from '../../mcp/stdio-bridge'
 import { CLAUDE_CODE_MODEL_ALIASES } from '../adapter-models'
 import { PROMPT_MARKERS } from '../../mcp/session-readiness'
 
@@ -40,6 +40,7 @@ const defaultConfigReader: AgentConfigReader = {
  * - MCP injection via `claude mcp add-json` AND direct settings.json
  *   manipulation (dual-path fix for BUG-mcp-tools-not-loaded)
  * - StatusLine hook for context usage reporting
+ * - MCP connection through the stdio bridge (mcp/stdio-bridge.ts)
  * - CLAUDE.md as project marker
  */
 /**
@@ -51,11 +52,15 @@ const defaultConfigReader: AgentConfigReader = {
  * `X-Mux-Entity` schreibt. Fehlte die Rolle hier, sähe der Server sie nie:
  * gemessen am 2026-10-09, die Local Cyber Factory bekam ihr Werkzeug nicht, und
  * jede Claude-Code-Rolle zählte als „ohne Rolle", also auch für Companion Memory.
+ *
+ * **Über die Brücke**, damit die Session einen Neustart des Mux übersteht: siehe
+ * mcp/stdio-bridge.ts.
  */
 export function buildClaudeCodeMcpEntry(
   ctx: Pick<AdapterContext, 'mcpUrl' | 'mcpApiKey' | 'workspaceId' | 'entityId'>,
-): ReturnType<typeof buildMcpServerConfig> {
-  return buildMcpServerConfig(ctx.mcpUrl, ctx.mcpApiKey, ctx.workspaceId, ctx.entityId)
+  scriptDir?: string,
+): ReturnType<typeof buildResilientMcpEntry> {
+  return buildResilientMcpEntry(ctx.mcpUrl, ctx.mcpApiKey, ctx.workspaceId, ctx.entityId, scriptDir)
 }
 
 /**

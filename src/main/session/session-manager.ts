@@ -40,7 +40,7 @@ import { extractCharacterBlock } from '../character/character-defaults'
 import { resolvePersonaForPreset } from './persona-resolver'
 import { ensureRunDir, resolveRunDir, RUNS_BASE } from './entity-run-dir'
 import { claudeMdExemptions } from './entity-claudemd-exemptions'
-import { buildMcpServerConfig } from '../mcp/workspace-header'
+import { buildResilientMcpEntry } from '../mcp/stdio-bridge'
 import { buildBoundToken, BOUND_TOKEN_ENV_VAR } from '../mcp/bound-token'
 import { findEntitySessions, entityStartKey } from './entity-session-lookup'
 import type { Workspace } from '../../shared/persona-types'
@@ -1441,7 +1441,7 @@ export class SessionManager extends EventEmitter {
           // config.id rides along as X-Mux-Entity: the MCP server has no other
           // way to know which role is calling, and that decides which tools
           // it registers for the connection.
-          'cipher-mux': buildMcpServerConfig(mcpUrl, this.mcpConfig.mcpApiKey, workspaceId, config.id),
+          'cipher-mux': buildResilientMcpEntry(mcpUrl, this.mcpConfig.mcpApiKey, workspaceId, config.id),
         },
       }
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2), 'utf-8')
