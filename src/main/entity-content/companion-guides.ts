@@ -578,14 +578,14 @@ Am unteren Rand einer Zelle erscheint ein Handle — klicken verbindet die Zelle
 
 ### Was eine Session über ihren Workspace erfährt
 
-Jede Session, die zu einem Workspace gehört — Ordner-Session, Workspace-Zelle oder Rolle —, bekommt in ihre Projektanweisung eine Sektion \`## Workspace Prompt\`:
+Jede Session, die zu einem Workspace gehört — Ordner-Session, Workspace-Zelle oder Rolle —, bekommt eine Sektion \`## Workspace Prompt\`:
 
 - den **Namen** des Workspaces („Du arbeitest im Workspace **KEEL**"),
 - seine **Projekte**: die Projektordner aus den Zellen (Zellen mit Rollen zählen nicht),
 - einen Verweis auf die **Kontextordner** in \`## Context Directories\`,
 - danach den Workspace-Prompt, falls es einen gibt.
 
-Eine Ordner-Session, die du mit Workspace „ohne" startest, bekommt diese Sektionen **entfernt** — sie liest keinen Prompt, der zu einem anderen Workspace gehört.
+Eine Rolle bekommt das in ihre CLAUDE.md im Run-Verzeichnis. Eine Ordner-Session oder Workspace-Zelle bekommt es **beim Start mitgegeben**, zusammen mit den Global Rules — in die Dateien des Projekts schreibt der Mux seit 0.14.3 nichts mehr. Mit Workspace „ohne" bekommt sie nur die Global Rules.
 
 ### Mehrere Workspaces gleichzeitig
 

@@ -54,7 +54,8 @@ import { resolvePersonaForPreset } from './session/persona-resolver'
 import { resolveSessionTopic } from './session/resolve-session-topic'
 import { resolveRestoredWorkspaceId } from './session/resolve-restored-workspace'
 import { pruneRunDirs, liveWorkspaceIds } from './session/entity-run-dir'
-import { restoreAdapterId } from './session/folder-session'
+import { restoreAdapterId, launchLine } from './session/folder-session'
+import type { MuxKontext } from './session/folder-session'
 import { IPC } from '../shared/ipc-channels'
 import { MCP_DEFAULT_PORT, MCP_DEFAULT_HOST, MAX_MANUAL_TAGS } from '../shared/constants'
 import { BRAND } from '../shared/brand'
@@ -3305,13 +3306,27 @@ ist dieses Entity fokussiert?
           const savedAdapterId = restoreAdapterId(entry, (aid) => !!this.adapterRegistry.get(aid))
           const adapter = (savedAdapterId ? this.adapterRegistry.get(savedAdapterId) : undefined)
             ?? this.sessionManager.adapterForEntity(entry.entityId ?? null)
+          // Sitzungskontext in die Startzeile — auch beim Fortsetzen: Claude Code
+          // nimmt nach dem naechsten Kompaktieren den Prompt dieses Starts.
+          // Rollen tragen ihn im Run-Verzeichnis.
+          let muxKontext: MuxKontext | undefined
+          if (!entry.entityId) {
+            try {
+              muxKontext = this.sessionManager.prepareMuxKontext(
+                { projectPath: entry.projectPath, workspaceId: entry.workspaceId ?? null },
+                adapter,
+              )
+            } catch (err) {
+              console.warn('[IpcHub] keepWorking: Sitzungskontext fehlgeschlagen:', (err as Error).message)
+            }
+          }
           const launchCmd = adapter.buildLaunchCommand({
             projectPath: entry.projectPath,
             sessionName: entry.name,
             resume: true,
+            muxKontext,
           })
-          const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
-          const autoLaunch = `cd '${escaped}' && clear; ${cmdStr}\n`
+          const autoLaunch = `cd '${escaped}' && clear; ${launchLine(launchCmd)}\n`
 
           // `entityId` muss mit: `start()` loest daran den Adapter fuer
           // MCP-Injektion und Status-Hook auf. Fehlt es, baut das Startkommando

@@ -10,10 +10,10 @@ const PERSONAS: Persona[] = [
 ]
 
 function makeMockStarter() {
-  const started: { name: string; projectPath: string; autoLaunch?: string; workspacePrompt?: string; contextPaths?: string[] }[] = []
+  const started: { name: string; projectPath: string; autoLaunch?: string; folderLaunch?: { skipPermissions?: boolean }; workspacePrompt?: string; contextPaths?: string[] }[] = []
   return {
     started,
-    start: async (opts: { name: string; projectPath: string; autoLaunch?: string; workspacePrompt?: string; contextPaths?: string[] }) => {
+    start: async (opts: { name: string; projectPath: string; autoLaunch?: string; folderLaunch?: { skipPermissions?: boolean }; workspacePrompt?: string; contextPaths?: string[] }) => {
       started.push(opts)
       return { id: `session-${started.length}` }
     },
@@ -91,9 +91,9 @@ describe('applyWorkspace', () => {
     const starter = makeMockStarter()
     await applyWorkspace(ws, PERSONAS, starter, () => {})
     assert.equal(starter.started[0].workspacePrompt, 'run tests')
-    assert.ok(!starter.started[0].autoLaunch?.includes('run tests'))
-    assert.ok(starter.started[0].autoLaunch?.includes('--dangerously-skip-permissions'))
-    assert.ok(starter.started[0].autoLaunch?.startsWith('clear;'))
+    // Die Zeile baut der Adapter (folderLaunch) — der Prompt reist als Sitzungskontext, nicht als Text der Zeile
+    assert.equal(starter.started[0].autoLaunch, undefined)
+    assert.deepEqual(starter.started[0].folderLaunch, { skipPermissions: true })
   })
 
   it('cell prompt overrides workspace prompt', async () => {

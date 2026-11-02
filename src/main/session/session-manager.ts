@@ -52,10 +52,35 @@ import {
   ensureInstructionsFile,
   ensureEntityInstructionsFile,
   workspaceProjects,
+  buildMuxKontext,
+  muxKontextPath,
+  syncOwnedInstructionsKontext,
+  launchLine,
 } from './folder-session'
+import type { MuxKontext } from './folder-session'
 
 /** Role directories — a workspace cell pointing here is a role, not a project. */
 const ENTITIES_ROOT = path.join(os.homedir(), '.config', 'cipher-mux', 'entities')
+
+/**
+ * Wohin der Sitzungskontext geschrieben wird. Unter `node --test` nie ins echte
+ * `~/.config` — jeder Test, der eine Ordner-Session startet, schriebe sonst dort
+ * hinein (dasselbe Muster wie `zustellungImTestGesperrt` beim Bugreport).
+ */
+function kontextBase(): string {
+  if (process.env.CIPHER_MUX_KONTEXT_BASE) return process.env.CIPHER_MUX_KONTEXT_BASE
+  if (process.env.NODE_TEST_CONTEXT || process.execArgv.includes('--test')) return path.join(os.tmpdir(), 'cmux-kontext-test')
+  return RUNS_BASE
+}
+
+/** Run- und Rollenverzeichnisse gehoeren dem Mux; dort darf er Anweisungsdateien pflegen. */
+function isMuxOwnedDir(dir: string): boolean {
+  const d = path.resolve(dir)
+  return [RUNS_BASE, ENTITIES_ROOT].some((base) => {
+    const rel = path.relative(path.resolve(base), d)
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
+  })
+}
 import type { WorkspaceSectionSource } from './folder-session'
 import { generateLocalWorkshopPreset } from '../local-factory/workshop-preset'
 import { generateLocalFactoryPreset, generateLocalWorkerPreset, LOCAL_WORKER_DISPATCH_TOOL } from '../local-factory/presets'
@@ -379,16 +404,9 @@ export class SessionManager extends EventEmitter {
       }
     }
 
-    // Inject workspace prompt + context directories into project CLAUDE.md.
-    // Entity sessions handle this in assembleEntityClaudeMd (no regex — pure append).
-    //
-    // Abgleichen, nicht nur hinzufuegen: eine Session, die ausdruecklich ohne
-    // Workspace startet, entfernt die Sektionen. Bis 0.12.0 blieb dort stehen,
-    // was der letzte Workspace-Start geschrieben hatte. Wer `workspaceId` gar
-    // nicht setzt (Shell aus dem Zellenkopf), laesst die Datei weiter in Ruhe.
     // Die Datei, die die CLI wirklich liest. Nur fuer einen Ordner-Start mit
     // CLI — eine Shell aus dem Zellenkopf startet nichts, das eine neu angelegte
-    // AGENTS.md lesen wuerde, und bleibt bei der CLAUDE.md wie bisher.
+    // AGENTS.md lesen wuerde. Angelegt wird sie nur, wenn sie fehlt.
     let instructionsFile = 'CLAUDE.md'
     if (opts.projectPath && !opts._entityInjected && opts.folderLaunch && !opts.folderLaunch.shellOnly) {
       try {
@@ -398,31 +416,29 @@ export class SessionManager extends EventEmitter {
       }
     }
 
+    // Sitzungskontext: Global Rules, Workspace, Kontextordner.
+    //
+    // **Ins Projekt schreibt der Mux ihn nicht mehr** (2026-11-02). Bis 0.14.2
+    // standen die Sektionen dauerhaft in der CLAUDE.md des Projekts, wurden
+    // mitcommittet und ueberlebten den Workspace, aus dem sie kamen. Jetzt reist
+    // der Kontext in der Startzeile (`muxKontext`, siehe `prepareMuxKontext`).
+    //
+    // Ausnahme: ein Verzeichnis, das dem Mux gehoert (Run- und Rollenverzeichnisse,
+    // z. B. eine Rolle, die Keep Working neu startet). Dort bleibt es beim
+    // Abgleich der Datei wie bisher — Rollen sind von der Umstellung ausgenommen.
+    let muxKontext: MuxKontext | undefined
     if (opts.projectPath && !opts._entityInjected) {
-      try {
-        const sections = resolveWorkspaceSections(
-          { workspaceId: opts.workspaceId, workspacePrompt: opts.workspacePrompt, contextPaths: opts.contextPaths },
-          configStore.get('workspaces') as WorkspaceSectionSource[] | undefined,
-          ENTITIES_ROOT,
-        )
-        if (sections.reconcile) {
-          this.injectWorkspaceSections(
-            opts.projectPath,
-            formatWorkspacePrompt(sections),
-            sections.contextPaths,
-            instructionsFile,
+      if (isMuxOwnedDir(opts.projectPath)) {
+        this.reconcileMuxOwnedInstructions(opts, instructionsFile)
+      } else {
+        try {
+          muxKontext = this.prepareMuxKontext(
+            { projectPath: opts.projectPath, workspaceId: opts.workspaceId, workspacePrompt: opts.workspacePrompt, contextPaths: opts.contextPaths },
+            adapter,
           )
+        } catch (err) {
+          console.warn('[SessionManager] Sitzungskontext fehlgeschlagen:', err)
         }
-      } catch (err) {
-        console.warn('[SessionManager] Workspace section injection failed:', err)
-      }
-    }
-
-    // REQ-GLOBAL-002: Inject global rules into manual (non-entity) sessions.
-    // Entity sessions are handled in startEntity() before this point.
-    if (opts.projectPath && !opts._entityInjected) {
-      try { this.injectGlobalRulesSection(opts.projectPath, instructionsFile) } catch (e) {
-        console.warn('[SessionManager] Failed to inject global rules:', e)
       }
     }
 
@@ -470,6 +486,7 @@ export class SessionManager extends EventEmitter {
           forkLatest: opts.folderLaunch.forkLatest,
           skipPermissions: opts.folderLaunch.skipPermissions,
           model,
+          muxKontext,
         }))
       : undefined)
 
@@ -486,9 +503,9 @@ export class SessionManager extends EventEmitter {
         sessionName: opts.name,
         forkFromClaudeSessionId: opts.forkFromClaudeSessionId,
         model,
+        muxKontext,
       })
-      const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
-      this.setPendingLaunch(id, `clear; ${cmdStr}\n`)
+      this.setPendingLaunch(id, `clear; ${launchLine(launchCmd)}\n`)
     }
 
     this.emit('session-changed', session)
@@ -1060,6 +1077,62 @@ export class SessionManager extends EventEmitter {
    */
   private prepareInstructionsFile(projectPath: string, adapter: AgentAdapter): string {
     return ensureInstructionsFile(projectPath, adapter)
+  }
+
+  /**
+   * Den Sitzungskontext einer Session ohne Rolle schreiben und fuer die
+   * Startzeile zurueckgeben. Oeffentlich, weil Keep Working, Fork und Kickoff
+   * ihre Startzeile selbst bauen — vor `start()`, ohne Session-ID.
+   *
+   * `workspaceId`: String = dieser Workspace, sonst keiner (`undefined` und `null`
+   * heissen hier dasselbe — es wird nichts mehr entfernt, weil nichts mehr in der
+   * Datei steht). Ausdrueckliche Werte (Zellen-Prompt) gewinnen wie bisher.
+   *
+   * Fuer eine CLI ohne `kontextAtLaunch` (opencode) geht der Kontext nur in eine
+   * AGENTS.md, die der Mux selbst angelegt hat; zurueck kommt dann `undefined`.
+   */
+  prepareMuxKontext(
+    req: { projectPath: string; workspaceId?: string | null; workspacePrompt?: string; contextPaths?: string[] },
+    adapter: AgentAdapter,
+  ): MuxKontext | undefined {
+    const sections = resolveWorkspaceSections(
+      { workspaceId: req.workspaceId ?? null, workspacePrompt: req.workspacePrompt, contextPaths: req.contextPaths },
+      configStore.get('workspaces') as WorkspaceSectionSource[] | undefined,
+      ENTITIES_ROOT,
+    )
+    const text = buildMuxKontext(sections, getCachedGlobalRules())
+    if (!adapter.kontextAtLaunch) {
+      syncOwnedInstructionsKontext(path.join(req.projectPath, 'AGENTS.md'), text)
+      return undefined
+    }
+    const file = muxKontextPath(kontextBase(), req.projectPath, req.workspaceId)
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, text, 'utf-8')
+    // Ein fehlender Ordner liesse `--add-dir` den Start abbrechen.
+    const contextDirs = (sections.contextPaths ?? []).filter((d) => {
+      try { return fs.statSync(d).isDirectory() } catch { return false }
+    })
+    return { file, text, contextDirs }
+  }
+
+  /** Der Abgleich von frueher, nur noch fuer Verzeichnisse des Mux. */
+  private reconcileMuxOwnedInstructions(opts: StartSessionOpts, instructionsFile: string): void {
+    const projectPath = opts.projectPath!
+    try {
+      const sections = resolveWorkspaceSections(
+        { workspaceId: opts.workspaceId, workspacePrompt: opts.workspacePrompt, contextPaths: opts.contextPaths },
+        configStore.get('workspaces') as WorkspaceSectionSource[] | undefined,
+        ENTITIES_ROOT,
+      )
+      if (sections.reconcile) {
+        this.injectWorkspaceSections(projectPath, formatWorkspacePrompt(sections), sections.contextPaths, instructionsFile)
+      }
+    } catch (err) {
+      console.warn('[SessionManager] Workspace section injection failed:', err)
+    }
+    try { this.injectGlobalRulesSection(projectPath, instructionsFile) } catch (e) {
+      console.warn('[SessionManager] Failed to inject global rules:', e)
+    }
   }
 
   /**
@@ -1838,12 +1911,22 @@ export class SessionManager extends EventEmitter {
     // kann. Die Rolle ist der Rueckfall, der globale Default der letzte.
     const adapter = this.getAdapterForSession(sourceSessionId)
       ?? this.adapterForEntity(source.entityId ?? null)
+    // Der Fork bekommt den Kontext der Quelle — Rollen nicht, die tragen ihn im Run-Verzeichnis.
+    let muxKontext: MuxKontext | undefined
+    if (source.projectPath && !source.entityId && !isMuxOwnedDir(source.projectPath)) {
+      try {
+        muxKontext = this.prepareMuxKontext({ projectPath: source.projectPath, workspaceId: source.workspaceId ?? null }, adapter)
+      } catch (err) {
+        console.warn('[SessionManager] Sitzungskontext fuer Fork fehlgeschlagen:', err)
+      }
+    }
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: source.projectPath || os.homedir(),
       sessionName: `${source.name}-fork`,
       forkFromClaudeSessionId: source.claudeSessionId,
+      muxKontext,
     })
-    const cmdStr = [launchCmd.cmd, ...launchCmd.args].join(' ')
+    const cmdStr = launchLine(launchCmd)
 
     const newSession = await this.start({
       name: `${source.name}-fork`,

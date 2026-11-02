@@ -101,6 +101,7 @@ export class CodexAdapter implements AgentAdapter {
   readonly id = 'codex'
   readonly displayName = 'Codex CLI'
   readonly tier = 'tier-2' as const
+  readonly kontextAtLaunch = true
 
   private readonly configReader: CodexConfigReader
 
@@ -158,6 +159,16 @@ export class CodexAdapter implements AgentAdapter {
 
     if (opts.model) {
       args.push('--model', opts.model)
+    }
+
+    // Sitzungskontext einer Session ohne Rolle. `developer_instructions` wirkt
+    // (gemessen an 0.162.1, 2026-11-02, ueber ein verlangtes Antwortpraefix);
+    // `model_instructions_file` ersetzte die Basisanweisungen und kommt nicht in
+    // Frage. Der Wert ist TOML — ein JSON-String ist ein gueltiger TOML-String
+    // und traegt die Zeilenumbrueche als `\n`, nicht als echte Umbrueche, die
+    // beim Tippen ins Pane die Zeile abschoeben.
+    if (opts.muxKontext) {
+      args.push('-c', `developer_instructions=${JSON.stringify(opts.muxKontext.text)}`)
     }
 
     // Die TUI laeuft sonst im Alternate Screen, und der frisst die

@@ -23,6 +23,7 @@ import {
   formatWorkspacePrompt,
   newInstructionsFile,
   workspaceProjects,
+  MUX_OWNED_MARKER,
 } from '../../src/main/session/folder-session'
 
 const workspaces = [
@@ -164,11 +165,11 @@ describe('newInstructionsFile — der Kopf einer neu angelegten Anweisungsdatei'
   it('mit Verweis: die CLI soll die CLAUDE.md lesen', () => {
     const c = newInstructionsFile({ file: 'AGENTS.md', pointerTo: 'CLAUDE.md' })
     assert.ok(c.includes('`CLAUDE.md`'))
-    assert.ok(c.startsWith('# '))
+    assert.ok(c.startsWith(`${MUX_OWNED_MARKER}\n# `), 'erste Zeile: vom Mux angelegt — nur solche Dateien pflegt er weiter')
   })
 
-  it('ohne Verweis: nur eine Ueberschrift', () => {
-    assert.equal(newInstructionsFile({ file: 'AGENTS.md' }), '# Projektanweisungen\n')
+  it('ohne Verweis: Marker und eine Ueberschrift', () => {
+    assert.equal(newInstructionsFile({ file: 'AGENTS.md' }), `${MUX_OWNED_MARKER}\n# Projektanweisungen\n`)
   })
 })
 

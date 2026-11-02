@@ -5,11 +5,10 @@
  * Zwei reine Entscheidungen, damit `SessionManager.start()` sie nicht inline
  * trifft:
  *
- * 1. **Welche Workspace-Sektionen gehoeren in die CLAUDE.md.** Bis 0.12.0 wurde
- *    nur injiziert, wenn ein Prompt mitkam. Eine Session ohne Workspace fasste
- *    die Datei nie an — und las dann den Prompt, den ein frueherer
- *    Workspace-Start dort hinterlassen hatte, unerneuert und zu keinem
- *    Workspace mehr gehoerend.
+ * 1. **Was eine Session ueber ihren Workspace erfaehrt.** Bis 0.14.2 stand das
+ *    als Sektionen in der CLAUDE.md des Projekts; seitdem reist es als
+ *    Sitzungskontext in der Startzeile (siehe unten, `buildMuxKontext`). In die
+ *    Datei schreibt der Mux nur noch bei Rollen, im Run-Verzeichnis.
  * 2. **Wie die Startzeile aussieht.** Der Renderer baute sie selbst, fest als
  *    `claude …`, waehrend der Main-Prozess MCP fuer die Default-CLI einrichtete.
  *    Jetzt baut sie der Adapter, der auch injiziert.
@@ -142,10 +141,92 @@ export function formatWorkspacePrompt(
  * eigentlichen Projektanweisungen, sobald einmal eine Codex-Session dort lief.
  */
 export function newInstructionsFile(target: InstructionsTarget): string {
-  if (!target.pointerTo) return '# Projektanweisungen\n'
-  return '# Projektanweisungen\n\n'
+  const kopf = `${MUX_OWNED_MARKER}\n# Projektanweisungen\n`
+  if (!target.pointerTo) return kopf
+  return kopf + '\n'
     + `Die eigentlichen Projektanweisungen stehen in \`${target.pointerTo}\` in diesem Verzeichnis. `
     + 'Lies sie zu Beginn der Session vollständig; was dort steht, gilt hier genauso.\n'
+}
+
+// ─── Sitzungskontext ohne Injektion (2026-11-02) ─────────────
+//
+// Bis 0.14.2 schrieb der Mux Global Rules, Workspace Prompt und Context
+// Directories dauerhaft in die CLAUDE.md des Projekts. Dort blieben sie stehen,
+// wurden mitcommittet und widersprachen sich, sobald ein Workspace sich
+// aenderte. Jetzt steht der Kontext in einer Datei, die dem Mux gehoert, und
+// reist beim Start mit: Claude Code `--append-system-prompt-file`, Codex
+// `-c developer_instructions`. opencode 2.0.29 hat dafuer keinen Weg — sein
+// `instructions` in der Config wirkt nicht (gemessen) —, dort bekommt nur eine
+// AGENTS.md den Kontext, die der Mux selbst angelegt hat.
+
+/** Erste Zeile einer Anweisungsdatei, die der Mux angelegt hat und pflegen darf. */
+export const MUX_OWNED_MARKER = '<!-- cipher-mux: vom Mux angelegt -->'
+
+/** Kopf der Kontext-Sektion in einer Mux-eigenen AGENTS.md. Alles danach schreibt der Mux neu. */
+export const MUX_KONTEXT_HEADING = '## Sitzungskontext (cipher-mux)'
+
+/** Der Sitzungskontext einer Session ohne Rolle, wie er beim Start mitgegeben wird. */
+export interface MuxKontext {
+  /** Datei unter `runs/folder/` — Claude Code liest sie selbst. */
+  file: string
+  /** Derselbe Text, fuer CLIs, die ihn als Argument brauchen (Codex). */
+  text: string
+  /** Kontextordner, die es gibt — Claude Code bekommt sie zusaetzlich als `--add-dir`. */
+  contextDirs: string[]
+}
+
+/**
+ * Der Text des Sitzungskontexts. Dieselben Inhalte wie die frueheren Sektionen,
+ * in derselben Form, nur in einer Datei des Mux statt im Projekt.
+ */
+export function buildMuxKontext(sections: WorkspaceSections, globalRules: string): string {
+  const parts: string[] = [
+    MUX_KONTEXT_HEADING,
+    'Diesen Kontext gibt der cipher-mux beim Start mit; er steht in keiner Datei des Projekts. '
+      + 'Die Mux-Werkzeuge (`mux_*`) kommen über den MCP-Server `cipher-mux`.',
+  ]
+  const ws = formatWorkspacePrompt(sections)
+  if (ws) parts.push(`## Workspace Prompt\n\n${ws}`)
+  if (sections.contextPaths?.length) {
+    parts.push(`## Context Directories\n\n${sections.contextPaths.map(p => `- \`${p}\``).join('\n')}`)
+  }
+  if (globalRules.trim()) parts.push(`## Global Rules\n\n${globalRules.trim()}`)
+  return parts.join('\n\n') + '\n'
+}
+
+/**
+ * Wo der Kontext einer Session liegt. Pro Projekt und Workspace, nicht pro
+ * Session: Keep Working und Fork bauen die Startzeile, bevor es eine Session-ID
+ * gibt. Zwei Sessions im selben Projekt und Workspace teilen ihn — wie vorher die
+ * CLAUDE.md, nur ohne das Projekt anzufassen.
+ */
+export function muxKontextPath(runsBase: string, projectPath: string, workspaceId: string | null | undefined): string {
+  let h = 0x811c9dc5
+  for (const ch of `${path.resolve(projectPath)}\0${workspaceId ?? ''}`) {
+    h = Math.imul(h ^ ch.codePointAt(0)!, 0x01000193) >>> 0
+  }
+  const name = `${path.basename(projectPath).replace(/[^A-Za-z0-9_.-]/g, '_')}-${h.toString(16).padStart(8, '0')}.md`
+  return path.join(runsBase, 'folder', name)
+}
+
+/**
+ * Den Kontext in eine **Mux-eigene** AGENTS.md schreiben (opencode). Eine Datei
+ * ohne `MUX_OWNED_MARKER` in der ersten Zeile hat jemand anders geschrieben und
+ * bleibt unangetastet; eine fehlende legt der Mux nicht hier an, das tut
+ * `ensureInstructionsFile`. Gibt zurueck, ob geschrieben wurde.
+ */
+export function syncOwnedInstructionsKontext(filePath: string, kontext: string): boolean {
+  let content: string
+  try {
+    content = fs.readFileSync(filePath, 'utf-8')
+  } catch {
+    return false
+  }
+  if (!content.startsWith(MUX_OWNED_MARKER)) return false
+  const idx = content.indexOf(`\n${MUX_KONTEXT_HEADING}`)
+  const head = (idx >= 0 ? content.slice(0, idx) : content).replace(/\s+$/, '')
+  fs.writeFileSync(filePath, `${head}\n\n${kontext}`, 'utf-8')
+  return true
 }
 
 /**
@@ -224,7 +305,15 @@ function shellArg(s: string): string {
 export function buildFolderAutoLaunch(dirPath: string, launch: LaunchCommand | null): string {
   const cd = `cd ${shellQuote(dirPath)} && clear`
   if (!launch) return `${cd}\n`
-  return `${cd}; ${[launch.cmd, ...launch.args].map(shellArg).join(' ')}\n`
+  return `${cd}; ${launchLine(launch)}\n`
+}
+
+/**
+ * Die Startzeile mit gequoteten Argumenten. Ein schlichtes `join(' ')` reicht
+ * nicht mehr, seit Argumente Text tragen (Codex `developer_instructions`).
+ */
+export function launchLine(launch: LaunchCommand): string {
+  return [launch.cmd, ...launch.args].map(shellArg).join(' ')
 }
 
 /**

@@ -103,3 +103,16 @@ Vertrauensfrage. Was eine unbeaufsichtigte Session hier aufhält, ist etwas ande
 angemeldeten Anbieter** steht sie am Prompt mit dem Hinweis „Run /connect to add an AI provider"
 und tut auf jede Eingabe nichts. Das ist kein Dialog, den ein Flag wegnimmt — es ist eine
 Voraussetzung, die vor dem Start erfüllt sein muss.
+
+## Sitzungskontext ohne Startweg (gemessen 2026-11-02, opencode 2.0.29)
+
+Seit 0.14.3 schreibt der Mux Global Rules und Workspace-Kontext nicht mehr in die
+Dateien eines Projekts, sondern gibt sie beim Start mit. Für opencode gibt es
+dafür keinen gemessenen Weg: `instructions` in der `opencode.json` wird gelesen
+(`opencode debug config` zeigt den Eintrag), wirkt aber nicht — weder mit
+absolutem noch mit relativem Pfad; dieselbe Anweisung in einer `AGENTS.md`
+wirkt. Deshalb bekommt eine opencode-Ordner-Session den Kontext nur in eine
+`AGENTS.md`, die der Mux selbst angelegt hat (erste Zeile
+`<!-- cipher-mux: vom Mux angelegt -->`). Eine von Hand geschriebene, oder eine,
+die ein Mux vor 0.14.3 ohne diese Zeile angelegt hat, bleibt unangetastet — dort
+läuft die Session ohne Mux-Kontext.

@@ -109,3 +109,12 @@ codex-spezifisch, nicht eine des Adapter-Vertrags.
 die Verbindung (`src/main/mcp/entity-header.ts`) und registriert die vier `companion_memory_*`
 nur für Companion — oder für Verbindungen ohne Rolle, das ist die App selbst. Eine Permission
 zu entfernen hätte nicht gereicht: sie erzeugt eine Rückfrage, sie hält kein Werkzeug zurück.
+
+## Sitzungskontext in der Startzeile (gemessen 2026-11-02, codex-cli 0.162.1)
+
+Seit 0.14.3 reisen Global Rules und Workspace-Kontext einer Ordner-Session als
+`-c developer_instructions=<TOML-String>`. Gemessen über ein verlangtes
+Antwortpräfix — nach dem Wortlaut gefragt, verweigert Codex die Wiedergabe.
+Der Wert ist ein JSON-String (gültiges TOML), damit Zeilenumbrüche als `\n` und
+nicht als echte Umbrüche ins Pane getippt werden. `model_instructions_file`
+ersetzt die Basisanweisungen und kommt deshalb nicht in Frage.

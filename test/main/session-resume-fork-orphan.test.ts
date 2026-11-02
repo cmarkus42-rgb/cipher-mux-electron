@@ -334,14 +334,12 @@ describe('Ordner-Start: Workspace-Sektionen und Startzeile', () => {
     fsSyncIso.writeFileSync(pathIso.join(dir, 'CLAUDE.md'), STALE)
   })
 
-  it('ausdruecklich ohne Workspace: der alte Prompt verschwindet', async () => {
+  // Seit 2026-11-02 schreibt der Mux nicht mehr ins Projekt — auch nicht, um
+  // Altlasten zu entfernen. Die Session bekommt ihren Kontext beim Start.
+  it('ausdruecklich ohne Workspace: die Datei bleibt, wie sie ist — Altlasten auch', async () => {
     const sm = createSessionManager(tmux)
     await sm.start({ name: 'ordner', projectPath: dir, workspaceId: null, folderLaunch: {} })
-    const md = fsSyncIso.readFileSync(pathIso.join(dir, 'CLAUDE.md'), 'utf-8')
-    assert.ok(!md.includes('## Workspace Prompt'), md)
-    assert.ok(!md.includes('alter Prompt'))
-    assert.ok(!md.includes('## Context Directories'))
-    assert.ok(md.includes('# Projekt'), 'der eigene Inhalt bleibt')
+    assert.equal(fsSyncIso.readFileSync(pathIso.join(dir, 'CLAUDE.md'), 'utf-8'), STALE)
   })
 
   it('ohne Angabe (Shell aus dem Zellenkopf): die Datei bleibt, wie sie ist', async () => {
@@ -376,7 +374,7 @@ describe('Ordner-Start: Workspace-Sektionen und Startzeile', () => {
 
 // ─── Anweisungsdatei pro CLI ────────────────────────────────
 
-describe('Ordner-Start: der Mux schreibt in die Datei, die die CLI liest', () => {
+describe('Ordner-Start: Anweisungsdatei pro CLI — ins Projekt nur, was der Mux selbst angelegt hat', () => {
   let tmux: MockTmuxManager
   let dir: string
 
@@ -402,7 +400,9 @@ describe('Ordner-Start: der Mux schreibt in die Datei, die die CLI liest', () =>
     fsSyncIso.writeFileSync(pathIso.join(dir, 'CLAUDE.md'), '# Eigenes\n\nInhalt\n')
   })
 
-  it('fehlt AGENTS.md: neu angelegt, mit Verweis auf die CLAUDE.md; die CLAUDE.md bleibt unberuehrt', async () => {
+  // Die CLI hier hat keinen Startweg fuer den Kontext (wie opencode): er geht
+  // nur in eine AGENTS.md, die der Mux selbst angelegt hat.
+  it('fehlt AGENTS.md: neu angelegt, mit Verweis und Kontext; die CLAUDE.md bleibt unberuehrt', async () => {
     const sm = agentsMdManager()
     await sm.start({ name: 'o', projectPath: dir, adapterId: 'agents', workspacePrompt: 'P', folderLaunch: {} })
     assert.ok(exists('AGENTS.md'))
@@ -411,12 +411,11 @@ describe('Ordner-Start: der Mux schreibt in die Datei, die die CLI liest', () =>
     assert.equal(read('CLAUDE.md'), '# Eigenes\n\nInhalt\n')
   })
 
-  it('vorhandene AGENTS.md: ihr Inhalt bleibt, die Sektionen kommen dazu', async () => {
+  it('vorhandene, fremde AGENTS.md: bleibt Byte fuer Byte, wie sie war', async () => {
     fsSyncIso.writeFileSync(pathIso.join(dir, 'AGENTS.md'), '# Schon da\n')
     const sm = agentsMdManager()
     await sm.start({ name: 'o', projectPath: dir, adapterId: 'agents', workspacePrompt: 'P', folderLaunch: {} })
-    assert.ok(read('AGENTS.md').startsWith('# Schon da\n'))
-    assert.ok(read('AGENTS.md').includes('## Workspace Prompt'))
+    assert.equal(read('AGENTS.md'), '# Schon da\n')
   })
 
   it('nur Shell: keine AGENTS.md — es startet keine CLI, die sie lesen wuerde', async () => {
@@ -425,10 +424,10 @@ describe('Ordner-Start: der Mux schreibt in die Datei, die die CLI liest', () =>
     assert.ok(!exists('AGENTS.md'))
   })
 
-  it('Claude-artige CLI (kein instructionsTarget): weiter CLAUDE.md', async () => {
+  it('Claude-artige CLI (kein instructionsTarget): keine AGENTS.md, die CLAUDE.md bleibt unberuehrt', async () => {
     const sm = createSessionManager(tmux)
     await sm.start({ name: 'o', projectPath: dir, workspacePrompt: 'P', folderLaunch: {} })
     assert.ok(!exists('AGENTS.md'))
-    assert.ok(read('CLAUDE.md').includes('## Workspace Prompt\n\nP'))
+    assert.equal(read('CLAUDE.md'), '# Eigenes\n\nInhalt\n')
   })
 })

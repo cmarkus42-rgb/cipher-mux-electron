@@ -17,6 +17,7 @@
  */
 
 import type { AdapterFeature, AdapterCapabilities, ContextUsage } from '../../shared/types'
+import type { MuxKontext } from '../session/folder-session'
 
 export type { AdapterFeature, AdapterCapabilities }
 
@@ -79,6 +80,12 @@ export interface LaunchOpts {
   entityId?: string | null
   /** Tatsächliches Arbeitsverzeichnis (Run-Verzeichnis); `projectPath` ist bei Rollen das authored-Verzeichnis. */
   workDir?: string
+  /**
+   * Sitzungskontext einer Session ohne Rolle (Global Rules, Workspace, Kontextordner).
+   * Nur Adapter mit `kontextAtLaunch` setzen ihn in die Startzeile; die anderen
+   * bekommen ihn über eine Mux-eigene Anweisungsdatei (`folder-session.ts`).
+   */
+  muxKontext?: MuxKontext
 }
 
 export interface AdapterContext {
@@ -156,13 +163,20 @@ export interface AgentAdapter {
   /** Read the agent's project instructions file (e.g. CLAUDE.md). */
   readProjectInstructions(projectPath: string): Promise<ProjectInstructions | null>
   /**
-   * The file this CLI actually reads as project instructions — where the Mux
-   * writes Global Rules and the workspace sections of a folder session.
+   * The file this CLI actually reads as project instructions. The Mux creates it
+   * when missing (with a pointer to CLAUDE.md); it writes the session context
+   * into it only if it created it itself (see `kontextAtLaunch`).
    * Absent = CLAUDE.md. Decided from which files exist, because that is what
    * the CLI decides it from: opencode reads CLAUDE.md only when no AGENTS.md
    * lies next to it (measured 2026-10-09).
    */
   instructionsTarget?(present: { agentsMd: boolean; claudeMd: boolean }): InstructionsTarget
+  /**
+   * Nimmt die CLI den Sitzungskontext in der Startzeile entgegen
+   * (`LaunchOpts.muxKontext`)? Fehlt = nein; dann schreibt der Mux ihn nur in
+   * eine Anweisungsdatei, die er selbst angelegt hat.
+   */
+  readonly kontextAtLaunch?: boolean
 
   // --- runtime signals (capability-gated) ---
   /** Check if the adapter supports a specific feature. */

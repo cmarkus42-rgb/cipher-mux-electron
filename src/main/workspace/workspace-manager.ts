@@ -25,7 +25,7 @@ export interface ApplyResult {
  *   string    → that workspace
  */
 export interface SessionStarter {
-  start(opts: { name: string; projectPath: string; autoLaunch?: string; workspacePrompt?: string; contextPaths?: string[]; workspaceId?: string | null; adapterId?: string }): Promise<{ id: string }>
+  start(opts: { name: string; projectPath: string; autoLaunch?: string; folderLaunch?: { skipPermissions?: boolean }; workspacePrompt?: string; contextPaths?: string[]; workspaceId?: string | null; adapterId?: string }): Promise<{ id: string }>
   startEntity?(entityId: string, opts?: { workspacePrompt?: string; contextPaths?: string[]; workspaceId?: string | null }): Promise<{ id: string }>
 }
 
@@ -203,7 +203,6 @@ export async function applyWorkspace(
     const cellPaths = cell.contextPaths?.length ? cell.contextPaths : undefined
     const effectivePaths = cellPaths ?? wsPaths
 
-    const launchCmd = `clear; claude --dangerously-skip-permissions\n`
     const sessionName = cell.project.split('/').pop() || 'session'
     const project = cell.project
     startTasks.push({
@@ -211,9 +210,11 @@ export async function applyWorkspace(
       // workspaceId explicit for the same reason as the preset branch above —
       // without it these sessions stay unbound and every cell of the freshly
       // applied workspace renders the "no workspace" badge.
-      // adapterId: die Zeile oben startet fest Claude Code — ohne die Angabe
-      // richtete start() MCP fuer die Default-CLI ein.
-      start: () => sessionStarter.start({ name: sessionName, projectPath: project, autoLaunch: launchCmd, workspacePrompt: effectivePrompt, contextPaths: effectivePaths, workspaceId: workspace.id, adapterId: 'claude-code' }),
+      // Claude Code wie bisher, aber die Zeile baut jetzt der Adapter
+      // (`folderLaunch`), wie beim Ordner-Start: nur so reist der
+      // Sitzungskontext mit, und das Sitzungsmodell gilt auch hier. Bis 0.14.2
+      // stand hier fest `claude --dangerously-skip-permissions` ohne `--model`.
+      start: () => sessionStarter.start({ name: sessionName, projectPath: project, folderLaunch: { skipPermissions: true }, workspacePrompt: effectivePrompt, contextPaths: effectivePaths, workspaceId: workspace.id, adapterId: 'claude-code' }),
     })
   }
 

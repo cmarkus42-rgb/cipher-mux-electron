@@ -288,11 +288,11 @@ describe('resizeCells', () => {
 
 describe('applyWorkspace', () => {
   function mockStarter() {
-    const started: Array<{ workspacePrompt?: string; contextPaths?: string[]; autoLaunch?: string; workspaceId?: string | null }> = []
+    const started: Array<{ workspacePrompt?: string; contextPaths?: string[]; autoLaunch?: string; folderLaunch?: { skipPermissions?: boolean }; workspaceId?: string | null }> = []
     const startedEntities: Array<{ entityId: string; workspaceId?: string | null; contextPaths?: string[] }> = []
     const starter: SessionStarter = {
       start: async (opts) => {
-        started.push({ workspacePrompt: opts.workspacePrompt, contextPaths: opts.contextPaths, autoLaunch: opts.autoLaunch, workspaceId: opts.workspaceId })
+        started.push({ workspacePrompt: opts.workspacePrompt, contextPaths: opts.contextPaths, autoLaunch: opts.autoLaunch, folderLaunch: opts.folderLaunch, workspaceId: opts.workspaceId })
         return { id: `sess-${started.length}` }
       },
       startEntity: async (entityId, opts) => {
@@ -380,8 +380,8 @@ describe('applyWorkspace', () => {
     })
 
     await applyWorkspace(ws, TEST_PERSONAS, starter, () => {})
-    assert.ok(!started[0].autoLaunch?.includes('my prompt'))
-    assert.ok(started[0].autoLaunch?.includes('--dangerously-skip-permissions'))
+    assert.equal(started[0].autoLaunch, undefined)
+    assert.deepEqual(started[0].folderLaunch, { skipPermissions: true })
   })
 
   // ── workspace binding ──────────────────────────────────────────────────────

@@ -12,6 +12,8 @@ import type {
 } from '../../shared/types'
 import { buildLauncherPrompt } from './launcher-prompt'
 import { KickoffWatcher } from './kickoff-watcher'
+import { launchLine } from '../session/folder-session'
+import type { MuxKontext } from '../session/folder-session'
 
 export interface KickoffWorkshopDeps {
   sessionManager: SessionManager
@@ -86,11 +88,18 @@ export class KickoffWorkshop extends EventEmitter {
     })
 
     // 4. Build launch command from adapter (structured, no shell injection).
+    let launcherKontext: MuxKontext | undefined
+    try {
+      launcherKontext = this.deps.sessionManager.prepareMuxKontext({ projectPath: this.deps.projectlauncherPath }, adapter)
+    } catch (err) {
+      console.warn('[KickoffWorkshop] Sitzungskontext fehlgeschlagen:', err)
+    }
     const launchCmd = adapter.buildLaunchCommand({
       projectPath: this.deps.projectlauncherPath,
       sessionName: `Launcher: ${projectName}`,
+      muxKontext: launcherKontext,
     })
-    const autoLaunchStr = `clear; ${[launchCmd.cmd, ...launchCmd.args].join(' ')}\n`
+    const autoLaunchStr = `clear; ${launchLine(launchCmd)}\n`
 
     const session = await this.deps.sessionManager.start({
       name: `Launcher: ${projectName}`,
@@ -159,11 +168,18 @@ export class KickoffWorkshop extends EventEmitter {
 
     // Start the follow-up session using adapter launch command.
     const adapter = this.deps.adapterRegistry.getDefault()
+    let muxKontext: MuxKontext | undefined
+    try {
+      muxKontext = this.deps.sessionManager.prepareMuxKontext({ projectPath: active.handle.projectDir }, adapter)
+    } catch (err) {
+      console.warn('[KickoffWorkshop] Sitzungskontext fehlgeschlagen:', err)
+    }
     const followLaunchCmd = adapter.buildLaunchCommand({
       projectPath: active.handle.projectDir,
       sessionName: active.handle.projectName,
+      muxKontext,
     })
-    const followAutoLaunch = `clear; ${[followLaunchCmd.cmd, ...followLaunchCmd.args].join(' ')}\n`
+    const followAutoLaunch = `clear; ${launchLine(followLaunchCmd)}\n`
 
     this.deps.sessionManager.start({
       name: active.handle.projectName,

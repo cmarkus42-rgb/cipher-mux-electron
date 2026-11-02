@@ -58,11 +58,28 @@ export function buildClaudeCodeMcpEntry(
   return buildMcpServerConfig(ctx.mcpUrl, ctx.mcpApiKey, ctx.workspaceId, ctx.entityId)
 }
 
+/**
+ * Sitzungskontext in die Startzeile (gemessen an 2.1.316, 2026-11-02): der
+ * angehaengte Prompt ueberlebt `/clear` und `/compact`. Beim Fortsetzen gilt der
+ * beim ersten Start aufgezeichnete Systemprompt weiter, bis kompaktiert wird
+ * (`--system-prompt-snapshot`, Default an) — danach der dieses Starts. Deshalb
+ * gehoert das Flag in jede Startzeile, auch in `--resume`.
+ *
+ * `--add-dir` gibt Zugriff auf die Kontextordner; eine CLAUDE.md dort laedt es
+ * nicht (gemessen) — wozu sie dienen, steht im Kontext.
+ */
+function pushKontext(args: string[], opts: LaunchOpts): void {
+  if (!opts.muxKontext) return
+  args.push('--append-system-prompt-file', opts.muxKontext.file)
+  for (const dir of opts.muxKontext.contextDirs) args.push('--add-dir', dir)
+}
+
 export class ClaudeCodeAdapter implements AgentAdapter {
   readonly id = 'claude-code'
   readonly displayName = 'Claude Code'
   readonly tier = 'tier-1' as const
   readonly promptMarkers = PROMPT_MARKERS
+  readonly kontextAtLaunch = true
 
   private readonly configReader: AgentConfigReader
 
@@ -82,6 +99,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     if (opts.forkLatest && !opts.forkFromClaudeSessionId) {
       args.push('--continue', '--fork-session')
       if (opts.model) args.push('--model', opts.model)
+      pushKontext(args, opts)
       return { cmd: 'claude', args }
     }
     // Resuming is what Keep Working is built on, so it stays. Naming the
@@ -104,6 +122,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     if (opts.model) {
       args.push('--model', opts.model)
     }
+    pushKontext(args, opts)
     return { cmd: 'claude', args }
   }
 

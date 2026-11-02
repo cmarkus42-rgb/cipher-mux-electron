@@ -174,7 +174,7 @@ Grid layout editor. Visual editor with merge handles (vertical cell spanning). C
 
 **Workspace-level settings:** Workspace Prompt, Context Directories, Default Tags (\`klasse:wert\`), Notes Global toggle.
 
-**What a session in a workspace learns** — every session bound to a workspace (folder session, workspace cell, role) gets a section \`## Workspace Prompt\` naming the workspace ("Du arbeitest im Workspace **KEEL**"), listing its **projects** (the cells' project paths, role directories excluded) and pointing to \`## Context Directories\`, followed by the workspace prompt if there is one. A folder session started with workspace "none" has these sections **removed**. The file is the one the CLI reads (see *Agent-CLIs*).
+**What a session in a workspace learns** — every session bound to a workspace (folder session, workspace cell, role) gets a section \`## Workspace Prompt\` naming the workspace ("Du arbeitest im Workspace **KEEL**"), listing its **projects** (the cells' project paths, role directories excluded) and pointing to \`## Context Directories\`, followed by the workspace prompt if there is one. A role gets this in its CLAUDE.md in the run directory. A folder session or workspace cell gets it **at launch**, together with the Global Rules — since 0.14.3 the Mux writes nothing into a project's files (Claude Code: \`--append-system-prompt-file\`, Codex: \`-c developer_instructions\`; opencode only via an AGENTS.md the Mux created itself). With workspace "none" it gets the Global Rules only.
 
 **Multi-Workspace:** Each session carries its own workspace. Presets run in several workspaces in parallel; \`singleInstance\` applies per workspace. Unbound sessions are visible from every workspace.
 
