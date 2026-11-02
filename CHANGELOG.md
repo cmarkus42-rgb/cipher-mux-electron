@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.4] — 2026-11-02
+
+### Fixed
+
+- **Sessions verlieren den MCP-Server nicht mehr.** Claude-Code-Sessions verbinden sich über eine lokale Brücke (`~/.config/cipher-mux/mcp-bridge.cjs`) statt direkt per HTTP. Sie übersteht den Neustart des Mux, den 4-Stunden-Timeout und das Limit von 24 Verbindungen. Ein Aufruf wartet während eines Ausfalls bis zu 120 s; ein Aufruf, dessen Verbindung mittendrin abreißt, wird nicht wiederholt. Gilt ab dem nächsten Start der jeweiligen Session. Codex und opencode sprechen weiter direkt HTTP.
+
 ## [0.14.3] — 2026-11-02
 
 ### Changed
