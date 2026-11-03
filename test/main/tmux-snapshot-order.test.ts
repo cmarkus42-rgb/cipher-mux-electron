@@ -60,7 +60,7 @@ async function waitFor(pred: () => boolean, timeoutMs = 5000): Promise<boolean> 
 
 /** Letzte vollstaendige Zaehlerzeile `L<n>` in einem Text, oder -1. */
 function lastComplete(text: string): number {
-  const all = [...text.matchAll(/(?<=^|\n)L(\d+)\r?\n/g)];
+  const all = [...text.matchAll(/(?<=^|\n)L(\d+) *\r?\n/g)];
   return all.length ? Number(all[all.length - 1][1]) : -1;
 }
 
