@@ -62,8 +62,7 @@ diesem Merge gebaut und hatte einen installierten Härtungsstand überschrieben.
 
 Kontext-Diät und Modell-Routing. Gemessen vom 25.09. bis 24.10.: 85 % der Tokens liefen auf Opus,
 96,5 % davon Cache-Reads — weil `~/.claude/settings.json` global `opus` setzt und keine
-Mux-Session ein Modell mitgab. Spec und Messung:
-`docs/superpowers/specs/2026-10-24-kontext-diaet-modellrouting-se-vorschlag.md`.
+Mux-Session ein Modell mitgab.
 
 ### Added
 - **Rolle Systems Engineer** (aus cipher keel übersetzt): führt das Projekt, schreibt keinen Code,

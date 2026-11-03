@@ -1,7 +1,6 @@
 /**
  * Systems Engineer — die projektführende Rolle (übernommen aus cipher keel,
- * übersetzt auf den Mux; Vorschlag 2026-10-24,
- * `docs/superpowers/specs/2026-10-24-kontext-diaet-modellrouting-se-vorschlag.md`).
+ * übersetzt auf den Mux; Vorschlag 2026-10-24).
  *
  * Keel führt über einen Graphen, der Mux hat keinen. Abgebildet wird er auf
  * Notes (Steuer-Note, Gate-Notes), Übergaben (`mux_notes_handoff_*`) und die

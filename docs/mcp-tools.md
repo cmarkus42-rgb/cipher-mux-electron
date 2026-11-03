@@ -16,6 +16,13 @@ other role **63**.
 **Auth:** Bearer token (auto-injected into `.mcp.json` per entity). Codex sends no custom
 headers, so its workspace and role travel inside the token — `src/main/mcp/bound-token.ts`.
 
+**Connection:** Since 0.14.4 Claude Code sessions do not connect over HTTP directly. They talk stdio
+to a bridge (`src/main/mcp/stdio-bridge.ts`, deployed as `~/.config/cipher-mux/mcp-bridge.cjs`), which
+holds the HTTP connection, waits out a server restart and registers again with the same workspace and
+role binding. A `tools/call` whose connection breaks mid-call is never retried. A session gets the
+bridge at its next CLI start; until then it stays on HTTP. Codex and opencode connect over HTTP
+directly, and their behaviour during an outage has not been measured.
+
 > **Counting them from the code undercounts.** A grep for `registerMuxTool(` finds 57, because
 > the ten entity handoff tools are generated inside `registerAllHandoffTools`
 > (`src/main/mcp/handoff-kernel.ts`) rather than written out one by one. The authority is what

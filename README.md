@@ -18,15 +18,15 @@
 
 <p align="center">
   <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cmarkus42-rgb/cipher-mux-electron/ci.yml?branch=main&label=CI&style=flat-square&labelColor=000000&color=F5F5EC"></a>
-  <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.14.0-0088A0?style=flat-square&labelColor=000000"></a>
-  <a href="#built-with-itself"><img alt="Tests" src="https://img.shields.io/badge/tests-2689%20green-00FF88?style=flat-square&labelColor=000000"></a>
+  <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.14.4-0088A0?style=flat-square&labelColor=000000"></a>
+  <a href="#built-with-itself"><img alt="Tests" src="https://img.shields.io/badge/tests-3036%20green-00FF88?style=flat-square&labelColor=000000"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="#install"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS%2012%2B-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="CONTRIBUTING.md#maintenance-status"><img alt="Maintenance" src="https://img.shields.io/badge/maintenance-active-00FF88?style=flat-square&labelColor=000000"></a>
   <a href="#install"><img alt="Open Beta" src="https://img.shields.io/badge/status-open%20beta-0088A0?style=flat-square&labelColor=000000"></a>
 </p>
 
-<p align="center"><sub><b>v0.14.0</b> · open beta · feedback via <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/issues">Issues</a></sub></p>
+<p align="center"><sub><b>v0.14.4</b> · open beta · feedback via <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/issues">Issues</a></sub></p>
 
 ---
 
@@ -120,12 +120,13 @@ hands-free operation.
 |---|---|
 | **Three agent CLIs** | Claude Code (Tier 1), Codex CLI (Tier 2), opencode (Tier 2). One per role, or a global default → [Agent CLIs](#agent-clis) |
 | **Grid** | Up to 21 cells, drag & drop, vertical merges, Focus Mode |
-| **8 roles** | Companion, Ideation, Refinement, Cyber Factory, Testing, Debugger, Workshop, Audit — each with its own directory, instructions and recovery |
+| **9 roles** | Systems Engineer, Companion, Ideation, Refinement, Cyber Factory, Testing, Debugger, Workshop, Audit — each with its own directory, instructions and recovery |
 | **6 characters** | How the model talks to you: from bone-dry (Cipher) to socratic (Theaitetos) to chaos (Der Glitch) |
 | **Workspaces** | One project, one workspace: folders, grid layout, roles, prompts. Switch in one click; roles run in several workspaces at once |
 | **Role boundaries** | A role that coordinates cannot write code — enforced by a hook, not by a polite sentence |
+| **Model routing** | Opus leads, Sonnet builds and reviews, Haiku supports. Set per role, never silently inherited → [Model routing](#model-routing) |
 | **Voice I/O** | Local Whisper STT, Silero VAD, Piper or macOS TTS, Bluetooth remote. **Commands are German** |
-| **MCP server** | 67 tools in 12 categories, Streamable HTTP, bound per connection to workspace and role |
+| **MCP server** | 68 tools in 12 categories, Streamable HTTP, bound per connection to workspace and role. Claude Code sessions keep it across a Mux restart → [The MCP bridge](#the-mcp-bridge) |
 | **Notes** | Markdown editor (CodeMirror 6), auto-tagging via local Ollama, handoff notes with a live world-state delta, file mirroring with visible drift |
 | **Tags** | Five axes plus two editable classes, exclusive groups, hierarchical tree with tri-state filtering |
 | **Companion memory** | SQLite FTS5, workspace-scoped, available to the Companion |
@@ -257,11 +258,12 @@ cell and dims the rest.
 
 ### Roles
 
-Eight roles structure the process. Each gets its own directory, its own `CLAUDE.md` (or
+Nine roles structure the process. Each gets its own directory, its own `CLAUDE.md` (or
 `AGENTS.md`, depending on the CLI), and can be recovered after a restart.
 
 | Role | What it is for |
 |------|----------------|
+| **Systems Engineer** | Leads the project across all roles. Writes no code and reads no diffs; handoffs and gate verdicts run through it. One per workspace. |
 | **Coding Companion** | Your constant guide. Knows your profile, answers questions about the system, gets you started. |
 | **Ideation Partner** | Research and synthesis. Turns brainstorming into a tangible concept. |
 | **Refinement** | Requirements analysis. Turns a vague idea into a precise specification. |
@@ -288,8 +290,12 @@ A session's instructions are assembled, not configured: role (function) × chara
 workspace (project context). Resolution has three levels — cell prompt > workspace override >
 default.
 
-Workspace prompt and context directories are injected as sections **into the project
-instruction file**, not passed as a CLI argument. That is what makes them survive a `/clear`.
+Since 0.14.3 the Mux no longer writes into your project's instruction files. Global rules, workspace
+prompt and context directories travel on the launch line: `--append-system-prompt-file` under Claude
+Code (measured to survive `/clear` and `/compact`), `developer_instructions` under Codex. opencode
+has no measured launch path for this, so it only gets them in an `AGENTS.md` the Mux created itself;
+one you wrote stays untouched, and that session runs without Mux context. Only a role's own run
+directory still has files generated by the Mux.
 
 ### Voice
 
@@ -350,6 +356,42 @@ one would hand it another session's identity. Two consequences: opencode 2 reads
 instructions from `AGENTS.md` only (the Mux creates one pointing at your `CLAUDE.md`), and the
 top-level CLI has no `--model` or `--fork` (the role's model travels in `opencode.json`; forking an
 opencode session is not available yet).
+
+### The MCP bridge
+
+Claude Code sessions reach the MCP server through a small local stdio bridge
+(`~/.config/cipher-mux/mcp-bridge.cjs`) instead of connecting over HTTP directly. Sessions live in
+tmux and outlast the app, but a direct HTTP connection gives up for good about 15 seconds after the
+server goes away, and a Mux restart takes longer than that. The bridge waits for the server and
+registers again with the same workspace and role binding.
+
+A `tools/call` whose connection breaks mid-call is **never** retried, since it may already have run.
+Only what provably did not reach the server is repeated.
+
+What this does and does not cover:
+
+- **Claude Code only.** Codex and opencode still connect over HTTP; how they behave during an outage
+  has not been measured.
+- **From the next CLI start.** A session that is already running stays on HTTP until then.
+- **How far it is proven.** Surviving an outage was measured with the real CLI against a test server.
+  A new session running through the bridge was confirmed against the real Mux; a restart of the real
+  Mux with a bridge session attached has not been verified yet.
+
+### Model routing
+
+Without a model on the launch line, every session inherits the CLI's default, which can quietly put
+everything on the most expensive model. Since 0.14.0 the Mux sets the model itself:
+
+| Level | Model | Who |
+|-------|-------|-----|
+| Lead | Opus | Systems Engineer only |
+| Build and review | Sonnet | Every other role, and any session without a role |
+| Support | Haiku | Launcher, Voice-Relay |
+
+Sub-agents inherit Sonnet unless their own definition says otherwise. These defaults apply under
+Claude Code only; a role on Codex or opencode keeps its own model, and a model you set in Settings
+wins over all of them. Any other role gets Opus only with a stated reason (`eskalation.grund`), which
+the Mux records as a note.
 
 ### Choosing a CLI and a model
 
@@ -459,7 +501,7 @@ All of these are valid choices. Pick what fits your workflow.
 
 ### How many MCP tools are there?
 
-**67**, in twelve categories: Session Management, Messaging, Task Management, Notes, Companion
+**68** defined, in twelve categories, and no single connection is offered all of them (the app and the Companion get 67, other roles fewer): Session Management, Messaging, Task Management, Notes, Companion
 Memory, Grid & UI Control, Demo & Presentation, Voice/TTS, Entity Pipeline (Runs and Handoffs),
 Hub Migration, and Other. Full reference: [docs/mcp-tools.md](docs/mcp-tools.md).
 
@@ -517,7 +559,7 @@ fallback) · better-sqlite3 (WAL) · MCP SDK · tmux control mode.
 src/main/              Electron main process
   agent/               AgentAdapter contract, registry, three adapters
   tmux/                TmuxManager, control-mode parser, output batcher
-  mcp/                 Streamable HTTP MCP server, 67 tools, auth, per-connection binding
+  mcp/                 Streamable HTTP MCP server, 68 tools, auth, per-connection binding, stdio bridge
   session/             SessionManager, recovery, entity registry, role boundaries
   workspace/           Workspaces, prompt resolution, skill sync
   notes/               NoteManager, tagging, handoff delta, mirror drift
