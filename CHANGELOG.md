@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- `zod` 3 → 4 und `npm audit fix` (`body-parser`, `fast-uri`, `ip-address`, `qs`). Das DMG von 0.14.4 enthält
+  noch die alten Stände; betroffen ist der MCP-Server, der nur auf `127.0.0.1` lauscht und einen
+  Bearer-Token verlangt.
+
 ## [0.14.4] — 2026-11-02
 
 ### Fixed
