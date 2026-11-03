@@ -125,7 +125,7 @@ export function applyTagFilter(notes: NoteInfo[], filter: TagFilterState): NoteI
  *  Global notes (no workspace: tag at all) are included in every workspace.
  *
  *  Der Vergleich ignoriert die Schreibweise. Gemessen am 2026-09-30 standen
- *  unter den Workspace-Werten „projekt-b" und „projekt-b"
+ *  unter den Workspace-Werten „Projekt B" und „projekt b"
  *  nebeneinander — der Tag wurde früher aus dem Anzeigenamen gebildet. Ein
  *  buchstabengenauer Vergleich lässt eine der beiden Notes lautlos aus ihrem
  *  Workspace fallen, und lautlos ist hier das Schlimme: eine fehlende Note

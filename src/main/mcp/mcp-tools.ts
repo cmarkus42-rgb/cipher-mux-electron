@@ -795,8 +795,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
             // notesGlobal: skip workspace scope tag so note is visible in all workspaces
             if (!ws.notesGlobal && noteWorkspaceId) {
               // Die ID, nicht der Anzeigename. Aus `ws.name` sind die
-              // Schreibweisen-Dubletten entstanden ("projekt-b" neben
-              // "projekt-b"); die Leseseite akzeptiert beide Formen.
+              // Schreibweisen-Dubletten entstanden ("Projekt B" neben
+              // "projekt b"); die Leseseite akzeptiert beide Formen.
               tags.push(`workspace:${noteWorkspaceId}`)
             }
             // User-configured cross-workspace tags

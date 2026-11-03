@@ -35,7 +35,7 @@ import { KIND_VALUES, PHASE_VALUES, STATUS_VALUES, ENTITY_VALUES, SEVERITY_VALUE
 
 const CTX: MigrationContext = {
   workspaceNameToId: new Map([
-    ['projekt-b', 'ws-1779806802206'],
+    ['projekt b', 'ws-1779806802206'],
     ['cipher-mux', 'ws-1777957373268'],
     ['keel', 'ws-1780606236960'],
   ]),
@@ -47,12 +47,12 @@ function tagsAfter(tags: string[], ctx: MigrationContext = CTX): string[] {
 }
 
 describe('Workspace: Anzeigename wird zur ID', () => {
-  // Die Ursache der Dubletten. "projekt-b" (368x) und "projekt-b"
+  // Die Ursache der Dubletten. "Projekt B" (368x) und "projekt b"
   // (27x) sind derselbe Workspace, und ein buchstabengenauer Filter sah sie
   // als zwei.
   it('bildet beide Schreibweisen auf dieselbe ID ab', () => {
-    assert.deepEqual(tagsAfter(['workspace:projekt-b']), ['workspace:ws-1779806802206'])
-    assert.deepEqual(tagsAfter(['workspace:projekt-b']), ['workspace:ws-1779806802206'])
+    assert.deepEqual(tagsAfter(['workspace:Projekt B']), ['workspace:ws-1779806802206'])
+    assert.deepEqual(tagsAfter(['workspace:projekt b']), ['workspace:ws-1779806802206'])
   })
 
   it('laesst eine ID unangetastet', () => {
@@ -170,7 +170,7 @@ describe('project: doppelt zum Workspace', () => {
   // project:projekt-b (147x) sagt dasselbe wie der Workspace-Tag. Wo
   // beide stehen, fliegt die Doppelung; wo der Workspace fehlt, bleibt sie.
   it('entfaellt, wenn ein Workspace-Tag da ist', () => {
-    const result = tagsAfter(['workspace:projekt-b', 'project:projekt-b'])
+    const result = tagsAfter(['workspace:Projekt B', 'project:projekt-b'])
     assert.ok(!result.some(t => t.startsWith('project:')))
   })
 
@@ -251,7 +251,7 @@ describe('migrateNotesDir', () => {
     dir = await fs.mkdtemp(path.join(os.tmpdir(), 'tag-migration-'))
     await fs.writeFile(
       path.join(dir, 'a.md'),
-      '---\ntitle: A\ntags:\n  - \'kind:wellenplan\'\n  - \'workspace:projekt-b\'\n---\n\n# A\n\nInhalt.\n',
+      '---\ntitle: A\ntags:\n  - \'kind:wellenplan\'\n  - \'workspace:Projekt B\'\n---\n\n# A\n\nInhalt.\n',
     )
     await fs.writeFile(
       path.join(dir, 'b.md'),
@@ -396,11 +396,11 @@ describe('runTagMigrationOnce', () => {
   it('bildet den Workspace-Anzeigenamen auf die ID ab', async () => {
     await fs.writeFile(
       path.join(dir, 'b.md'),
-      '---\ntitle: B\ntags:\n  - \'workspace:projekt-b\'\n---\n\n# B\n',
+      '---\ntitle: B\ntags:\n  - \'workspace:Projekt B\'\n---\n\n# B\n',
     )
     await runTagMigrationOnce({
       notesDir: dir,
-      workspaces: [{ id: 'ws-123', name: 'projekt-b' }],
+      workspaces: [{ id: 'ws-123', name: 'Projekt B' }],
     })
     assert.match(await fs.readFile(path.join(dir, 'b.md'), 'utf-8'), /workspace:ws-123/)
   })
@@ -416,10 +416,10 @@ describe('runTagMigrationOnce', () => {
 describe('Zwei Workspace-Tags', () => {
   // Audit-Befund vom 2026-10-01: vor dem Umzug trugen 128 Notes zwei
   // Workspace-Tags -- fast alle, weil Anzeigename und Kleinschreibung als zwei
-  // galten ("projekt-b" und "projekt-b"). Der Umzug fuehrt sie
+  // galten ("Projekt B" und "projekt b"). Der Umzug fuehrt sie
   // zusammen, weil beide auf dieselbe ID abbilden.
   it('fuehrt zwei Schreibweisen desselben Workspace zusammen', () => {
-    const result = tagsAfter(['workspace:projekt-b', 'workspace:projekt-b'])
+    const result = tagsAfter(['workspace:Projekt B', 'workspace:projekt b'])
     assert.deepEqual(result, ['workspace:ws-1779806802206'])
   })
 

@@ -266,18 +266,18 @@ describe('workspace scoping composed with tag filtering', () => {
 
 describe('filterByWorkspace — Schreibweise', () => {
   // Gemessen am 2026-09-30: unter den 13 Workspace-Werten standen
-  // "projekt-b" und "projekt-b" nebeneinander. Die Ursache liegt
+  // "Projekt B" und "projekt b" nebeneinander. Die Ursache liegt
   // auf der Schreibseite -- der Tag wurde aus dem ANZEIGENAMEN gebildet --,
   // die Folge trifft die Leseseite: `candidates.includes(t)` vergleicht
   // buchstabengenau, also faellt eine der beiden Notes lautlos aus ihrem
   // Workspace. Lautlos ist hier das Schlimme: niemand sieht eine fehlende Note.
   it('findet eine Note, deren Workspace-Tag anders geschrieben ist', () => {
     const notes = [
-      { id: '1', title: 'A', tags: ['workspace:projekt-b'] },
-      { id: '2', title: 'B', tags: ['workspace:projekt-b'] },
+      { id: '1', title: 'A', tags: ['workspace:Projekt B'] },
+      { id: '2', title: 'B', tags: ['workspace:projekt b'] },
     ] as unknown as NoteInfo[]
 
-    const result = filterByWorkspace(notes, 'ws-b', 'projekt-b')
+    const result = filterByWorkspace(notes, 'ws-b', 'Projekt B')
     assert.equal(result.length, 2, 'beide gehoeren in diesen Workspace')
   })
 
@@ -285,6 +285,6 @@ describe('filterByWorkspace — Schreibweise', () => {
     const notes = [
       { id: '1', title: 'A', tags: ['workspace:cipher-mux'] },
     ] as unknown as NoteInfo[]
-    assert.equal(filterByWorkspace(notes, 'ws-b', 'projekt-b').length, 0)
+    assert.equal(filterByWorkspace(notes, 'ws-b', 'Projekt B').length, 0)
   })
 })

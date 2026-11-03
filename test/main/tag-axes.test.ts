@@ -20,7 +20,7 @@ import { EntityRegistry, registerBuiltinEntities } from '../../src/main/session/
 //
 // Gemessen war der Ist-Zustand ein anderer: 958 Notes, 14 Klassen, 269 Tags
 // ganz ohne Klasse. `kind` allein hatte 29 Werte, `workspace` dreizehn --
-// darunter "projekt-b" und "projekt-b" nebeneinander --, und unter
+// darunter "Projekt B" und "projekt b" nebeneinander --, und unter
 // `phase` standen Wellennummern.
 //
 // Der Grund ist der Weg: das Auto-Tagging fragt ein lokales Modell und

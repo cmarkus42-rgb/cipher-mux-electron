@@ -27,9 +27,6 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 
-/** Basis-URL des Gateways, wenn die Config nichts sagt. */
-export const DEFAULT_GATEWAY_URL = 'http://<gateway-host>:4000/v1'
-
 /** Datei mit dem Gateway-Schluessel. Bewusst im Home, nicht im Repo. */
 export const KEY_FILE = path.join(os.homedir(), '.cipher-litellm.env')
 
@@ -114,11 +111,11 @@ function getGatewayConfig(): { baseUrl: string; tier: string } {
     const { configStore } = require('../config/config-store')
     const llm = configStore.get('llm')
     return {
-      baseUrl: llm?.gatewayUrl || DEFAULT_GATEWAY_URL,
+      baseUrl: llm?.gatewayUrl ?? '',
       tier: llm?.gatewayTier || DEFAULT_TIER,
     }
   } catch {
-    return { baseUrl: DEFAULT_GATEWAY_URL, tier: DEFAULT_TIER }
+    return { baseUrl: '', tier: DEFAULT_TIER }
   }
 }
 
@@ -191,6 +188,13 @@ export async function gatewayChat(opts: {
   if (!key) {
     throw new LiteLlmError(
       `Kein Gateway-Schluessel. Erwartet wird ${KEY_NAMEN[0]} in ${KEY_FILE}.`,
+      true,
+    )
+  }
+
+  if (!baseUrl) {
+    throw new LiteLlmError(
+      `Kein Gateway konfiguriert. Erwartet wird LITELLM_BASE_URL in ${KEY_FILE}.`,
       true,
     )
   }

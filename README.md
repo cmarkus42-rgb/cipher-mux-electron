@@ -18,15 +18,15 @@
 
 <p align="center">
   <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cmarkus42-rgb/cipher-mux-electron/ci.yml?branch=main&label=CI&style=flat-square&labelColor=000000&color=F5F5EC"></a>
-  <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.14.4-0088A0?style=flat-square&labelColor=000000"></a>
-  <a href="#built-with-itself"><img alt="Tests" src="https://img.shields.io/badge/tests-3036%20green-00FF88?style=flat-square&labelColor=000000"></a>
+  <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.14.5-0088A0?style=flat-square&labelColor=000000"></a>
+  <a href="#built-with-itself"><img alt="Tests" src="https://img.shields.io/badge/tests-3038%20green-00FF88?style=flat-square&labelColor=000000"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="#install"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS%2012%2B-F5F5EC?style=flat-square&labelColor=000000"></a>
   <a href="CONTRIBUTING.md#maintenance-status"><img alt="Maintenance" src="https://img.shields.io/badge/maintenance-active-00FF88?style=flat-square&labelColor=000000"></a>
   <a href="#install"><img alt="Open Beta" src="https://img.shields.io/badge/status-open%20beta-0088A0?style=flat-square&labelColor=000000"></a>
 </p>
 
-<p align="center"><sub><b>v0.14.4</b> · open beta · feedback via <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/issues">Issues</a></sub></p>
+<p align="center"><sub><b>v0.14.5</b> · open beta · feedback via <a href="https://github.com/cmarkus42-rgb/cipher-mux-electron/issues">Issues</a></sub></p>
 
 ---
 
@@ -200,6 +200,19 @@ claude login
 > installs nor checks them — `src/main/setup/` and `src/main/util/dependency-check.ts` know only
 > the Claude Code CLI. If you point a role at Codex or opencode, install and authenticate that
 > CLI yourself.
+
+### Optional: LLM gateway for bug reports
+
+Bug reports can be tidied up by any OpenAI-compatible gateway such as litellm. Without one nothing
+is missing: the report goes out as dictated. To use it, create `~/.cipher-litellm.env`:
+
+```bash
+LITELLM_BASE_URL=http://your-gateway:4000
+LITELLM_MASTER_KEY=your-key
+```
+
+The token the MCP server uses is a different thing. The app generates it on first start and hands it
+to its sessions, so there is nothing to set.
 
 ### Linux & Windows
 

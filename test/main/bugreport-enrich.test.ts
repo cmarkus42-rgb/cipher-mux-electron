@@ -90,6 +90,15 @@ describe('litellm-Klient gegen einen echten Server', () => {
     assert.ok(letzteAnfrage.body, 'Anfrage kam nicht an — Pfad falsch zusammengesetzt')
   })
 
+  it('ohne konfigurierte Adresse: klarer Fehler, kein Netzzugriff', async () => {
+    // Der Mux kennt kein Standard-Gateway. Eine leere Adresse darf nicht als
+    // ungueltige URL hochfliegen; der Bugreport geht dann ohne Aufbereitung raus.
+    await assert.rejects(
+      () => gatewayChat({ system: 's', user: 'u', baseUrl: '', apiKey: 'k' }),
+      (e: unknown) => e instanceof LiteLlmError && e.permanent && /Kein Gateway konfiguriert/.test(e.message),
+    )
+  })
+
   it('ohne Schluessel wird gar nicht erst gefragt', async () => {
     modus = 'ok'
     letzteAnfrage = {}

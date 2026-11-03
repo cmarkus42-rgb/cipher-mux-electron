@@ -28,7 +28,7 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'warn',
         {
-          selector: 'Literal[value=/\\/Users\\/Shared\\/Cloud/]',
+          selector: 'Literal[value=/\\/Users\\/Shared/]',
           message: 'Use BRAND.* constants from src/shared/brand.ts instead of hardcoded cipher paths.',
         },
       ],

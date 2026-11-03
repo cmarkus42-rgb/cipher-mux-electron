@@ -137,7 +137,7 @@ Nicht nachgewiesen: dass der Fehler lange besteht. Wer ihn angeht, baut zuerst d
 
 ### 2.4 Der Workspace einer Handoff-Note sollte aus `anchor_repo` kommen
 
-Gefunden beim Anlegen dieser Übergabe: die Note landete in **projekt-b**, weil der
+Gefunden beim Anlegen dieser Übergabe: die Note landete in **Projekt B**, weil der
 Workspace gerade aktiv war — obwohl sie über cipher-mux geht. Die Regel
 (`resolveNoteWorkspaceId`) hat korrekt gearbeitet, das Ergebnis war trotzdem falsch.
 
@@ -176,7 +176,7 @@ wie die Achsen.
 
 Der Gegenbeweis für Freitext steht in der Messung: 958 Notes, 14 Tag-Klassen, `kind` mit 29
 Werten, 269 Tags ganz ohne Klasse, `workspace` als Anzeigename in 13 Schreibweisen — darunter
-„projekt-b" neben „projekt-b".
+„Projekt B" neben „projekt b".
 
 ### 3.2 `entity` ist eine Tatsache, die Phase eine Ableitung daraus
 

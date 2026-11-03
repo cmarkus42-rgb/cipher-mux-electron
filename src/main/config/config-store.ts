@@ -77,7 +77,7 @@ const defaults: AppConfig = {
     ollamaModel: 'gemma4:26b',
     // Gateway statt eigenem Modellzoo. Der Schluessel steht NICHT hier, sondern
     // in ~/.cipher-litellm.env — eine Config wandert in Backups und Logs.
-    gatewayUrl: 'http://<gateway-host>:4000/v1',
+    gatewayUrl: '',
     gatewayTier: 't3',
   },
   ui: {

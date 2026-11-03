@@ -5,7 +5,7 @@ Ausgelagert aus CLAUDE.md am 2026-10-24 (Kontext-Diät). Wer an dem LLM-Gateway 
 ## LLM-Aufrufe: das Gateway, nicht der eigene Zoo
 
 Seit dem 2026-10-02 gehen Modellaufrufe an das **litellm-Tier-Gateway auf gateway-host**
-(`http://<gateway-host>:4000/v1`, OpenAI-kompatibel), nicht mehr an einen im Mux gepflegten
+(OpenAI-kompatibel, Adresse und Schlüssel in `~/.cipher-litellm.env`), nicht mehr an einen im Mux gepflegten
 Ollama-Katalog. Der Grund ist nicht Bequemlichkeit: Jede Anwendung im Haus, die Host, Port und
 Modellnamen selbst hält, pflegt dieselbe Tabelle noch einmal — und sie altert in jeder einzeln.
 Das Gateway hat sie einmal (`litellm/config.yaml`).

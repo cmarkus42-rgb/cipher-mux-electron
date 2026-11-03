@@ -5,7 +5,7 @@
  *
  * Der Ist-Zustand war ein anderer, gemessen am selben Tag: 958 Notes,
  * 14 Klassen, 269 Tags ganz ohne Klasse. `kind` allein trug 29 Werte,
- * `workspace` dreizehn — darunter „projekt-b" und „projekt-b"
+ * `workspace` dreizehn — darunter „Projekt B" und „projekt b"
  * nebeneinander —, und unter `phase` standen Wellennummern.
  *
  * Der Grund liegt im Verfahren: Das Auto-Tagging fragt ein lokales Modell und
