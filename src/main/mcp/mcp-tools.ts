@@ -1966,7 +1966,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: {
         target: z.string().describe('Logical name of the popup/dialog'),
         action: z.enum(['open', 'close', 'toggle']).optional().describe('Action to perform (default: toggle)'),
-        context: z.record(z.unknown()).optional().describe('Additional context, e.g. { cell: "1-0", tab: "themes" }'),
+        context: z.record(z.string(), z.unknown()).optional().describe('Additional context, e.g. { cell: "1-0", tab: "themes" }'),
       },
     },
     async (args: { target: string; action?: 'open' | 'close' | 'toggle'; context?: Record<string, unknown> }) => {

@@ -46,7 +46,7 @@
     "lucide-preact": "^1.14.0",
     "react-i18next": "^17.0.4",
     "ulidx": "^2.4.0",
-    "zod": "^3.23.0"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.9.2",
