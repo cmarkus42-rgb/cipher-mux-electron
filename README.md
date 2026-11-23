@@ -508,6 +508,16 @@ tests, hands findings to the Debugger, and the cycle runs without a manual trigg
 
 All of these are valid choices. Pick what fits your workflow.
 
+### Sibling project: Coop Deck
+
+[Coop Deck](https://github.com/cmarkus42-rgb/coop-deck) comes from the same workbench and answers a
+different question. cipher-mux runs and coordinates many sessions; Coop Deck puts **one session next
+to one artifact** — a roadmap, a project sheet, a document, a running page — so that you and the
+agent work on the same thing. You mark a spot and say a sentence, the agent points back and asks,
+and what you decide stays in the project as plain files that the next session, or another CLI, can
+read. It works with Claude Code, Codex, opencode and pi, shares the tmux control-mode parser with
+cipher-mux, and is otherwise its own code base. The two do not depend on each other.
+
 ---
 
 ## FAQ
